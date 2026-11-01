@@ -1,0 +1,600 @@
+name: Weekly Argentum upgrade
+# Every Monday: move Arcana onto upstream Argentum's latest main, rebuild the engine, check every
+# imported card (custom cards, premade decks, the six official precons) and the full app test suite,
+# then open or refresh one draft PR into development. Nothing merges on its own.
+#
+# Two security domains (engine-upgrade/tests/test_weekly_workflow.py enforces them):
+#   validate  runs upstream's build scripts with a READ-ONLY token and no stored credentials. It can
+#             change nothing remotely; it uploads a candidate patch, its SHA-256 and the reports.
+#   publish   never runs upstream code. It verifies the candidate's hash and paths, then pushes the bot
+#             branch and opens/updates the PR or the conflict issue. Skipped entirely on dry runs.
+# Uses only GitHub-hosted Actions minutes on this public repo: no Copilot, no paid workers.
+on:
+  schedule:
+    - cron: '17 9 * * 1'   # Mondays 09:17 UTC = 03:17 Denver in summer (MDT), 02:17 in winter (MST)
+    # Backups: GitHub sometimes drops a scheduled run (2026-10-26). A later run that finds the upgrade
+    # already merged stops at "up to date"; one that finds it still open refreshes the same PR.
+    - cron: '47 14 * * 1'  # Mondays 14:47 UTC
+    - cron: '47 14 * * 2'  # Tuesdays 14:47 UTC
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Upstream commit (40 hex) or branch to upgrade to'
+        default: main
+  push:
+    # A push to the automation's own branch, or to a fix branch someone (Claude, or GPT covering) made
+    # from a red run's handoff notes, is a dry run: validate only, nothing published.
+    branches:
+      - claude/argentum-weekly-upgrade
+      - 'claude/argentum-weekly-fix-**'
+      - 'gpt/argentum-weekly-fix-**'
+permissions: {}
+concurrency:
+  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && github.ref || 'live' }}
+  cancel-in-progress: false
+env:
+  BASE: gpt/arcana-integration-next
+  UPSTREAM_URL: https://github.com/wingedsheep/argentum-engine
+  # No __pycache__ in the checkout: the candidate is built from it.
+  PYTHONDONTWRITEBYTECODE: '1'
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+    outputs:
+      status: ${{ steps.final.outputs.status }}
+      green: ${{ steps.report.outputs.green }}
+      base_sha: ${{ steps.base.outputs.sha }}
+      upstream_sha: ${{ steps.target.outputs.sha }}
+      candidate_sha256: ${{ steps.candidate.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || env.BASE }}
+          persist-credentials: false
+      - name: Record the exact Arcana base
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: The running workflow is the reviewed copy on the base
+        # A scheduled run uses main's copy of this file; the safety tests below read the base's copy.
+        # They must be the same file, or the tests would certify a workflow that is not the one running.
+        env:
+          RUNNING_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          f=.github/workflows/argentum-weekly-upgrade.yml
+          if [ "$RUNNING_SHA" != "$(git rev-parse HEAD)" ]; then
+            git fetch -q --depth=1 origin "$RUNNING_SHA"
+          fi
+          if ! git diff --exit-code "$RUNNING_SHA" HEAD -- "$f"; then
+            echo "::error title=Workflow drift::$f at $RUNNING_SHA differs from $BASE; sync main with the reviewed copy"
+            exit 1
+          fi
+      - name: Workflow safety checks
+        run: |
+          python3 -m pip install --quiet pyyaml
+          set +e
+          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
+            grep -E '^(FAIL|ERROR):|Error:|^AssertionError' "$RUNNER_TEMP/safety.log" | head -12 \
+              | while IFS= read -r line; do echo "::error title=Safety check::${line:0:900}"; done
+          fi
+          exit "$code"
+      - name: Keep the shipped card data for comparison
+        run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+      - name: Resolve the upstream target to an exact commit
+        id: target
+        env:
+          REQUESTED: ${{ inputs.target || 'main' }}
+        run: |
+          set -euo pipefail
+          if [[ "$REQUESTED" =~ ^[0-9a-f]{40}$ ]]; then sha="$REQUESTED"
+          else sha=$(git ls-remote "$UPSTREAM_URL" "refs/heads/$REQUESTED" | cut -f1); fi
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve upstream $REQUESTED"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Upstream target: $sha ($REQUESTED)"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ steps.target.outputs.sha }}
+          path: argentum-engine
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Rebase Arcana's patches onto upstream
+        id: rebase
+        env:
+          # A fix branch already pinned to the target is validated as-is instead of skipped.
+          WEEKLY_FORCE: ${{ github.event_name == 'push' && '1' || '' }}
+        run: |
+          set +e
+          python3 engine-upgrade/weekly.py rebase argentum-engine "${{ steps.target.outputs.sha }}"
+          code=$?
+          echo "status=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['status'])")" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 2 ]; then exit 0; fi  # 2 = conflict, reported as a status, not a crash
+          exit "$code"
+
+      - name: Prove the refreshed patches apply exactly to the target
+        id: audit
+        if: steps.rebase.outputs.status == 'rebased'
+        continue-on-error: true
+        run: |
+          git -C argentum-engine checkout -q -f "${{ steps.target.outputs.sha }}"
+          git -C argentum-engine clean -fdq
+          python3 engine-upgrade/audit_patches.py
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        if: steps.rebase.outputs.status == 'rebased'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build the four engine jars and export the card library
+        id: build
+        if: steps.rebase.outputs.status == 'rebased' && steps.audit.outcome == 'success'
+        continue-on-error: true
+        working-directory: argentum-engine
+        run: |
+          set -o pipefail
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run \
+            2>&1 | tee "$RUNNER_TEMP/engine-build.log"
+      - name: Collect engine build errors
+        if: steps.audit.outcome == 'failure' || steps.build.outcome == 'failure'
+        run: |
+          mkdir -p engine-upgrade/weekly
+          if [ "${{ steps.audit.outcome }}" = failure ]; then
+            python3 -c "import json;r=json.load(open('engine-upgrade/patch-report.json'));[print(p['patch'],p['status'],p['diagnostics'][:400]) for p in r['patches'] if p['status']!='applied']" \
+              > "$RUNNER_TEMP/engine-build.log" 2>&1 || echo 'strict patch audit failed' > "$RUNNER_TEMP/engine-build.log"
+          fi
+          { grep -E '^e: |^\* What went wrong|^> ' "$RUNNER_TEMP/engine-build.log" || tail -40 "$RUNNER_TEMP/engine-build.log"; } \
+            | sed -E 's#file://[^ ]*/argentum-engine/##' | head -60 > engine-upgrade/weekly/build-errors.txt
+          head -20 engine-upgrade/weekly/build-errors.txt | while IFS= read -r line; do echo "::error title=Engine build::${line:0:900}"; done
+      - name: Final status
+        id: final
+        env:
+          REBASE: ${{ steps.rebase.outputs.status }}
+          AUDIT: ${{ steps.audit.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          if [ "$REBASE" = rebased ] && { [ "$AUDIT" = failure ] || [ "$BUILD" = failure ]; }; then echo "status=build_failed" >> "$GITHUB_OUTPUT"
+          else echo "status=$REBASE" >> "$GITHUB_OUTPUT"; fi
+      - name: Install the new engine into the app
+        if: steps.final.outputs.status == 'rebased'
+        run: python3 engine-upgrade/weekly.py install argentum-engine
+      - name: Refresh agent docs for the new engine (vendored DSL docs, stated pin, SDK index)
+        id: docs
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          fail() {  # name the failing sub-step and its last lines as annotations, then stop
+            echo "::error title=Agent docs: $1::$(tail -5 "$RUNNER_TEMP/docs.log" | tr '\n' ' ' | cut -c1-900)"
+            exit 1
+          }
+          # Keep the previous engine's SDK index: reviews are re-bound only if no SDK member they name was removed.
+          cp docs/agents/generated/sdk-api.json "$RUNNER_TEMP/sdk-api.previous.json"
+          python3 engine-upgrade/weekly.py docs argentum-engine 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "weekly.py docs"
+          tools/cardkit/cardkit sdk-index 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit sdk-index"
+          # Reviews are bound to the engine JAR hash: carry the still-valid ones onto the new runtime
+          # (stale ones return to automatic card work). Older bases without the command skip it.
+          if tools/cardkit/cardkit restamp --help >/dev/null 2>&1; then
+            tools/cardkit/cardkit restamp --previous-sdk "$RUNNER_TEMP/sdk-api.previous.json" 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit restamp"
+          fi
+          tools/cardkit/cardkit docs-check 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit docs-check"
+          python3 -m unittest discover -s tools/cardkit/tests 2>&1 | tee "$RUNNER_TEMP/docs.log" || {
+            grep -E '^(FAIL|ERROR):' "$RUNNER_TEMP/docs.log" | head -5 | while IFS= read -r l; do echo "::error title=Cardkit test::$l"; done
+            fail "cardkit unit tests"
+          }
+
+      - name: Check every imported card against the new library
+        id: cards
+        if: steps.final.outputs.status == 'rebased'
+        run: |
+          set +e
+          python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        if: steps.final.outputs.status == 'rebased'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        if: steps.final.outputs.status == 'rebased'
+        with:
+          packages: platform-tools
+      - name: Android SDK
+        if: steps.final.outputs.status == 'rebased'
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Custom cards on the new engine (compile, export, scenario tests; collisions reconciled)
+        id: custom
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        # Every Arcana custom card is kept. Where Argentum now has the same card, its scenario tests pick
+        # which version is played (custom-overrides.txt, part of the candidate's assets).
+        run: python3 engine-upgrade/weekly.py reconcile
+      - name: App test suite on the new engine
+        id: app
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest \
+            :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Build a test APK
+        id: apk
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: B140 cards on the candidate engine (report only, never a merge gate)
+        id: b140
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        # Adoption-time compatibility: B140's entire custom-card set (read live from the branch, no card
+        # lists) compiled and scenario-tested on this candidate engine, in a scratch copy of the candidate's
+        # Android tree. Results inform a numbered build (B141 checklist); they never change green or merge.
+        env:
+          B140_BRANCH: gpt/b140-card-request-test-apk-20261028
+        run: |
+          set -uo pipefail
+          d="$RUNNER_TEMP/b140-overlay"; rm -rf "$d"; mkdir -p "$d"
+          git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$B140_BRANCH" >/dev/null 2>&1 || { echo 'B140 fetch failed'; exit 1; }
+          b140=$(git rev-parse FETCH_HEAD)
+          cp -a android "$d/android" && rm -rf "$d/android/custom-cards/src" "$d/android/custom-cards/build"
+          git archive FETCH_HEAD android/custom-cards/src | tar -x -C "$d"
+          ( cd "$d/android" && ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test \
+              --tests 'com.arcanatable.customcards.*ScenarioTest' ) > "$RUNNER_TEMP/b140.log" 2>&1
+          code=$?
+          python3 - "$d/android/custom-cards/build/test-results/test" "$RUNNER_TEMP/b140.log" "$b140" "$code" <<'EOF'
+          import json, pathlib, re, sys, xml.etree.ElementTree as ET
+          res, log, sha, code = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+          cards = {}
+          for f in sorted(res.glob('*.xml')) if res.is_dir() else []:
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  card = re.sub(r'ScenarioTest$', '', tc.get('classname', '').rsplit('.', 1)[-1])
+                  bad = tc.find('failure') is not None or tc.find('error') is not None
+                  c = cards.setdefault(card, {'tests': 0, 'failed': []})
+                  c['tests'] += 1
+                  if bad: c['failed'].append(tc.get('name', '?'))
+          errors = [l.strip() for l in log.read_text(errors='replace').splitlines() if l.startswith('e: ')][:15]
+          failing = sorted(k for k, v in cards.items() if v['failed'])
+          out = pathlib.Path('engine-upgrade/weekly'); out.mkdir(parents=True, exist_ok=True)
+          (out / 'b140.json').write_text(json.dumps({'b140': sha, 'exit': code, 'cards': cards, 'compileErrors': errors}, indent=1))
+          lines = ['### B140 cards on this engine (report only)', '',
+                   f'B140 `{sha[:10]}` custom-card scenario tests on the candidate engine. Not a merge gate: '
+                   'this informs the next numbered build (B141 checklist in `docs/stabilization/CONTROL-PLAN.md`).', '']
+          if errors and not cards:
+              lines += ['❌ **B140 cards do not compile on this engine:**', '', '```', *errors, '```']
+          elif not cards:
+              lines += [f'⚠️ No results (Gradle exit {code}); see the run log.']
+          else:
+              lines += [f"{'✅' if not failing else '❌'} {len(cards) - len(failing)} of {len(cards)} B140 cards pass "
+                        f"({sum(v['tests'] for v in cards.values())} scenarios)."]
+              lines += [f"- **{k}**: {', '.join(cards[k]['failed'][:4])}" for k in failing[:30]]
+          (out / 'b140.md').write_text('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+          EOF
+      - name: Count test results
+        if: steps.final.outputs.status == 'rebased'
+        run: python3 engine-upgrade/weekly.py summary android
+
+      - name: Write the report
+        id: report
+        if: always() && steps.final.outputs.status != 'up_to_date' && steps.final.outputs.status != ''
+        env:
+          REBASE: ${{ steps.final.outputs.status }}
+          CARDS: ${{ steps.cards.outputs.code }}
+          CUSTOM: ${{ steps.custom.outcome }}
+          APP: ${{ steps.app.outcome }}
+          APK: ${{ steps.apk.outcome }}
+          DOCS: ${{ steps.docs.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          w = pathlib.Path('engine-upgrade/weekly')
+          r = json.loads((w / 'rebase.json').read_text())
+          env = os.environ
+          head = (f"Upstream `{r['old_pin'][:10]}` → `{r['target']}` ({r.get('upstream_commits', '?')} upstream commits), "
+                  f"on Arcana `{env['BASE_SHA']}`.")
+          if env['REBASE'] == 'conflict':
+              green, title = False, 'Weekly Argentum upgrade blocked: patch conflict'
+              body = [head, '', (w / 'rebase.md').read_text()]
+          elif env['REBASE'] == 'build_failed':
+              green, title = False, 'Weekly Argentum upgrade blocked: engine build failed'
+              errors = (w / 'build-errors.txt').read_text().strip() if (w / 'build-errors.txt').is_file() else '(no output captured)'
+              body = [head, '', 'The patches merged as text, but the patched engine does not compile: upstream changed '
+                      'code an Arcana patch depends on. Fix the patch (engine lane), record any conflict resolution, '
+                      'and re-run.', '', '```', errors, '```']
+          else:
+              t = json.loads((w / 'tests.json').read_text())
+              checks = {
+                  'Patches rebased and pass the strict audit': True,
+                  'Imported cards: every premade-deck and precon card still resolves': env['CARDS'] == '0',
+                  'Custom cards compile and pass scenario + data tests on the new engine (collisions reconciled)': env['CUSTOM'] == 'success',
+                  'App test suite': env['APP'] == 'success',
+                  'Test APK builds': env['APK'] == 'success',
+                  'Agent docs and cardkit current on the new engine (SDK index, vendored docs, pin)': env['DOCS'] == 'success',
+              }
+              green = all(checks.values())
+              title = f"Weekly Argentum upgrade to {r['target'][:10]}" + ('' if green else ' (needs work)')
+              patches = r['patches']
+              retired = [p['patch'] for p in patches if p['status'] != 'refreshed']
+              body = [head, '', '| Check | Result |', '|---|---|']
+              body += [f"| {k} | {'✅' if v else '❌'} |" for k, v in checks.items()]
+              body += ['', f"Tests: {t['tests']} run, {t['failures'] + t['errors']} failed, {t['skipped']} skipped."]
+              if t['failed']:
+                  body += ['', '<details><summary>Failing tests</summary>', ''] + [f'- `{x}`' for x in t['failed']] + ['', '</details>']
+              body += ['', f"Patches: {len(patches) - len(retired)} refreshed" +
+                       (f"; retired because upstream now has them: {', '.join(retired)}" if retired else '') + '.']
+              auto = w / 'auto-resolved.md'
+              if auto.is_file() and auto.read_text().strip():
+                  body += ['', auto.read_text()]
+              body += ['', (w / 'cards.md').read_text()]
+              rec = w / 'reconcile.md'
+              if rec.is_file():
+                  body += ['', rec.read_text()]
+              b140 = w / 'b140.md'
+              if b140.is_file():
+                  body += ['', b140.read_text()]
+              body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
+                       'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. A green PR means the checks above passed, '
+                       'not that every card is Oracle-correct. Debug APK: see the run artifacts.']
+          if not green:
+              import subprocess
+              kind = env['REBASE'] if env['REBASE'] in ('conflict', 'build_failed') else 'needs_work'
+              subprocess.run(['python3', 'engine-upgrade/weekly.py', 'handoff', kind, r['target'], env['RUN_URL']],
+                             check=True, capture_output=True)
+              body += ['', (w / 'handoff.md').read_text()]
+          body += ['', f"Run: {env['RUN_URL']}", '',
+                   'Owner approves the merge. Engine conflicts and failing engine-facing tests go to Claude\'s lane; '
+                   'card regressions to GPT (issue #81).']
+          (w / 'title.txt').write_text(title)
+          (w / 'body.md').write_text('\n'.join(body) + '\n')
+          with open(env['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"green={'true' if green else 'false'}\n")
+          with open(env['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write(f"## {title}\n\n" + '\n'.join(body) + '\n')
+          # The headline also as annotations, readable from the run page and the checks API.
+          clean = lambda x: str(x).replace('%', '%25').replace('\r', '').replace('\n', ' ')[:900]
+          print(f"::notice title=Weekly upgrade::{clean(title)}")
+          if env['REBASE'] == 'rebased':
+              print("::notice title=Checks::" + clean('; '.join(f"{k}: {'pass' if v else 'FAIL'}" for k, v in checks.items())))
+              for name in t['failed'][:8]:
+                  print(f"::error title=Failing test::{clean(name)}")
+              cards = json.loads((w / 'cards.json').read_text())
+              rec = w / 'reconcile.json'
+              if rec.is_file():
+                  rr = json.loads(rec.read_text())
+                  if rr['collisions']:
+                      print("::notice title=Custom cards reconciled::" + clean(
+                          f"Argentum's version played: {', '.join(rr['argentum_in_play']) or 'none'}; "
+                          f"Arcana's kept: {', '.join(rr['arcana_kept']) or 'none'}"))
+              for d in cards.get('precons', []):
+                  if d['newly_missing']:
+                      print(f"::warning title=Precon slots lost ({clean(d['name'])})::" + clean(', '.join(d['newly_missing'])))
+          PY
+      - name: Package the candidate (local only, nothing pushed)
+        id: candidate
+        if: steps.final.outputs.status == 'rebased' || steps.final.outputs.status == 'build_failed'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/candidate"
+          git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum \
+            docs/agents/generated/sdk-api.md docs/agents/generated/sdk-api.json docs/agents/argentum-upstream \
+            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py tools/cardkit/data/verified-support.json
+          git reset -q -- engine-upgrade/weekly engine-upgrade/patch-report.json
+          git reset -q -- ':(glob)**/__pycache__/**'
+          git diff --cached --binary > "$RUNNER_TEMP/candidate/candidate.patch"
+          sum=$(sha256sum "$RUNNER_TEMP/candidate/candidate.patch" | cut -d' ' -f1)
+          echo "sha256=$sum" >> "$GITHUB_OUTPUT"
+          echo "Candidate patch sha256: $sum"
+      - name: Stage reports for upload
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/candidate"
+          cp -r engine-upgrade/weekly "$RUNNER_TEMP/candidate/" 2>/dev/null || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: argentum-weekly-candidate
+          retention-days: 14
+          path: ${{ runner.temp }}/candidate/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.final.outputs.status == 'rebased'
+        with:
+          name: argentum-weekly-evidence
+          retention-days: 14
+          path: |
+            engine-upgrade/patch-report.json
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Fail the dry run when the upgrade is blocked
+        if: always() && github.event_name == 'push' && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
+        run: |
+          cat engine-upgrade/weekly/body.md
+          echo '::error::Upgrade blocked (${{ steps.final.outputs.status }}); see the job summary'
+          exit 1
+
+  publish:
+    needs: validate
+    # Never on a dry run (push); never when already up to date.
+    if: github.event_name != 'push' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      BOT_BRANCH: bot/argentum-weekly
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.validate.outputs.base_sha }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: argentum-weekly-candidate
+          path: ${{ runner.temp }}/candidate
+      - name: Verify the candidate before using it
+        if: needs.validate.outputs.status == 'rebased' || needs.validate.outputs.status == 'build_failed'
+        env:
+          EXPECTED: ${{ needs.validate.outputs.candidate_sha256 }}
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/candidate/candidate.patch"
+          echo "$EXPECTED  $patch" | sha256sum -c -
+          # Quick pre-check on the patch text: every file header must be a plain, in-scope path.
+          python3 - "$patch" <<'PY'
+          import re, sys
+          allowed = ('argentum-patches/', 'engine-upgrade/forward-ports/', 'engine-upgrade/audit_patches.py',
+                     'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
+                     'android/app/src/main/assets/argentum/', 'docs/agents/generated/sdk-api.',
+                     'docs/agents/argentum-upstream/', 'AGENTS.md', 'docs/agents/CARD-WORKFLOW.md',
+                     'tools/cardkit/cardkit_lib/repo.py', 'tools/cardkit/data/verified-support.json')
+          text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
+          headers = re.findall(r'^diff --git .*$', text, re.M)
+          pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]
+          paths = {p for m in pairs if m for p in m.groups()}
+          bad = sorted(p for p in paths if not p.startswith(allowed) or '..' in p)
+          if bad or not paths or not all(pairs):
+              sys.exit(f'Candidate touches paths outside the upgrade scope: {bad or headers or "none at all"}')
+          print(f'{len(paths)} paths, all inside the upgrade scope')
+          PY
+          # The authoritative check runs on git's staged index (next step), from this trusted copy.
+          cp engine-upgrade/candidate_scope.py "$RUNNER_TEMP/candidate_scope.py"
+      - name: Apply the candidate and check what it changed
+        if: needs.validate.outputs.status == 'rebased' || needs.validate.outputs.status == 'build_failed'
+        run: |
+          set -euo pipefail
+          git checkout -q -B "$BOT_BRANCH"
+          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/candidate/candidate.patch"
+          python3 -I "$RUNNER_TEMP/candidate_scope.py"
+      - name: Push the upgrade branch
+        if: needs.validate.outputs.status == 'rebased' || needs.validate.outputs.status == 'build_failed'
+        run: |
+          set -euo pipefail
+          bot_email='41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions[bot]'
+          git config user.email "$bot_email"
+          git commit -q -F - <<EOF
+          $(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
+
+          Upstream ${{ needs.validate.outputs.upstream_sha }}
+          Validated in run ${{ github.run_id }}; candidate sha256 ${{ needs.validate.outputs.candidate_sha256 }}
+          Automated by .github/workflows/argentum-weekly-upgrade.yml
+          EOF
+          # Replace the bot branch only if it is absent or still exactly the automation's own previous
+          # commit (bot author, our trailer). Anything else on it is someone's work: stop, don't overwrite.
+          remote=$(git ls-remote origin "refs/heads/$BOT_BRANCH" | cut -f1)
+          if [ -n "$remote" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/$remote" --jq '[.commit.author.email, .commit.committer.email, (.commit.message | contains("Automated by .github/workflows/argentum-weekly-upgrade.yml"))] | @tsv')
+            if [ "$tip" != "$(printf '%s\t%s\ttrue' "$bot_email" "$bot_email")" ]; then
+              echo "::error title=Bot branch has other work::$BOT_BRANCH is at $remote, which this workflow did not write; not overwriting"
+              exit 1
+            fi
+          fi
+          # The lease pins the exact head we just inspected (empty = branch must not exist yet).
+          git push --force-with-lease="refs/heads/$BOT_BRANCH:$remote" origin "HEAD:refs/heads/$BOT_BRANCH"
+      - name: Open or refresh the draft PR
+        if: needs.validate.outputs.status == 'rebased'
+        run: |
+          set -uo pipefail
+          w="$RUNNER_TEMP/candidate/weekly"
+          title=$(cat "$w/title.txt")
+          number=$(gh pr list --head "$BOT_BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file "$w/body.md"
+          elif ! url=$(gh pr create --draft --head "$BOT_BRANCH" --base "$BASE" --title "$title" --body-file "$w/body.md"); then
+            # Repo setting may forbid Actions from opening PRs; fall back to an issue with a compare link.
+            printf '\n[Open the PR](%s/%s/compare/%s...%s?expand=1)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$BASE" "$BOT_BRANCH" >> "$w/body.md"
+            issue=$(gh issue create --title "$title" --body-file "$w/body.md") && number=${issue##*/}
+          else
+            number=${url##*/}
+          fi
+          note=""
+          if [ "${{ needs.validate.outputs.green }}" != true ]; then
+            note=" Not green: handoff notes in the PR (Claude's engine lane; GPT finishes if Claude is unavailable; card decisions are GPT's)."
+          fi
+          gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).$note" || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+        id: pr
+      - name: Merge a green upgrade into the integration branch
+        # Owner decision (2026-10-26): fully automated. Only a green run merges, only into $BASE (never
+        # main, never a release); the PR (or issue) body records every check and each custom-card choice.
+        # Repo settings may forbid Actions from opening PRs, so this merges the bot branch directly.
+        if: needs.validate.outputs.status == 'rebased' && needs.validate.outputs.green == 'true'
+        env:
+          NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -uo pipefail
+          title=$(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/merges" -f base="$BASE" -f head="$BOT_BRANCH" \
+               -f commit_message="Merge $title (run $GITHUB_RUN_ID)" >/dev/null; then
+            gh issue comment 81 --body "**$title** was green and has been merged into \`$BASE\` automatically ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)." || true
+            if [ -n "$NUMBER" ]; then gh issue close "$NUMBER" --comment "Merged automatically into \`$BASE\`." || true; fi
+          else
+            echo "::warning title=Auto-merge::Could not merge $BOT_BRANCH into $BASE; it stays for a manual merge."
+            gh issue comment 81 --body "**$title** is green but could not be merged into \`$BASE\` automatically; please merge \`$BOT_BRANCH\`." || true
+          fi
+      - name: Report a blocked upgrade
+        # Both get an issue with handoff notes, never a PR: a failed build's refreshed patches and pins (no
+        # jars) were pushed to the bot branch above as the place a fix starts, but must not be mergeable.
+        if: needs.validate.outputs.status == 'conflict' || needs.validate.outputs.status == 'build_failed'
+        run: |
+          w="$RUNNER_TEMP/candidate/weekly"
+          title=$(cat "$w/title.txt")
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then gh issue comment "$number" --body-file "$w/body.md"
+          else gh issue create --title "$title" --body-file "$w/body.md"; fi
+          gh issue comment 81 --body "**$title** ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Handoff notes in the issue: Claude's engine lane; GPT finishes if Claude is unavailable." || true
+
+  verdict:
+    # The run's own result: green only when the upgrade is green (or there was nothing to do). A dry run
+    # or a live run that found failing tests, a collision, a conflict or a broken build ends red, even
+    # though the live run still published its draft PR or issue for people to act on.
+    needs: [validate, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # issues: write only to post the #81 notice below. This job checks out nothing and runs no repo code.
+    permissions:
+      issues: write
+    steps:
+      - name: Tell issue 81 when a live run failed without publishing anything
+        # publish already posts to #81 whenever it ran (PR, conflict or build-failure issue). This covers
+        # the rest: validation broke (drift check, infrastructure, a crash) or publish itself failed.
+        if: always() && github.event_name != 'push' && (needs.validate.result != 'success' || (needs.publish.result != 'success' && needs.publish.result != 'skipped'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          STATUS: ${{ needs.validate.outputs.status }}
+        run: |
+          gh issue comment 81 --repo "$GITHUB_REPOSITORY" --body "Weekly Argentum upgrade **did not complete** (validate: $VALIDATE, publish: $PUBLISH, status: ${STATUS:-none}). Nothing was published. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Engine lane (Claude) to triage."
+      - name: Overall result
+        env:
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          STATUS: ${{ needs.validate.outputs.status }}
+          GREEN: ${{ needs.validate.outputs.green }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT"
+          if [ "$VALIDATE" != success ]; then echo "::error::Validation did not finish successfully ($VALIDATE)"; exit 1; fi
+          if [ "$STATUS" = up_to_date ]; then echo 'Already on the latest upstream; nothing to do.'; exit 0; fi
+          if [ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on a dry run ($PUBLISH)"; exit 1; fi
+          if [ "$EVENT" != push ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
+          if [ "$STATUS" != rebased ] || [ "$GREEN" != true ]; then
+            echo "::error::Upgrade not green (status=$STATUS, green=$GREEN); see the validate job summary"; exit 1
+          fi
+          echo 'Upgrade green.'

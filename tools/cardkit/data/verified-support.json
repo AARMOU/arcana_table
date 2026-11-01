@@ -1,0 +1,622 @@
+{
+  "_about": "Engineer-reviewed support decisions. reviewedLines preserve literal rules wording and name implemented primitives. Each reviewed entry records the exact evidence base SHA and hashes of the full Oracle rules record and adopted runtime/SDK JARs. A rules or runtime change invalidates the decision; unrelated card commits do not. Source review authorizes candidate implementation only, never certification or integration.",
+  "cards": {
+    "Eldrazi Displacer": {
+      "summary": "exile-then-return is Effects.Move(→EXILE) then Effects.Move(→BATTLEFIELD) (upstream Emiel the Blessed); Effects.Move takes a tapped flag (sdk-api.md, card-sdk-language-reference 'tapped = true'); {C} in an activation cost is ordinary mana",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2017-2022/.../jmp/cards/EmielTheBlessed.kt"
+      ]
+    },
+    "Forsaken Monument": {
+      "summary": "AdditionalManaOnSourceTap(sourceFilter, whenProducing = TappedForManaType.COLORLESS) takes any GameObjectFilter, so Permanent.youControl() replaces Ultima's Land.youControl(); colorless filter is GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless) (tested custom Skittering Cicada)",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2025/.../fin/cards/UltimaOriginOfOblivion.kt",
+        "android/custom-cards/.../cards/SkitteringCicada.kt"
+      ]
+    },
+    "Abstruse Archaic": {
+      "summary": "TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl().abilitySourceMatches(filter) takes any GameObjectFilter (Echo uses Creature; reference lists Artifact too); colorless via CardPredicate.IsColorless; mana abilities are untargetable by construction",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2026/.../msh/cards/EchoPerceptiveProdigy.kt"
+      ]
+    },
+    "Darksteel Monolith": {
+      "summary": "MayCastWithoutPayingManaCost(controllerOnly, spellFilter, oncePerTurn, fromZones) — Warped Space uses oncePerTurn + fromZones={EXILE}; here spellFilter = colorless (CardPredicate.IsColorless), fromZones = {HAND}. Paying {0} rather than the mana cost is the same alternative cost",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2024/.../dsk/cards/CharredFoyerWarpedSpace.kt",
+        "docs/agents/argentum-upstream/sdk-index.md MayCastWithoutPayingManaCost"
+      ]
+    },
+    "Ancient Stone Idol": {
+      "summary": "Dies trigger: Triggers.self.dies() + Effects.CreateToken(power=6, toughness=12, creatureTypes={Construct}, keywords={TRAMPLE}, artifactToken=true); same shape as Thopter Mechanic with different stats/keyword",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/bro/cards/ThopterMechanic.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this creature dies, create a 6/12 colorless Construct artifact creature token with trample.",
+          "primitives": [
+            "Triggers.self.dies",
+            "Effects.CreateToken(artifactToken = true)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "0430c73af957c16936fca2d0150fb3cedb2af824a2d983103948dc3175f5e3d0",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Marneus Calgar": {
+      "summary": "Activated {6}: Effects.CreateToken(count=2, power=2, toughness=2, colors={WHITE}, creatureTypes={Astartes, Warrior}, keywords={VIGILANCE}); Call the Cavalry's effect as an activated ability",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dom/cards/CallTheCavalry.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Chapter Master — {6}: Create two 2/2 white Astartes Warrior creature tokens with vigilance.",
+          "primitives": [
+            "activatedAbility",
+            "Effects.CreateToken(count = 2)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "9ea1226afa0d32a700ed917f61a5956ec023cf43fec5ebb15e451dc8b843a756",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Thunderhawk Gunship": {
+      "summary": "ETB: Triggers.self.enters() + Effects.CreateToken(count=2, 2/2, WHITE, {Astartes, Warrior}, {VIGILANCE}); Soul of Migration's trigger with Call the Cavalry's token",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh2/cards/SoulOfMigration.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dom/cards/CallTheCavalry.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this Vehicle enters, create two 2/2 white Astartes Warrior creature tokens with vigilance.",
+          "primitives": [
+            "Triggers.self.enters",
+            "Effects.CreateToken(count = 2)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "8f141c4009468cca3f2009b2579a7cc201c49723bd3807d55846eff8005e1533",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Be'lakor, the Dark Master": {
+      "summary": "Triggers.another(GameObjectFilter.Creature.withSubtype(Demon).youControl()).enters() (Champion of the Path) + Effects.DealDamage(DynamicAmounts.triggeringPower(), target(Targets.Any), damageSource = EffectTarget.TriggeringEntity) (Warstorm Surge)",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ecl/cards/ChampionOfThePath.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/m12/cards/WarstormSurge.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Lord of Torment — Whenever another Demon you control enters, it deals damage equal to its power to any target.",
+          "primitives": [
+            "Triggers.another(...withSubtype...youControl()).enters",
+            "DynamicAmounts.triggeringPower",
+            "damageSource = EffectTarget.TriggeringEntity"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "7202ea2cbdfd23153efa3a4047f006bcf930b740c1d276650ec0df0b83354223",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Kill! Maim! Burn!": {
+      "summary": "Mode: target(Targets.Player) + Effects.DealDamage(3, t); Flame Jet uses Targets.PlayerOrPlaneswalker, Requisition Raid shows Targets.Player; choose-one-or-more modal already matched",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/uds/cards/FlameJet.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/RequisitionRaid.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "• Kill! Maim! Burn! deals 3 damage to target player.",
+          "primitives": [
+            "Targets.Player",
+            "Effects.DealDamage"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "777a9ade22c6399ce0713e47535efa8540d314cf619c5041dd6616d8f7b8f610",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Collective Effort": {
+      "summary": "Mode is Requisition Raid's third mode verbatim: target(Targets.Player) + Effects.ForEachInGroup(GroupFilter(GameObjectFilter.Creature.targetPlayerControls(player)), AddCounters(+1/+1, 1, IterationEntity)); Escalate and the other modes matched",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/RequisitionRaid.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "• Put a +1/+1 counter on each creature target player controls.",
+          "primitives": [
+            "Effects.ForEachInGroup",
+            "GameObjectFilter.Creature.targetPlayerControls"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "743804b71a860717671e47f3ee7b3579e702ae928f0462312d8c50498a8dc2a2",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Mirrorpool": {
+      "summary": "Activated {4}{C}, {T}, sacrifice this land: Effects.CreateTokenCopyOfTarget(target(TargetFilter.CreatureYouControl)) (Self-Reflection), with the same tap+sacrifice-self land cost shape as its matched spell-copy line",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/lci/cards/SelfReflection.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "{4}{C}, {T}, Sacrifice this land: Create a token that's a copy of target creature you control.",
+          "primitives": [
+            "Effects.CreateTokenCopyOfTarget",
+            "TargetFilter.CreatureYouControl"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "a18679acde76a50e29fb69802a28a3addec8baeec5b49ee6e15803fec93d8b30",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Illuminor Szeras": {
+      "summary": "Mana ability: Costs.Composite(Costs.Tap, Costs.SacrificeAnother(GameObjectFilter.Creature)) (Bolg's Company) + Effects.AddMana(BLACK, DynamicAmounts.manaValueOf(EffectTarget.SacrificedAsCost(0))) (Priest of Yawgmoth). Scenario test must assert X = sacrificed creature's mana value with SacrificeAnother",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/hob/cards/BolgsCompany.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/atq/cards/PriestOfYawgmoth.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Secrets of the Soul — {T}, Sacrifice another creature: Add an amount of {B} equal to the sacrificed creature's mana value.",
+          "primitives": [
+            "Costs.SacrificeAnother",
+            "DynamicAmounts.manaValueOf(EffectTarget.SacrificedAsCost(0))"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "20532c4d8ba4db7eb8e67ef214b505642d28245c301151341dc31dee8cfccb14",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Knuckles the Echidna": {
+      "summary": "Treasure Hunter is an ability word (no rules meaning, CR 207.2c); 'Treasure' in Scryfall keywords is the token type, created by Effects.CreateTreasure (Professional Face-Breaker, 1.00 match). The win line is an upkeep intervening-if trigger: Inventors' Fair's YouControlAtLeast(N, Artifact) condition with Simic Ascendancy's WinGame effect.",
+      "verifiedBy": "Claude, 2026-10-31: read pinned upstream sources of Inventors' Fair, Simic Ascendancy and Professional Face-Breaker; all members present in docs/agents/generated/sdk-api.md",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/kld/cards/InventorsFair.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/SimicAscendancy.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Treasure Hunter — At the beginning of your upkeep, if you control thirty or more artifacts, you win the game.",
+          "primitives": [
+            "Triggers.you.beginningOf(Step.UPKEEP)",
+            "interveningIf=Conditions.YouControlAtLeast(30",
+            "GameObjectFilter.Artifact)",
+            "Effects.WinGame(EffectTarget.Controller)"
+          ]
+        }
+      ],
+      "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
+      "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Acolyte Hybrid": {
+      "summary": "Heavy Rock Cutter is an ability word. Attack trigger with up to one target artifact = Kellan, Inquisitive Prodigy. 'If an artifact is destroyed this way, its controller draws' = the pinned destroy-outcome pipeline: gather(ChosenTargets) -> moveTracked(MoveType.Destroy) (indestructible/regenerated/removed targets drop out) -> ifNotEmpty(destroyed) -> ForEachPlayer(Player.ControllerOf(target)) draw 1, exactly as Dire Strain Rampage ('its controller') and Break the Spell ('destroyed this way, draw'). The #141 Priority A blocker (unverified) is disproven; the 'outcome of a specific destroy' pattern blocker is removed.",
+      "verifiedBy": "Claude, 2026-10-31: read the pinned (7fb07333) sources of Kellan, Dire Strain Rampage and Break the Spell; gather/moveTracked/ifNotEmpty/CardSource$ChosenTargets/MoveType present in the committed SDK jar and sdk-api.md",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mkm/cards/KellanInquisitiveProdigy.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mid/cards/DireStrainRampage.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/woe/cards/BreakTheSpell.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Heavy Rock Cutter — Whenever this creature attacks, destroy up to one target artifact. If an artifact is destroyed this way, its controller draws a card.",
+          "primitives": [
+            "Triggers.self.attacks()",
+            "target(TargetFilter.Artifact",
+            "optional = true)",
+            "Effects.Pipeline{gather(CardSource.ChosenTargets)}",
+            "moveTracked(CardDestination.ToZone(Zone.GRAVEYARD)",
+            "moveType = MoveType.Destroy)",
+            "ifNotEmpty(destroyed)",
+            "Effects.ForEachPlayer(Player.ControllerOf(target)",
+            "Effects.DrawCards(1))"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Armory Automaton": {
+      "summary": "Triggers.or combines self-enters and self-attacks; Effects.May supplies the resolution choice. Super-Soldier Serum uses zero-or-more Equipment targets and processes each with ForEachTarget and AttachTargetEquipmentToCreature. Shagrat confirms Equipment need not be controlled by this source and attachment does not change control.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/msh/cards/SuperSoldierSerum.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/ShagratLootBearer.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpittingDilophosaurus.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RoccoCabarettiCaterer.kt",
+        "docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Whenever this creature enters or attacks, you may attach any number of target Equipment to it.",
+          "primitives": [
+            "Triggers.or",
+            "Triggers.self.enters",
+            "Triggers.self.attacks",
+            "Effects.May",
+            "TargetObject(unlimited=true)",
+            "Effects.ForEachTarget",
+            "Effects.AttachTargetEquipmentToCreature"
+          ]
+        }
+      ],
+      "baseSha": "45c62f77393a34105469deb5436785375ffe17c9",
+      "oracleHash": "eda0d6c9d963e00f38ce698ec35a378bb0ca05c474131c3b8dc10352cb49bdb8",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Dragon's Rage Channeler": {
+      "summary": "Conditions.Delirium with four distinct card types gates conditional stat and keyword abilities in The Swarmweaver; MustAttack is Battle-Mad Ronin's attacks-each-combat ability.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dsk/cards/TheSwarmweaver.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2003-2007/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/chk/cards/BattleMadRonin.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Delirium — As long as there are four or more card types among cards in your graveyard, this creature gets +2/+2, has flying, and attacks each combat if able.",
+          "primitives": [
+            "Conditions.Delirium()",
+            "ModifyStats",
+            "GrantKeyword(Keyword.FLYING)",
+            "MustAttack()"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "aacbe1c9180ea8d934acf8f40798f64452bfc981a84c42b8492ff2273de444d2",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Monstrous Onslaught": {
+      "summary": "Capture the battlefield greatest-power amount as the spell is cast, then read capturedAtCast as DividedDamage.dynamicTotal; cap any-number target selection by that same maxPower. Traverse the Outlands exercises maxPower, Undercity Upheaval proves cast-time amount capture and announcement, and Chandra proves divided damage among targets.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mat/cards/UndercityUpheaval.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/UndercityUpheavalScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/fdn/cards/ChandraFlameshaper.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ChandraFlameshaperScenarioTest.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Monstrous Onslaught deals X damage divided as you choose among any number of target creatures, where X is the greatest power among creatures you control as you cast this spell.",
+          "primitives": [
+            "captureAtCast",
+            "DynamicAmounts.capturedAtCast",
+            "DynamicAmounts.battlefield.maxPower",
+            "Effects.DividedDamage",
+            "dynamicMaxCount"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "452abb7610483ac128e8f5980c884986bb7b838b507081bdaee2fa7544e835ca",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Tangleweave Armor": {
+      "summary": "Dynamic equipped-creature stats use GrantDynamicStats and Filters.EquippedCreature (Cranial Plating scenario-tested). Aggregate each commander-filtered zone's greatest mana value with DynamicAmounts.battlefield/zone(...).maxManaValue(), then combine zone values with DynamicAmounts.max; Zone.COMMAND, commander filtering, and zone aggregations are supported by the committed SDK API. Emissary Escort, Boon of Boseiju, and Wick's Patrol implement the constituent dynamic-stat and max-mana-value patterns; Akroma's Will scenario-tests commander filtering.",
+      "verifiedBy": "Copilot, inspected pinned Argentum sources, committed SDK API, and custom scenario tests 2026-10-31",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/eoe/cards/EmissaryEscort.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/neo/cards/BoonOfBoseiju.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blb/cards/WicksPatrol.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AkromasWillScenarioTest.kt",
+        "docs/agents/generated/sdk-api.md",
+        "docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Equipped creature gets +X/+X, where X is the greatest mana value among your commanders.",
+          "primitives": [
+            "GrantDynamicStats",
+            "Filters.EquippedCreature",
+            "DynamicAmounts.max",
+            "DynamicAmounts.battlefield.maxManaValue",
+            "DynamicAmounts.zone.maxManaValue",
+            "GameObjectFilter.commander",
+            "Zone.COMMAND"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "98b3957af8f25d1d493e967d67cbc1a8591d854c55e84ed7d675c7ab1963b7dc",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Whiptongue Hydra": {
+      "summary": "ETB: Triggers.self.enters() + Effects.DestroyAll(GameObjectFilter.Creature.withKeyword(Keyword.FLYING), storeDestroyedAs = collection) then Effects.AddDynamicCounters(PLUS_ONE_PLUS_ONE, collection.count, Self), as in Bane of Progress; Squall and Plummet show the flying filter",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (pinned Argentum engine c1c04ca3265c61df913af6db65460ad4ce409614)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/c13/cards/BaneOfProgress.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/s99/cards/Squall.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/arc/cards/Plummet.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this creature enters, destroy all creatures with flying. Put a +1/+1 counter on this creature for each creature destroyed this way.",
+          "primitives": [
+            "Triggers.self.enters",
+            "GameObjectFilter.Creature.withKeyword(Keyword.FLYING)",
+            "Effects.DestroyAll(GameObjectFilter",
+            "storeDestroyedAs)",
+            "Effects.Pipeline.runStoringCollection",
+            "Effects.AddDynamicCounters"
+          ]
+        }
+      ],
+      "baseSha": "853ce781efa03bbeff90d2f8a799b6d1c98a1069",
+      "oracleHash": "11bcaf4f9413e1ae76bc0df32df97ff574a6e817d02567ed48d7cf2c6e087606",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Abaddon the Despoiler": {
+      "summary": "The line is covered by a cast-triggered Effects.Cascade (Wildsear, Quandrix), with a hand-zone spell predicate; a dynamic mana-value filter is implemented (Rocco), and DynamicAmounts.lifeLostThisTurn(Player.EachOpponent) sums opponents' life loss (Bloodsoaked Insight). During-your-turn is a triggerRestriction.",
+      "verifiedBy": "Copilot; source inspection of Argentum c1c04ca3265c61df913af6db65460ad4ce409614 on 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/WildsearScouringMaw.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/sos/cards/QuandrixTheProof.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh3/cards/BloodsoakedInsight.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/snc/cards/RoccoCabarettiCaterer.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Mark of Chaos Ascendant — During your turn, spells you cast from your hand with mana value X or less have cascade, where X is the total amount of life your opponents have lost this turn.",
+          "primitives": [
+            "Triggers.you.casts",
+            "SpellCastPredicate.CastFromZone(Zone.HAND)",
+            "Conditions.IsYourTurn",
+            "GameObjectFilter.manaValueAtMostDynamic",
+            "DynamicAmounts.lifeLostThisTurn(Player.EachOpponent)",
+            "Effects.Cascade"
+          ]
+        }
+      ],
+      "baseSha": "bc20a025ba8857f1a5dab41ca8c84d138cde047b",
+      "oracleHash": "63177c9660b62d94fb0d886ebbd66c99d6ef6f3545ca62d4ee8fde589252b02b",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Anrakyr the Traveller": {
+      "summary": "Triggers.self.attacks plus gather from multiple zones (HAND and GRAVEYARD), filter artifacts, choose up to one, then Effects.CastFromCollectionByPaying with Costs.additional.PayLifeEqualToManaValueOfSpell supplies the life-equals-mana-value alternative cost. Surtland Elementalist shows attack-trigger gather/choose/cast; Amped Raptor uses CastFromCollectionByPaying with an AdditionalCost during a trigger; Nashi uses the exact mana-value life cost.",
+      "verifiedBy": "Copilot, source inspection 2026-11-01 (argentum-engine@c1c04ca3265c61df913af6db65460ad4ce409614)",
+      "references": [
+        "upstream mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/khm/cards/SurtlandElementalist.kt",
+        "upstream mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh3/cards/AmpedRaptor.kt",
+        "upstream mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/neo/cards/NashiMoonSagesScion.kt",
+        "docs/agents/argentum-upstream/sdk-index.md CardSource.FromMultipleZones"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Lord of the Pyrrhian Legions — Whenever Anrakyr the Traveller attacks, you may cast an artifact spell from your hand or graveyard by paying life equal to its mana value rather than paying its mana cost.",
+          "primitives": [
+            "Triggers.self.attacks",
+            "CardSource.FromMultipleZones",
+            "GameObjectFilter.Artifact",
+            "chooseUpTo(1)",
+            "Effects.CastFromCollectionByPaying",
+            "Costs.additional.PayLifeEqualToManaValueOfSpell"
+          ]
+        }
+      ],
+      "baseSha": "7999edca6725a93fc1d273d7dbf9e17f73da3793",
+      "oracleHash": "6fcf58d8ce11908606ef33519bc5811f3157c1a5c21e6ed20d2008a624061880",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Arch of Orazca": {
+      "summary": "The activated draw ability uses Costs.Composite(Costs.Mana, Costs.Tap), Effects.DrawCards, and ActivationRestriction.OnlyIfCondition(Conditions.YouHaveCitysBlessing). Fool's Tome demonstrates the activated draw/only-if pattern; Sea Gate Wreckage has real positive/negative activation-restriction scenarios; Wayward Swordtooth uses the blessing condition in implemented rules and a scenario verifies the no-blessing restriction.",
+      "verifiedBy": "Copilot, source and scenario inspection 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tmp/cards/FoolsTome.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SeaGateWreckage.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SeaGateWreckageScenarioTest.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WaywardSwordtooth.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WaywardSwordtoothScenarioTest.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "{5}, {T}: Draw a card. Activate only if you have the city's blessing.",
+          "primitives": [
+            "Costs.Composite",
+            "Costs.Mana",
+            "Costs.Tap",
+            "Effects.DrawCards",
+            "ActivationRestriction.OnlyIfCondition",
+            "Conditions.YouHaveCitysBlessing"
+          ]
+        }
+      ],
+      "baseSha": "ac7221f343ccdfa1532cd620ee7d1cadd8b0028d",
+      "oracleHash": "d0d22fa8102670b67b82e29dd5fa15e87e96865d2e8ea901f7873b00054a891c",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Aspiring Champion": {
+      "summary": "Combat-damage trigger (Aberrant) -> IfYouDo(SacrificeSelfEffect, PermanentsSacrificed) (Marit Lage's Slumber) -> Pipeline gatherUntilMatch(Creature)/reveal/move to battlefield/ShuffleLibrary (Riptide Shapeshifter, Hei Bai, Selvala's Stampede) -> Effects.If(CollectionContainsMatch(found, Creature.withSubtype Demon)) with DealDamage(powerOf(found.asTarget), each opponent, damageSource = found.asTarget) (powerOf/damageSource shape per Spinning Wheel Kick; CollectionSlot.asTarget in sdk language reference). Source review only; candidate implementation must prove the Demon power damage with a scenario test.",
+      "verifiedBy": "Copilot, source inspection 2026-11-01 (argentum-engine@c1c04ca)",
+      "references": [
+        "upstream mtg-sets/2017-2022/.../mh1/cards/MaritLagesSlumber.kt",
+        "upstream mtg-sets/2000-2002/.../ons/cards/RiptideShapeshifter.kt",
+        "upstream mtg-sets/2025/.../tle/cards/HeiBaiForestGuardian.kt",
+        "upstream mtg-sets/2008-2016/.../cn2/cards/SelvalasStampede.kt",
+        "android/custom-cards/.../cards/Aberrant.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Ruinous Ascension — When this creature deals combat damage to a player, sacrifice it. If you do, reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield, then shuffle the rest into your library. If that creature is a Demon, it deals damage equal to its power to each opponent.",
+          "primitives": [
+            "Triggers.self.dealsCombatDamage(Recipient.AnyPlayer)",
+            "Effects.IfYouDo(SacrificeSelfEffect",
+            "then",
+            "successCriterion = SuccessCriterion.PermanentsSacrificed)",
+            "Effects.Pipeline{gatherUntilMatch(GameObjectFilter.Creature)",
+            "reveal",
+            "move(ToZone(BATTLEFIELD))",
+            "Effects.ShuffleLibrary()}",
+            "Effects.If(Conditions.CollectionContainsMatch(found",
+            "Creature.withSubtype(\"Demon\")))",
+            "Effects.DealDamage(DynamicAmounts.powerOf(found.asTarget)",
+            "PlayerRef(Player.EachOpponent)",
+            "damageSource = found.asTarget)"
+          ]
+        }
+      ],
+      "baseSha": "759c35233bae183e4f061ee2e89be65e7c8a98b7",
+      "oracleHash": "cac1f05df7aefc0a7cb3166c5f3dbfee9fc370b36d4e3f74329ce69965164e9b",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Assault Suit": {
+      "summary": "Existing equipment stats/haste, equipped-creature attack and sacrifice restrictions, opponent-upkeep may/if-you-do flow, target-player control transfer and untap primitives cover both lines.",
+      "verifiedBy": "Copilot, source inspection of pinned Argentum c1c04ca3265c61df913af6db65460ad4ce409614 on 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/LavaspurBoots.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/woe/cards/ErietteOfTheCharmedApple.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tdm/cards/ZurgoThundersDecree.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/sos/cards/LoreholdTheHistorian.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tla/cards/IrohTeaMaster.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mir/cards/Wellspring.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Equipped creature gets +2/+2, has haste, can't attack you or planeswalkers you control, and can't be sacrificed.",
+          "primitives": [
+            "ModifyStats",
+            "GrantKeyword(Keyword.HASTE)",
+            "CantAttackYou(coversPlaneswalkers = true)",
+            "CantBeSacrificed(scope = ANY)"
+          ]
+        },
+        {
+          "line": "At the beginning of each opponent's upkeep, you may have that player gain control of equipped creature until end of turn. If you do, untap it.",
+          "primitives": [
+            "Triggers.anOpponent.beginningOf(Step.UPKEEP)",
+            "Effects.May(Effects.IfYouDo(...))",
+            "Effects.GiveControl",
+            "Effects.Untap"
+          ]
+        }
+      ],
+      "baseSha": "bbf3ec8cbc6f5533578a4b69f637d28e05fc7f0f",
+      "oracleHash": "67cec29a87564650b16e0e9b480a02effd58946ea9f1700612131b3efda6820e",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    }
+  }
+}

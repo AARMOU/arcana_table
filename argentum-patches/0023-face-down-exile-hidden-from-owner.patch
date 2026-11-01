@@ -1,0 +1,63 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
+index 33b3c102..d50babd6 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
+@@ -96,7 +96,14 @@ internal class CardProjector(
+         // Handle face-down card masking
+         // Opponents and spectators see modified stats but no card information
+         // Controller sees real card info + morph cost (but not spectators)
+-        if (frame.isFaceDown && (isSpectator || frame.controllerId != viewingPlayerId)) {
++        // A face-down card in exile is hidden from its owner too unless something lets them look
++        // (CR 406.3, 708.5): the controller shortcut is for face-down permanents and spells only. In
++        // exile the controller keeps the full card only when Visibility grants the look (foretell,
++        // "look at it" effects, may-play); otherwise it is masked like it is for everyone else.
++        val exiledOutOfOwnersSight = frame.isFaceDown && frame.zoneType == Zone.EXILE && !isSpectator &&
++            frame.controllerId == viewingPlayerId &&
++            !visibility.isCardIdentityVisibleTo(state, zoneKey, entityId, viewingPlayerId, isSpectator)
++        if (frame.isFaceDown && (isSpectator || frame.controllerId != viewingPlayerId || exiledOutOfOwnersSight)) {
+             // Check if the face-down card has been revealed to the viewing player (e.g., via Spy Network)
+             // Also check LookAtFaceDownCreatures (e.g., Lens of Clarity) — only for battlefield creatures,
+             // not face-down spells on the stack (per ruling).
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
+index c676c2c8..8ea9ebff 100644
+--- a/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
+@@ -318,6 +318,38 @@ class CardIdentityVisibilityTest : ScenarioTestBase() {
+             visibility.isCardIdentityVisibleTo(state, exileKey, exiled, game.player2Id) shouldBe false
+         }
+ 
++        // Arcana patch 0023: the client projection must give the same answer as Visibility. The
++        // projector's controller shortcut used to hand a face-down exiled card's full printed
++        // identity to its owner (Arcana #492, Ulamog's Nullifier).
++        test("the client view masks a face-down exiled card from its owner, and a foreteller still sees theirs") {
++            val game = scenario()
++                .withPlayers()
++                .withCardInExile(1, "Craw Wurm")
++                .build()
++            val exiled = game.state.getExile(game.player1Id).single()
++            val client = ClientStateTransformer(cardRegistry, predicateEvaluator = services.predicateEvaluator)
++
++            val hidden = game.state.updateEntity(exiled) { it.with(FaceDownComponent) }
++            for ((viewer, who) in listOf(game.player1Id to "owner", game.player2Id to "opponent")) {
++                val card = client.transform(hidden, viewer).cards[exiled]
++                withClue("$who must not learn the card's identity") {
++                    card?.isFaceDown shouldBe true
++                    (card?.name == "Craw Wurm") shouldBe false
++                    card?.revealedName shouldBe null
++                }
++            }
++
++            val foretold = game.state.updateEntity(exiled) {
++                it.with(FaceDownComponent).with(ForetoldComponent(controllerId = game.player1Id, turnForetold = 1))
++            }
++            withClue("a look permission keeps the owner's full view, as before") {
++                client.transform(foretold, game.player1Id).cards[exiled]?.name shouldBe "Craw Wurm"
++            }
++            withClue("the opponent still sees nothing of a foretold card") {
++                client.transform(foretold, game.player2Id).cards[exiled]?.revealedName shouldBe null
++            }
++        }
++
+         // CR 702.143a: "That player may look at that card as long as it remains in exile." The
+         // engine stamps FaceDownComponent on a foretold card to mask it from opponents, so the
+         // CR 708.5 scoping above must not take the foreteller's own view away with it.

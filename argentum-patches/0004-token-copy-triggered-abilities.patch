@@ -1,18 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0004-token-copy-triggered-abilities
+
+---
+ .../token/CreateTokenCopyOfTargetExecutor.kt  | 19 +++++-----------
+ .../effects/token/CreateTokenExecutor.kt      | 22 ++++---------------
+ 2 files changed, 10 insertions(+), 31 deletions(-)
+
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
+index 54ac888639..a3136195cc 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
+@@ -18,7 +18,6 @@ import com.wingedsheep.engine.registry.CardRegistry
+ import com.wingedsheep.engine.event.DelayedTriggeredAbility
+ import com.wingedsheep.engine.event.GrantedActivatedAbility
+ import com.wingedsheep.engine.event.GrantedStaticAbility
+-import com.wingedsheep.engine.event.GrantedTriggeredAbility
+ import com.wingedsheep.engine.state.Component
+ import com.wingedsheep.engine.state.ComponentContainer
+ import com.wingedsheep.engine.state.GameState
+@@ -357,7 +356,12 @@ class CreateTokenCopyOfTargetExecutor(
+             flipSide = card.flipSide?.let(::withAddedStatics),
+         )
+         val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))
+-            .copy(ownerId = controllerId, isDoubleFaced = false)
++            .let { copied -> copied.copy(
++                ownerId = controllerId,
++                isDoubleFaced = false,
++                // Added token triggers become part of the copy's rules text.
++                copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities,
++            ) }
+ 
+         val cappedCount = com.wingedsheep.engine.core.GameLimits.cappedTokenCount(count, "target-copy tokens")
+         // CR 508.4: "its controller chooses ... as it enters" — every copy's defender is settled
+@@ -512,17 +516,6 @@ class CreateTokenCopyOfTargetExecutor(
+                 initialCounters = initialCounters, predicateEvaluator = amountEvaluator.predicates
+             )
+ 
+-            for (ability in effect.triggeredAbilities) {
+-                val grant = GrantedTriggeredAbility(
+-                    entityId = tokenId,
+-                    ability = ability,
+-                    duration = Duration.Permanent
+-                )
+-                newState = newState.copy(
+-                    grantedTriggeredAbilities = newState.grantedTriggeredAbilities + grant
+-                )
+-            }
+-
+             // Activated abilities granted to the copy (e.g. Shelob's Food sacrifice ability). Tokens
+             // have no CardDefinition, so granted abilities live in GameState.grantedActivatedAbilities,
+             // which the legal-action enumerator and ActivateAbilityHandler consult for any entity.
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
+index 7507c1b24b..a06e2eb570 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
-@@ -281,7 +281,9 @@
-                 ownerId = tokenControllerId,
+@@ -301,7 +301,9 @@ class CreateTokenExecutor(
                  imageUri = resolvedImageUri,
                  copyNumericKeywords = effect.numericKeywords,
--                copyStaticAbilities = effect.staticAbilities,
-+                copyStaticAbilities = effect.staticAbilities,
-+                // Token-defined rules text must survive copying and leaving the battlefield.
-+                copyTriggeredAbilities = effect.triggeredAbilities,
+                 copyStaticAbilities = effect.staticAbilities,
+-                copyTriggeredAbilities = donatedTriggers,
++                // Arcana 0004: token-defined triggers are copiable rules text, not merely grants;
++                // keep upstream's donated triggers (AFR) alongside them.
++                copyTriggeredAbilities = effect.triggeredAbilities + donatedTriggers,
              )
  
              val components = mutableListOf<Component>(
-@@ -434,24 +436,8 @@
+@@ -436,24 +438,8 @@ class CreateTokenExecutor(
              }
          }
  
@@ -32,55 +88,9 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effect
 -            }
 -        }
 -
--        // If activated abilities are specified, grant them permanently to each created token.
+         // If activated abilities are specified, grant them permanently to each created token.
 -        // Mirrors the triggered-ability path: tokens have no CardDefinition, so their activated
-+        // If activated abilities are specified, grant them permanently to each created token.
 +        // Tokens have no CardDefinition, so their activated
          // abilities live in GameState.grantedActivatedAbilities, which the legal-action
          // enumerator and ActivateAbilityHandler already consult for any entity. Models e.g.
          // Mourner's Surprise's Mercenary token with "{T}: Target creature you control gets +1/+0...".
-diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
---- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
-+++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
-@@ -15,7 +15,6 @@
- import com.wingedsheep.engine.event.DelayedTriggeredAbility
- import com.wingedsheep.engine.event.GrantedActivatedAbility
- import com.wingedsheep.engine.event.GrantedStaticAbility
--import com.wingedsheep.engine.event.GrantedTriggeredAbility
- import com.wingedsheep.engine.state.Component
- import com.wingedsheep.engine.state.ComponentContainer
- import com.wingedsheep.engine.state.GameState
-@@ -307,8 +306,13 @@
-             copyStaticAbilities = card.copyStaticAbilities + effect.addedStaticAbilities,
-             flipSide = card.flipSide?.let(::withAddedStatics),
-         )
--        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))
--            .copy(ownerId = controllerId, isDoubleFaced = false)
-+        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))
-+            .let { copied -> copied.copy(
-+                ownerId = controllerId,
-+                isDoubleFaced = false,
-+                // Added token abilities are part of the resulting copy's rules text too.
-+                copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities,
-+            ) }
- 
-         val cappedCount = com.wingedsheep.engine.core.GameLimits.cappedTokenCount(count, "target-copy tokens")
-         for (index in 0 until cappedCount) {
-@@ -437,17 +441,6 @@
-             newState = afterCounters
-             events.addAll(counterEvents)
- 
--            for (ability in effect.triggeredAbilities) {
--                val grant = GrantedTriggeredAbility(
--                    entityId = tokenId,
--                    ability = ability,
--                    duration = Duration.Permanent
--                )
--                newState = newState.copy(
--                    grantedTriggeredAbilities = newState.grantedTriggeredAbilities + grant
--                )
--            }
--
-             // Activated abilities granted to the copy (e.g. Shelob's Food sacrifice ability). Tokens
-             // have no CardDefinition, so granted abilities live in GameState.grantedActivatedAbilities,
-             // which the legal-action enumerator and ActivateAbilityHandler consult for any entity.

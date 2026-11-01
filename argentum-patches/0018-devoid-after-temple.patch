@@ -1,0 +1,51 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
+index 06055b8c3..5a09d2570 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
+@@ -127,6 +127,13 @@ sealed interface ManaRestriction {
+             "Spend this mana only to cast colorless $subtype spells or activate abilities of colorless $subtype"
+     }
+ 
++    /** Restricted mana for spells carrying the Devoid keyword (not all colorless spells). */
++    @SerialName("DevoidSpellsOnly")
++    @Serializable
++    data object DevoidSpellsOnly : ManaRestriction {
++        override val description: String = "Spend this mana only to cast a spell with devoid"
++    }
++
+     /**
+      * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
+      * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+index 49fbcf4c4..155a9aa78 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+@@ -43,6 +43,8 @@ data class SpellPaymentContext(
+      * letting it pay for a colored spell.
+      */
+     val isColorless: Boolean = false,
++    /** True only for an actual spell with devoid. A plain colorless spell does not qualify. */
++    val isDevoid: Boolean = false,
+     /**
+      * How many colors the spell being cast has (CR 105.2), or `null` when the context doesn't
+      * describe a spell's characteristics — which refuses
+@@ -235,6 +237,7 @@ fun ManaRestriction.isSatisfiedBy(context: SpellPaymentContext): Boolean = when
+         context.subtypes.any { it.equals(subtype, ignoreCase = true) } &&
+             ((context.isSpellCast && context.isColorless) ||
+                 (context.isAbilityActivation && context.isAbilitySourceColorless))
++    is ManaRestriction.DevoidSpellsOnly -> context.isSpellCast && context.isDevoid
+     is ManaRestriction.SpellsWithExactColorCount -> context.isSpellCast && context.colorCount == count
+     is ManaRestriction.CostsContainingXOnly -> (context.isSpellCast || context.isAbilityActivation) && context.hasXInCost
+     is ManaRestriction.SubtypeSpellsOrAbilitiesOnly ->
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
+index a0dad3f94..cdb786a21 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
+@@ -50,6 +50,7 @@ internal fun spellPaymentContextFor(
+     manaValue = cardComponent.manaCost.cmc,
+     hasXInCost = cardComponent.manaCost.hasX,
+     isColorless = colors.isEmpty(),
++    isDevoid = Keyword.DEVOID in cardComponent.baseKeywords,
+     colorCount = colors.size,
+     subtypes = paymentSubtypesOf(cardComponent),
+     isFromExile = isFromExile,

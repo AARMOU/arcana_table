@@ -1,0 +1,171 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 22bdfe89c..4edf7aaaf 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -11048,7 +11048,8 @@ staticAbility {
+   abilities including mana abilities (Ashnod's Altar, auto-pay included). It is per permanent, as the
+   ruling reads it: an artifact creature can't pay "Sacrifice an artifact", a noncreature artifact
+   still can. Sacrifices a resolving spell or ability performs (edicts, exploit, "unless you
+-  sacrifice") ignore it. Pair with `PlayersCantPayLifeForCosts()` for "pay life or sacrifice".
++  sacrifice") ignore the cost-only scope; `Scope.ANY` also removes the permanent from those choices
++  (`ForceSacrificeExecutor`, `SacrificeExecutor`), so the player sacrifices another matching permanent or nothing. Pair with `PlayersCantPayLifeForCosts()` for "pay life or sacrifice".
+ - `OpponentsCantMakeYouSacrifice` — "Spells and abilities your opponents control can't cause you to
+   sacrifice permanents" (Sigarda, Host of Herons). The **player-scoped** counterpart of
+   `CantBeSacrificed`: it protects the controller rather than a set of permanents, so it also covers
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
+index 53ee6fe3c..4ba2e54e3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
+@@ -134,10 +134,12 @@ class ForceSacrificeExecutor(
+         // Pass sourceId so source-relative filter predicates (e.g.
+         // DealtCombatDamageToSourceControllerThisTurn — Witch-king of Angmar) resolve against
+         // the edict's source rather than the sacrificing player.
++        // A permanent that can't be sacrificed (CantBeSacrificed, Scope.ANY) is never a legal choice: the player
++        // sacrifices another matching permanent, or nothing (CR 701.21a). Edicts included (Assault Suit).
+         return BattlefieldFilterUtils.findMatchingOnBattlefield(
+             state, filter.youControl(), PredicateContext(controllerId = playerId, sourceId = sourceId),
+             predicateEvaluator = zones.predicateEvaluator
+-        )
++        ).filterNot { state.projectedState.hasKeyword(it, com.wingedsheep.sdk.core.AbilityFlag.CANT_BE_SACRIFICED) }
+     }
+ 
+     private fun presentSacrificeDecision(
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
+index 7603c756e..9996f486d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
+@@ -95,10 +95,11 @@ class SacrificeExecutor(
+         // The resolving ability's whole context, as ReflexiveTriggerEffectExecutor's feasibility
+         // check reads it — so a source-relative filter ("an Aura attached to Three Dog",
+         // `attachedToSource()`) sees its source and the two agree on what can be sacrificed.
++        // A permanent that can't be sacrificed is never a legal choice (CR 701.21a), as in ForceSacrificeExecutor.
+         val matches = BattlefieldFilterUtils.findMatchingOnBattlefield(
+             state, effect.filter.youControl(), context,
+             predicateEvaluator = zones.predicateEvaluator
+-        )
++        ).filterNot { state.projectedState.hasKeyword(it, com.wingedsheep.sdk.core.AbilityFlag.CANT_BE_SACRIFICED) }
+         return if (effect.excludeSource && sourceId != null) {
+             matches.filter { it != sourceId }
+         } else {
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
+new file mode 100644
+index 000000000..ab2d4e306
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
+@@ -0,0 +1,116 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.CantBeSacrificed
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.collections.shouldContain
++import io.kotest.matchers.collections.shouldNotContain
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * A permanent that "can't be sacrificed" (`CantBeSacrificed`, `Scope.ANY`) can't be chosen for a sacrifice a
++ * resolving spell or ability makes a player perform, an edict included (CR 701.21a: a player can't sacrifice
++ * something that can't be sacrificed). The player sacrifices another matching permanent if they have one, and
++ * nothing if they don't. Assault Suit's "equipped creature can't be sacrificed" versus an edict is the case
++ * that found this.
++ */
++class CantBeSacrificedByEffectsTest : FunSpec({
++
++    val protectedCreature = card("Unsacrificeable Golem") {
++        manaCost = "{3}"
++        typeLine = "Artifact Creature — Golem"
++        oracleText = "This creature can't be sacrificed."
++        power = 3
++        toughness = 3
++        staticAbility { ability = CantBeSacrificed(GroupFilter.source()) }
++    }
++    val bear = card("Edict Test Bear") {
++        manaCost = "{1}{G}"
++        typeLine = "Creature — Bear"
++        power = 2
++        toughness = 2
++    }
++    val edict = card("Opponents Edict") {
++        manaCost = "{B}"
++        typeLine = "Sorcery"
++        oracleText = "Each opponent sacrifices a creature."
++        spell { effect = Effects.Sacrifice(GameObjectFilter.Creature, 1, EffectTarget.PlayerRef(Player.EachOpponent)) }
++    }
++    val ownSacrifice = card("Own Sacrifice Sorcery") {
++        manaCost = "{B}"
++        typeLine = "Sorcery"
++        oracleText = "Sacrifice a creature."
++        spell { effect = Effects.SacrificeOwn(GameObjectFilter.Creature) }
++    }
++
++    fun newDriver(): Pair<GameTestDriver, EntityId> {
++        val driver = GameTestDriver()
++        driver.registerCards(TestCards.all + listOf(protectedCreature, bear, edict, ownSacrifice))
++        driver.initMirrorMatch(deck = Deck.of("Swamp" to 40), skipMulligans = true, startingPlayer = 0)
++        val me = driver.activePlayer!!
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        driver.putLandOnBattlefield(me, "Swamp")
++        return driver to me
++    }
++
++    test("an edict skips the creature that can't be sacrificed and takes the other one, without asking") {
++        val (driver, me) = newDriver()
++        val opponent = driver.getOpponent(me)
++        val golem = driver.putCreatureOnBattlefield(opponent, "Unsacrificeable Golem")
++        val other = driver.putCreatureOnBattlefield(opponent, "Edict Test Bear")
++        driver.submitSuccess(CastSpell(playerId = me, cardId = driver.putCardInHand(me, "Opponents Edict")))
++        driver.bothPass()
++        withClue("only one creature is eligible, so there is no choice to make") { driver.pendingDecision shouldBe null }
++        driver.getGraveyard(opponent) shouldContain other
++        driver.findPermanent(opponent, "Unsacrificeable Golem") shouldBe golem
++    }
++
++    test("an edict against only creatures that can't be sacrificed sacrifices nothing") {
++        val (driver, me) = newDriver()
++        val opponent = driver.getOpponent(me)
++        val golem = driver.putCreatureOnBattlefield(opponent, "Unsacrificeable Golem")
++        driver.submitSuccess(CastSpell(playerId = me, cardId = driver.putCardInHand(me, "Opponents Edict")))
++        driver.bothPass()
++        driver.findPermanent(opponent, "Unsacrificeable Golem") shouldBe golem
++        driver.getGraveyard(opponent) shouldNotContain golem
++    }
++
++    test("'sacrifice a creature' from a resolving spell can't take it either") {
++        val (driver, me) = newDriver()
++        val golem = driver.putCreatureOnBattlefield(me, "Unsacrificeable Golem")
++        driver.submitSuccess(CastSpell(playerId = me, cardId = driver.putCardInHand(me, "Own Sacrifice Sorcery")))
++        driver.bothPass()
++        driver.findPermanent(me, "Unsacrificeable Golem") shouldBe golem
++
++        val (second, me2) = newDriver()
++        second.putCreatureOnBattlefield(me2, "Unsacrificeable Golem")
++        val other = second.putCreatureOnBattlefield(me2, "Edict Test Bear")
++        second.submitSuccess(CastSpell(playerId = me2, cardId = second.putCardInHand(me2, "Own Sacrifice Sorcery")))
++        second.bothPass()
++        second.getGraveyard(me2) shouldContain other
++        second.findPermanent(me2, "Unsacrificeable Golem") shouldNotBe null
++    }
++
++    test("without the restriction the edict still asks which creature to sacrifice") {
++        val (driver, me) = newDriver()
++        val opponent = driver.getOpponent(me)
++        driver.putCreatureOnBattlefield(opponent, "Edict Test Bear")
++        driver.putCreatureOnBattlefield(opponent, "Edict Test Bear")
++        driver.submitSuccess(CastSpell(playerId = me, cardId = driver.putCardInHand(me, "Opponents Edict")))
++        driver.bothPass()
++        driver.pendingDecision shouldNotBe null
++    }
++})

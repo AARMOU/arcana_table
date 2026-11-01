@@ -168,6 +168,7 @@ object CustomCards {
         Entry(Mutilate, "TOR", "Six WotC precons"),
         Entry(TheirNameIsDeath, "40K", "Six WotC precons"),
         Entry(Plasmancer, "40K", "Six WotC precons"),
+        Entry(SceptreOfEternalGlory, "40K", "Six WotC precons"),
         Entry(UlamogsCrusher, "ROE", "Six WotC precons"),
         Entry(AssaultIntercessor, "40K", "Six WotC precons"),
         Entry(HeraldOfSlaanesh, "40K", "Six WotC precons"),
@@ -247,7 +248,30 @@ object CustomCards {
         Entry(DenyTheWitch, "40K", "Six WotC precons"),
         Entry(HexmarkDestroyer, "40K", "Six WotC precons"),
         Entry(TriarchPraetorian, "40K", "Six WotC precons"),
+        Entry(RiseOfTheEldrazi, "CMM", "Six WotC precons"),
+        Entry(TransmogrifyingWand, "CMM", "Six WotC precons"),
+        Entry(UlamogsDreadsire, "M3C", "Six WotC precons"),
         Entry(Zoanthrope, "40K", "Six WotC precons"),
+        // Backported, isolated distinct precon batches: PRs #74, #76, #77, #84 and #85.
+        Entry(ArcoFlagellant, "40K", "Six WotC precons"),
+        Entry(UltramarinesHonourGuard, "40K", "Six WotC precons"),
+        Entry(CommissarSeverinaRaine, "40K", "Six WotC precons"),
+        Entry(BoneSabres, "40K", "Six WotC precons"),
+        Entry(Tervigon, "40K", "Six WotC precons"),
+        Entry(CranialPlating, "40K", "Six WotC precons"),
+        Entry(Chronomancer, "40K", "Six WotC precons"),
+        Entry(RoyalWarden, "40K", "Six WotC precons"),
+        Entry(KeeperOfSecrets, "40K", "Six WotC precons"),
+        Entry(NurglesRot, "40K", "Six WotC precons"),
+        Entry(MatterReshaper, "OGW", "Six WotC precons"),
+        Entry(Scaretiller, "ELD", "Six WotC precons"),
+        Entry(GoliathTruck, "40K", "Six WotC precons"),
+        Entry(EldraziConscription, "M3C", "Six WotC precons"),
+        // Eldrazi Incursion.
+        Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
+        Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
+        Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
+        Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
