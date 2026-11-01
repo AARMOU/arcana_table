@@ -166,6 +166,8 @@ internal fun TableController.TableOverlaysB() {
 
 
 
+    // In-game room viewer is informational; never reopen the pre-game host/join dialog.
+    if (activeLobbyViewerOpen) ActiveMultiplayerRoomViewer()
     if (lobbyOpen) LobbyDialog(
         players = players,
         roomCreated = lobbyCreated || roomConnected,
