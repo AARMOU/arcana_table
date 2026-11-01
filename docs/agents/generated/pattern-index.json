@@ -108,6 +108,17 @@
     }
    ]
   },
+  "Conditions.Delirium": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
   "Conditions.EmptyHand": {
    "count": 2,
    "examples": [
@@ -2659,6 +2670,17 @@
     }
    ]
   },
+  "Effects.Surveil": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.TakeExtraTurn": {
    "count": 1,
    "examples": [
@@ -2983,7 +3005,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -4066,7 +4088,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -4087,6 +4109,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ScreamerKillerScenarioTest.kt"
     },
     {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    },
+    {
      "card": "Iron Man, Bleeding Edge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IronManBleedingEdge.kt",
      "lines": 41,
@@ -4097,12 +4125,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SaiMasterThopterist.kt",
      "lines": 49,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SaiMasterThopteristScenarioTest.kt"
-    },
-    {
-     "card": "The Fantasticar",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
-     "lines": 56,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheFantasticarScenarioTest.kt"
     }
    ]
   },
@@ -4498,7 +4520,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4539,7 +4561,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4623,7 +4645,7 @@
  },
  "field": {
   "condition": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -4644,6 +4666,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WerebearScenarioTest.kt"
     },
     {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    },
+    {
      "card": "Nut Collector",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NutCollector.kt",
      "lines": 40,
@@ -4654,12 +4682,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
-    },
-    {
-     "card": "Forge of Heroes",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ForgeOfHeroes.kt",
-     "lines": 50,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ForgeOfHeroesScenarioTest.kt"
     }
    ]
   },
@@ -5678,7 +5700,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -5793,7 +5815,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -5834,13 +5856,19 @@
    ]
   },
   "MustAttack": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Ulamog's Crusher",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt"
+    },
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
     }
    ]
   },
@@ -6473,8 +6501,14 @@
    ]
   },
   "GameObjectFilter.Noncreature": {
-   "count": 2,
+   "count": 3,
    "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    },
     {
      "card": "The Cabbage Merchant",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheCabbageMerchant.kt",
