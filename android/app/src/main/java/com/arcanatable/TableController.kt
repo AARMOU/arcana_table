@@ -383,6 +383,8 @@ internal class TableController(
     var layoutLabOpen by run { mutableStateOf(false) }
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
+    /** Read-only roster overlay for an already-started human multiplayer match. */
+    var activeLobbyViewerOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
     var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("tutorial_offer_seen", false))
     var tutorialHubOpen by mutableStateOf(false)
