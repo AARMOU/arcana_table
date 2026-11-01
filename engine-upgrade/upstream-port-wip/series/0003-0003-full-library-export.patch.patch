@@ -1,7 +1,7 @@
 From 04389cedcce7820c36d7606da8207826d24ae3e5 Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:07 -0600
-Subject: [PATCH 3/9] 0003-full-library-export.patch
+Subject: [PATCH 03/19] 0003-full-library-export.patch
 
 ---
  arcana-export/build.gradle.kts                |  6 +--

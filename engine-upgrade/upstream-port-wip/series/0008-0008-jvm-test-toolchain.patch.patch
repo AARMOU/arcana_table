@@ -1,7 +1,7 @@
 From 76beac2b5c7781a551939fdf12db664390308b94 Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:08 -0600
-Subject: [PATCH 8/9] 0008-jvm-test-toolchain.patch
+Subject: [PATCH 08/19] 0008-jvm-test-toolchain.patch
 
 ---
  buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts | 4 +++-

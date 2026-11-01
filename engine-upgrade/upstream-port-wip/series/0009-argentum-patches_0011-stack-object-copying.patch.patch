@@ -1,7 +1,7 @@
 From 0034cccfd24561416371dc1e439c49845a84fd2d Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:22:55 -0600
-Subject: [PATCH 9/9] argentum-patches_0011-stack-object-copying.patch
+Subject: [PATCH 09/19] argentum-patches_0011-stack-object-copying.patch
 
 ---
  docs/card-sdk-language-reference.md           |  16 +-

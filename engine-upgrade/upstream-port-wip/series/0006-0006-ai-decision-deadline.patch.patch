@@ -1,7 +1,7 @@
 From 5652923bbfd74a25879b2ee89ff974405346266f Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:08 -0600
-Subject: [PATCH 6/9] 0006-ai-decision-deadline.patch
+Subject: [PATCH 06/19] 0006-ai-decision-deadline.patch
 
 ---
  .../com/wingedsheep/ai/engine/AIPlayer.kt     |  3 +-

@@ -1,7 +1,7 @@
 From 92b80e2cc2cd73e43feecace9205f2a997e19099 Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:08 -0600
-Subject: [PATCH 5/9] 0005-last-known-negative-subtype.patch
+Subject: [PATCH 05/19] 0005-last-known-negative-subtype.patch
 
 ---
  .../com/wingedsheep/engine/event/TriggerMatcher.kt       | 9 +++++++++

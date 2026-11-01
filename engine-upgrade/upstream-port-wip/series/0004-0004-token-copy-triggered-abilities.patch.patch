@@ -1,7 +1,7 @@
 From 82f84408ac785b1579fee80d2917491fcfda5cf1 Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:08 -0600
-Subject: [PATCH 4/9] 0004-token-copy-triggered-abilities.patch
+Subject: [PATCH 04/19] 0004-token-copy-triggered-abilities.patch
 
 ---
  .../token/CreateTokenCopyOfTargetExecutor.kt  | 19 +++++-----------

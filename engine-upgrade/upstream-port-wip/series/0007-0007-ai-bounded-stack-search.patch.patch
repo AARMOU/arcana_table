@@ -1,7 +1,7 @@
 From 6c46f35f3fdb9ed4f841f60f614bd89e832b20e0 Mon Sep 17 00:00:00 2001
 From: arcana <a@a>
 Date: Sat, 31 Oct 2026 20:23:08 -0600
-Subject: [PATCH 7/9] 0007-ai-bounded-stack-search.patch
+Subject: [PATCH 07/19] 0007-ai-bounded-stack-search.patch
 
 ---
  .../com/wingedsheep/ai/engine/AIPlayer.kt     | 17 ++++++--
