@@ -65,14 +65,12 @@ index e5b1afd15d..6c0466d1b5 100644
 +        return false
 +    }
 +
-+    private companion object {
-+        val COMBAT_TRICK_KEYWORDS = setOf(
-+            Keyword.DEATHTOUCH.name, Keyword.DOUBLE_STRIKE.name, Keyword.FIRST_STRIKE.name,
-+            Keyword.FLYING.name, Keyword.INDESTRUCTIBLE.name, Keyword.LIFELINK.name,
-+            Keyword.MENACE.name, Keyword.REACH.name, Keyword.TRAMPLE.name,
-+            Keyword.VIGILANCE.name, Keyword.HEXPROOF.name, Keyword.SHROUD.name,
-+        )
-+    }
++    private val COMBAT_TRICK_KEYWORDS = setOf(
++        Keyword.DEATHTOUCH.name, Keyword.DOUBLE_STRIKE.name, Keyword.FIRST_STRIKE.name,
++        Keyword.FLYING.name, Keyword.INDESTRUCTIBLE.name, Keyword.LIFELINK.name,
++        Keyword.MENACE.name, Keyword.REACH.name, Keyword.TRAMPLE.name,
++        Keyword.VIGILANCE.name, Keyword.HEXPROOF.name, Keyword.SHROUD.name,
++    )
 +
      private fun drawsOf(effect: Effect): Int? = when (effect) {
          is DrawCardsEffect -> fixed(effect.count)

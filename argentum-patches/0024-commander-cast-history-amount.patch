@@ -112,7 +112,7 @@ index 0000000000..0c0ff91ecd
 +    }
 +
 +    private fun amount(game: TestGame, player: EntityId): Int =
-+        game.services.predicateEvaluator.amounts.evaluate(
++        services.predicateEvaluator.amounts.evaluate(
 +            game.state,
 +            DynamicAmounts.commanderCastsFromCommandZone(),
 +            EffectContext(sourceId = null, controllerId = player),
@@ -157,3 +157,16 @@ index 0000000000..0c0ff91ecd
 +        }
 +    }
 +}
+
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -645,1 +645,2 @@
++- `DynamicAmount.CommanderCastsFromCommandZone(player: Player)` — How many times player has cast a commander from the command zone this game.
+ - `DynamicAmount.CommanderColorIdentityCount(player: Player)` — The number of colors (0–5) in player's commanders' color identity — the union of the color identities of all their commanders, so a Partner / Background pair counts both (CR 903.4).
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1661,1 +1661,2 @@
++DynamicAmount.CommanderCastsFromCommandZone — DynamicAmount — The Swarmlord — DynamicAmount.CommanderColorIdentityCount, DynamicAmount.SpellsCastThisGame — color identity counts which colors commanders have, while spells-cast history counts every spell; neither records only successful designated commander casts from the command zone.
+ DynamicAmount.CommanderColorIdentityCount — DynamicAmount — War Room — EntityNumericProperty.ColorCount, AggregateBattlefield(DISTINCT_COLORS) — both count colors an object has right now (one entity's projected colors, the distinct colors among matching permanents); a commander's color identity is fixed before the game begins (CR 903.4a), read off its card in any zone and unioned across a Partner pair, and is undefined with no commander (CR 903.4f) — an axis on either would fork what they read
