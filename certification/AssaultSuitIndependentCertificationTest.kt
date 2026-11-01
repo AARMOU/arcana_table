@@ -114,10 +114,10 @@ class AssaultSuitIndependentCertificationTest {
         assertNull(equip(d, player, suit, creature).error)
         d.resolveAll()
 
-        d.tapPermanent(creature)
         d.passPriorityUntil(Step.UPKEEP, activePlayer = player)
         d.resolveAll()
         assertEquals(player, d.getController(creature))
+        d.tapPermanent(creature)
         assertTrue(d.isTapped(creature))
         d.passPriorityUntil(Step.UPKEEP, activePlayer = opponent)
         assertTrue(d.isTapped(creature))
@@ -128,6 +128,7 @@ class AssaultSuitIndependentCertificationTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to player)).error)
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to planeswalker)).error)
+        d.removeSummoningSickness(otherCreature)
         assertNull(d.declareAttackers(opponent, mapOf(otherCreature to planeswalker)).error)
         assertEquals(opponent, d.getController(creature))
 
@@ -172,6 +173,7 @@ class AssaultSuitIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         val edict = d.putCardInHand(opponent, "Diabolic Edict")
         d.giveMana(opponent, Color.BLACK)
+        d.giveColorlessMana(opponent, 1)
         assertNull(d.castSpell(opponent, edict, listOf(player)).error)
         d.resolveAll()
 
