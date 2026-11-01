@@ -2,23 +2,124 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.AbaddonTheDespoiler
 import com.arcanatable.customcards.support.*
-import org.junit.Assert.*
+import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.model.Deck
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AbaddonTheDespoilerScenarioTest {
-    // CARDKIT-SCAFFOLD: replace this whole test with real scenarios on the engine, e.g.
-    //   val d = customScenario(AbaddonTheDespoiler)            // a real game, card round-tripped through its JSON data
-    //   val p = d.player1
-    //   val card = d.putCardInHand(p, "Abaddon the Despoiler")
-    //   d.giveMana(p, Color.WHITE); d.giveColorlessMana(p, 2)
-    //   assertNull(d.castSpell(p, card).error)
-    //   d.resolveAll(Choices(yes = true))
-    // Cover, for every line below, the positive case AND a negative/edge case (declined "may",
-    // no legal target, intervening-if false, wrong controller, source gone before resolution):
-    //   - Trample
-    //   - Mark of Chaos Ascendant — During your turn, spells you cast from your hand with mana value X or less have cascade, where X is the total amount of life your opponents have lost this turn.
     @Test
-    fun scaffoldIsNotImplementedYet() {
-        fail("Abaddon the Despoiler is a cardkit scaffold: implement its abilities and real scenarios first")
+    fun abaddonTramplesButDoesNotGrantTrampleToOpponentsCreatures() {
+        val d = customScenario(AbaddonTheDespoiler, "Grizzly Bears")
+        val abaddon = d.putCreatureOnBattlefield(d.player1, "Abaddon the Despoiler")
+        val opposingBear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+
+        assertTrue(d.projected.hasKeyword(abaddon, Keyword.TRAMPLE))
+        assertFalse(d.projected.hasKeyword(opposingBear, Keyword.TRAMPLE))
+    }
+
+    @Test
+    fun cascadesWhenTheTotalLifeLostByAllOpponentsMeetsTheSpellManaValue() {
+        val d = CardPool.driver("Shock", "Worn Powerstone", "Grizzly Bears", "Ornithopter")
+        d.registerCard(AbaddonTheDespoiler)
+        val (p, opponent1, opponent2) = d.initMultiplayer(List(3) { Deck.of("Plains" to 40) })
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
+        d.putCreatureOnBattlefield(p, "Abaddon the Despoiler")
+
+        val firstShock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, firstShock, listOf(opponent1)).error)
+        d.resolveAll()
+
+        d.putCardOnTopOfLibrary(p, "Ornithopter")
+        val secondShock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, secondShock, listOf(opponent2)).error)
+        d.resolveAll(Choices(yes = true))
+        assertEquals(1, d.permanentsNamed(p, "Ornithopter").size)
+
+        d.putCardOnTopOfLibrary(p, "Grizzly Bears")
+        val powerstone = d.putCardInHand(p, "Worn Powerstone")
+        d.giveColorlessMana(p, 3)
+        assertNull(d.castSpell(p, powerstone).error)
+        d.resolveAll(Choices(yes = true))
+
+        assertEquals(18, d.getLifeTotal(opponent1))
+        assertEquals(18, d.getLifeTotal(opponent2))
+        assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
+    }
+
+    @Test
+    fun doesNotCascadeWhenNoOpponentHasLostLifeThisTurn() {
+        val d = customScenario(AbaddonTheDespoiler, "Worn Powerstone", "Ornithopter")
+        val p = d.player1
+        d.putCreatureOnBattlefield(p, "Abaddon the Despoiler")
+        d.putCardOnTopOfLibrary(p, "Ornithopter")
+        val powerstone = d.putCardInHand(p, "Worn Powerstone")
+        d.giveColorlessMana(p, 3)
+
+        assertNull(d.castSpell(p, powerstone).error)
+        d.resolveAll(Choices(yes = true))
+
+        assertTrue(d.permanentsNamed(p, "Ornithopter").isEmpty())
+        assertEquals(20, d.getLifeTotal(d.player2))
+    }
+
+    @Test
+    fun doesNotCascadeForSpellsCastFromExile() {
+        val d = customScenario(
+            AbaddonTheDespoiler,
+            "Shock",
+            "Heralds of Tzeentch",
+            "Grizzly Bears",
+            "Ornithopter",
+        )
+        val p = d.player1
+        d.putCreatureOnBattlefield(p, "Abaddon the Despoiler")
+        val shock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, shock, listOf(d.player2)).error)
+        d.resolveAll()
+
+        d.putCardOnTopOfLibrary(p, "Ornithopter")
+        d.putCardOnTopOfLibrary(p, "Grizzly Bears")
+        val heralds = d.putCardInHand(p, "Heralds of Tzeentch")
+        d.giveMana(p, Color.BLUE)
+        d.giveColorlessMana(p, 4)
+        assertNull(d.castSpell(p, heralds).error)
+        d.resolveAll(Choices(yes = true))
+
+        assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
+        assertTrue(d.permanentsNamed(p, "Ornithopter").isEmpty())
+    }
+
+    @Test
+    fun doesNotCascadeOnYourSpellDuringAnOpponentsTurn() {
+        val d = CardPool.driver("Shock", "Ornithopter")
+        d.registerCard(AbaddonTheDespoiler)
+        val (p, opponent1, opponent2) = d.initMultiplayer(List(3) { Deck.of("Plains" to 40) })
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
+        d.putCreatureOnBattlefield(p, "Abaddon the Despoiler")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent1)
+
+        val opponentShock = d.putCardInHand(opponent1, "Shock")
+        d.giveMana(opponent1, Color.RED)
+        assertNull(d.castSpell(opponent1, opponentShock, listOf(opponent2)).error)
+        d.resolveAll()
+
+        d.putCardOnTopOfLibrary(p, "Ornithopter")
+        assertNull(d.passPriority(opponent1).error)
+        assertNull(d.passPriority(opponent2).error)
+        val shock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, shock, listOf(opponent1)).error)
+        d.resolveAll(Choices(yes = true))
+
+        assertTrue(d.permanentsNamed(p, "Ornithopter").isEmpty())
     }
 }
