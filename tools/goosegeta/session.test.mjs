@@ -202,10 +202,3 @@ test('fatal, uncorrelated and legacy rejections cannot recover; categories are a
     assert.equal(beginRejectionRecovery(g),false,'no action correlation on legacy/current stuck match');
   }
 });
-
-test('model-off cause remains separate from gameplay rejection and never guesses a legacy cause',()=>{
- const g=freshSession('id',1,'deck',100);g.model=false;g.modelOffReason='provider-or-budget';
- receive(g,{type:'error',code:'INVALID_ACTION',message:'private engine reason'},101);
- assert.equal(publicStatus(g).modelOffReason,'provider-or-budget');
- delete g.modelOffReason;assert.equal(publicStatus(g).modelOffReason,'unknown');
-});

@@ -232,6 +232,5 @@ export function publicStatus(session) {
     actionsSubmitted: session.actions, actionsAccepted: session.receipts, reason: session.reason, observedTransitions: session.transitions, lastTurn: session.lastTurn,
     rejectionCategory: session.rejection?.category ?? null,
     recoveryAvailable:canRecoverRejection(session) || canRecoverUnsupported(session),
-    modelOffReason: session.modelOffReason ?? (session.model ? null : 'unknown'),
     awaitingHost: !!session.awaiting, reservedTokens: session.reservedTokens, chatMode: session.chatMode ?? 'muted', banter: session.lastChatSource ?? (session.model ? 'model-ready' : 'canned'), model: session.model ? 'opted in' : 'off' };
 }
