@@ -1,97 +1,8 @@
-diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
---- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-+++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-@@ -314,11 +314,12 @@
-      * with at least one colored requirement for colorless mana to stand in for.
-      */
-     private fun substitutes(cost: ManaCost, context: SpellPaymentContext?): Boolean =
--        spendingColors.isNotEmpty() || (context?.colorlessAsAnyColor == true && cost.symbols.any { it.isColoredRequirement() })
-+        spendingColors.isNotEmpty() || cost.symbols.any { it is ManaSymbol.ColorlessHybrid } ||
-+            (context?.colorlessAsAnyColor == true && cost.symbols.any { it.isColoredRequirement() })
- 
-     private fun ManaSymbol.isColoredRequirement(): Boolean =
-         this is ManaSymbol.Colored || this is ManaSymbol.Phyrexian || this is ManaSymbol.HybridPair ||
--            this is ManaSymbol.MonocolorHybrid
-+            this is ManaSymbol.MonocolorHybrid || this is ManaSymbol.ColorlessHybrid
- 
-     /**
-      * Get amount of mana for a specific color.
-@@ -581,8 +582,9 @@
-                 is ManaSymbol.Phyrexian -> {
-                     remaining = remaining.trySpendColored(symbol.color, spellContext) ?: return false
-                 }
--                is ManaSymbol.MonocolorHybrid -> {
--                    // Resolved after strict pips below so a strict pip of the same color claims
-+                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
-+                is ManaSymbol.MonocolorHybrid -> {
-+                    // Resolved after strict pips below so a strict pip of the same color claims
-                     // its mana first.
-                 }
-                 ManaSymbol.Snow -> {
-@@ -665,8 +667,9 @@
-                 is ManaSymbol.Phyrexian -> {
-                     remaining = remaining.trySpendColored(symbol.color, spellContext)!!
-                 }
--                is ManaSymbol.MonocolorHybrid -> {
--                    // Resolved after strict pips below (mirrors canPay).
-+                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
-+                is ManaSymbol.MonocolorHybrid -> {
-+                    // Resolved after strict pips below (mirrors canPay).
-                 }
-                 ManaSymbol.Snow -> {
-                     // Paid after the colored pips (mirrors canPay).
-@@ -810,8 +813,9 @@
-                         unpaidSymbols.add(symbol)
-                     }
-                 }
--                is ManaSymbol.MonocolorHybrid -> {
--                    // Spend floating mana of the color if available; otherwise leave the hybrid
-+                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
-+                is ManaSymbol.MonocolorHybrid -> {
-+                    // Spend floating mana of the color if available; otherwise leave the hybrid
-                     // unpaid (as-is) so the land solver keeps the color-vs-generic choice rather
-                     // than locking it to the generic amount.
-                     val spent = remaining.trySpendColored(symbol.color, spellContext)
-@@ -914,7 +918,8 @@
-                 is ManaSymbol.Colored -> colors(symbol.color) + colorless
-                 is ManaSymbol.Phyrexian -> colors(symbol.color) + colorless
-                 is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> (colors(symbol.color1) + colors(symbol.color2)).distinct() + colorless
--                is ManaSymbol.MonocolorHybrid -> colors(symbol.color) + colorless
-+                is ManaSymbol.MonocolorHybrid -> colors(symbol.color) + colorless
-+                is ManaSymbol.ColorlessHybrid -> colors(symbol.color) + listOf(null)
-                 is ManaSymbol.Colorless -> listOf(null)
-                 else -> emptyList()
-             }
-diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
---- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
-+++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
-@@ -112,7 +112,8 @@
-         if (pip.isX) return xColors.isEmpty() || unit.color in xColors
-         return when (val symbol = pip.symbol) {
-             is ManaSymbol.Colored -> acceptsColor(unit, symbol.color)
--            is ManaSymbol.Colorless -> unit.color == null
-+            is ManaSymbol.Colorless -> unit.color == null
-+            is ManaSymbol.ColorlessHybrid -> unit.color == null || acceptsColor(unit, symbol.color)
-             is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian ->
-                 acceptsColor(unit, symbol.color1) || acceptsColor(unit, symbol.color2)
-             is ManaSymbol.Phyrexian -> acceptsColor(unit, symbol.color)
-diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
---- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-+++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-@@ -1355,7 +1355,8 @@
-                 is ManaSymbol.HybridPair -> color == symbol.color1 || color == symbol.color2
-                 is ManaSymbol.HybridPhyrexian -> color == symbol.color1 || color == symbol.color2
-                 is ManaSymbol.Phyrexian -> color == symbol.color
--                is ManaSymbol.MonocolorHybrid -> color == symbol.color
-+                is ManaSymbol.MonocolorHybrid -> color == symbol.color
-+                is ManaSymbol.ColorlessHybrid -> color == symbol.color
-                 else -> false
-             }
-         }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
+index 362560851..f95cf2963 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
-@@ -443,7 +443,8 @@
+@@ -443,7 +443,8 @@ class AlternativePaymentHandler(
  
          val hybridIndex = mutableSymbols.indexOfFirst { symbol ->
              (symbol is ManaSymbol.HybridPair && (symbol.color1 == color || symbol.color2 == color)) ||
@@ -101,8 +12,87 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
          }
          if (hybridIndex >= 0) {
              mutableSymbols.removeAt(hybridIndex)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+index d2cc4f59f..f1b41102c 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+@@ -1778,6 +1778,7 @@ class CostCalculator(
+                 is ManaSymbol.HybridPhyrexian -> color == symbol.color1 || color == symbol.color2
+                 is ManaSymbol.Phyrexian -> color == symbol.color
+                 is ManaSymbol.MonocolorHybrid -> color == symbol.color
++                is ManaSymbol.ColorlessHybrid -> color == symbol.color
+                 else -> false
+             }
+         }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
+index 25044cc56..3c9f8abab 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
+@@ -120,6 +120,7 @@ private fun ManaPool.matchFloating(
+         return when (val symbol = pip.symbol) {
+             is ManaSymbol.Colored -> acceptsColor(unit, symbol.color)
+             is ManaSymbol.Colorless -> unit.color == null
++            is ManaSymbol.ColorlessHybrid -> unit.color == null || acceptsColor(unit, symbol.color)
+             is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian ->
+                 acceptsColor(unit, symbol.color1) || acceptsColor(unit, symbol.color2)
+             is ManaSymbol.Phyrexian -> acceptsColor(unit, symbol.color)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+index 3d468e0ad..efdc2b31e 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+@@ -410,7 +410,7 @@ data class ManaPool(
+      * mana to stand in for.
+      */
+     private fun substitutes(cost: ManaCost, context: SpellPaymentContext?): Boolean =
+-        spendingColors.isNotEmpty() ||
++        spendingColors.isNotEmpty() || cost.symbols.any { it is ManaSymbol.ColorlessHybrid } ||
+             (context?.spendAsAnyColor == ManaSpentAsAnyColor.COLORLESS && cost.symbols.any { it.isColoredRequirement() })
+ 
+     /**
+@@ -425,7 +425,7 @@ data class ManaPool(
+ 
+     private fun ManaSymbol.isColoredRequirement(): Boolean =
+         this is ManaSymbol.Colored || this is ManaSymbol.Phyrexian || this is ManaSymbol.HybridPair ||
+-            this is ManaSymbol.MonocolorHybrid
++            this is ManaSymbol.MonocolorHybrid || this is ManaSymbol.ColorlessHybrid
+ 
+     /**
+      * Get amount of mana for a specific color.
+@@ -693,6 +693,7 @@ data class ManaPool(
+                 is ManaSymbol.Phyrexian -> {
+                     remaining = remaining.trySpendColored(symbol.color, spellContext) ?: return false
+                 }
++                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
+                 is ManaSymbol.MonocolorHybrid -> {
+                     // Resolved after strict pips below so a strict pip of the same color claims
+                     // its mana first.
+@@ -790,6 +791,7 @@ data class ManaPool(
+                 is ManaSymbol.Phyrexian -> {
+                     remaining = remaining.trySpendColored(symbol.color, spellContext)!!
+                 }
++                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
+                 is ManaSymbol.MonocolorHybrid -> {
+                     // Resolved after strict pips below (mirrors canPay).
+                 }
+@@ -967,6 +969,7 @@ data class ManaPool(
+                         unpaidSymbols.add(symbol)
+                     }
+                 }
++                is ManaSymbol.ColorlessHybrid -> error("Colorless hybrid must use the exact pool matcher")
+                 is ManaSymbol.MonocolorHybrid -> {
+                     // Spend floating mana of the color if available; otherwise leave the hybrid
+                     // unpaid (as-is) so the land solver keeps the color-vs-generic choice rather
+@@ -1076,6 +1079,7 @@ data class ManaPool(
+                 is ManaSymbol.Phyrexian -> colors(symbol.color)
+                 is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> colors(symbol.color1, symbol.color2)
+                 is ManaSymbol.MonocolorHybrid -> colors(symbol.color)
++                is ManaSymbol.ColorlessHybrid -> (colors(symbol.color) + listOf(null)).distinct()
+                 is ManaSymbol.Colorless -> listOf(null)
+                 else -> emptyList()
+             }
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
 new file mode 100644
+index 000000000..a175b46d3
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
 @@ -0,0 +1,82 @@

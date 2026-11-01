@@ -1,14 +1,3 @@
-From 089973eda1d11b9fbfc6b479032179ccf3afb028 Mon Sep 17 00:00:00 2001
-From: arcana <a@a>
-Date: Sat, 31 Oct 2026 20:22:57 -0600
-Subject: [PATCH 17/19] 
- engine-upgrade_build140_patches_0001-devoid-sdk-surface.patch
-
----
- docs/sdk-index.md                                   | 1 +
- mtg-sdk/src/test/resources/sdk-surface-baseline.txt | 1 +
- 2 files changed, 2 insertions(+)
-
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
 index 02cde100d..348f7a27b 100644
 --- a/docs/sdk-index.md
@@ -33,6 +22,3 @@ index bf0eb74bc..1d90b5c8d 100644
  ManaRestriction.ForetellOnly — ManaRestriction — Karfell Harbinger — ManaRestriction.UnlockDoorOnly, ManaRestriction.TurnPermanentsFaceUpOnly — each whitelists one special action's payment and is a shipped data object on the wire, so none can take another action as an axis; foretelling is its own special action (CR 702.143b), and casting the foretold card later is a spell cast that SpellsWithKeywordOnly covers
  ManaRestriction.OfChosenType — ManaRestriction — The Ringhart Crest (Kolvori, God of Kinship) — ManaRestriction.SubtypeSpellsOrAbilitiesOnly, ManaRestriction.SubtypeSpellsOnly — both carry a fixed subtype baked into the pool entry; "the chosen type" is unknown until the producing source is known, and a sentinel subtype string would collide with a printed one, so this is the unbound template the engine binds to SubtypeSpellsOrAbilitiesOnly as the mana is made (it subsumes the deleted AddAnyColorManaSpendOnChosenTypeEffect)
  ManaRestriction.SpellsWithKeywordOnly — ManaRestriction — Niko Defies Destiny — ManaRestriction.KickedSpellsOnly, ManaRestriction.SubtypeSpellsOnly — KickedSpellsOnly asks whether the kicker cost was paid, not whether the card has a keyword; SubtypeSpellsOnly reads type-line subtypes, and a keyword is not a subtype
--- 
-2.43.0
-

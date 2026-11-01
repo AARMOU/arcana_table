@@ -3,12 +3,9 @@ name: B141 engine runtime - B140 engine + targeted backports (NO APK)
 # (engine-upgrade/b141/apply_engine.sh). It rebuilds all four Argentum JARs from that one source, runs the engine's own
 # rules tests (including each backport's tests) and every existing Arcana custom-card test on the new JARs, then stages
 # the JARs on this candidate branch only when all of that is green. B140 is never modified. No APK, no release.
+# RETIRED 2026-11-01: owner chose the upstream engine for B141 (engine-port-validate.yml). Manual only, and its
+# staging step is disabled so it can never put the B140 engine back over the upstream one.
 on:
-  push:
-    branches: ['gpt/b141-candidate-*']
-    paths:
-      - engine-upgrade/b141/**
-      - .github/workflows/b141-engine-runtime.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -109,7 +106,7 @@ jobs:
           print({"tests":t,"failures":f,"errors":e}); assert t>500 and f==0 and e==0
           PY
       - name: Stage the verified JARs on this candidate branch (never B140)
-        if: github.event_name == 'push'
+        if: false
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'

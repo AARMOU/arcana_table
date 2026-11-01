@@ -1,14 +1,3 @@
-From 1d8acd09d3eb98c6f588f53f5b1d03d14c6089c9 Mon Sep 17 00:00:00 2001
-From: arcana <a@a>
-Date: Sat, 31 Oct 2026 20:22:57 -0600
-Subject: [PATCH 18/19] 
- engine-upgrade_build140_patches_0002-temple-projected-source-subtypes.patch
-
----
- .../mechanics/mana/AbilityPaymentContextBuilder.kt |  6 ++++++
- .../wingedsheep/engine/mechanics/mana/ManaPool.kt  | 14 +++++++++++---
- 2 files changed, 17 insertions(+), 3 deletions(-)
-
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 index befb346ca..28aaf5e30 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
@@ -58,6 +47,3 @@ index 155a9aa78..ce5a25da0 100644
      is ManaRestriction.DevoidSpellsOnly -> context.isSpellCast && context.isDevoid
      is ManaRestriction.SpellsWithExactColorCount -> context.isSpellCast && context.colorCount == count
      is ManaRestriction.CostsContainingXOnly -> (context.isSpellCast || context.isAbilityActivation) && context.hasXInCost
--- 
-2.43.0
-

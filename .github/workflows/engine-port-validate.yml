@@ -1,15 +1,22 @@
-name: Engine upstream port - validate (NO APK, no staging)
-# Builds current upstream Argentum (engine-upgrade/upstream-port-wip/UPSTREAM) plus the ported Arcana patch series
-# (engine-upgrade/upstream-port-wip/series, git am, fail closed), runs the engine's full SDK and rules test suites,
-# builds all four runtime JARs, then runs every Arcana custom-card test against them. Validation only: nothing is
-# committed, no JARs are staged, no APK is built.
+name: B141 engine - validate upstream + Arcana patches, stage on request (NO APK)
+# Builds upstream Argentum at engine-upgrade/audit_patches.py TARGET plus every MANDATORY patch in argentum-patches/
+# (the same series the Monday weekly carries), runs the engine's SDK and rules suites, installs the JARs and library
+# export into the app as the weekly does, reconciles custom-card collisions, and runs the custom-card and app suites.
+# With stage=true and everything green, commits the engine, library data, overrides and refreshed agent docs to this
+# B141 candidate branch. Never builds an APK.
 on:
   push:
     branches: ['gpt/b141-candidate-*']
     paths:
-      - engine-upgrade/upstream-port-wip/**
+      - argentum-patches/**
+      - engine-upgrade/audit_patches.py
       - .github/workflows/engine-port-validate.yml
   workflow_dispatch:
+    inputs:
+      stage:
+        description: Commit the validated engine and data to this branch
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -19,11 +26,13 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Upstream pin
         id: pin
-        run: echo "sha=$(tr -d ' \n' < engine-upgrade/upstream-port-wip/UPSTREAM)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(python3 -c "import re;print(re.search(r'^TARGET = \"([0-9a-f]{40})\"',open('engine-upgrade/audit_patches.py').read(),re.M)[1])")" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           repository: wingedsheep/argentum-engine
@@ -35,13 +44,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Apply the ported series (fail closed)
-        working-directory: argentum-engine
+      - name: Apply every MANDATORY patch in order (strict audit, fail closed)
         run: |
           set -euo pipefail
-          git config user.name arcana; git config user.email a@a
-          git am --3way ../engine-upgrade/upstream-port-wip/series/*.patch
-          git log --oneline ${{ steps.pin.outputs.sha }}..HEAD
+          python3 engine-upgrade/audit_patches.py
+          git -C argentum-engine status --short | wc -l
       - name: Engine SDK + rules tests and all four runtime JARs
         id: enginetests
         continue-on-error: true
@@ -82,10 +89,6 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Card sources that must change with the engine (port overlay, not committed)
-        run: |
-          set -euo pipefail
-          cp -rv engine-upgrade/upstream-port-wip/cards/. android/
       - name: Imported cards against the new library
         continue-on-error: true
         run: python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
@@ -132,6 +135,27 @@ jobs:
           echo "engine: ${{ steps.enginetests.outcome }}/${{ steps.enginesummary.outcome }} custom: ${{ steps.custom.outcome }} app: ${{ steps.app.outcome }}"
           test "${{ steps.enginetests.outcome }}" = success && test "${{ steps.enginesummary.outcome }}" = success
           test "${{ steps.custom.outcome }}" = success && test "${{ steps.app.outcome }}" = success
+      - name: Stage the validated engine, data and agent docs on this B141 branch
+        if: success() && inputs.stage
+        run: |
+          set -euo pipefail
+          old=$(git show HEAD:engine-upgrade/b141/engine-source.txt | grep -o '[0-9a-f]\{40\}' | head -1)
+          new=${{ steps.pin.outputs.sha }}
+          mkdir -p engine-upgrade/weekly
+          printf '{"old_pin":"%s","target":"%s"}\n' "$old" "$new" > engine-upgrade/weekly/rebase.json
+          python3 engine-upgrade/weekly.py docs argentum-engine || echo "::warning::weekly.py docs reported gaps"
+          tools/cardkit/cardkit sdk-index
+          tools/cardkit/cardkit docs-check || echo "::warning::cardkit docs-check"
+          { echo "upstream wingedsheep/argentum-engine@$new"
+            echo "series: argentum-patches/ MANDATORY (engine-upgrade/audit_patches.py), validated by run ${{ github.run_id }}"
+            sha256sum android/app/libs/argentum-*.jar; } > engine-upgrade/b141/engine-source.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f android/app/libs/argentum-*.jar android/app/src/main/assets/argentum engine-upgrade/b141/engine-source.txt
+          git add -A AGENTS.md docs tools/cardkit
+          git diff --cached --stat | tail -5
+          git commit -m "B141: upstream Argentum $new + Arcana patches 0001-0021; library, custom-card data, overrides and agent docs (run ${{ github.run_id }})"
+          git push origin HEAD:${{ github.ref_name }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

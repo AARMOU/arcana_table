@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "argentum-engine"
 PATCHES = ROOT / "argentum-patches"
 REPORT = ROOT / "engine-upgrade" / "patch-report.json"
-TARGET = "61e71e586b100faa661f86cac827ac3c3bbb5a78"
+TARGET = "c1c04ca3265c61df913af6db65460ad4ce409614"
 MANDATORY = [
     "0001-android-regex.patch",
     "0002-engine-trial-build.patch",
@@ -27,13 +27,17 @@ MANDATORY = [
     "0006-ai-decision-deadline.patch",
     "0007-ai-bounded-stack-search.patch",
     "0008-jvm-test-toolchain.patch",
-    # Ulalek / Zhulodok / Abaddon engine support (were engine-upgrade/ulalek/patches 0004-0009).
     "0011-stack-object-copying.patch",
     "0012-colorless-hybrid-sdk.patch",
     "0013-colorless-hybrid-floating-payment.patch",
     "0014-colorless-hybrid-auto-tap.patch",
     "0015-granted-cascade.patch",
     "0016-granted-keyword-mana-value-cap.patch",
+    "0017-colorless-eldrazi-source-mana.patch",
+    "0018-devoid-after-temple.patch",
+    "0019-devoid-sdk-surface.patch",
+    "0020-temple-projected-source-subtypes.patch",
+    "0021-azlask-exact-colors-trigger.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

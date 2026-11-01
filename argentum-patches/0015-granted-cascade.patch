@@ -1,7 +1,8 @@
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
+index 835d974bd..0d4899a65 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-@@ -24,6 +24,7 @@
+@@ -21,6 +21,7 @@ import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
  import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
  import com.wingedsheep.sdk.core.Keyword
  import com.wingedsheep.sdk.core.Zone
@@ -9,7 +10,7 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/action
  import com.wingedsheep.sdk.dsl.Patterns
  import com.wingedsheep.sdk.model.CardDefinition
  import com.wingedsheep.sdk.scripting.AbilityId
-@@ -163,9 +164,26 @@
+@@ -162,7 +163,24 @@ internal class CastTriggers(
          val storm = List(stormInstances(state, action, cardDef)) {
              selfTrigger(state, spell, "storm", copyEffect(spell, spellEffect, stormCount), "Storm — copy $name $stormCount time(s)")
          }
@@ -20,8 +21,8 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/action
 +            selfTrigger(state, spell, "cascade_granted", Effects.Cascade, "Cascade")
 +        }
 +        return conspire + casualty + replicate + storm + grantedCascade
-     }
- 
++    }
++
 +    private fun grantedCascadeInstances(state: GameState, action: CastSpell, cardDef: CardDefinition): Int {
 +        val grants = state.getEntity(action.playerId)?.get<GrantedSpellKeywordsComponent>()?.grants.orEmpty()
 +        val context = PredicateContext(controllerId = action.playerId)
@@ -32,65 +33,60 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/action
 +        return emblems + grantedKeywordResolver.countGrants(
 +            state, action.playerId, cardDef, Keyword.CASCADE, action.cardId
 +        )
-+    }
-+
+     }
+ 
      private fun stormInstances(state: GameState, action: CastSpell, cardDef: CardDefinition): Int {
-         val grants = state.getEntity(action.playerId)?.get<GrantedSpellKeywordsComponent>()?.grants ?: emptyList()
-         val evalContext = PredicateContext(controllerId = action.playerId)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
+index c8f8d0af7..f99d04fa7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
-@@ -88,6 +88,7 @@
-     ): EntityId? {
-         findNextSpellRider(state, playerId, cardDef, keyword)?.let { return it }
+@@ -91,6 +91,7 @@ class GrantedKeywordResolver(
+         val colors = state.projectedState.spellColors(playerId, cardDef.colors, spellId)
+         findNextSpellRider(state, playerId, cardDef, keyword, colors)?.let { return it }
          val spellZone by lazy(LazyThreadSafetyMode.NONE) { castZone(state, spellId) }
 +        val castManaValue by lazy(LazyThreadSafetyMode.NONE) { manaValueAtCast(state, spellId, cardDef) }
          for (permanentId in state.getBattlefield()) {
              val container = state.getEntity(permanentId) ?: continue
              val controllerId = container.get<ControllerComponent>()?.playerId ?: continue
-@@ -97,7 +98,7 @@
+@@ -99,7 +100,7 @@ class GrantedKeywordResolver(
              for (ability in sourceDef.script.staticAbilities) {
                  if (ability is GrantKeywordToOwnSpells &&
                      ability.keyword == keyword &&
--                    grantApplies(ability, cardDef) { spellZone }
-+                    grantApplies(ability, cardDef, { spellZone }, { castManaValue })
+-                    grantApplies(ability, cardDef, colors) { spellZone }
++                    grantApplies(ability, cardDef, colors, { spellZone }, { castManaValue })
                  ) {
                      return permanentId
                  }
-@@ -121,6 +122,7 @@
-     ): Int {
-         var count = state.pendingNextSpellKeywords.count { riderApplies(it, playerId, cardDef, keyword) }
+@@ -124,6 +125,7 @@ class GrantedKeywordResolver(
+         val colors = state.projectedState.spellColors(playerId, cardDef.colors, spellId)
+         var count = state.pendingNextSpellKeywords.count { riderApplies(it, playerId, cardDef, keyword, colors) }
          val spellZone by lazy(LazyThreadSafetyMode.NONE) { castZone(state, spellId) }
 +        val castManaValue by lazy(LazyThreadSafetyMode.NONE) { manaValueAtCast(state, spellId, cardDef) }
          for (permanentId in state.getBattlefield()) {
              val container = state.getEntity(permanentId) ?: continue
              val controllerId = container.get<ControllerComponent>()?.playerId ?: continue
-@@ -130,7 +132,7 @@
+@@ -132,7 +134,7 @@ class GrantedKeywordResolver(
              for (ability in sourceDef.script.staticAbilities) {
                  if (ability is GrantKeywordToOwnSpells &&
                      ability.keyword == keyword &&
--                    grantApplies(ability, cardDef) { spellZone }
-+                    grantApplies(ability, cardDef, { spellZone }, { castManaValue })
+-                    grantApplies(ability, cardDef, colors) { spellZone }
++                    grantApplies(ability, cardDef, colors, { spellZone }, { castManaValue })
                  ) {
                      count++
                  }
-@@ -164,18 +166,36 @@
-         matchesSpellFilter(rider.spellFilter, cardDef)
- 
+@@ -170,16 +172,34 @@ class GrantedKeywordResolver(
      /** [castZone] is only consulted by a zone-scoped grant, so the zone scan stays off the common path. */
--    private inline fun grantApplies(grant: GrantKeywordToOwnSpells, cardDef: CardDefinition, castZone: () -> Zone?): Boolean =
--        matchesSpellFilter(grant.spellFilter, cardDef) && (grant.fromZone == null || grant.fromZone == castZone())
-+    // Keep the three-argument overload for existing pre-cast keyword consumers (casualty).
-+    private inline fun grantApplies(grant: GrantKeywordToOwnSpells, cardDef: CardDefinition, castZone: () -> Zone?): Boolean =
-+        matchesSpellFilter(grant.spellFilter, cardDef) && (grant.fromZone == null || grant.fromZone == castZone())
+     private inline fun grantApplies(grant: GrantKeywordToOwnSpells, cardDef: CardDefinition, colors: Set<Color>, castZone: () -> Zone?): Boolean =
+         matchesSpellFilter(grant.spellFilter, cardDef, colors) && (grant.fromZone == null || grant.fromZone == castZone())
 +    private inline fun grantApplies(
 +        grant: GrantKeywordToOwnSpells,
 +        cardDef: CardDefinition,
++        colors: Set<Color>,
 +        castZone: () -> Zone?,
 +        manaValue: () -> Int
-+    ): Boolean = matchesSpellFilter(grant.spellFilter, cardDef, manaValue()) &&
++    ): Boolean = matchesSpellFilter(grant.spellFilter, cardDef, colors, manaValue()) &&
 +        (grant.fromZone == null || grant.fromZone == castZone())
- 
++
 +    /** Account for the announced X on the stack when qualifying a keyword grant. */
 +    private fun manaValueAtCast(state: GameState, spellId: EntityId?, cardDef: CardDefinition): Int {
 +        val container = spellId?.let { state.getEntity(it) } ?: return cardDef.manaCost.cmc
@@ -98,36 +94,36 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
 +        val x = container.get<SpellOnStackComponent>()?.xValue ?: 0
 +        return cost.withXAs(x).cmc
 +    }
-+
+ 
      /**
       * Match a spell's [cardDef] against a [GameObjectFilter] using the card's printed
-      * characteristics. Only a narrow set of predicates is supported because spells being cast
+      * characteristics, except [colors]: the spell's actual ones (Mycosynth Lattice). Only a narrow set of predicates is supported because spells being cast
       * don't yet have battlefield state — the caller knows the card, not an entity.
       */
--    private fun matchesSpellFilter(filter: GameObjectFilter, cardDef: CardDefinition): Boolean {
+-    private fun matchesSpellFilter(filter: GameObjectFilter, cardDef: CardDefinition, colors: Set<Color>): Boolean {
 +    private fun matchesSpellFilter(
-+        filter: GameObjectFilter, cardDef: CardDefinition, manaValue: Int = cardDef.manaCost.cmc
++        filter: GameObjectFilter, cardDef: CardDefinition, colors: Set<Color>, manaValue: Int = cardDef.manaCost.cmc
 +    ): Boolean {
          // GameObjectFilter.Any / empty predicates match everything.
          if (filter.cardPredicates.isEmpty() && filter.controllerPredicate == null) return true
--        return filter.cardPredicates.all { matchesPredicate(it, cardDef) }
-+        return filter.cardPredicates.all { matchesPredicate(it, cardDef, manaValue) }
+-        return filter.cardPredicates.all { matchesPredicate(it, cardDef, colors) }
++        return filter.cardPredicates.all { matchesPredicate(it, cardDef, colors, manaValue) }
      }
  
      /**
-@@ -184,11 +201,14 @@
+@@ -188,11 +208,14 @@ class GrantedKeywordResolver(
       * [GameObjectFilter.InstantOrSorcery] (an `Or` of `IsInstant`/`IsSorcery`) resolve, which
       * is what "instant and sorcery spells you cast have storm" needs.
       */
--    private fun matchesPredicate(predicate: CardPredicate, cardDef: CardDefinition): Boolean =
-+    private fun matchesPredicate(predicate: CardPredicate, cardDef: CardDefinition, manaValue: Int): Boolean =
+-    private fun matchesPredicate(predicate: CardPredicate, cardDef: CardDefinition, colors: Set<Color>): Boolean =
++    private fun matchesPredicate(predicate: CardPredicate, cardDef: CardDefinition, colors: Set<Color>, manaValue: Int): Boolean =
          when (predicate) {
--            is CardPredicate.And -> predicate.predicates.all { matchesPredicate(it, cardDef) }
--            is CardPredicate.Or -> predicate.predicates.any { matchesPredicate(it, cardDef) }
--            is CardPredicate.Not -> !matchesPredicate(predicate.predicate, cardDef)
-+            is CardPredicate.And -> predicate.predicates.all { matchesPredicate(it, cardDef, manaValue) }
-+            is CardPredicate.Or -> predicate.predicates.any { matchesPredicate(it, cardDef, manaValue) }
-+            is CardPredicate.Not -> !matchesPredicate(predicate.predicate, cardDef, manaValue)
+-            is CardPredicate.And -> predicate.predicates.all { matchesPredicate(it, cardDef, colors) }
+-            is CardPredicate.Or -> predicate.predicates.any { matchesPredicate(it, cardDef, colors) }
+-            is CardPredicate.Not -> !matchesPredicate(predicate.predicate, cardDef, colors)
++            is CardPredicate.And -> predicate.predicates.all { matchesPredicate(it, cardDef, colors, manaValue) }
++            is CardPredicate.Or -> predicate.predicates.any { matchesPredicate(it, cardDef, colors, manaValue) }
++            is CardPredicate.Not -> !matchesPredicate(predicate.predicate, cardDef, colors, manaValue)
 +            is CardPredicate.ManaValueAtLeast -> manaValue >= predicate.min
 +            is CardPredicate.ManaValueAtMost -> manaValue <= predicate.max
 +            is CardPredicate.ManaValueEquals -> manaValue == predicate.value
