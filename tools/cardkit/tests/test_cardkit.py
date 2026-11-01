@@ -144,7 +144,7 @@ class SdkTests(unittest.TestCase):
         self.assertTrue(sdk.member_exists("Costs", "Tap"))
         self.assertFalse(sdk.member_exists("Effects", "DrawCardsAndWinTheGame"))
         self.assertIn("FLYING", sdk.keyword_enum())
-        self.assertNotIn("INFECT", sdk.keyword_enum())
+        self.assertNotIn("FLIBBERJIG", sdk.keyword_enum())
 
     @unittest.skipUnless(shutil.which("javap"), "needs a JDK")
     def test_committed_index_is_current(self):

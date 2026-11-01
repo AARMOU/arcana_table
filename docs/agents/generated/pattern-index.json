@@ -221,7 +221,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -853,7 +853,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -1402,7 +1402,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -1596,7 +1596,7 @@
    ]
   },
   "Effects.CopyTargetSpell": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Reverberate",
@@ -1615,6 +1615,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
+    },
+    {
+     "card": "Primal Amulet",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
+     "lines": 71,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
   },
@@ -2896,7 +2902,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -3128,7 +3134,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -5583,7 +5589,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
@@ -6589,7 +6595,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     },
     {
@@ -6955,7 +6961,7 @@
    ]
   },
   "EffectTarget.TriggeringEntity": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -7308,7 +7314,7 @@
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 66,
+     "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
