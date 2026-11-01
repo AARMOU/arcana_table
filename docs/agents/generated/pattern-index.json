@@ -1779,7 +1779,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3442,7 +3442,7 @@
    ]
   },
   "Keyword.FLASH": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Sister of Silence",
@@ -3780,7 +3780,7 @@
    ]
   },
   "Keyword.TRAMPLE": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -4456,7 +4456,7 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Dinosaur Egg",
@@ -4483,16 +4483,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
     },
     {
+     "card": "Ancient Stone Idol",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
+     "lines": 52,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
+    },
+    {
      "card": "Power Depot",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
-    },
-    {
-     "card": "Matter Reshaper",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MatterReshaper.kt",
-     "lines": 81,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MatterReshaperScenarioTest.kt"
     }
    ]
   },
@@ -4933,7 +4933,7 @@
    ]
   },
   "keywords()": {
-   "count": 100,
+   "count": 101,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5205,7 +5205,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 60,
+   "count": 61,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5246,7 +5246,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 152,
+   "count": 153,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6589,7 +6589,7 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Herald of Slaanesh",
@@ -6608,6 +6608,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
+    },
+    {
+     "card": "Ancient Stone Idol",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
+     "lines": 52,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
     },
     {
      "card": "Primal Amulet",
@@ -7240,7 +7246,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 111,
+   "count": 112,
    "examples": [
     {
      "card": "Their Name Is Death",
