@@ -1,0 +1,8 @@
+{
+  "key": "zephyrim",
+  "name": "Zephyrim",
+  "issue": 703,
+  "source": "certification/ZephyrimIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ZephyrimIndependentCertificationTest",
+  "tests": 6
+}
