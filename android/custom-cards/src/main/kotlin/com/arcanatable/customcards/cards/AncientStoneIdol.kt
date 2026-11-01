@@ -38,6 +38,7 @@ val AncientStoneIdol = card("Ancient Stone Idol") {
             creatureTypes = setOf("Construct"),
             keywords = setOf(Keyword.TRAMPLE),
             artifactToken = true,
+            name = "Construct",
         )
     }
 
