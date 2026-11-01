@@ -1,0 +1,9 @@
+{
+  "key": "bituminous-blast",
+  "name": "Bituminous Blast",
+  "issue": 802,
+  "source": "certification/BituminousBlastIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BituminousBlastIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
