@@ -2,8 +2,8 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.WarpingWail
 import com.arcanatable.customcards.support.*
-import com.wingedsheep.engine.core.ChooseOptionDecision
-import com.wingedsheep.engine.core.OptionChosenResponse
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
@@ -14,17 +14,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WarpingWailIndependentCertificationTest {
-    private fun resolveMode(d: GameTestDriver, mode: Int, targets: List<EntityId> = emptyList()) {
-        repeat(60) {
-            when (val decision = d.state.pendingDecision) {
-                is ChooseOptionDecision ->
-                    assertNull(d.submitDecision(decision.playerId, OptionChosenResponse(decision.id, mode)).error)
-                null -> if (d.state.stack.isNotEmpty()) d.bothPass() else return
-                else -> d.decide(Choices(targets = targets))
-            }
-        }
-        error("Warping Wail did not finish resolving its selected mode")
-    }
+    // Modal spells announce their mode and targets before paying costs.
+    private fun castMode(
+        d: GameTestDriver, player: EntityId, card: EntityId,
+        mode: Int, targets: List<ChosenTarget> = emptyList(),
+    ) = d.submit(CastSpell(
+        playerId = player, cardId = card, targets = targets,
+        paymentStrategy = PaymentStrategy.FromPool,
+        chosenModes = listOf(mode), modeTargetsOrdered = listOf(targets),
+    ))
 
     @Test
     fun costsOneGenericAndOneColorlessManaAndExilesAZeroPowerCreature() {
@@ -35,10 +33,10 @@ class WarpingWailIndependentCertificationTest {
         d.giveMana(p, Color.BLUE)
         d.giveColorlessMana(p, 1)
 
-        assertNull(d.castSpell(p, wail, listOf(target)).error)
+        assertNull(castMode(d, p, wail, 0, listOf(ChosenTarget.Permanent(target))).error)
         assertEquals(0, d.manaPool(p).blue)
         assertEquals(0, d.manaPool(p).colorless)
-        resolveMode(d, 0, listOf(target))
+        d.resolveAll()
 
         assertTrue(d.zoneNames(d.player2, Zone.EXILE).contains("Ornithopter"))
         assertFalse(d.getPermanents(d.player2).contains(target))
@@ -52,7 +50,7 @@ class WarpingWailIndependentCertificationTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveMana(p, Color.BLUE, 2)
 
-        assertNotNull(d.castSpell(p, wail, listOf(target)).error)
+        assertNotNull(castMode(d, p, wail, 0, listOf(ChosenTarget.Permanent(target))).error)
         assertTrue(d.getHand(p).contains(wail))
         assertTrue(d.getPermanents(d.player2).contains(target))
         assertEquals(2, d.manaPool(p).blue)
@@ -66,8 +64,8 @@ class WarpingWailIndependentCertificationTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveColorlessMana(p, 2)
 
-        assertNull(d.castSpell(p, wail, listOf(target)).error)
-        resolveMode(d, 0, listOf(target))
+        assertNull(castMode(d, p, wail, 0, listOf(ChosenTarget.Permanent(target))).error)
+        d.resolveAll()
 
         assertTrue(d.zoneNames(d.player2, Zone.EXILE).contains("Savannah Lions"))
         assertFalse(d.getPermanents(d.player2).contains(target))
@@ -81,7 +79,7 @@ class WarpingWailIndependentCertificationTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveColorlessMana(p, 2)
 
-        assertNotNull(d.castSpell(p, wail, listOf(target)).error)
+        assertNotNull(castMode(d, p, wail, 0, listOf(ChosenTarget.Permanent(target))).error)
         assertTrue(d.getHand(p).contains(wail))
         assertTrue(d.getPermanents(d.player2).contains(target))
     }
@@ -102,8 +100,8 @@ class WarpingWailIndependentCertificationTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveMana(p, Color.RED)
         d.giveColorlessMana(p, 1)
-        assertNull(d.castSpellWithTargets(p, wail, listOf(ChosenTarget.Spell(spellOnStack))).error)
-        resolveMode(d, 1)
+        assertNull(castMode(d, p, wail, 1, listOf(ChosenTarget.Spell(spellOnStack))).error)
+        d.resolveAll()
 
         assertTrue(d.getGraveyard(opponent).contains(sorcery))
         assertEquals(0, d.stackSize)
@@ -124,7 +122,7 @@ class WarpingWailIndependentCertificationTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveMana(p, Color.BLUE)
         d.giveColorlessMana(p, 1)
-        assertNotNull(d.castSpellWithTargets(p, wail, listOf(ChosenTarget.Spell(spellOnStack))).error)
+        assertNotNull(castMode(d, p, wail, 1, listOf(ChosenTarget.Spell(spellOnStack))).error)
 
         assertTrue(d.getHand(p).contains(wail))
         assertEquals(1, d.stackSize)
@@ -139,8 +137,8 @@ class WarpingWailIndependentCertificationTest {
         d.giveMana(p, Color.BLUE)
         d.giveColorlessMana(p, 1)
 
-        assertNull(d.castSpell(p, wail).error)
-        resolveMode(d, 2)
+        assertNull(castMode(d, p, wail, 2).error)
+        d.resolveAll()
 
         val scion = d.permanentsNamed(p, "Eldrazi Scion").single()
         assertTrue(d.state.getEntity(scion)!!.has<TokenComponent>())
@@ -151,7 +149,8 @@ class WarpingWailIndependentCertificationTest {
             .forEach { assertFalse(d.projected.hasColor(scion, it)) }
 
         val colorlessBefore = d.manaPool(p).colorless
-        assertNull(d.activate(p, scion).error)
+        val sacrificeMana = d.abilityActions(p, scion).single().action
+        assertNull(d.submit(sacrificeMana).error)
         assertEquals(colorlessBefore + 1, d.manaPool(p).colorless)
         assertTrue(d.permanentsNamed(p, "Eldrazi Scion").isEmpty())
     }
