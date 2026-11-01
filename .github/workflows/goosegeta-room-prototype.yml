@@ -4,6 +4,7 @@ on:
     branches:
       - gpt/goosegeta-room-client-20261031
       - gpt/summon-goosegeta-cloud-20261031
+      - gpt/goosegeta-control-handoff-20261031
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,7 +56,8 @@ jobs:
             --tests 'com.arcanatable.GoosegetaStrictDeckTest' \
             --tests 'com.arcanatable.ArgentumRoomChatTest' \
             --tests 'com.arcanatable.MultiplayerLobby*Test' \
-            --tests 'com.arcanatable.RelayInboxTest'
+            --tests 'com.arcanatable.RelayInboxTest' \
+            --tests 'com.arcanatable.LanConnectionServiceGuardTest'
       - name: Verify exact JUnit counts (no skipped chat or strict-deck checks)
         run: |
           python3 - <<'PYXML'
@@ -76,3 +78,160 @@ jobs:
         with:
           name: summon-goosegeta-android-junit-no-apk
           path: android/app/build/test-results/testDebugUnitTest/
+
+  handoff-debug-apk:
+    name: Owner-approved Goosegeta + Arcana-Control handoff TEST APK
+    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/goosegeta-control-handoff-20261031'
+    needs: [node-prototype, android-source-no-apk]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm only isolated handoff repair + focused test + APK recipe changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=d7d4017e9dc0e4896f49d50342e437fc998f4970
+          git merge-base --is-ancestor "$BASE" HEAD
+          git diff --name-only "$BASE" HEAD | sort > /tmp/handoff-paths
+          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/build.gradle.kts' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' 'android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt' | sort > /tmp/allowed-paths
+          diff -u /tmp/allowed-paths /tmp/handoff-paths
+          for part in argentum-ai.jar argentum-mtg-sdk-tooling.jar argentum-mtg-sdk.jar argentum-rules-engine.jar; do
+            p="android/app/libs/$part"
+            test "$(git rev-parse "HEAD:$p")" = "$(git rev-parse "$BASE:$p")"
+          done
+          mkdir -p handoff-apk
+          git rev-parse HEAD > handoff-apk/SOURCE-SHA.txt
+          echo 'Authorized isolated Android debug test; production app, engine JARs, live Control and Cloudflare config unchanged.' > handoff-apk/SCOPE.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Point test install to existing isolated Goosegeta room, never production
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          file=Path('android/app/src/main/java/com/arcanatable/TableModel.kt')
+          src=file.read_text()
+          old='internal const val DEFAULT_CLOUD_ROOM_ENDPOINT = "https://arcana-table-rooms.arcanamtg.workers.dev"'
+          new='internal const val DEFAULT_CLOUD_ROOM_ENDPOINT = "https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev"'
+          assert src.count(old)==1, 'Cloud endpoint baseline drift'
+          file.write_text(src.replace(old,new))
+          print('Test-only endpoint confirmed; no source branch modification')
+          PY
+      - name: Prefetch Robolectric Android 14 jar with Maven checksum for real reconnect UI test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Robolectric's runtime MavenArtifactFetcher uses its own HTTP stack, not Gradle.
+          # Pin and verify the exact SDK 34 framework jar in a runner-local test-only dir.
+          # SDK 34 runs the test; Robolectric 4.14.1 also loads the app package with its newest SDK (35), so both
+          # instrumented jars must be local (run 41249008131: "Path is not a file: ...-15-robolectric-12650502-i7.jar").
+          dest="$RUNNER_TEMP/arcana-robolectric"
+          mkdir -p "$dest"
+          for version in 14-robolectric-10818077-i7 15-robolectric-12650502-i7; do
+            jar="android-all-instrumented-${version}.jar"
+            url="https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented/${version}/${jar}"
+            curl --fail --location --retry 2 --connect-timeout 10 --max-time 240 --silent --show-error "$url" -o "$dest/$jar"
+            curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 --silent --show-error "$url.sha1" -o "$dest/$jar.sha1"
+            expected="$(cut -c1-40 "$dest/$jar.sha1")"
+            actual="$(sha1sum "$dest/$jar" | awk '{print $1}')"
+            test -s "$dest/$jar"
+            test "$actual" = "$expected"
+            echo "PASS: $jar verified against Maven checksum"
+          done
+      - name: Run lifecycle guard regression and assemble isolated Android APK
+        shell: bash
+        working-directory: android
+        run: |
+          set -euo pipefail
+          # Print the *actual missing path or assertion* from JUnit on failure, without
+          # weakening the mandatory UI test or building an APK on a red result.
+          if ! ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.LanConnectionServiceGuardTest' \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest.unsupportedDecisionMalformedDataBackgroundPauseAndResume' \
+            -Parcana.robolectricJarDir="$RUNNER_TEMP/arcana-robolectric" \
+            -Parcana.debugApplicationIdSuffix=.goosegetahandoff; then
+            echo '--- EXACT JUnit failure details ---'
+            python3 - <<'PYJUNIT'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in sorted(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')):
+              root = ET.parse(p).getroot()
+              for testcase in root.iter('testcase'):
+                  for failure in list(testcase.findall('failure'))+list(testcase.findall('error')):
+                      print('TEST:', p.name, testcase.attrib.get('name'), 'MESSAGE:', failure.attrib.get('message'))
+                      print((failure.text or '')[-9000:])
+          PYJUNIT
+            echo '--- available runner-local Robolectric JARs ---'
+            ls -lh "$RUNNER_TEMP/arcana-robolectric" || true
+            exit 1
+          fi
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            -Parcana.debugApplicationIdSuffix=.goosegetahandoff \
+            '-Parcana.debugLabel=Goosegeta Handoff Test'
+      - name: Validate focused JUnit, isolated package, signature, bundled assets and fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          xml=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*LanConnectionServiceGuardTest.xml'))
+          assert len(xml)==1, xml
+          suite=ET.parse(xml[0]).getroot()
+          assert int(suite.attrib.get('tests','0'))==10, suite.attrib
+          assert all(int(suite.attrib.get(k,'0'))==0 for k in ('failures','errors','skipped')), suite.attrib
+          ui=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*ArgentumResilienceUiTest.xml'))
+          assert len(ui)==1, ui
+          ui_suite=ET.parse(ui[0]).getroot()
+          assert int(ui_suite.attrib.get('tests','0'))==1, ui_suite.attrib
+          assert all(int(ui_suite.attrib.get(k,'0'))==0 for k in ('failures','errors','skipped')), ui_suite.attrib
+          print('PASS: 10 lifecycle guards + real simulated socket background/foreground recovery')
+          PY
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > handoff-apk/badging.txt
+          grep -F "package: name='com.arcanatable.goosegetahandoff'" handoff-apk/badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > handoff-apk/signature.txt
+          grep -F 'Signer #1 certificate SHA-256 digest:' handoff-apk/signature.txt
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          source=Path('android/app/src/main/assets/argentum')
+          with ZipFile(apk) as z:
+            for f in source.iterdir():
+              if f.is_file():
+                name='assets/argentum/'+f.name
+                assert z.read(name)==f.read_bytes(), 'runtime asset mismatch: '+f.name
+          print('PASS: packaged Argentum assets byte-identical to source')
+          PY
+          cp "$APK" handoff-apk/Goosegeta-Handoff-Test.apk
+          sha256sum handoff-apk/Goosegeta-Handoff-Test.apk > handoff-apk/SHA256SUMS.txt
+          printf '%s\n' 'PACKAGE=com.arcanatable.goosegetahandoff' 'ROOMS=https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev' 'NO_NEW_PAID_MODEL_CALL_OR_CLOUDFLARE_DEPLOY' >> handoff-apk/SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Goosegeta-Handoff-Test-APK
+          path: handoff-apk/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Record APK availability
+        shell: bash
+        run: |
+          {
+            echo '## Goosegeta handoff DEBUG test APK'
+            echo 'The artifact Goosegeta-Handoff-Test-APK contains the installable APK and checksums.'
+            echo "Source: $(git rev-parse HEAD)"
+            echo 'No production merge, signing, Play release, Cloudflare deploy, or live paid-model call.'
+          } >> "$GITHUB_STEP_SUMMARY"

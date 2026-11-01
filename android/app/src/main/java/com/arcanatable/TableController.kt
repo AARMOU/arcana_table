@@ -660,7 +660,9 @@ internal class TableController(
     /** Offline: card id whose real maximum X the engine is still working out for the open composer. */
     var argentumXChecking by run { mutableStateOf<String?>(null) }
     // Wi-Fi play (one phone hosts the engine, the other joins).
-    var wifiServer: ArgentumHostLink? = null
+    // An open Wi-Fi or directed-cloud lobby needs the foreground game guard before play starts.
+    // Keep the host observable so Compose updates the guard when a lobby is opened or closed.
+    var wifiServer by run { mutableStateOf<ArgentumHostLink?>(null) }
     var onlineRoomCode by run { mutableStateOf<String?>(null) } // host: the code to share
     var onlineJoinOpen by run { mutableStateOf(false) }
     var onlineCodeInput by run { mutableStateOf("") }

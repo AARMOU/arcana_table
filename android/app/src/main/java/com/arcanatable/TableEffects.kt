@@ -143,6 +143,26 @@ import kotlinx.coroutines.CoroutineScope
 internal fun shouldFollowActivePlayerToBoard(followEnabled: Boolean, showingTable: Boolean, active: Int, playerCount: Int): Boolean =
     followEnabled && !showingTable && active in 0 until playerCount
 
+/**
+ * Protect both an already-started game and a Wi-Fi/directed-cloud host lobby.
+ * The lobby's multi-transport is not in the legacy roomHost/cloudRoomClient fields.
+ */
+internal fun shouldKeepMultiplayerConnectionGuard(
+    legacyHost: Boolean,
+    legacyClient: Boolean,
+    cloudClient: Boolean,
+    multiTransport: Boolean,
+    argentumEnabled: Boolean,
+): Boolean = legacyHost || legacyClient || cloudClient || multiTransport || argentumEnabled
+
+/** Only a suspended remote game is eligible for automatic app-switch recovery. */
+internal fun shouldResumePausedArgentumOnForeground(
+    foreground: Boolean,
+    gameEnabled: Boolean,
+    offline: Boolean,
+    status: ArgentumConnectionStatus,
+): Boolean = foreground && gameEnabled && !offline && status == ArgentumConnectionStatus.PAUSED
+
 /** All of the main screen's effects (LaunchedEffect / SideEffect / DisposableEffect). */
 @Composable
 internal fun TableController.TableEffects(darkMode: Boolean) {
@@ -231,9 +251,23 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         selectedPlayer = active
     }
 
-    LaunchedEffect(roomHost, roomClient, cloudRoomClient, argentumEnabled) {
-        if (roomHost != null || roomClient != null || cloudRoomClient != null || argentumEnabled) LanConnectionService.start(context)
-        else if (!argentumEnabled) LanConnectionService.stop(context)
+    // The connection guard follows the *presence* of any live game, not individual socket
+    // identities. Replacing a room client must not cycle the foreground service off.
+    val keepGameConnectionActive = shouldKeepMultiplayerConnectionGuard(
+        legacyHost = roomHost != null,
+        legacyClient = roomClient != null,
+        cloudClient = cloudRoomClient != null,
+        multiTransport = wifiServer != null,
+        argentumEnabled = argentumEnabled,
+    )
+    LaunchedEffect(keepGameConnectionActive) {
+        if (keepGameConnectionActive) LanConnectionService.start(context)
+        else LanConnectionService.stop(context)
+    }
+    // Only a real screen teardown may stop the guard. A room/client key change is not a
+    // teardown: its keyed DisposableEffect below must close old sockets, never the service.
+    DisposableEffect(context) {
+        onDispose { LanConnectionService.stop(context) }
     }
     LaunchedEffect(argentumEnabled) {
         if (argentumEnabled && argentumStatus == ArgentumConnectionStatus.DISCONNECTED) argentumSocket.connect(lobbyPlayerName)
@@ -242,6 +276,20 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     LaunchedEffect(argentumStatus, argentumEnabled) {
         if (argentumEnabled) recordDiagnostic("Argentum connection status: ${argentumStatus.name.lowercase()}")
     }
+    // Argentum deliberately pauses retries when Android backgrounds the app. The old
+    // lifecycle never resumed PAUSED on foreground, forcing a manual RESUME after Control.
+    // Use the existing session token and the socket's retryNow() path; do not start a new
+    // match, change seats or retry a deliberately replaced/ended session.
+    LaunchedEffect(appInForeground, argentumStatus, argentumEnabled, argentumOffline) {
+        if (shouldResumePausedArgentumOnForeground(
+                appInForeground, argentumEnabled, argentumOffline, argentumStatus
+            )
+        ) {
+            recordDiagnostic("Returning to Arcana: reconnecting paused Argentum session", DiagnosticCategory.CONNECTION)
+            argentumSocket.retryNow()
+        }
+    }
+
     LaunchedEffect(argentumQueue) {
         for (incoming in argentumQueue) {
             // A late update from a game you already left must not overwrite your table and deck.
@@ -361,7 +409,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             hostOwnedByEffect?.close()
             clientOwnedByEffect?.close()
             cloudClientOwnedByEffect?.close()
-            LanConnectionService.stop(context)
+            // Never stop LanConnectionService here: this runs whenever a room socket or
+            // host instance is replaced, including successful joins and reconnections.
         }
     }
     LaunchedEffect(players) { nextId = maxOf(nextId, (players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }.maxOfOrNull { it.id } ?: 0) + 1) }

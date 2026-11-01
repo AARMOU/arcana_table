@@ -142,24 +142,7 @@ internal fun TableController.MultiplayerLobbyScreen() {
                         }
                     }
 
-                    // Experimental host approval only. Gameplay/Control still require separately approved deployments.
-                    if (BuildConfig.DEBUG && hosting && online) {
-                        val empty = seats.indexOfFirst { it.kind == "waiting" }
-                        if (empty > 0) OutlinedButton(onClick = {
-                            val host = wifiServer as? ArgentumCloudMultiHost
-                            val requested = host?.inviteGoose(empty) { capability, error -> scope.launch {
-                                if (wifiServer !== host) return@launch
-                                if (capability == null) message = error ?: "Invitation unavailable."
-                                else {
-                                    val url = "https://aarmou.github.io/arcana_table/control/#goose-invite=${host.code}.$capability"
-                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-                                }
-                            } }
-                            if (requested != true) message = "Wait for the room connection, then try again."
-                        }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("INVITE GOOSEGETA · TEST", color = Mint, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    // Goosegeta is parked by owner decision; no experimental invite control.
 
                     // Table size (host only)
                     if (hosting && state != null) SeatCountPicker(
