@@ -113,6 +113,7 @@ object CustomCards {
         Entry(SwordOfFeastAndFamine, "2XM", POOL),
         Entry(SwordOfFireAndIce, "2XM", POOL),
         Entry(SwordOfLightAndShadow, "2XM", POOL),
+        Entry(AssaultSuit, "CMM", POOL),
         Entry(SwordOfWarAndPeace, "2XM", POOL),
         Entry(SigardasAid, "CMR", POOL),
         Entry(YavimayaHollow, "VMA", POOL),
