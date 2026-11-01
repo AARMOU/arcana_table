@@ -24,6 +24,7 @@ const INTEGRATED_DAYS = 7;
 const GREEN = new Set(['success', 'skipped', 'neutral']);
 const V = require('./verified-certification.cjs');
 const I = require('./card-integration.cjs');
+const DP = require('./destination-preflight.cjs');
 const A = require('./admission.cjs');
 const { unitCards } = require('./feasibility.cjs');
 const { contentWrittenAt, sessionsOf } = require('./units.cjs');
@@ -252,6 +253,7 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
     .filter(p => COPILOT.has(String(p.user?.login || '').toLowerCase()));
   const items = [];
   const integratedActivity = [];
+  let targetFingerprint;
   const suites = await suiteDependencies({ github, owner, repo, prs, now });
   // The display cap must not prevent newly approved cards or verified integration
   // receipts from being considered. Source PRs may remain open on a legacy base.
@@ -295,6 +297,26 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
     } catch { /* Unknown is not an implementation: fail closed, without dropping the row. */ }
     const row = classify(pr, checkRuns, reviews, unit.body, changedFiles);
     row.integrationUnverified = integrationUnverified;
+    // Destination preflight: a certified card reaches the owner's Verify list only after its destination gates
+    // passed on the current target engine. Unknown, pending or blocked: held back, with the reason shown.
+    if (row.readyForOwner) {
+      try {
+        targetFingerprint ??= await DP.engineFingerprint({ github, owner, repo,
+          ref: (await github.rest.git.getRef({ owner, repo, ref: 'heads/' + I.TARGET })).data.object.sha });
+        const pre = await DP.preflightFor({ github, owner, repo, pr, fingerprint: targetFingerprint });
+        row.preflight = pre ? { status: pre.status, runUrl: pre.runUrl, baseSha: pre.baseSha } : { status: 'pending' };
+        if (pre?.status !== 'passed') {
+          row.readyForOwner = false;
+          row.problems.unshift(pre?.status === 'blocked'
+            ? 'Would not integrate into the current build target: ' + String(pre.reason || '').split('\n')[0].slice(0, 300)
+            : 'Checking compatibility with the current build target before your approval');
+        }
+      } catch {
+        row.readyForOwner = false;
+        row.preflight = { status: 'unknown' };
+        row.problems.unshift('Build-target compatibility could not be verified');
+      }
+    }
     if (row.state === 'approved') {
       try {
         const integration = await I.receiptFor({github,owner,repo,pr});

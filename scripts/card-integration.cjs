@@ -169,6 +169,9 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     if (!suite) continue;
     const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
     if (receipt?.status === 'integrated') continue;
+    // Blocked by the target's engine (e.g. #662 `encore`, #690 registry cards): re-run only when that engine changes,
+    // not on every card-only target commit. Non-engine blocks keep re-running when the target moves.
+    if (!retry && await require('./destination-preflight.cjs').engineUnchangedSince({github,owner,repo,receipt,baseSha})) continue;
     const plan = {schema:1,pr:pr.number,sourceSha:snap.pr.head.sha,sourceBase:snap.pr.base.sha,
       sourceBaseRef:snap.pr.base.ref,baseSha,target:cfg.policy.target,controlSha,policyHash:cfg.policyHash,
       reviewId:ownerDecision(snap.reviews,snap.pr.head.sha,cfg.policy).id,
