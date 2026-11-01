@@ -83,8 +83,20 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
   assert.match(script,/Feed unavailable · last recorded status/);
 });
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
-  // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
-  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
+  // The only extra module is the owner's Web Push opt-in; the inline dashboard stays read-only.
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./card-ready-notifications.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
+test('card-ready notifications are opt-in, same-origin, and carry the exact honk in the PWA',()=>{
+  const client=fs.readFileSync(path.join(__dirname,'card-ready-notifications.js'),'utf8');
+  const worker=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+  assert.match(client,/Notification\.requestPermission\(\)/);
+  assert.match(client,/pushManager\.subscribe/);
+  assert.match(client,/arcana-review-session-v1/);
+  assert.match(client,/method, cache: 'no-store'/);
+  assert.match(worker,/push',event/);
+  assert.match(worker,/notificationclick',event/);
+  assert.match(worker,/🪿🪿🪿CARD READY FOR APPROVAL HONK🪿🪿🪿/);
+  assert.doesNotThrow(()=>new vm.Script(client));
+});
 test('all-hands check-in is a separate owner-authenticated module, not a dashboard dispatch',()=>{
   assert.match(html,/id="allHandsCheckIn"/);
   assert.match(html,/id="allHandsStatus"/);
@@ -504,7 +516,7 @@ test('Verify count keeps the last published count after five minutes and labels 
   const ctx=vm.createContext({Date,window:{ArcanaReview:actual}});
   vm.runInContext(script.slice(start,end)+'\nconst REVIEW_CURRENT_MS=15*60*1000;this.countLabel=reviewCountLabel;',ctx);
   const now=Date.parse('2026-10-29T05:52:00Z');
-  const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified'};
+  const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified',readyForOwner:true,preflight:{status:'passed'}};
   const review=(min,items=[card])=>({checkedAt:new Date(now-min*60000).toISOString(),items});
   assert.equal(ctx.countLabel(review(2),now),'1 ready');
   assert.equal(ctx.countLabel(review(6),now),'1 ready','5-minute aging does not hide Verify count');

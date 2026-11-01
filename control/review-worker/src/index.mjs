@@ -16,6 +16,7 @@
 
 import { publicGithub } from './public-github.mjs';
 import { runScheduled } from './scheduled.mjs';
+import { handleCardPush, runCardReadyPush } from './card-ready-push.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';
 import { goosegeta } from './goosegeta.mjs';
 import { checkInStatus, requestAllHandsCheckIn } from './team-checkin.mjs';
@@ -142,6 +143,22 @@ export function cleanNote(note) {
 }
 
 // Core decision logic. api: authenticated-as-owner GitHub caller.
+const PREFLIGHT_MARKER = "<!-- arcana-destination-preflight-v1 -->";
+/** Status of the newest trusted destination-preflight receipt for [sha] ("passed" / "blocked"), or null. */
+export function latestPreflight(comments, sha) {
+  let status = null;
+  for (const c of Array.isArray(comments) ? comments : []) {
+    if (c?.user?.id !== 41898282 || c?.user?.login !== "github-actions[bot]") continue;
+    const body = String(c.body || "");
+    if (!body.startsWith(PREFLIGHT_MARKER + "\n```json\n")) continue;
+    try {
+      const r = JSON.parse(body.split("\n```json\n")[1].split("\n```")[0]);
+      if (r?.schema === 1 && r.sourceSha === sha && ["passed", "blocked"].includes(r.status)) status = r.status;
+    } catch { /* malformed receipt is not evidence */ }
+  }
+  return status;
+}
+
 export async function decide(api, { pr, sha, decision, note }) {
   if (!Number.isSafeInteger(pr) || pr < 1 || !/^[0-9a-f]{40}$/.test(String(sha)) || !["approve", "request-fix"].includes(decision))
     return [400, { error: "bad-request" }];
@@ -185,6 +202,12 @@ export async function decide(api, { pr, sha, decision, note }) {
     // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
     const certification = certificationStatus(runs, sha);
     if (certification !== "certified") return [422, { error: "not-certified", certification }];
+    // Same gate as the inbox's readyToVerify: the newest destination preflight for this exact head must be a
+    // trusted bot receipt that passed. None, pending or blocked fails closed; integration still re-checks the target.
+    const comments = await api(`/issues/${pr}/comments?per_page=100`);
+    if (!comments.ok) return decisionFailure(comments, "preflight", [502, { error: "preflight-unavailable" }]);
+    const preflight = latestPreflight(comments.body, sha);
+    if (preflight !== "passed") return [422, { error: "preflight-not-passed", preflight: preflight || "none" }];
     // Certification only reaches Copilot's own drafts, and the workflow token cannot mark them ready.
     // Every gate above has passed for this exact head, so the owner's own session does it here;
     // integration only considers non-draft PRs. If GitHub refuses, nothing is approved.
@@ -213,8 +236,10 @@ export async function decide(api, { pr, sha, decision, note }) {
 export default {
   // Cloudflare Cron Triggers (wrangler.toml): start the allowlisted status workflows on time.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || ''), scheduledTime: event.scheduledTime })
-      .then(r => console.log(JSON.stringify(r))));
+    ctx.waitUntil(Promise.all([
+      runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || ''), scheduledTime: event.scheduledTime }),
+      event.cron === '*/15 * * * *' ? runCardReadyPush(env) : Promise.resolve({ skipped: 'not-review-tick' }),
+    ]).then(([workflows, cardPush]) => console.log(JSON.stringify({ workflows, cardPush }))));
   },
   async fetch(request, env, ctx, fetchImpl = fetch) {
     const url = new URL(request.url);
@@ -272,6 +297,28 @@ export default {
       const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
       if (!session) return json({ error: "sign-in-required" }, 401, origin);
       return json({ ok: true, login: session.login, expiresAt: session.exp }, 200, origin);
+    }
+
+    // Real Android PWA push. Subscriptions are owner-authenticated, stored only in
+    // the Worker KV namespace, and cannot approve cards or authorize work.
+    if (url.pathname === "/v1/card-ready-push" || url.pathname === "/v1/card-ready-push/config") {
+      if (request.method === "OPTIONS") return new Response(null, { status: origin === PWA_ORIGIN ? 204 : 403,
+        headers: origin === PWA_ORIGIN ? { "Access-Control-Allow-Origin": PWA_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, DELETE",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+          "Access-Control-Max-Age": "600", "Vary": "Origin", "Cache-Control": "no-store" }
+          : { "Cache-Control": "no-store" } });
+      if (origin !== PWA_ORIGIN) return json({ error: "origin-not-allowed" }, 403, origin);
+      if (url.pathname.endsWith("/config")) {
+        if (request.method !== "GET") return json({ error: "use-get" }, 405, origin);
+        return json({ configured: !!(env.CARD_PUSH && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_JWK),
+          publicKey: env.CARD_PUSH && env.VAPID_PRIVATE_JWK ? String(env.VAPID_PUBLIC_KEY || "") : "" }, 200, origin);
+      }
+      const session = await openSession(env.SESSION_SECRET,
+        (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
+      if (!session) return json({ error: "sign-in-required" }, 401, origin);
+      const [status, result] = await handleCardPush(request.method, request, env);
+      return json(result, status, origin);
     }
 
     if (url.pathname === "/v1/goosegeta") {

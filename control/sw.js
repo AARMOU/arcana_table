@@ -4,7 +4,8 @@
 const BUILD='dev';
 const CACHE='arcana-control-shell-v20-'+BUILD;
 const DATA='arcana-control-data-v1';
-const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./authorize.js','./team-checkin.js','./goosegeta.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const HONK_TITLE='🪿🪿🪿CARD READY FOR APPROVAL HONK🪿🪿🪿';
+const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./card-ready-notifications.js','./authorize.js','./team-checkin.js','./goosegeta.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const scope=new URL(self.registration.scope);
 const shellUrls=new Set(SHELL.map(s=>new URL(s,scope).href));
 // Public, read-only status feeds the dashboard reads. They are always fetched from the network first; the last good
@@ -47,6 +48,24 @@ async function data(event){
   throw error;
  }
 }
+// Android notifications are sent by the signed Web Push service even with the PWA closed.
+self.addEventListener('push',event=>{
+ event.waitUntil(self.registration.showNotification(HONK_TITLE,{
+  body:'A certified card is ready. Open Arcana Control to Verify / Approve.',
+  icon:new URL('./icons/icon-192.png',scope).href,
+  tag:'arcana-card-ready',renotify:true,data:{url:new URL('./#overview',scope).href}
+ }));
+});
+self.addEventListener('notificationclick',event=>{
+ event.notification.close();
+ event.waitUntil((async()=>{
+  const target=new URL('./#overview',scope).href;
+  const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  const app=windows.find(c=>c.url.startsWith(scope.href));
+  if(app){if('navigate' in app)await app.navigate(target);return app.focus();}
+  return self.clients.openWindow(target);
+ })());
+});
 self.addEventListener('fetch',event=>{
  const request=event.request,url=new URL(request.url);
  if(request.method!=='GET')return;

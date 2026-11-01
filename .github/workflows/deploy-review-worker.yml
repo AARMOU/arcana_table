@@ -55,9 +55,21 @@ jobs:
           # Optional: this repository only, Actions read/write only. Lets the Worker's timer start
           # the review inbox refresh and certification backfill workflows on time.
           ACTIONS_DISPATCH_TOKEN: ${{ secrets.REVIEW_ACTIONS_DISPATCH_TOKEN }}
+          PUSH_KV_ID: ${{ vars.REVIEW_CARD_PUSH_KV_ID }}
+          VAPID_PUBLIC: ${{ secrets.REVIEW_VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE: ${{ secrets.REVIEW_VAPID_PRIVATE_JWK }}
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund wrangler@4.69.0
+          # Optional owner-only push: never create Cloudflare resources or mutate bindings
+          # merely by merging. The owner provisions this existing KV ID separately.
+          if [ -n "${PUSH_KV_ID:-}" ] && [ -n "${VAPID_PUBLIC:-}" ] && [ -n "${VAPID_PRIVATE:-}" ]; then
+            [[ "$PUSH_KV_ID" =~ ^[0-9a-f]{32}$ ]] || { echo 'Invalid REVIEW_CARD_PUSH_KV_ID'; exit 1; }
+            [[ "$VAPID_PUBLIC" =~ ^[A-Za-z0-9_-]{87}$ ]] || { echo 'Invalid VAPID public key'; exit 1; }
+            printf '\n[[kv_namespaces]]\nbinding = "CARD_PUSH"\nid = "%s"\n' "$PUSH_KV_ID" >> control/review-worker/wrangler.toml
+          else
+            echo 'Card-ready Web Push not configured. Review Worker retains existing features.'
+          fi
           npx wrangler deploy --config control/review-worker/wrangler.toml --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID"
           printf '%s' "$CLIENT_SECRET" | npx wrangler secret put GITHUB_OAUTH_CLIENT_SECRET --config control/review-worker/wrangler.toml
           printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET --config control/review-worker/wrangler.toml
@@ -70,5 +82,9 @@ jobs:
             printf '%s' "$ACTIONS_DISPATCH_TOKEN" | npx wrangler secret put GITHUB_ACTIONS_DISPATCH_TOKEN --config control/review-worker/wrangler.toml
           else
             echo 'REVIEW_ACTIONS_DISPATCH_TOKEN not set: the Worker timer starts nothing; status refresh relies on GitHub schedules.'
+          fi
+          if [ -n "${PUSH_KV_ID:-}" ] && [ -n "${VAPID_PUBLIC:-}" ] && [ -n "${VAPID_PRIVATE:-}" ]; then
+            printf '%s' "$VAPID_PUBLIC" | npx wrangler secret put VAPID_PUBLIC_KEY --config control/review-worker/wrangler.toml
+            printf '%s' "$VAPID_PRIVATE" | npx wrangler secret put VAPID_PRIVATE_JWK --config control/review-worker/wrangler.toml
           fi
           echo 'Review Worker deployed. Check https://arcana-review.arcanamtg.workers.dev/health'

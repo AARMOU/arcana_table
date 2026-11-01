@@ -85,6 +85,10 @@ function classifyChangeFiles(files, title = '') {
 // Drafts count once certified: the owner's Approve marks the PR ready for review (review Worker).
 const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true && !i.shapeProblem &&
   i.state === 'certified' && i.certification === 'certified';
+// The one "ready to Verify" predicate for counts, alerts, Control and the card-ready push: certified AND
+// held-for-preflight cleared (readyForOwner) AND destination preflight passed on the current build target.
+// Pending, blocked, unknown or missing preflight fails closed.
+const readyToVerify = i => isReadyForOwner(i) && i.readyForOwner === true && i.preflight?.status === 'passed';
 
 
 // The card's own acceptance lines from its [Arcana Queue] unit (what Copilot was asked to implement).
@@ -144,9 +148,9 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null)
 function inboxPayload(items, now = new Date(), integratedActivity = []) {
   const order = { certified: 0, 'awaiting-review': 1, 'checks-failed': 2, 'repair-exhausted': 2, orphaned: 2, held: 3,
     'changes-requested': 3, 'no-checks': 4, 'checks-running': 4, approved: 5, integrated: 6 };
-  const sorted = [...items].sort((a, b) => Number(isReadyForOwner(b)) - Number(isReadyForOwner(a)) ||
+  const sorted = [...items].sort((a, b) => Number(readyToVerify(b)) - Number(readyToVerify(a)) ||
     Number(b.kind === 'card') - Number(a.kind === 'card') || (order[a.state] ?? 9) - (order[b.state] ?? 9) || a.pr - b.pr).slice(0, MAX_ITEMS);
-  return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(isReadyForOwner).length, items: sorted,
+  return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(readyToVerify).length, items: sorted,
     // Separate from the 30-row review inbox: this timestamped sample powers a conservative daily merge count.
     integratedActivity: integratedActivity.slice(0, 100),
     note: 'Owner-approved cards may integrate automatically under the standing card-only policy after destination-engine checks pass. APK builds, signing and releases remain separately authorized. Checks passing is not rules certification.' };
@@ -372,7 +376,7 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
 // last alert is new, so refreshes every 15 minutes post nothing until something changes.
 const READY_MARKER = '<!-- arcana-ready-to-verify-v1 -->';
 async function alertReady({ github, owner, repo, payload, issue = 78 }) {
-  const ready = (payload?.items || []).filter(isReadyForOwner).filter(i => Number.isSafeInteger(i.pr) && /^[0-9a-f]{40}$/.test(String(i.headSha)));
+  const ready = (payload?.items || []).filter(readyToVerify).filter(i => Number.isSafeInteger(i.pr) && /^[0-9a-f]{40}$/.test(String(i.headSha)));
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
   const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(READY_MARKER));
   const seen = new Set((String(previous?.body || '').match(/^ready: (.*)$/m)?.[1] || '').split(' ').filter(Boolean));
@@ -470,5 +474,5 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
   return 'posted ' + list.length;
 }
 
-module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER,
+module.exports = { classify, classifyChangeFiles, isReadyForOwner, readyToVerify, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER,
   stalls, reportStalls, STALL_MARKER, inGptLane, unreleasedBuild, LANE_HOURS, BUILD_HOURS, identityOf, offlineOracle, applyWorkState };

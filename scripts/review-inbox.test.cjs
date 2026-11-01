@@ -40,8 +40,8 @@ test('only the owner\'s review of the CURRENT head counts', () => {
 
 test('payload puts cards needing the owner first and counts the badge', () => {
   const p = R.inboxPayload([
-    { pr: 1, state: 'checks-running' }, { pr: 2, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false },
-    { pr: 3, state: 'approved' }, { pr: 4, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false },
+    { pr: 1, state: 'checks-running' }, { pr: 2, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false, readyForOwner: true, preflight: { status: 'passed' } },
+    { pr: 3, state: 'approved' }, { pr: 4, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false, readyForOwner: true, preflight: { status: 'passed' } },
   ], new Date('2026-10-28T17:00:00Z'));
   assert.equal(p.awaitingReview, 2);
   assert.deepEqual(p.items.map(i => i.pr), [2, 4, 1, 3]);
@@ -84,8 +84,10 @@ test('certification is only an explicit certification check, never plain CI', ()
   assert.deepEqual([certified.state, certified.certification], ['certified', 'certified']);
   const failedCert = R.classify(pr(), [...green, certRun('failure')]);
   assert.deepEqual([failedCert.state, failedCert.certification], ['checks-failed', 'failed']);
-  assert.equal(R.inboxPayload([R.classify(pr(), [...green, certRun()], [], '', cardFiles),
-    R.classify(pr({ number: 1 }), green, [], '', cardFiles)]).awaitingReview, 1);
+  // Counted once the destination preflight passed (buildReviewInbox sets it on certified rows).
+  const passed = r => ({ ...r, preflight: { status: 'passed' } });
+  assert.equal(R.inboxPayload([passed(R.classify(pr(), [...green, certRun()], [], '', cardFiles)),
+    passed(R.classify(pr({ number: 1 }), green, [], '', cardFiles))]).awaitingReview, 1);
 });
 
 test('details carry abilities, check links, problems and stale-review warnings', () => {
@@ -121,7 +123,9 @@ test('file evidence separates actual cards from audits and engine blockers; cert
   const blocker = R.classify(pr({ title: 'Hold Ulamog pending engine support', number: 330 }), green, [], '', []);
   const notes = R.classify(pr({ title: 'Record cast-count blocker', number: 320 }), green, [], '', ['tools/cardkit/data/known-blockers.json']);
   assert.deepEqual([audit.kind, blocker.kind, notes.kind], ['audit', 'engine', 'engine']);
-  assert.equal(R.inboxPayload([real, draft, uncertifiedDraft, audit, blocker, notes]).awaitingReview, 2);
+  const passed = r => ({ ...r, preflight: { status: 'passed' } });
+  assert.equal(R.inboxPayload([real, draft, uncertifiedDraft, audit, blocker, notes].map(passed)).awaitingReview, 2);
+  assert.equal(R.inboxPayload([real, draft]).awaitingReview, 0, 'no preflight receipt: not counted');
   assert.equal(R.classify(pr(), green, [], '', null).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', cardFiles.slice(0, 1)).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', Array(100).fill(cardFiles[0])).readyForOwner, false);
@@ -235,13 +239,13 @@ test('control-plane feeder/observer runs do not hold a certified card in checks-
 
 test('owner is mentioned once per newly ready card head, never on unchanged refreshes', async () => {
   const card = (n, h) => ({ pr: n, card: 'Card ' + n, headSha: h.repeat(40), kind: 'card', hasTest: true, draft: false,
-    state: 'certified', certification: 'certified', checks: {} });
+    state: 'certified', certification: 'certified', checks: {}, readyForOwner: true, preflight: { status: 'passed' } });
   const comments = [];
   const github = { rest: { issues: { listComments() {}, createComment: async ({ body }) => {
     comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }); } } },
     paginate: async () => comments };
   const go = items => R.alertReady({ github, owner: 'o', repo: 'r', payload: { items } });
-  assert.equal(R.isReadyForOwner(card(1, 'a')), true, 'fixture is a ready card');
+  assert.equal(R.readyToVerify(card(1, 'a')), true, 'fixture is a ready card');
   assert.equal(await go([]), 'unchanged');
   assert.equal(await go([card(1, 'a')]), 'posted 1');
   assert.match(comments[0].body, /^<!-- arcana-ready-to-verify-v1 -->/);
@@ -495,4 +499,22 @@ test('zero-delivery diagnosis appears on #78 without PR rows, engine classificat
   assert.match(body,/zero-delivery: #458.*finished without a PR; unclassified/);
   assert.match(body,/Owner:\*\* Work GPT \/ Goose \(engineering\)/);
   assert.doesNotMatch(body,/engine#458|add the engine support/);
+});
+
+test('ready-to-Verify count and owner alert fail closed until the destination preflight passed', async () => {
+  const base = { pr: 9, card: 'Card 9', headSha: 'f'.repeat(40), kind: 'card', hasTest: true, draft: false,
+    state: 'certified', certification: 'certified', checks: {} };
+  const comments = [];
+  const github = { rest: { issues: { listComments() {}, createComment: async ({ body }) => {
+    comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }); } } }, paginate: async () => comments };
+  for (const extra of [{ readyForOwner: false, preflight: { status: 'pending' } }, { readyForOwner: false, preflight: { status: 'blocked' } },
+    { readyForOwner: false, preflight: { status: 'unknown' } }, { readyForOwner: true }, { readyForOwner: true, preflight: { status: 'blocked' } }]) {
+    const item = { ...base, ...extra };
+    assert.equal(R.readyToVerify(item), false, JSON.stringify(extra));
+    assert.equal(R.inboxPayload([item]).awaitingReview, 0, JSON.stringify(extra));
+    assert.equal(await R.alertReady({ github, owner: 'o', repo: 'r', payload: { items: [item] } }), 'unchanged', JSON.stringify(extra));
+  }
+  const ok = { ...base, readyForOwner: true, preflight: { status: 'passed' } };
+  assert.equal(R.inboxPayload([ok]).awaitingReview, 1);
+  assert.equal(await R.alertReady({ github, owner: 'o', repo: 'r', payload: { items: [ok] } }), 'posted 1');
 });
