@@ -25,6 +25,16 @@ class AberrantIndependentCertificationTest {
         return aberrant
     }
 
+    private fun GameTestDriver.finishCombat(target: EntityId) {
+        repeat(80) {
+            if (state.step == Step.POSTCOMBAT_MAIN &&
+                state.pendingDecision == null && state.stack.isEmpty()) return
+            if (state.pendingDecision != null) decide(Choices(targets = listOf(target)))
+            else assertNull(bothPass().error)
+        }
+        error("Combat did not settle: step=${state.step} decision=${state.pendingDecision}")
+    }
+
     @Test
     fun xThreePaysTheGenericAndGreenCostAndEntersWithExactlyThreeCounters() {
         val d = customScenario(Aberrant)
@@ -123,8 +133,7 @@ class AberrantIndependentCertificationTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
 
         assertNull(d.declareAttackers(p, listOf(aberrant), opponent).error)
-        d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
-        d.resolveAll(Choices(targets = listOf(targetArtifact)))
+        d.finishCombat(targetArtifact)
 
         assertEquals(19, d.getLifeTotal(opponent))
         assertFalse(d.getPermanents(opponent).contains(targetArtifact))
@@ -143,8 +152,7 @@ class AberrantIndependentCertificationTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
 
         assertNull(d.declareAttackers(p, listOf(aberrant), opponent).error)
-        d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
-        d.resolveAll(Choices(targets = listOf(arena)))
+        d.finishCombat(arena)
 
         assertFalse(d.getPermanents(opponent).contains(arena))
         assertTrue(d.getGraveyard(opponent).contains(arena))
