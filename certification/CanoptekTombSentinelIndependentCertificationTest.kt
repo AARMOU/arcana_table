@@ -3,6 +3,7 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.CanoptekTombSentinel
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
+import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -187,8 +188,8 @@ class CanoptekTombSentinelIndependentCertificationTest {
         assertTrue(d.permanentsNamed(p, name).contains(sentinel))
 
         val murder = d.putCardInHand(p, "Murder")
-        d.giveMana(p, com.wingedsheep.sdk.core.Color.BLACK)
-        d.giveColorlessMana(p, 2)
+        d.giveMana(p, Color.BLACK, 2)
+        d.giveColorlessMana(p, 1)
         assertNull(
             d.castSpellWithTargets(p, murder, listOf(ChosenTarget.Permanent(sentinel))).error,
         )
