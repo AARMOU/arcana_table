@@ -85,6 +85,31 @@ test('empty GitHub billing response provides safe, specific diagnostic',async()=
  assert.equal(x.error,'empty-billing-usage-items');
  assert.equal(x.status.maxNewAssignments,0);
 });
+test('month rollover: an empty report counts as zero only early in the month and only if last month billed Copilot here',async()=>{
+ const env={COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'};
+ const nov1=new Date('2026-11-01T00:05:00Z');
+ const byMonth=prevItems=>async url=>({ok:true,json:async()=>/month=11\b/.test(url)
+   ? {user:'AARMOU',timePeriod:{year:2026,month:11},usageItems:[]}
+   : {user:'AARMOU',timePeriod:{year:2026,month:10},usageItems:prevItems}});
+ const billed=[{product:'Copilot',sku:'Copilot AI Credits',unitType:'ai-credits',grossQuantity:2400}];
+ const ok=await m.readBudget(env,{now:nov1,fetchImpl:byMonth(billed)});
+ assert.equal(ok.error,null);
+ assert.equal(ok.snapshot.reportedUsed,0);
+ assert.match(ok.snapshot.basis,/new-month-empty-report/);
+ assert.equal(ok.status.level,'normal');
+ // Last month had no Copilot billed to this account: still fail closed.
+ for(const prev of [[],[{product:'Actions',unitType:'minutes',grossQuantity:5}],[{product:'Copilot',unitType:'ai-credits',grossQuantity:0}]]){
+  const x=await m.readBudget(env,{now:nov1,fetchImpl:byMonth(prev)});
+  assert.equal(x.error,'empty-billing-usage-items');assert.equal(x.status.maxNewAssignments,0);
+ }
+ // Past the first days of the month: still fail closed even if last month was billed.
+ const late=await m.readBudget(env,{now:new Date('2026-11-04T00:05:00Z'),fetchImpl:byMonth(billed)});
+ assert.equal(late.error,'empty-billing-usage-items');
+ // A failed previous-month read fails closed.
+ const err=await m.readBudget(env,{now:nov1,retryDelayMs:0,fetchImpl:async url=>/month=11\b/.test(url)
+   ? {ok:true,json:async()=>({user:'AARMOU',timePeriod:{year:2026,month:11},usageItems:[]})} : {ok:false,status:503}});
+ assert.ok(err.error);assert.equal(err.status.maxNewAssignments,0);
+});
 test('new Copilot SKU is accepted only with verified AI-credit unit',async()=>{
  const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
  {now,fetchImpl:async()=>({ok:true,json:async()=>report([
