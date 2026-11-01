@@ -28,6 +28,40 @@ const approveBlocked = i => canApprove(i) ? null
       : !i.hasTest ? 'Executable card scenario tests are missing. You can still request a fix.'
         : i.shapeProblem ? String(i.shapeProblem) + '. The card lane must fix the PR first; you can still request a fix.'
         : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
+// Only the single-card queue identity is a lookup key; PR titles are work descriptions.
+const cardName = item => typeof item?.name === 'string' ? item.name.trim() : '';
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function oracleText(record) {
+  if (!record || typeof record.type_line !== 'string') return '';
+  const rules = typeof record.oracle_text === 'string' ? record.oracle_text
+    : (Array.isArray(record.card_faces) ? record.card_faces : [])
+      .map(f => String(f.name || '') + ': ' + String(f.oracle_text || '')).join('\n');
+  return (record.mana_cost ? record.mana_cost + ' · ' : '') + record.type_line + (rules ? '\n' + rules : '');
+}
+async function loadOracle(item, fetchImpl) {
+  const name = cardName(item);
+  if (!name) return 'Oracle text unavailable: no single verified card name in the review feed.';
+  const snapshot = item.oracle;
+  if (snapshot?.source === 'trusted-queue-snapshot' && snapshot.issue === item.issue &&
+      sameName(snapshot.record?.name, name) && oracleText(snapshot.record))
+    return oracleText(snapshot.record) + '\nSource: trusted queue Oracle snapshot.';
+  try {
+    const response = await fetchImpl('https://api.scryfall.com/cards/named?exact=' + encodeURIComponent(name), { cache: 'no-store' });
+    const record = response.ok ? await response.json() : null;
+    return sameName(record?.name, name) && oracleText(record)
+      ? oracleText(record) : 'Oracle text unavailable for this verified card name.';
+  } catch { return 'Oracle text unavailable (offline).'; }
+}
+function githubFailureDetail(body) {
+  const stages = { pr: 'reading the PR', unit: 'reading the queue issue', reviews: 'checking existing reviews',
+    files: 'checking changed files', checks: 'reading checks', ready: 'marking the draft ready', review: 'recording the review' };
+  let text = stages[body?.stage] ? ' Failed while ' + stages[body.stage] + '.' : '';
+  if (body?.rateLimitResource === 'core' || body?.rateLimitResource === 'graphql') text += ' GitHub quota: ' + body.rateLimitResource + '.';
+  // Display a duration so the owner does not need to convert server UTC timestamps.
+  const retryAt = Date.parse(body?.retryAt || '');
+  if (Number.isFinite(retryAt) && retryAt > Date.now()) text += ' Retry in about ' + Math.max(1, Math.ceil((retryAt - Date.now()) / 60000)) + ' minute(s).';
+  return text;
+}
 function decisionMessage(status, body) {
   if (status === 200 && body?.duplicate) return { ok: true, text: 'Already recorded for this commit.' };
   if (status === 200 || status === 207) return { ok: true, text: body?.state === 'approved'
@@ -37,9 +71,9 @@ function decisionMessage(status, body) {
   if (status === 401 && body?.error === 'github-credential-rejected')
     return { ok: false, signIn: true, text: 'GitHub rejected the stored OAuth credential. No approval recorded. Sign in to GitHub again, then retry once.' };
   if (status === 503 && body?.error === 'github-rate-limited')
-    return { ok: false, text: 'GitHub is limiting API requests from the approval service (HTTP ' + body.upstreamStatus + '). No approval recorded. Repeated taps will not help; retry when GitHub access recovers.' };
+    return { ok: false, text: 'GitHub is limiting API requests from the approval service (HTTP ' + body.upstreamStatus + '). No approval recorded.' + githubFailureDetail(body) + ' Repeated taps will not help; retry when GitHub access recovers.' };
   if (status === 403 && body?.error === 'github-access-denied')
-    return { ok: false, text: 'GitHub denied the approval service access to this PR (HTTP 403). No approval recorded. The OAuth permissions or GitHub access policy need checking.' };
+    return { ok: false, text: 'GitHub denied the approval service access to this PR (HTTP 403). No approval recorded. The OAuth permissions or GitHub access policy need checking.' + githubFailureDetail(body) };
   if (status === 404 && body?.error === 'github-pr-not-accessible')
     return { ok: false, text: 'GitHub returned HTTP 404 to the approval service. This PR exists publicly; the approval service may lack access with your current credential. No approval recorded.' };
   if (status === 502 && body?.error === 'github-pr-read-failed')
@@ -54,7 +88,7 @@ function decisionMessage(status, body) {
   if (status === 400 && body?.error === 'describe-the-fix') return { ok: false, text: 'Describe what needs fixing.' };
   return { ok: false, text: 'Not recorded (' + (body?.error || 'HTTP ' + status) + ').' };
 }
-const api = { REVIEW_API, LABELS, sessionFromHash, isReadyForOwner, canDecide, canApprove, approveBlocked, decisionMessage };
+const api = { REVIEW_API, LABELS, sessionFromHash, isReadyForOwner, canDecide, canApprove, approveBlocked, decisionMessage, loadOracle };
 root.ArcanaReview = api;
 if (typeof module === 'object' && module.exports) { module.exports = api; return; }
 if (typeof document === 'undefined') return;
@@ -172,7 +206,7 @@ function render(container, payload, changed) {
       const main = el('div', 'row-main');
       const detail = (i.problems?.[0] || i.reason || (LABELS[i.state] || i.state)) +
         ' · head ' + String(i.headSha || '').slice(0, 7);
-      main.append(el('div', 'row-title', '#' + i.pr + ' ' + String(i.card || 'Untitled work')),
+      main.append(el('div', 'row-title', '#' + i.pr + ' ' + String(cardName(i) || i.card || 'Untitled work')),
         el('div', 'row-sub', detail));
       const status = isReadyForOwner(i) ? 'Ready' : i.draft ? 'Draft' : (LABELS[i.state] || String(i.state));
       row.append(main, el('span', 'tag ' + (isReadyForOwner(i) ? 'blue' : 'gray'), status));
@@ -186,7 +220,7 @@ function openSheet(item) {
   sheet.replaceChildren();
   const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => { sheet.close(); refreshSheet = () => {}; });
   const head = el('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:start';
-  head.append(el('h2', '', String(item.card || 'Card')), close);
+  head.append(el('h2', '', String(cardName(item) || item.card || 'Card')), close);
   const statusLabel = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
   const link = el('a', '', 'PR #' + item.pr + ' · commit ' + String(item.headSha || '').slice(0, 12) + ' ↗');
   link.href = safeUrl(item.url); link.target = '_blank'; link.rel = 'noopener noreferrer';
@@ -259,12 +293,8 @@ function openSheet(item) {
     el('p', 'fine', 'Approval is card sign-off for integration review only. It never merges, builds, signs or releases.'));
   refresh();
   sheet.showModal();
-  fetch('https://api.scryfall.com/cards/named?exact=' + encodeURIComponent(String(item.card || '')), { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : null).then(c => {
-      const text = c?.oracle_text || (c?.card_faces || []).map(f => f.name + ': ' + (f.oracle_text || '')).join('\n');
-      oracle.textContent = text ? (c.mana_cost ? c.mana_cost + ' · ' : '') + (c.type_line || '') + '\n' + text : 'Oracle text unavailable for this name.';
-      oracle.style.whiteSpace = 'pre-wrap';
-    }).catch(() => { oracle.textContent = 'Oracle text unavailable (offline).'; });
+  oracle.style.whiteSpace = 'pre-wrap';
+  void loadOracle(item, fetch).then(text => { oracle.textContent = text; });
 }
 api.render = render;
 // The top-level Verify action opens the next reviewable card's existing owner-gated sheet.
