@@ -5,6 +5,7 @@ import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.GameObjectFilter
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 val KnucklesTheEchidna = card("Knuckles the Echidna") {
     manaCost = "{2}{R}{R}"
