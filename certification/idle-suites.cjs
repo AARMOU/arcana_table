@@ -65,8 +65,9 @@ function plan({ cards, manifest, requests, status, now = Date.now(), burst = nul
     // dispatcher's status, which lags by a run. Pending pickup still comes from the status.
     const w = status.workers || {};
     const waiting = idle.filter(r => r.state === 'open' && !(r.assignees || []).length).length;
-    const running = Number.isSafeInteger(live) ? live : (Number(w.running) || 0);
-    const busy = running + (Number(w.pendingPickup) || 0) + waiting;
+    // With a live count, the status's pending-pickup figure (often a run stale) is ignored: an extra open request
+    // just waits, since dispatcher admission still caps sessions at three.
+    const busy = Number.isSafeInteger(live) ? live + waiting : (Number(w.running) || 0) + (Number(w.pendingPickup) || 0) + waiting;
     if (busy >= b.parallel) return { skip: `burst: ${busy}/${b.parallel} workers busy or waiting` };
     slots = b.parallel - busy;
   } else if (idle.some(r => r.state === 'open' && !(r.assignees || []).length)) return { skip: 'an idle suite request is still waiting' };

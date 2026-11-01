@@ -1,0 +1,52 @@
+name: Arcana Idle Burst Pump
+# Owner burst window (certification/idle-burst.json). Event chains proved unreliable (runs started with
+# GITHUB_TOKEN never fire workflow_run, and Copilot completions did not always reach us), so during the window
+# this one job checks once a minute: fewer Copilot sessions than `parallel` -> open idle suite requests (same
+# feeder, caps and billing guard) and start the dispatcher if it is not already queued or running. It never
+# assigns or spends anything itself; dispatcher admission decides. Ends when the window ends.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'certification/idle-burst.json'
+      - '.github/workflows/arcana-idle-burst-pump.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  actions: write
+concurrency:
+  group: arcana-idle-burst-pump
+  cancel-in-progress: true
+jobs:
+  pump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const I = require('./certification/idle-suites.cjs');
+            const P = require('./certification/policy.cjs');
+            const { owner, repo } = context.repo;
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            const burst = I.readBurst('.');
+            for (let tick = 0; I.activeBurst(burst, Date.now()) && tick < 360; tick++) {
+              try {
+                const b = I.activeBurst(burst, Date.now());
+                const live = await I.liveCopilotSessions({ github, owner, repo });
+                if (live !== null && live < b.parallel) {
+                  const idle = await I.requestIdleSuite({ github, owner, repo, root: '.', manifest: P.readManifest('./certification/suites.json'), burst });
+                  const runs = (await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: 'arcana-card-dispatcher.yml', per_page: 5 })).data.workflow_runs || [];
+                  const dispatching = runs.some(r => r.status !== 'completed');
+                  if (!dispatching) await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'arcana-card-dispatcher.yml', ref: 'main', inputs: { dry_run: 'false' } });
+                  core.info(`${new Date().toISOString()} live=${live} idle=${JSON.stringify(idle)} dispatcher=${dispatching ? 'busy' : 'started'}`);
+                } else core.info(`${new Date().toISOString()} live=${live}`);
+              } catch (e) { core.warning('tick failed: ' + String(e?.message || e).slice(0, 300)); }
+              await sleep(60e3);
+            }
+            core.info('Burst window over.');
