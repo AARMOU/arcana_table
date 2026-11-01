@@ -369,3 +369,37 @@ test('changed base or policy gets fresh full revalidation, not an unchanged auto
   assert.equal(newBase.autoRetry,undefined);
   assert.equal(m.refs.size,0);
 });
+
+test('other cards\' suite merges and the idle-burst window on main do not block publishing; own suite and other control changes still do',async()=>{
+  const live='9'.repeat(40);
+  const setup=files=>{const m=githubMock();const getRef=m.github.rest.git.getRef;
+    m.github.rest.git.getRef=async a=>a.ref==='heads/main'?{data:{object:{sha:live}}}:getRef(a);
+    m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files}});return m;};
+  const p=plan();
+  const other=[{filename:'certification/BaneOfBalaGedIndependentCertificationTest.kt',status:'added'},
+    {filename:'certification/suites/bane-of-bala-ged.json',status:'added'},
+    {filename:'certification/idle-burst.json',status:'modified'}];
+  const ok=setup(other);
+  assert.equal((await P.publish({...common,github:ok.github,plan:p,...result(p)})).status,'integrated');
+  for(const files of [
+    [...other,{filename:suite.source,status:'modified'}],
+    [{filename:`certification/suites/${suite.key}.json`,status:'modified'}],
+    [{filename:'certification/BaneOfBalaGedIndependentCertificationTest.kt',status:'removed'}],
+    [{filename:'certification/XIndependentCertificationTest.kt',status:'renamed',previous_filename:'certification/policy.cjs'}],
+    [{filename:'certification/policy.cjs',status:'modified'}],
+    [{filename:'certification/suites.json',status:'modified'}]]){
+    const m=setup(files);
+    await assert.rejects(P.publish({...common,github:m.github,plan:p,...result(p)}),/control changed/,JSON.stringify(files).slice(0,120));
+    assert.equal(m.writes.length,0);
+  }
+});
+
+test('a card already registered on the destination is not re-planned (no repeat "already registered" receipts)',async()=>{
+  const registry=t=>({data:{encoding:'base64',content:Buffer.from(t).toString('base64')}});
+  const m=githubMock();
+  m.github.rest.repos.getContent=async({path,ref})=>{assert.equal(path,P.REGISTRY);assert.equal(ref,base);
+    return registry(`        Entry(${paths.symbol}, "SET", POOL),\n`);};
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  m.github.rest.repos.getContent=async()=>registry(`        Entry(${paths.symbol}Token, "SET", POOL),\n`);
+  assert.equal((await P.planNext({...common,github:m.github,controlSha:control})).pr,410,'a different symbol with the same prefix does not count');
+});
