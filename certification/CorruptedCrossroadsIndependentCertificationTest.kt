@@ -4,7 +4,6 @@ import com.arcanatable.customcards.cards.CorruptedCrossroads
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
-import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
@@ -72,30 +71,25 @@ class CorruptedCrossroadsIndependentCertificationTest {
 
     @Test
     fun coloredManaCanBeSpentToCastADevoidSpell() {
-        val d = customScenario(CorruptedCrossroads, "Ornithopter")
+        val d = customScenario(CorruptedCrossroads, "Blisterpod")
         val p = d.player1
-        val target = d.putCreatureOnBattlefield(d.player2, "Ornithopter")
         val crossroads = d.putLandOnBattlefield(p, "Corrupted Crossroads")
-        val wail = d.putCardInHand(p, "Warping Wail")
+        val blisterpod = d.putCardInHand(p, "Blisterpod")
 
         assertNull(d.activate(p, crossroads, index = 1).error)
-        d.resolveAll(Choices(color = Color.RED))
-        d.giveColorlessMana(p, 1)
+        d.resolveAll(Choices(color = Color.GREEN))
 
         assertNull(d.submit(CastSpell(
             playerId = p,
-            cardId = wail,
-            targets = listOf(ChosenTarget.Permanent(target)),
+            cardId = blisterpod,
             paymentStrategy = PaymentStrategy.FromPool,
-            chosenModes = listOf(0),
-            modeTargetsOrdered = listOf(listOf(ChosenTarget.Permanent(target))),
         )).error)
         d.resolveAll()
 
-        assertFalse(d.zoneNames(d.player2, Zone.BATTLEFIELD).contains("Ornithopter"))
-        assertTrue(d.zoneNames(d.player2, Zone.EXILE).contains("Ornithopter"))
-        assertFalse(d.zoneNames(p, Zone.HAND).contains("Warping Wail"))
+        assertTrue(d.permanentsNamed(p, "Blisterpod").contains(blisterpod))
+        assertFalse(d.zoneNames(p, Zone.HAND).contains("Blisterpod"))
         assertEquals(19, d.getLifeTotal(p))
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
     }
 
     @Test
