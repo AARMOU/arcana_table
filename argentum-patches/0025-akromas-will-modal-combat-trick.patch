@@ -1,0 +1,132 @@
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+index c5b958f346..8907dda6e6 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+@@ -86,6 +86,7 @@ internal enum class AmountSign {
+             // Counts, mana values, mana spent, X: none of them can go below zero.
+             is DynamicAmount.Speed, is DynamicAmount.DungeonsCompleted, is DynamicAmount.PlayerCounterCount, is DynamicAmount.CardsCycledThisGame,
+             is DynamicAmount.SpellsCastThisGame,
++            is DynamicAmount.CommanderCastsFromCommandZone,
+             is DynamicAmount.StartingLifeTotal, is DynamicAmount.UnspentMana, is DynamicAmount.XValue,
+             is DynamicAmount.LastKnownSourceCounters, is DynamicAmount.LastKnownDamageDealtToSource,
+             is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
+index e5b1afd15d..6c0466d1b5 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
+@@ -173,6 +173,7 @@ object CardIntentAnalyzer {
+         var expiringPump = false
+         var pumpToughness = 0
+         var expiringGroupPump = false
++        var expiringGroupTrick = false
+         // Hand selection reads gated interiors too — see [handSelectionLeaves] for why only here.
+         val handLeaves = scripts.flatMap { script ->
+             EffectWalker.slots(script).map { it.effect } +
+@@ -200,6 +201,13 @@ object CardIntentAnalyzer {
+             if (isExpiringGroupPump(effect)) expiringGroupPump = true
+         }
+ 
++        // Modal instants can grant evasion, protection, or combat keywords through a group
++        // iteration instead of modifying stats. The shared rater walk intentionally treats modal
++        // bodies as leaves, so inspect this timing-sensitive shape separately without widening the
++        // scoring traversal.
++        val spellEffects = scripts.mapNotNull { it.spellEffect }
++        if (spellEffects.any(::hasExpiringGroupCombatGrant)) expiringGroupTrick = true
++
+         var anthemBonus = 0
+         for (static in scripts.flatMap { it.staticAbilities }) {
+             tags += tagsOf(static)
+@@ -220,7 +228,7 @@ object CardIntentAnalyzer {
+         // a permanent investment you can make whenever you like, and holding it for combat is not
+         // the same decision — so it stays PUMP and never reaches [HoldPolicy]'s no-window verdict.
+         val speed = speedOf(card, scripts, tags)
+-        if (speed == Speed.INSTANT && expiringPump) tags += IntentTag.COMBAT_TRICK
++        if (speed == Speed.INSTANT && (expiringPump || expiringGroupTrick)) tags += IntentTag.COMBAT_TRICK
+ 
+         val repeatable = repeatableOf(card, scripts)
+         val arrivalTags = arrivalTagsOf(card, scripts, tags)
+@@ -516,6 +524,31 @@ object CardIntentAnalyzer {
+                 isExpiringPump(it) && (it as ModifyStatsEffect).target == EffectTarget.IterationEntity
+             }
+ 
++    /** A modal mode that grants temporary combat abilities to each member of a group. */
++    private fun hasExpiringGroupCombatGrant(effect: Effect): Boolean {
++        if (effect is ModalEffect && effect.modes.any { hasExpiringGroupCombatGrant(it.effect) }) return true
++        if (effect is CompositeEffect) return effect.effects.any(::hasExpiringGroupCombatGrant)
++        if (effect is ForEachEffect && effect.space is IterationSpace.Group) {
++            return EffectWalker.leaves(effect.body).any { leaf ->
++                (leaf as? GrantKeywordEffect)?.let {
++                    it.target == EffectTarget.IterationEntity &&
++                        it.duration == Duration.EndOfTurn &&
++                        (it.keyword in COMBAT_TRICK_KEYWORDS || it.keyword.startsWith("PROTECTION_FROM_"))
++                } == true
++            }
++        }
++        return false
++    }
++
++    private companion object {
++        val COMBAT_TRICK_KEYWORDS = setOf(
++            Keyword.DEATHTOUCH.name, Keyword.DOUBLE_STRIKE.name, Keyword.FIRST_STRIKE.name,
++            Keyword.FLYING.name, Keyword.INDESTRUCTIBLE.name, Keyword.LIFELINK.name,
++            Keyword.MENACE.name, Keyword.REACH.name, Keyword.TRAMPLE.name,
++            Keyword.VIGILANCE.name, Keyword.HEXPROOF.name, Keyword.SHROUD.name,
++        )
++    }
++
+     private fun drawsOf(effect: Effect): Int? = when (effect) {
+         is DrawCardsEffect -> fixed(effect.count)
+         is DrawUpToEffect -> effect.maxCards
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
+index d95624e5a6..542a1c7f48 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
+@@ -5,6 +5,14 @@ import com.wingedsheep.engine.state.components.identity.RoomComponent
+ import com.wingedsheep.engine.state.components.identity.RoomFace
+ import com.wingedsheep.engine.state.components.identity.RoomFaceId
+ import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.dsl.*
++import com.wingedsheep.sdk.scripting.Duration
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.effects.Mode
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
+ import com.wingedsheep.mtg.sets.definitions.dsk.cards.UnholyAnnexRitualChamber
+ import com.wingedsheep.mtg.sets.definitions.woe.cards.VirtueOfLoyalty
+ import io.kotest.assertions.withClue
+@@ -106,6 +114,33 @@ class CardIntentAnalyzerTest : ScenarioTestBase() {
+             }
+         }
+ 
++        test("a modal group keyword grant is a combat trick") {
++            val modalTrick = card("Modal Group Combat Trick") {
++                manaCost = "{3}{W}"
++                typeLine = "Instant"
++                spell {
++                    val creatures = GroupFilter(GameObjectFilter.Creature.youControl())
++                    effect = Effects.Modal(
++                        modes = listOf(
++                            Mode(
++                                effect = Effects.ForEachInGroup(
++                                    creatures,
++                                    Effects.GrantKeyword(Keyword.FLYING, EffectTarget.IterationEntity, Duration.EndOfTurn) then
++                                        Effects.GrantProtectionFromColor(Color.WHITE, EffectTarget.IterationEntity, Duration.EndOfTurn),
++                                ),
++                                description = "Flying and protection",
++                            ),
++                        ),
++                        chooseCount = 1,
++                    )
++                }
++            }
++
++            val intent = CardIntentAnalyzer.analyze(modalTrick)
++            intent.speed shouldBe Speed.INSTANT
++            intent.tags shouldContain IntentTag.COMBAT_TRICK
++        }
++
+         test("a +X/+X instant whose X cannot go negative is a combat trick") {
+             // Regression: an engine-vs-engine game cast Accelerated Mutation in its precombat main
+             // on a creature it then did not attack with. Only `Fixed` modifiers were read, so the

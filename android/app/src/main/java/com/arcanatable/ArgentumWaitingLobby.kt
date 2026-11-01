@@ -2,6 +2,7 @@ package com.arcanatable
 
 import com.arcanatable.engine.LocalArgentumHost
 import com.arcanatable.engine.LocalSeat
+import com.arcanatable.engine.ai.AiDifficulty
 import com.wingedsheep.sdk.model.EntityId
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,7 +21,7 @@ import org.json.JSONObject
  */
 internal class ArgentumWaitingLobby(
     private val host: LocalSeat,
-    private val aiOptions: List<LocalSeat>,
+    aiOptions: List<LocalSeat>,
     seatCount: Int,
 ) {
     init {
@@ -39,6 +40,7 @@ internal class ArgentumWaitingLobby(
         EntityId("offline-ai-2"),
         EntityId("offline-ai-3"),
     )
+    private val aiOptions = aiOptions.toMutableList()
     private val ids: List<EntityId> get() = allIds.take(seatCount)
     // One entry per possible opponent seat (1..3), so resizing keeps each seat's choice.
     private val kinds = MutableList(3) { Kind.AI }
@@ -54,6 +56,13 @@ internal class ArgentumWaitingLobby(
     }
 
     fun kindOf(index: Int): Kind? = if (index in 1 until seatCount) kinds[index - 1] else null
+
+    /** Host-selected difficulty for an AI seat; ignored for friend seats and after START. */
+    fun setAiDifficulty(index: Int, difficulty: AiDifficulty): Boolean {
+        if (started || index !in 1 until seatCount || kinds[index - 1] != Kind.AI || index in admitted) return false
+        aiOptions[index - 1] = aiOptions[index - 1].copy(difficulty = difficulty)
+        return true
+    }
 
     /** Whether [newCount] seats is allowed now: no seated guest may be dropped by shrinking. */
     fun canResize(newCount: Int): Boolean =
@@ -156,6 +165,7 @@ internal class ArgentumWaitingLobby(
                     .put("kind", kind)
                     .put("ready", kind != "waiting" && (kind != "human" || index in readySeats))
                     .put("name", if (kind == "waiting") "Waiting for a friend" else seat.name)
+                    .put("difficulty", if (kind == "ai") seat.difficulty.name else JSONObject.NULL)
                     .put("commander", if (kind == "waiting") JSONObject.NULL else seat.commander ?: JSONObject.NULL))
             }
         })

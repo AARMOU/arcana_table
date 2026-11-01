@@ -46,6 +46,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.json.JSONArray
 import org.json.JSONObject
+import com.arcanatable.engine.ai.AiDifficulty
 
 /*
  * The 2–4 player lobby for Wi-Fi and online Commander. The host sees every seat, can change open
@@ -63,6 +64,7 @@ internal data class LobbySeat(
     val name: String,
     val commander: String?,
     val ready: Boolean,
+    val difficulty: AiDifficulty = AiDifficulty.DEFAULT,
 )
 
 internal fun lobbySeats(state: JSONObject?): List<LobbySeat> {
@@ -74,6 +76,7 @@ internal fun lobbySeats(state: JSONObject?): List<LobbySeat> {
             name = seat.optString("name"),
             commander = seat.optString("commander").takeUnless { it.isBlank() || it == "null" },
             ready = seat.optBoolean("ready"),
+            difficulty = AiDifficulty.fromName(seat.optString("difficulty")),
         )
     }
 }
@@ -228,6 +231,7 @@ internal fun TableController.MultiplayerLobbyScreen() {
                             controlsEnabled = !multiLobbySeatChangePending,
                             onMakeAi = { setMultiSeatFriend(index, friend = false) },
                             onOpenForFriend = { setMultiSeatFriend(index, friend = true) },
+                            onDifficulty = { setMultiSeatAiDifficulty(index, it) },
                             onRemove = { removeTarget = seat },
                         )
                     }
@@ -373,6 +377,7 @@ private fun SeatCard(
     controlsEnabled: Boolean,
     onMakeAi: () -> Unit,
     onOpenForFriend: () -> Unit,
+    onDifficulty: (AiDifficulty) -> Unit,
     onRemove: () -> Unit,
 ) {
     val waiting = seat.kind == "waiting"
@@ -397,14 +402,35 @@ private fun SeatCard(
                         when (seat.kind) { "host" -> "HOST"; "ai" -> "AI"; "human" -> "FRIEND"; else -> "OPEN SEAT" },
                         "YOU".takeIf { isYou },
                     ).joinToString(" · ")
-                    Text(role, color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    Text(
+                        if (seat.kind == "ai") "$role · ${seat.difficulty.label}" else role,
+                        color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp,
+                    )
                     seat.commander?.let {
                         Text(it, color = CounterGold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 StatusChip(seat)
             }
-            if (hostControls) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+            if (hostControls && seat.kind == "ai") {
+                Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    Text("AI DIFFICULTY", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        AiDifficulty.entries.forEach { level ->
+                            OutlinedButton(
+                                onClick = { onDifficulty(level) }, enabled = controlsEnabled,
+                                modifier = Modifier.weight(1f).heightIn(min = 42.dp),
+                                colors = if (seat.difficulty == level)
+                                    ButtonDefaults.outlinedButtonColors(containerColor = Mint, contentColor = Ink)
+                                else ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
+                            ) { Text(level.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                        }
+                    }
+                    TextButton(onClick = onOpenForFriend, enabled = controlsEnabled, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp)) {
+                        Text("OPEN FOR A FRIEND", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (hostControls) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
                 when (seat.kind) {
                     "waiting" -> TextButton(onClick = onMakeAi, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("PLAY AS AI", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold) }

@@ -1,0 +1,159 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+index dcc44911ab..9e0d480783 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+@@ -1095,6 +1095,10 @@ object DynamicAmounts {
+     fun spellsCastThisGame(player: Player = Player.You): DynamicAmount =
+         DynamicAmount.SpellsCastThisGame(player)
+ 
++    /** Commander cards [player] has cast from the command zone this game, including countered casts. */
++    fun commanderCastsFromCommandZone(player: Player = Player.You): DynamicAmount =
++        DynamicAmount.CommanderCastsFromCommandZone(player)
++
+     /** Spells [player] cast during their own last turn (Arboria). */
+     fun spellsCastDuringTheirLastTurn(player: Player): DynamicAmount =
+         DynamicAmount.TurnTracking(player, TurnTracker.SPELLS_CAST_DURING_THEIR_LAST_TURN)
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+index 1419fdb6e6..89e9afbc38 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+@@ -2113,6 +2113,19 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
+             else "the number of spells ${player.description} has cast this game"
+     }
+ 
++    /**
++     * How many times [player] has cast a commander from the command zone this game. The count
++     * includes the current cast once it is resolving, including a cast that is later countered;
++     * partner commanders are summed for their owner (CR 903.8).
++     */
++    @SerialName("CommanderCastsFromCommandZone")
++    @Serializable
++    data class CommanderCastsFromCommandZone(val player: Player = Player.You) : DynamicAmount {
++        override val description: String =
++            if (player == Player.You) "the number of times you've cast a commander from the command zone this game"
++            else "the number of times ${player.description} has cast a commander from the command zone this game"
++    }
++
+     /**
+      * Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
+      *
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+index be880c0390..498cbc534f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+@@ -26,6 +26,7 @@ import com.wingedsheep.engine.state.components.identity.FaceDownComponent
+ import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
+ import com.wingedsheep.engine.state.components.identity.NumericKeywordValuesComponent
+ import com.wingedsheep.engine.state.components.identity.PlayerComponent
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
+ import com.wingedsheep.engine.state.components.player.ManaPoolComponent
+ import com.wingedsheep.engine.state.components.player.PlayerCountersRemovedThisTurnComponent
+ import com.wingedsheep.engine.state.components.identity.RoomComponent
+@@ -227,6 +228,7 @@ class DynamicAmountEvaluator(
+         is DynamicAmount.PlayerCounterCount,
+         is DynamicAmount.CardsCycledThisGame,
+         is DynamicAmount.SpellsCastThisGame,
++        is DynamicAmount.CommanderCastsFromCommandZone,
+         is DynamicAmount.Speed,
+         is DynamicAmount.DungeonsCompleted,
+         DynamicAmount.SpellsCastLastTurn,
+@@ -464,6 +466,12 @@ class DynamicAmountEvaluator(
+                         ?.count ?: 0
+                 }
+ 
++            is DynamicAmount.CommanderCastsFromCommandZone ->
++                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
++                    state.findEntitiesWith<CommanderComponent>()
++                        .sumOf { (_, commander) -> if (commander.ownerId == playerId) commander.castsFromCommandZone else 0 }
++                }
++
+             // Unlocked doors among Rooms the player controls (CR 709.5). Reads per-face door
+             // state off each Room's RoomComponent — a single Room entity can contribute two
+             // doors, so this can't go through the entity-level AggregateBattlefield. Controller
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+index 4c0f14c5cb..314449b5fb 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+@@ -444,6 +444,7 @@ class CreateDelayedTriggerExecutor(
+         is DynamicAmount.PlayerCounterCount,
+         is DynamicAmount.CardsCycledThisGame,
+         is DynamicAmount.SpellsCastThisGame,
++        is DynamicAmount.CommanderCastsFromCommandZone,
+         is DynamicAmount.Speed,
+         is DynamicAmount.DungeonsCompleted,
+         DynamicAmount.SpellsCastLastTurn,
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
+new file mode 100644
+index 0000000000..0c0ff91ecd
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
+@@ -0,0 +1,69 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.state.ZoneKey
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
++import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.Phase
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.DynamicAmounts
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.EntityId
++import io.kotest.matchers.shouldBe
++
++class CommanderCastsFromCommandZoneTest : ScenarioTestBase() {
++    private val commander = card("Commander Cast Count Test") {
++        manaCost = "{0}"
++        typeLine = "Legendary Creature — Test"
++        power = 1
++        toughness = 1
++    }
++
++    private fun amount(game: TestGame, player: EntityId): Int =
++        game.services.predicateEvaluator.amounts.evaluate(
++            game.state,
++            DynamicAmounts.commanderCastsFromCommandZone(),
++            EffectContext(sourceId = null, controllerId = player),
++        )
++
++    init {
++        cardRegistry.register(commander)
++
++        test("counts the current cast from the command zone, including a cast that has not resolved") {
++            val game = scenario()
++                .withPlayers()
++                .withCardInCommandZone(1, commander.name)
++                .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
++                .build()
++            val owner = game.player1Id
++            val cardId = game.state.getZone(ZoneKey(owner, Zone.COMMAND)).single()
++            game.state = game.state.updateEntity(cardId) { it.with(CommanderComponent(ownerId = owner)) }
++
++            amount(game, owner) shouldBe 0
++            game.execute(CastSpell(playerId = owner, cardId = cardId)).error shouldBe null
++            amount(game, owner) shouldBe 1
++        }
++
++        test("sums partner commanders for their owner and excludes the opponent") {
++            val game = scenario()
++                .withPlayers()
++                .withCardInCommandZone(1, commander.name)
++                .withCardInCommandZone(1, commander.name)
++                .withCardInCommandZone(2, commander.name)
++                .build()
++            val firstOwner = game.player1Id
++            val opponent = game.player2Id
++            val first = game.state.getZone(ZoneKey(firstOwner, Zone.COMMAND))[0]
++            val partner = game.state.getZone(ZoneKey(firstOwner, Zone.COMMAND))[1]
++            val enemy = game.state.getZone(ZoneKey(opponent, Zone.COMMAND)).single()
++            game.state = game.state
++                .updateEntity(first) { it.with(CommanderComponent(ownerId = firstOwner, castsFromCommandZone = 2)) }
++                .updateEntity(partner) { it.with(CommanderComponent(ownerId = firstOwner, castsFromCommandZone = 3)) }
++                .updateEntity(enemy) { it.with(CommanderComponent(ownerId = opponent, castsFromCommandZone = 20)) }
++
++            amount(game, firstOwner) shouldBe 5
++        }
++    }
++}

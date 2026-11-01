@@ -40,6 +40,8 @@ MANDATORY = [
     "0021-azlask-exact-colors-trigger.patch",
     "0022-cant-be-sacrificed-by-effects.patch",
     "0023-face-down-exile-hidden-from-owner.patch",
+    "0024-commander-cast-history-amount.patch",
+    "0025-akromas-will-modal-combat-trick.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

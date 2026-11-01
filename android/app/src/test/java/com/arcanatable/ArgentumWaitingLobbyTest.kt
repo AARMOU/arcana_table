@@ -2,6 +2,7 @@ package com.arcanatable
 
 import com.arcanatable.engine.LocalArgentumHost
 import com.arcanatable.engine.LocalSeat
+import com.arcanatable.engine.ai.AiDifficulty
 import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.json.JSONObject
 
 /** No socket or runtime JAR changes: prove admission before wiring to the actual Wi-Fi host. */
 @RunWith(RobolectricTestRunner::class)
@@ -120,6 +122,30 @@ class ArgentumWaitingLobbyTest {
         assertFalse(serialized.contains("deck", ignoreCase = true))
         assertEquals("waiting", body.getJSONArray("seats").getJSONObject(2).getString("kind"))
         assertEquals("ai", body.getJSONArray("seats").getJSONObject(3).getString("kind"))
+    }
+
+    @Test fun hostSelectsAiDifficultyAndGuestsSeeItBeforeStart() {
+        val room = lobby(3)
+        room.setKind(2, ArgentumWaitingLobby.Kind.FRIEND)
+        assertTrue(room.setAiDifficulty(1, AiDifficulty.BRUTAL))
+        assertFalse(room.setAiDifficulty(2, AiDifficulty.HARD))
+        val guest = room.seatGuest(seat("Guest", "Plains"))!!
+        assertTrue(room.setReady(guest, true))
+
+        val aiSeat = room.lobbyMessage().getJSONArray("seats").getJSONObject(1)
+        assertEquals("BRUTAL", aiSeat.getString("difficulty"))
+        assertEquals("null", room.lobbyMessage().getJSONArray("seats").getJSONObject(2).getString("difficulty"))
+
+        val guestView = lobbySeats(room.lobbyMessage()).single { it.kind == "ai" }
+        assertEquals(AiDifficulty.BRUTAL, guestView.difficulty)
+        val roster = room.start()!!
+        assertEquals(AiDifficulty.BRUTAL, roster.players[1].difficulty)
+        assertFalse(room.setAiDifficulty(1, AiDifficulty.EASY))
+
+        val legacy = lobbySeats(JSONObject(
+            """{"seats":[{"seatId":"offline-ai","kind":"ai","name":"Old host AI","ready":true}]}""",
+        )).single()
+        assertEquals(AiDifficulty.DEFAULT, legacy.difficulty)
     }
     @Test fun startWaitsForEveryGuestToMarkReadyAndReadyCanBeWithdrawn() {
         val room = lobby(3)

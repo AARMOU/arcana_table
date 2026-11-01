@@ -557,6 +557,16 @@ internal fun TableController.setMultiSeatFriend(index: Int, friend: Boolean) {
     changeMultiSeats(room, apply = { it.setKind(index, wanted) }, revert = { it.setKind(index, previous) })
 }
 
+/** Host: select the local AI policy for an AI seat before START. */
+internal fun TableController.setMultiSeatAiDifficulty(
+    index: Int,
+    difficulty: com.arcanatable.engine.ai.AiDifficulty,
+) {
+    val room = wifiMultiLobby ?: return
+    if (argentumSocket.runningLocalHost != null) return
+    if (room.setAiDifficulty(index, difficulty)) publishMultiLobby()
+}
+
 /** Host: change the number of seats (2–4). Never drops a seated guest. */
 internal fun TableController.resizeMultiLobby(count: Int) {
     val room = wifiMultiLobby ?: return
