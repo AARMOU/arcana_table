@@ -32,6 +32,14 @@ upstream retired an SDK type they use:
 - `PrimalAmulet.kt`: `ManaSpellRider.CopySpellWhenSpent` became `TriggersWhenSpent(filter, CopyTargetSpell(TriggeringEntity))`.
   This is upstream #3746, which is how upstream migrated Pyromancer's Goggles. Taken from int-base (6ea1936).
 
+## Validation: run 41284786258, green
+- Engine: 9,224 / 9,224 mtg-sdk and rules-engine tests.
+- Custom cards: 800 / 800 after the weekly's reconcile. 41 collisions; Argentum's version plays for 40, Arcana's
+  Sifter of Skulls is kept.
+- App unit tests: 441 / 441 (5 skipped). This needed the int-base catalog fix (`DeckSupport.kt` honours
+  `custom-overrides.txt`), which is now on this branch.
+- Weekly manifest: PR #740 adds these patches to int-base's `MANDATORY` as 0011–0021, so Monday runs carry them.
+
 ## Reproduce
 ```
 git -C argentum-engine checkout $(cat engine-upgrade/upstream-port-wip/UPSTREAM)
@@ -39,6 +47,6 @@ git -C argentum-engine am --3way engine-upgrade/upstream-port-wip/series/*.patch
 ```
 
 ## Next
-1. CI green on the engine suites and the card tests. Fix any failures in the series.
-2. Point the weekly upgrade's manifest and pin at this series and `UPSTREAM`, so Monday runs start from here.
+1. Done: CI green.
+2. PR #740, waiting on owner approval: the weekly's manifest carries the full series.
 3. With owner approval, stage these JARs on the B141 candidate in place of the B140-plus-backports JARs.
