@@ -15,8 +15,10 @@ on:
     - cron: '41 * * * *'
   # Each dispatcher run can free or fill a worker slot: re-check idle suite requests right after it
   # (timer mode: no green-CI re-runs). Stops on its own: no new request, no new dispatcher run.
+  # Copilot session events come from GitHub's own app, so they fire even when the dispatcher was started by
+  # GITHUB_TOKEN (whose runs never trigger workflow_run). A finished session frees a worker slot.
   workflow_run:
-    workflows: ['Arcana Card Worker Dispatcher']
+    workflows: ['Arcana Card Worker Dispatcher', 'Running Copilot cloud agent']
     types: [completed]
   workflow_dispatch:
     inputs:

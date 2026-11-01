@@ -51,7 +51,7 @@ function playedCustomCards({ registry, customIndex, libraryIndex, overrides, dec
 }
 
 // Pure: what to request next, or why nothing.
-function plan({ cards, manifest, requests, status, now = Date.now(), burst = null }) {
+function plan({ cards, manifest, requests, status, now = Date.now(), burst = null, live = null }) {
   const b = activeBurst(burst, now);
   if (!status || (!b && status.state !== 'nothing-eligible')) return { skip: 'dispatcher has eligible work (or no status)' };
   if (!(now - Date.parse(status.checkedAt || '') <= STATUS_MAX_AGE_MS)) return { skip: 'dispatcher status is stale' };
@@ -61,9 +61,12 @@ function plan({ cards, manifest, requests, status, now = Date.now(), burst = nul
   if (b) {
     // Busy = Copilot sessions running or awaiting pickup (dispatcher status) + idle requests still unassigned.
     // An open request whose session already finished (PR in review) does not hold a worker.
+    // `live` (when given) is the count of Copilot sessions in progress right now, read from Actions: it beats the
+    // dispatcher's status, which lags by a run. Pending pickup still comes from the status.
     const w = status.workers || {};
     const waiting = idle.filter(r => r.state === 'open' && !(r.assignees || []).length).length;
-    const busy = (Number(w.running) || 0) + (Number(w.pendingPickup) || 0) + waiting;
+    const running = Number.isSafeInteger(live) ? live : (Number(w.running) || 0);
+    const busy = running + (Number(w.pendingPickup) || 0) + waiting;
     if (busy >= b.parallel) return { skip: `burst: ${busy}/${b.parallel} workers busy or waiting` };
     slots = b.parallel - busy;
   } else if (idle.some(r => r.state === 'open' && !(r.assignees || []).length)) return { skip: 'an idle suite request is still waiting' };
@@ -133,15 +136,28 @@ async function dispatcherStatus({ github, owner, repo }) {
   try { return m ? JSON.parse(m[1]) : null; } catch { return null; }
 }
 
+// Copilot sessions queued or running now (GitHub's dynamic Copilot workflow). null on any error: fall back to status.
+async function liveCopilotSessions({ github, owner, repo }) {
+  try {
+    let n = 0;
+    for (const status of ['in_progress', 'queued']) {
+      const runs = (await github.rest.actions.listWorkflowRunsForRepo({ owner, repo, event: 'dynamic', status, per_page: 50 })).data.workflow_runs || [];
+      n += runs.filter(r => r.path === 'dynamic/copilot-swe-agent/copilot').length;
+    }
+    return n;
+  } catch { return null; }
+}
+
 function readBurst(root = '.') {
   try { return JSON.parse(fs.readFileSync(root + '/certification/idle-burst.json', 'utf8')); } catch { return null; }
 }
 
 async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now = Date.now(), dry = false, fetchImpl = fetch, burst = readBurst(root) }) {
   const status = await dispatcherStatus({ github, owner, repo });
+  const live = activeBurst(burst, now) ? await liveCopilotSessions({ github, owner, repo }) : null;
   const requests = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', creator: BOT, per_page: 100 }))
     .filter(i => !i.pull_request && String(i.title || '').startsWith(SUITE_TITLE) && String(i.body || '').startsWith(SUITE_MARKER + '\n'));
-  const early = plan({ cards: [], manifest, requests, status, now, burst });
+  const early = plan({ cards: [], manifest, requests, status, now, burst, live });
   if (early.skip && early.skip !== 'every played custom card has a suite or a request') return { requested: null, reason: early.skip };
   const target = JSON.parse(fs.readFileSync(root + '/integration/policy.json', 'utf8')).target;
   const [registry, customIndex, libraryIndex, overrides] = await Promise.all([REGISTRY, ASSETS + 'custom-cards.index.tsv',
@@ -155,7 +171,7 @@ async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now
     for (const d of six.decks || []) deckLists.push((d.cards || []).map(c => `1 ${c.name}`).join('\n'));
   } catch {}
   const cards = playedCustomCards({ registry, customIndex, libraryIndex, overrides, deckLists });
-  const p = plan({ cards, manifest, requests, status, now, burst });
+  const p = plan({ cards, manifest, requests, status, now, burst, live });
   if (p.skip) return { requested: null, reason: p.skip, played: cards.length };
   const cache = await readText(github, owner, repo, 'tools/cardkit/data/oracle-cache.jsonl', target);
   const made = [], planned = [];
@@ -173,4 +189,4 @@ async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now
   return { requested: made[0].number, card: made[0].card, decks: made[0].decks, all: made, played: cards.length, today: p.today + made.length, burst: p.burst };
 }
 
-module.exports = { requestIdleSuite, playedCustomCards, plan, activeBurst, readBurst, idleRequest, oracleFor, DAILY_CAP, idleMarker };
+module.exports = { requestIdleSuite, playedCustomCards, plan, activeBurst, readBurst, liveCopilotSessions, idleRequest, oracleFor, DAILY_CAP, idleMarker };
