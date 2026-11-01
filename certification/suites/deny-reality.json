@@ -1,0 +1,9 @@
+{
+  "key": "deny-reality",
+  "name": "Deny Reality",
+  "issue": 847,
+  "source": "certification/DenyRealityIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DenyRealityIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
