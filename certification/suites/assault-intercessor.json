@@ -1,0 +1,9 @@
+{
+  "key": "assault-intercessor",
+  "name": "Assault Intercessor",
+  "issue": 783,
+  "source": "certification/AssaultIntercessorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AssaultIntercessorIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
