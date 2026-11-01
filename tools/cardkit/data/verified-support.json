@@ -521,6 +521,33 @@
       "baseSha": "7999edca6725a93fc1d273d7dbf9e17f73da3793",
       "oracleHash": "6fcf58d8ce11908606ef33519bc5811f3157c1a5c21e6ed20d2008a624061880",
       "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Arch of Orazca": {
+      "summary": "The activated draw ability uses Costs.Composite(Costs.Mana, Costs.Tap), Effects.DrawCards, and ActivationRestriction.OnlyIfCondition(Conditions.YouHaveCitysBlessing). Fool's Tome demonstrates the activated draw/only-if pattern; Sea Gate Wreckage has real positive/negative activation-restriction scenarios; Wayward Swordtooth uses the blessing condition in implemented rules and a scenario verifies the no-blessing restriction.",
+      "verifiedBy": "Copilot, source and scenario inspection 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tmp/cards/FoolsTome.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SeaGateWreckage.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SeaGateWreckageScenarioTest.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WaywardSwordtooth.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WaywardSwordtoothScenarioTest.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "{5}, {T}: Draw a card. Activate only if you have the city's blessing.",
+          "primitives": [
+            "Costs.Composite",
+            "Costs.Mana",
+            "Costs.Tap",
+            "Effects.DrawCards",
+            "ActivationRestriction.OnlyIfCondition",
+            "Conditions.YouHaveCitysBlessing"
+          ]
+        }
+      ],
+      "baseSha": "ac7221f343ccdfa1532cd620ee7d1cadd8b0028d",
+      "oracleHash": "d0d22fa8102670b67b82e29dd5fa15e87e96865d2e8ea901f7873b00054a891c",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
