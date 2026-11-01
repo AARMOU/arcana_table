@@ -1,0 +1,131 @@
+name: Engine upstream port - validate (NO APK, no staging)
+# Builds current upstream Argentum (engine-upgrade/upstream-port-wip/UPSTREAM) plus the ported Arcana patch series
+# (engine-upgrade/upstream-port-wip/series, git am, fail closed), runs the engine's full SDK and rules test suites,
+# builds all four runtime JARs, then runs every Arcana custom-card test against them. Validation only: nothing is
+# committed, no JARs are staged, no APK is built.
+on:
+  push:
+    branches: ['gpt/b141-candidate-*']
+    paths:
+      - engine-upgrade/upstream-port-wip/**
+      - .github/workflows/engine-port-validate.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: engine-port-validate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upstream pin
+        id: pin
+        run: echo "sha=$(tr -d ' \n' < engine-upgrade/upstream-port-wip/UPSTREAM)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ steps.pin.outputs.sha }}
+          path: argentum-engine
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply the ported series (fail closed)
+        working-directory: argentum-engine
+        run: |
+          set -euo pipefail
+          git config user.name arcana; git config user.email a@a
+          git am --3way ../engine-upgrade/upstream-port-wip/series/*.patch
+          git log --oneline ${{ steps.pin.outputs.sha }}..HEAD
+      - name: Engine SDK + rules tests and all four runtime JARs
+        id: enginetests
+        continue-on-error: true
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-engine \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 --continue \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test :rules-engine:test :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Engine test summary (failures listed)
+        id: enginesummary
+        if: always()
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=0; bad=[]
+          for mod in ("mtg-sdk","rules-engine"):
+            for p in Path(f"argentum-engine/{mod}/build/test-results/test").glob("TEST-*.xml"):
+              r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+              for tc in r.iter("testcase"):
+                if tc.find("failure") is not None or tc.find("error") is not None:
+                  f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+          print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
+          assert t>1000 and f==0
+          PY
+      - name: Swap the four JARs into the app workspace (not committed)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,struct,shutil
+          mods={"argentum-mtg-sdk.jar":"mtg-sdk","argentum-mtg-sdk-tooling.jar":"mtg-sdk-tooling",
+                "argentum-rules-engine.jar":"rules-engine","argentum-ai.jar":"ai"}
+          for dest,mod in mods.items():
+            jars=[p for p in Path(f"argentum-engine/{mod}/build/libs").glob("*.jar")
+                  if not any(s in p.name for s in ("sources","javadoc","test"))]
+            assert len(jars)==1,(mod,jars)
+            with zipfile.ZipFile(jars[0]) as z:
+              v=max(struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class"))
+            assert v<=61,(mod,v)
+            shutil.copyfile(jars[0],Path("android/app/libs")/dest); print(dest,v)
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Every Arcana custom-card test on the ported engine
+        working-directory: android
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-custom-cards \
+            ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test
+      - name: Card test summary (failures listed)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=0; bad=[]
+          for p in Path("android/custom-cards/build/test-results/test").glob("TEST-*.xml"):
+            r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+            for tc in r.iter("testcase"):
+              if tc.find("failure") is not None or tc.find("error") is not None:
+                f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+          print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
+          assert t>500 and f==0
+          PY
+      - name: Gate - engine suites green
+        if: always()
+        run: |
+          echo "engine tests: ${{ steps.enginetests.outcome }}, summary: ${{ steps.enginesummary.outcome }}"
+          test "${{ steps.enginetests.outcome }}" = success && test "${{ steps.enginesummary.outcome }}" = success
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-port-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            gradle-logs/
+            argentum-engine/rules-engine/build/test-results/test/*.xml
+            argentum-engine/mtg-sdk/build/test-results/test/*.xml
+            android/custom-cards/build/test-results/test/*.xml
