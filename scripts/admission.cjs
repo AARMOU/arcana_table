@@ -395,7 +395,9 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
   }
   // Lane capacity at the owner ceiling is decided before budget so budget diagnostics stay complete;
   // the total-ceiling check above still rejects immediately.
-  const laneDenied = laneDenial({ op, holders, capacity: ready.maxUnits });
+  // Owner burst window (certification/idle-burst.json): builds may use every slot at the full ceiling.
+  // A waiting repair then starts when the next session ends; budget-scaled capacity still applies below.
+  const laneDenied = ready.burst && op === 'assign' ? null : laneDenial({ op, holders, capacity: ready.maxUnits });
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
   const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });

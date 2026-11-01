@@ -410,9 +410,12 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   // Measured credits per session (owner: auto-calibrate). Only the source is reported: figures are private.
   const cal = await calibrateReady({ github, owner, repo, env, ready, snapshot });
   report.estimateSource = cal.source;
+  let burst = null;
+  try { const I = require('../certification/idle-suites.cjs'); burst = I.activeBurst(I.readBurst(require('node:path').join(__dirname, '..')), Math.max(now, Date.now())); } catch {}
+  report.burst = burst ? { until: burst.until } : null;
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
     actionable },
-    units, labeledCount: labeled.length, ready: cal.ready, snapshot, now: Math.max(now, Date.now()) });
+    units, labeledCount: labeled.length, ready: burst ? { ...cal.ready, burst: true } : cal.ready, snapshot, now: Math.max(now, Date.now()) });
   report.decision = { issue: n, ...decision };
   // Job summaries of a public repository are public: no usage ratio or credit totals.
   await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, allowed: !!decision.allowed,

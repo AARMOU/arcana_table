@@ -330,3 +330,11 @@ test('dynamic capacity: up to 3 workers, lanes never take every slot, budget sca
   assert.equal(A.scaledCapacity(3, 'warn'), 3); assert.equal(A.scaledCapacity(3, 'slow'), 1);
   assert.equal(A.scaledCapacity(3, 'paused'), 0); assert.equal(A.scaledCapacity(3, 'unknown'), 0);
 });
+
+test('burst window: builds may take all three slots; repairs keep their rule; budget scaling unchanged', () => {
+  const three = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '3' }));
+  const burst = { ...three, burst: true };
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2)], ready: burst, snapshot: snap(100), now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2), working(3)], ready: burst, snapshot: snap(100), now: NOW }).reason, /capacity: 3 of 3/);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2)], ready: three, snapshot: snap(100), now: NOW }).reason, /builder slot occupied/);
+});

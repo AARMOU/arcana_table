@@ -13,6 +13,11 @@ on:
       - 'certification/**'
   schedule:
     - cron: '41 * * * *'
+  # Each dispatcher run can free or fill a worker slot: re-check idle suite requests right after it
+  # (timer mode: no green-CI re-runs). Stops on its own: no new request, no new dispatcher run.
+  workflow_run:
+    workflows: ['Arcana Card Worker Dispatcher']
+    types: [completed]
   workflow_dispatch:
     inputs:
       scheduled:
@@ -53,7 +58,7 @@ jobs:
           script: |
             try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const { backfill } = require('./certification/backfill.cjs');
-            const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule' || context.payload.inputs?.scheduled === 'true' || context.payload.inputs?.scheduled === true, report: true });
+            const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule' || context.eventName === 'workflow_run' || context.payload.inputs?.scheduled === 'true' || context.payload.inputs?.scheduled === true, report: true });
             core.info(JSON.stringify(r));
             await core.summary.addHeading('Certification backfill').addCodeBlock(JSON.stringify(r, null, 1)).write();
             // Idle-time work (owner, 2026-11-01, cap 6/day; owner burst window in certification/idle-burst.json): one suite request for an integrated card when the
