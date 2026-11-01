@@ -2,7 +2,8 @@ name: Protect coordination issue 81
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    # The guard only reads title/body. New commits and reopening do not change those inputs.
+    types: [opened, edited]
   issues:
     types: [closed]
 
@@ -13,6 +14,9 @@ permissions:
 
 jobs:
   coordination-guard:
+    # Only closure of the permanent coordination issue needs a job; other issue closes
+    # cannot affect this guard and would otherwise consume an Actions runner.
+    if: github.event_name != 'issues' || github.event.issue.number == 81
     runs-on: ubuntu-latest
     steps:
       - name: Reject automatic closing references and report unexpected closure

@@ -3,7 +3,8 @@ name: Arcana Card Review Inbox Refresh
 # budget, approval, or worker launch. Only updates one public review-status comment.
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # One bounded refresh fallback; exact-head certification completion remains event-driven.
+    - cron: '7,37 * * * *'
   workflow_run:
     workflows: ['Arcana Independent Card Certification']
     types: [completed]

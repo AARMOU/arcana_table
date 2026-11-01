@@ -1,28 +1,51 @@
 'use strict';
 // Read-only worker observer. No dispatcher, budget API, or Copilot assignments.
 const { loadUnits } = require('./units.cjs');
-const { summarizeUnits, publishStatus, freshStatus } = require('./control-status.cjs');
-// Event-driven refreshes within this window are skipped; schedule and manual runs always refresh.
-// GITHUB_TOKEN allows 1,000 requests/hour per repository, shared by every workflow, and a refresh costs
-// ~100. Only a Copilot session finishing changes what a worker is doing, so it keeps the short window;
-// issue/PR churn and dispatcher/feeder/router completions (the dispatcher publishes its own worker list)
-// wait for the long window, which matches the 15-minute schedule (event scans: up to 12/hour -> about 4).
-const MIN_EVENT_INTERVAL_MS = 5 * 60 * 1000;
-const LOW_VALUE_EVENT_INTERVAL_MS = 15 * 60 * 1000;
-const eventIntervalMs = context => context.eventName === 'workflow_run' &&
-  /^Running Copilot cloud agent$/.test(String(context.payload?.workflow_run?.name || ''))
-  ? MIN_EVENT_INTERVAL_MS : LOW_VALUE_EVENT_INTERVAL_MS;
+const { summarizeUnits, publishStatus, previousStatus } = require('./control-status.cjs');
+
+// A duplicate event for the same underlying state must not trigger another ~100-call scan.
+// The bounded schedule remains the recovery path for missed or newly visible GitHub state.
+function eventInputKey(context = {}) {
+  const p = context.payload || {};
+  if (context.eventName === 'workflow_run') {
+    const run = p.workflow_run || {};
+    if (run.name !== 'Running Copilot cloud agent' || run.status !== 'completed') return null;
+    return JSON.stringify({ type: 'copilot-completed', id: run.id || null,
+      headSha: run.head_sha || null, conclusion: run.conclusion || null });
+  }
+  if (context.eventName === 'issues') {
+    const issue = p.issue || {};
+    if (!['opened', 'closed', 'assigned', 'unassigned', 'labeled', 'unlabeled'].includes(p.action)) return null;
+    return JSON.stringify({ type: 'issue', number: issue.number || null, action: p.action,
+      state: issue.state || null, updatedAt: issue.updated_at || null,
+      labels: (issue.labels || []).map(label => label.name).sort() });
+  }
+  if (context.eventName === 'pull_request_target') {
+    const pr = p.pull_request || {};
+    if (!['opened', 'closed', 'reopened'].includes(p.action)) return null;
+    return JSON.stringify({ type: 'pull-request', number: pr.number || null, action: p.action,
+      state: pr.state || null, updatedAt: pr.updated_at || null, headSha: pr.head?.sha || null });
+  }
+  return null;
+}
 
 async function refreshWorkerStatus({ github, context, core, now = () => new Date(), load = loadUnits, publish = publishStatus,
-  fresh = freshStatus, minIntervalMs = eventIntervalMs(context) }) {
+  previous = previousStatus }) {
   const { owner, repo } = context.repo;
   const checkedAt = now();
-  // Each refresh reads every open unit's timeline and comments (~100 API calls). Bursts of
-  // workflow_run/issue events otherwise exhaust the repository's shared hourly token quota.
-  if (!['schedule', 'workflow_dispatch'].includes(context.eventName) &&
-      await fresh({ github, owner, repo, kind: 'workers', maxAgeMs: minIntervalMs, now: checkedAt.getTime() })) {
-    core.info('Worker status refreshed within the last ' + minIntervalMs / 60000 + ' min; skipped to conserve API quota.');
-    return { skipped: true };
+  const inputKey = eventInputKey(context);
+  // Read and retain the last key even on scheduled runs. Schedules always refresh as a bounded
+  // fallback; event runs scan only when the relevant issue/PR/session state actually changed.
+  const prior = await previous({ github, owner, repo, kind: 'workers' });
+  if (!['schedule', 'workflow_dispatch'].includes(context.eventName)) {
+    if (!inputKey) {
+      core.info('No worker-status input for this event; skipped.');
+      return { skipped: true, reason: 'irrelevant-event' };
+    }
+    if (prior?.lastInputKey === inputKey) {
+      core.info('Worker-status input already observed; skipped duplicate event.');
+      return { skipped: true, reason: 'duplicate-input' };
+    }
   }
   // Same GitHub event/ledger observation as admission, but NO writes or spending.
   const data = await load({ github, owner, repo, now: checkedAt.getTime(), approvers: [owner] });
@@ -31,6 +54,7 @@ async function refreshWorkerStatus({ github, context, core, now = () => new Date
     checkedAt: checkedAt.toISOString(),
     runId: String(context.runId || ''),
     event: context.eventName || 'unknown',
+    lastInputKey: inputKey || prior?.lastInputKey || null,
     workers,
     source: 'read-only-worker-observer',
   };
@@ -45,4 +69,4 @@ async function refreshWorkerStatus({ github, context, core, now = () => new Date
   if (published.startsWith('failed')) throw Error('Worker status publication failed: ' + published);
   return { payload, published };
 }
-module.exports = { refreshWorkerStatus, eventIntervalMs, MIN_EVENT_INTERVAL_MS, LOW_VALUE_EVENT_INTERVAL_MS };
+module.exports = { refreshWorkerStatus, eventInputKey };
