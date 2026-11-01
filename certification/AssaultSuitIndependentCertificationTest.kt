@@ -114,8 +114,6 @@ class AssaultSuitIndependentCertificationTest {
         assertNull(equip(d, player, suit, creature).error)
         d.resolveAll()
 
-        d.passPriorityUntil(Step.UPKEEP, activePlayer = player)
-        d.resolveAll()
         assertEquals(player, d.getController(creature))
         d.tapPermanent(creature)
         assertTrue(d.isTapped(creature))
