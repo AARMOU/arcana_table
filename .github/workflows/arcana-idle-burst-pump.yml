@@ -41,10 +41,16 @@ jobs:
                 const live = await I.liveCopilotSessions({ github, owner, repo });
                 if (live !== null && live < b.parallel) {
                   const idle = await I.requestIdleSuite({ github, owner, repo, root: '.', manifest: P.readManifest('./certification/suites.json'), burst });
+                  // Each dispatcher run (and the router run after it) reads billing, which GitHub rate-limits: start one
+                  // only when an idle request is waiting for a worker, and at most once every 4 minutes.
                   const runs = (await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: 'arcana-card-dispatcher.yml', per_page: 5 })).data.workflow_runs || [];
                   const dispatching = runs.some(r => r.status !== 'completed');
-                  if (!dispatching) await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'arcana-card-dispatcher.yml', ref: 'main', inputs: { dry_run: 'false' } });
-                  core.info(`${new Date().toISOString()} live=${live} idle=${JSON.stringify(idle)} dispatcher=${dispatching ? 'busy' : 'started'}`);
+                  const recent = runs[0] && Date.now() - Date.parse(runs[0].created_at) < 4 * 60e3;
+                  const waiting = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', creator: 'github-actions[bot]', per_page: 100 }))
+                    .some(i => !i.pull_request && /<!-- arcana-idle-suite:/.test(i.body || '') && !(i.assignees || []).length);
+                  const start = waiting && !dispatching && !recent;
+                  if (start) await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'arcana-card-dispatcher.yml', ref: 'main', inputs: { dry_run: 'false' } });
+                  core.info(`${new Date().toISOString()} live=${live} waiting=${waiting} idle=${JSON.stringify(idle)} dispatcher=${start ? 'started' : dispatching ? 'busy' : recent ? 'recent' : 'not needed'}`);
                 } else core.info(`${new Date().toISOString()} live=${live}`);
               } catch (e) { core.warning('tick failed: ' + String(e?.message || e).slice(0, 300)); }
               await sleep(60e3);
