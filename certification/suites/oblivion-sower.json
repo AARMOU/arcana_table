@@ -1,0 +1,9 @@
+{
+  "key": "oblivion-sower",
+  "name": "Oblivion Sower",
+  "issue": 760,
+  "source": "certification/OblivionSowerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.OblivionSowerIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
