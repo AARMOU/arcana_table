@@ -13,6 +13,16 @@ const { SUITE_TITLE, SUITE_MARKER, SUITE_BASE } = require('../scripts/admission.
 const { suiteKey, pascal } = require('./suite-requests.cjs');
 
 const DAILY_CAP = 6;
+// Owner-requested burst (certification/idle-burst.json): while `until` is in the future, keep up to `parallel`
+// idle suite requests open at once (not just one) and open them even when the dispatcher has other work (it still
+// ranks idle suites after everything else), within a rolling-24 h `cap`. Billing must still be normal. When the
+// window ends this falls back to the normal one-at-a-time, 6-a-day behaviour on its own.
+function activeBurst(burst, now = Date.now()) {
+  if (!burst || !(Date.parse(burst.until || '') > now)) return null;
+  const parallel = Math.min(3, Math.max(1, Number.parseInt(burst.parallel, 10) || 1));
+  const cap = Math.min(60, Math.max(DAILY_CAP, Number.parseInt(burst.cap, 10) || DAILY_CAP));
+  return { until: burst.until, parallel, cap };
+}
 const STATUS_ISSUE = 78;
 const DISPATCHER_STATUS = '<!-- arcana-control-status-v1:dispatcher -->';
 const STATUS_MAX_AGE_MS = 75 * 60 * 1000;
@@ -41,19 +51,27 @@ function playedCustomCards({ registry, customIndex, libraryIndex, overrides, dec
 }
 
 // Pure: what to request next, or why nothing.
-function plan({ cards, manifest, requests, status, now = Date.now() }) {
-  if (!status || status.state !== 'nothing-eligible') return { skip: 'dispatcher has eligible work (or no status)' };
+function plan({ cards, manifest, requests, status, now = Date.now(), burst = null }) {
+  const b = activeBurst(burst, now);
+  if (!status || (!b && status.state !== 'nothing-eligible')) return { skip: 'dispatcher has eligible work (or no status)' };
   if (!(now - Date.parse(status.checkedAt || '') <= STATUS_MAX_AGE_MS)) return { skip: 'dispatcher status is stale' };
   if (status.billing?.level !== 'normal') return { skip: 'billing not normal' };
   const idle = requests.filter(r => IDLE.test(String(r.body || '')));
-  if (idle.some(r => r.state === 'open' && !(r.assignees || []).length)) return { skip: 'an idle suite request is still waiting' };
+  let slots = 1;
+  if (b) {
+    const open = idle.filter(r => r.state === 'open').length;
+    if (open >= b.parallel) return { skip: `burst: ${open}/${b.parallel} idle suites already open` };
+    slots = b.parallel - open;
+  } else if (idle.some(r => r.state === 'open' && !(r.assignees || []).length)) return { skip: 'an idle suite request is still waiting' };
+  const cap = b ? b.cap : DAILY_CAP;
   const today = idle.filter(r => now - Date.parse(r.created_at || '') < 24 * 3600e3).length;
-  if (today >= DAILY_CAP) return { skip: `daily cap reached (${today}/${DAILY_CAP})` };
+  if (today >= cap) return { skip: `daily cap reached (${today}/${cap})` };
+  slots = Math.min(slots, cap - today);
   const certified = new Set(manifest.suites.map(s => s.name.toLowerCase()));
   const requested = new Set(idle.map(r => String(r.body).match(IDLE)[1]));
   const next = cards.filter(c => !certified.has(c.name.toLowerCase()) && !requested.has(suiteKey(c.name)))
     .sort((a, b) => b.decks - a.decks || a.name.localeCompare(b.name));
-  return next.length ? { candidates: next, today } : { skip: 'every played custom card has a suite or a request' };
+  return next.length ? { candidates: next, today, slots, burst: !!b } : { skip: 'every played custom card has a suite or a request' };
 }
 
 function idleRequest({ card, oracleLine, target }) {
@@ -111,11 +129,15 @@ async function dispatcherStatus({ github, owner, repo }) {
   try { return m ? JSON.parse(m[1]) : null; } catch { return null; }
 }
 
-async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now = Date.now(), dry = false, fetchImpl = fetch }) {
+function readBurst(root = '.') {
+  try { return JSON.parse(fs.readFileSync(root + '/certification/idle-burst.json', 'utf8')); } catch { return null; }
+}
+
+async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now = Date.now(), dry = false, fetchImpl = fetch, burst = readBurst(root) }) {
   const status = await dispatcherStatus({ github, owner, repo });
   const requests = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', creator: BOT, per_page: 100 }))
     .filter(i => !i.pull_request && String(i.title || '').startsWith(SUITE_TITLE) && String(i.body || '').startsWith(SUITE_MARKER + '\n'));
-  const early = plan({ cards: [], manifest, requests, status, now });
+  const early = plan({ cards: [], manifest, requests, status, now, burst });
   if (early.skip && early.skip !== 'every played custom card has a suite or a request') return { requested: null, reason: early.skip };
   const target = JSON.parse(fs.readFileSync(root + '/integration/policy.json', 'utf8')).target;
   const [registry, customIndex, libraryIndex, overrides] = await Promise.all([REGISTRY, ASSETS + 'custom-cards.index.tsv',
@@ -129,18 +151,22 @@ async function requestIdleSuite({ github, owner, repo, root = '.', manifest, now
     for (const d of six.decks || []) deckLists.push((d.cards || []).map(c => `1 ${c.name}`).join('\n'));
   } catch {}
   const cards = playedCustomCards({ registry, customIndex, libraryIndex, overrides, deckLists });
-  const p = plan({ cards, manifest, requests, status, now });
+  const p = plan({ cards, manifest, requests, status, now, burst });
   if (p.skip) return { requested: null, reason: p.skip, played: cards.length };
   const cache = await readText(github, owner, repo, 'tools/cardkit/data/oracle-cache.jsonl', target);
-  for (const card of p.candidates.slice(0, 5)) {
+  const made = [], planned = [];
+  for (const card of p.candidates.slice(0, 5 + p.slots)) {
+    if (made.length + planned.length >= p.slots) break;
     const oracleLine = await oracleFor(card.name, { cache, fetchImpl });
     if (!oracleLine) continue;
     const req = idleRequest({ card, oracleLine, target });
-    if (dry) return { requested: null, planned: req.title, played: cards.length, today: p.today };
+    if (dry) { planned.push(req.title); continue; }
     const created = (await github.rest.issues.create({ owner, repo, title: req.title, body: req.body })).data;
-    return { requested: created.number, card: card.name, decks: card.decks, played: cards.length, today: p.today + 1 };
+    made.push({ number: created.number, card: card.name, decks: card.decks });
   }
-  return { requested: null, reason: 'no Oracle record for the next candidates', played: cards.length };
+  if (dry && planned.length) return { requested: null, planned: planned[0], plannedAll: planned, played: cards.length, today: p.today, burst: p.burst };
+  if (!made.length) return { requested: null, reason: 'no Oracle record for the next candidates', played: cards.length };
+  return { requested: made[0].number, card: made[0].card, decks: made[0].decks, all: made, played: cards.length, today: p.today + made.length, burst: p.burst };
 }
 
-module.exports = { requestIdleSuite, playedCustomCards, plan, idleRequest, oracleFor, DAILY_CAP, idleMarker };
+module.exports = { requestIdleSuite, playedCustomCards, plan, activeBurst, readBurst, idleRequest, oracleFor, DAILY_CAP, idleMarker };

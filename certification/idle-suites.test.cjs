@@ -96,3 +96,26 @@ test('oracle: exact name from the build branch cache first, then Scryfall; never
   assert.equal(fetched.oracle_text, 'Front: A\n//\nBack: B');
   assert.equal(await I.oracleFor('Other', { fetchImpl: async () => ({ ok: true, json: async () => ({ name: 'Different', oracle_text: 'x' }) }) }), null);
 });
+
+test('burst: up to `parallel` open at once, ignores other eligible work, keeps billing guard, own cap, expires', () => {
+  const burst = { until: new Date(NOW + 3600e3).toISOString(), parallel: 3, cap: 40 };
+  const busy = status({ state: 'attempted' });
+  const p = I.plan({ cards, manifest, requests: [], status: busy, now: NOW, burst });
+  assert.equal(p.slots, 3);
+  assert.equal(p.burst, true);
+  const open = k => idleIssue(k, { state: 'open', assignees: [{ login: 'Copilot' }], created_at: new Date(NOW - 60e3).toISOString() });
+  assert.equal(I.plan({ cards, manifest, requests: [open('a'), open('b')], status: busy, now: NOW, burst }).slots, 1);
+  assert.match(I.plan({ cards, manifest, requests: [open('a'), open('b'), open('c')], status: busy, now: NOW, burst }).skip, /3\/3 idle suites already open/);
+  assert.match(I.plan({ cards, manifest, requests: [], status: status({ state: 'attempted', billing: { level: 'slow' } }), now: NOW, burst }).skip, /billing/);
+  const many = Array.from({ length: 39 }, (_, i) => idleIssue('m' + i, { created_at: new Date(NOW - 3600e3).toISOString() }));
+  assert.equal(I.plan({ cards, manifest, requests: many, status: busy, now: NOW, burst }).slots, 1, 'cap limits slots');
+  assert.match(I.plan({ cards, manifest, requests: [...many, idleIssue('m39', { created_at: new Date(NOW - 3600e3).toISOString() })], status: busy, now: NOW, burst }).skip, /daily cap reached \(40\/40\)/);
+  const expired = { ...burst, until: new Date(NOW - 1).toISOString() };
+  assert.match(I.plan({ cards, manifest, requests: [], status: busy, now: NOW, burst: expired }).skip, /eligible work/);
+  assert.equal(I.activeBurst({ until: burst.until, parallel: 9, cap: 999 }, NOW).parallel, 3, 'never more than the 3-worker ceiling');
+  assert.equal(I.activeBurst({ until: burst.until, parallel: 9, cap: 999 }, NOW).cap, 60);
+});
+
+test('normal mode is unchanged without a burst', () => {
+  assert.equal(I.plan({ cards, manifest, requests: [], status: status(), now: NOW }).slots, 1);
+});

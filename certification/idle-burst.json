@@ -1,0 +1,6 @@
+{
+  "until": "2026-11-01T21:00:00Z",
+  "parallel": 3,
+  "cap": 40,
+  "why": "Owner 2026-11-01: keep all three Copilot workers on idle certification suites, then measure credit use two hours after they all start. Expires on its own; afterwards the normal 6-a-day, one-at-a-time rule applies."
+}
