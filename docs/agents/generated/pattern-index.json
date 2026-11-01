@@ -3443,7 +3443,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3470,16 +3470,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZoanthropeScenarioTest.kt"
     },
     {
+     "card": "Zephyrim",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zephyrim.kt",
+     "lines": 28,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZephyrimScenarioTest.kt"
+    },
+    {
      "card": "Cloudshredder Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CloudshredderSliver.kt",
      "lines": 30,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CloudshredderSliverScenarioTest.kt"
-    },
-    {
-     "card": "Heralds of Tzeentch",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HeraldsOfTzeentch.kt",
-     "lines": 33,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HeraldsOfTzeentchScenarioTest.kt"
     }
    ]
   },
@@ -3781,13 +3781,19 @@
    ]
   },
   "Keyword.VIGILANCE": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Wilson, Refined Grizzly",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WilsonRefinedGrizzly.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WilsonRefinedGrizzlyScenarioTest.kt"
+    },
+    {
+     "card": "Zephyrim",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zephyrim.kt",
+     "lines": 28,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZephyrimScenarioTest.kt"
     },
     {
      "card": "For the Emperor!",
@@ -3812,12 +3818,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/InquisitorGreyfax.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/InquisitorGreyfaxScenarioTest.kt"
-    },
-    {
-     "card": "Ulamog's Dreadsire",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsDreadsire.kt",
-     "lines": 38,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsDreadsireScenarioTest.kt"
     }
    ]
   }
@@ -3979,8 +3979,14 @@
    ]
   },
   "KeywordAbility.miracle": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Zephyrim",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zephyrim.kt",
+     "lines": 28,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZephyrimScenarioTest.kt"
+    },
     {
      "card": "Sister Repentia",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
@@ -4829,7 +4835,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 24,
+   "count": 25,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4862,15 +4868,15 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WilsonRefinedGrizzlyScenarioTest.kt"
     },
     {
-     "card": "Sister Repentia",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
-     "lines": 29,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
+     "card": "Zephyrim",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zephyrim.kt",
+     "lines": 28,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZephyrimScenarioTest.kt"
     }
    ]
   },
   "keywords()": {
-   "count": 98,
+   "count": 99,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5073,13 +5079,19 @@
    ]
   },
   "squad()": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Space Marine Devastator",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpaceMarineDevastator.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SpaceMarineDevastatorScenarioTest.kt"
+    },
+    {
+     "card": "Zephyrim",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zephyrim.kt",
+     "lines": 28,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZephyrimScenarioTest.kt"
     },
     {
      "card": "Ultramarines Honour Guard",
