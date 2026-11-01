@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.StarOfExtinction
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.DamageDealtEvent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
@@ -16,7 +17,6 @@ class StarOfExtinctionIndependentCertificationTest {
             "Forest",
             "Grizzly Bears",
             "Serra Angel",
-            "Boros Reckoner",
             "Sol Ring",
         )
         val p = d.player1
@@ -29,7 +29,6 @@ class StarOfExtinctionIndependentCertificationTest {
 
         val ownCreature = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val opposingCreature = d.putCreatureOnBattlefield(d.player2, "Serra Angel")
-        val reckoner = d.putCreatureOnBattlefield(p, "Boros Reckoner")
         val targetLand = d.putLandOnBattlefield(d.player2, "Forest")
         val otherLand = d.putLandOnBattlefield(p, "Forest")
         val artifact = d.putPermanentOnBattlefield(d.player2, "Sol Ring")
@@ -43,12 +42,16 @@ class StarOfExtinctionIndependentCertificationTest {
 
         assertFalse(d.getPermanents(d.player1).contains(ownCreature))
         assertFalse(d.getPermanents(d.player2).contains(opposingCreature))
-        assertFalse(d.getPermanents(d.player1).contains(reckoner))
         assertFalse(d.getPermanents(d.player1).contains(walker))
         assertFalse(d.getPermanents(d.player2).contains(targetLand))
         assertTrue(d.getPermanents(d.player1).contains(otherLand))
         assertTrue(d.getPermanents(d.player2).contains(artifact))
-        assertEquals("Boros Reckoner reflects exactly 20 damage", 80, d.getLifeTotal(d.player2))
+        assertEquals(
+            mapOf(ownCreature to 20, opposingCreature to 20, walker to 20),
+            d.events.filterIsInstance<DamageDealtEvent>()
+                .filter { it.sourceId == spell }
+                .associate { it.targetId to it.amount },
+        )
     }
 
     @Test
