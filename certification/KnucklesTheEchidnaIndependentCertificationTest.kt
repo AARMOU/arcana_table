@@ -14,7 +14,7 @@ class KnucklesTheEchidnaIndependentCertificationTest {
         val d = customScenario(KnucklesTheEchidna)
         val player = d.player1
         val knuckles = d.putCardInHand(player, "Knuckles the Echidna")
-        d.giveColorlessMana(player, 4)
+        d.giveColorlessMana(player, 2)
 
         assertNotNull(d.castSpell(player, knuckles).error)
         d.giveMana(player, Color.RED, 2)
