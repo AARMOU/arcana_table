@@ -103,6 +103,7 @@ jobs:
           cp control/card-queue.js _site/control/card-queue.js
           cp control/card-preflight.js _site/control/card-preflight.js
           cp control/review.js _site/control/review.js
+          cp control/card-ready-notifications.js _site/control/card-ready-notifications.js
           cp control/authorize.js _site/control/authorize.js
           cp control/team-checkin.js _site/control/team-checkin.js
           cp control/goosegeta.js _site/control/goosegeta.js
