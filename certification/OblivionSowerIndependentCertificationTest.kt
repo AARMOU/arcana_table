@@ -52,6 +52,12 @@ class OblivionSowerIndependentCertificationTest {
         d.castSower()
 
         assertTrue(d.zoneNames(opponent, Zone.EXILE).isEmpty())
+        // Cast triggers can reach their target prompt only after priority advances.
+        repeat(30) {
+            if (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) {
+                assertNull(d.bothPass().error)
+            }
+        }
         val decision = d.state.pendingDecision as? ChooseTargetsDecision
         assertNotNull("the cast trigger must choose its target before resolving", decision)
         val legalTargets = decision!!.legalTargets.values.flatten()
