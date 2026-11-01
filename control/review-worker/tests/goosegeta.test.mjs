@@ -14,24 +14,26 @@ async function harness(){
   const run=(r,e=env)=>worker.fetch(r,e,{},()=>{throw Error('No GitHub, OpenAI or arbitrary HTTP request permitted');});
   return {env,calls,request,run};
 }
-test('Goosegeta owner OAuth, origin and feature gates run before service access',async()=>{
+test('parked Goosegeta retains owner OAuth and origin checks',async()=>{
   const h=await harness();
   assert.equal((await h.run(h.request({}, {Authorization:''}))).status,401);
   assert.equal((await h.run(h.request({}, {Origin:'https://evil.test'}))).status,403);
-  assert.equal((await h.run(h.request(),{...h.env,GOOSEGETA_ENABLED:'false'})).status,503);
+  assert.equal((await h.run(h.request(),{...h.env,GOOSEGETA_ENABLED:'false'})).status,410);
   assert.equal(h.calls.length,0);
 });
-test('Goosegeta service binding gets only fixed room path and separate credential; response is private allowlist',async()=>{
-  const h=await harness();const r=await h.run(h.request({capability:'host-cap',deckId:'goosegeta-glue',requestId:'unique-request-id'}));
-  assert.equal(r.status,200);assert.equal(r.headers.get('Cache-Control'),'no-store');
-  assert.deepEqual(await r.json(),{sessionId:'s',status:'joining',model:'off'});
-  assert.equal(h.calls[0].url,'https://rooms/internal/goosegeta/GOOSE1');
-  assert.ok(!JSON.stringify(h.calls).includes('never-forward-this-oauth-token'));
-  assert.equal(JSON.parse(h.calls[0].init.body).model,false);
+test('parked endpoint never forwards old model, retry or dismiss requests even with enabled bindings',async()=>{
+  const h=await harness();
+  for(const action of ['summon','chat','recover','dismiss']) {
+    const r=await h.run(h.request({action,model:true,capability:'private-host-cap'}));
+    assert.equal(r.status,410);assert.equal(r.headers.get('Cache-Control'),'no-store');
+    assert.deepEqual(await r.json(),{error:'goosegeta-parked'});
+  }
+  assert.equal(h.calls.length,0);
 });
-test('Goosegeta rejects URLs and invalid methods; status read never summons',async()=>{
-  const h=await harness();assert.equal((await h.run(h.request({code:'https://evil.test'}))).status,400);
-  assert.equal((await h.run(h.request({}, {}, 'PUT'))).status,405);assert.equal(h.calls.length,0);
-  assert.equal((await h.run(h.request({}, {}, 'GET'))).status,200);
-  assert.equal(h.calls[0].init.method,'GET');assert.equal(h.calls[0].init.body,undefined);
+test('parked status and malformed room payloads cannot invoke the room service',async()=>{
+  const h=await harness();
+  assert.equal((await h.run(h.request({code:'https://evil.test'}))).status,410);
+  assert.equal((await h.run(h.request({}, {}, 'PUT'))).status,405);
+  assert.equal((await h.run(h.request({}, {}, 'GET'))).status,410);
+  assert.equal(h.calls.length,0);
 });

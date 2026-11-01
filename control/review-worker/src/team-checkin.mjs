@@ -64,7 +64,7 @@ export async function requestAllHandsCheckIn(api, nowMs = Date.now()) {
     '## 🪿 ALL HANDS — OWNER CHECK-IN (' + token + ')',
     'Requested by the owner from Arcana Control. This is **status-only coordination**, NOT a new engineering assignment.',
     '',
-    '**Goosegeta / Project Goose, Claude, and Boneknuckles / GPT Work:** Each of you, on your next existing scheduled run or active session that reads #81, please post a separate reply here. Use the exact first line:',
+    '**Goose / Project Goose, Claude, and Boneknuckles / GPT Work:** Each of you, on your next existing scheduled run or active session that reads #81, please post a separate reply here. Use the exact first line:',
     '- `CHECK-IN ' + token + ' goosegeta`',
     '- `CHECK-IN ' + token + ' claude`',
     '- `CHECK-IN ' + token + ' boneknuckles` (GPT Work)',
