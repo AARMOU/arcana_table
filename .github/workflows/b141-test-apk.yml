@@ -1,0 +1,87 @@
+name: B141 TEST APK (debug, separate install, no release)
+# Owner-requested test build of the B141 candidate on the upstream engine. Debug-signed, installs beside every other
+# Arcana build (package com.arcanatable.b141test), never a release, AAB or Play upload. Refuses to build unless the
+# staged engine is the validated upstream one.
+on:
+  push:
+    branches: ['gpt/b141-candidate-*']
+    paths: ['.github/workflows/b141-test-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    if: startsWith(github.ref_name, 'gpt/b141-candidate-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Staged engine is the validated upstream engine
+        run: |
+          set -euo pipefail
+          target=$(python3 -c "import re;print(re.search(r'^TARGET = \"([0-9a-f]{40})\"',open('engine-upgrade/audit_patches.py').read(),re.M)[1])")
+          grep -F "upstream wingedsheep/argentum-engine@$target" engine-upgrade/b141/engine-source.txt
+          sha256sum -c <(grep -E '^[0-9a-f]{64}  android/app/libs/' engine-upgrade/b141/engine-source.txt)
+          echo "BUILD_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Android regex compatibility checks
+        run: |
+          python3 tools/check_android_regex.py
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stamp B141 test version in the checkout (never committed)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path("android/app/build.gradle.kts"); s=p.read_text()
+          s,n1=re.subn(r"versionCode = \d+","versionCode = 141",s,count=1)
+          s,n2=re.subn(r'versionName = "[^"]*"','versionName = "0.34.1-b141-upstream-engine-test"',s,count=1)
+          assert n1==1 and n2==1; p.write_text(s)
+          PY
+      - name: Debug TEST APK
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            -ParcanaCardRequestUrl=https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests \
+            '-Parcana.debugApplicationIdSuffix=.b141test' \
+            '-Parcana.debugLabel=Arcana TEST B141'
+      - name: Verify package, signature and shipped engine data
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/aapt" dump badging "$APK" > b141-badging.txt
+          grep -F "package: name='com.arcanatable.b141test' versionCode='141'" b141-badging.txt
+          "$BT/apksigner" verify --print-certs "$APK" > b141-signature.txt
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          z=ZipFile("android/app/build/outputs/apk/debug/app-debug.apk"); names=set(z.namelist())
+          for a in ("all-cards.jsonl","all-cards.index.tsv","custom-cards.jsonl","custom-overrides.txt"):
+            src=Path("android/app/src/main/assets/argentum")/a
+            assert z.read(f"assets/argentum/{a}")==src.read_bytes(), a
+          print("APK carries the staged card library, custom cards and overrides")
+          PY
+          sha256sum "$APK" > b141-apk.sha256
+          printf 'TEST-ONLY debug APK, B141 candidate on upstream Argentum.\nSource: %s\n' "$BUILD_SOURCE_SHA" > b141-scope.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b141-test-apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            b141-apk.sha256
+            b141-signature.txt
+            b141-badging.txt
+            b141-scope.txt
+            engine-upgrade/b141/engine-source.txt
+          retention-days: 14
+          if-no-files-found: error
