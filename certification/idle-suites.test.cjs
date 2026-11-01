@@ -122,3 +122,10 @@ test('burst: up to `parallel` open at once, ignores other eligible work, keeps b
 test('normal mode is unchanged without a burst', () => {
   assert.equal(I.plan({ cards, manifest, requests: [], status: status(), now: NOW }).slots, 1);
 });
+
+test('burst: live Copilot session count overrides a lagging dispatcher status', () => {
+  const burst = { until: new Date(NOW + 3600e3).toISOString(), parallel: 3, cap: 40 };
+  const stale = status({ state: 'nothing-eligible', workers: { running: 3, pendingPickup: 0 } });
+  assert.match(I.plan({ cards, manifest, requests: [], status: stale, now: NOW, burst }).skip, /3\/3/);
+  assert.equal(I.plan({ cards, manifest, requests: [], status: stale, now: NOW, burst, live: 1 }).slots, 2);
+});
