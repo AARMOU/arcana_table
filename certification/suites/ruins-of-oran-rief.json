@@ -1,0 +1,9 @@
+{
+  "key": "ruins-of-oran-rief",
+  "name": "Ruins of Oran-Rief",
+  "issue": 763,
+  "source": "certification/RuinsOfOranRiefIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.RuinsOfOranRiefIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
