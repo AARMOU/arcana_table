@@ -502,8 +502,15 @@ internal fun TableController.TableOverlays() {
     if (argentumMulliganPrompt && argentumSnapshot == null) ArgentumOpeningHandScreen(
         cards = players.getOrNull(localSeat)?.hand.orEmpty(),
         title = "Opening hand",
-        subtitle = argentumMulliganInfo?.let { (count, onPlay, _) ->
-            listOfNotNull(if (onPlay) "You're on the play" else "You're on the draw", if (count > 0) "Mulligan $count · you'll put $count on the bottom after keeping" else null).joinToString(" · ")
+        subtitle = argentumMulliganInfo?.let { (count, onPlay, cardsToBottom) ->
+            listOfNotNull(
+                if (onPlay) "You're on the play" else "You're on the draw",
+                when {
+                    count == 0 -> "Your first mulligan is FREE"
+                    cardsToBottom == 0 -> "Free mulligan used · keep all 7"
+                    else -> "Mulligan $count · bottom $cardsToBottom after keeping"
+                }
+            ).joinToString(" · ")
         } ?: "Argentum dealt your opening seven.",
         selectable = false, selection = emptySet(), onToggle = {},
         primaryLabel = "KEEP ${players.getOrNull(localSeat)?.hand?.size ?: 7}", primaryEnabled = !argentumAwaitingUpdate,
