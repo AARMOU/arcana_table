@@ -59,9 +59,13 @@ function plan({ cards, manifest, requests, status, now = Date.now(), burst = nul
   const idle = requests.filter(r => IDLE.test(String(r.body || '')));
   let slots = 1;
   if (b) {
-    const open = idle.filter(r => r.state === 'open').length;
-    if (open >= b.parallel) return { skip: `burst: ${open}/${b.parallel} idle suites already open` };
-    slots = b.parallel - open;
+    // Busy = Copilot sessions running or awaiting pickup (dispatcher status) + idle requests still unassigned.
+    // An open request whose session already finished (PR in review) does not hold a worker.
+    const w = status.workers || {};
+    const waiting = idle.filter(r => r.state === 'open' && !(r.assignees || []).length).length;
+    const busy = (Number(w.running) || 0) + (Number(w.pendingPickup) || 0) + waiting;
+    if (busy >= b.parallel) return { skip: `burst: ${busy}/${b.parallel} workers busy or waiting` };
+    slots = b.parallel - busy;
   } else if (idle.some(r => r.state === 'open' && !(r.assignees || []).length)) return { skip: 'an idle suite request is still waiting' };
   const cap = b ? b.cap : DAILY_CAP;
   const today = idle.filter(r => now - Date.parse(r.created_at || '') < 24 * 3600e3).length;
