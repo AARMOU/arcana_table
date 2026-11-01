@@ -2,10 +2,13 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.Zephyrim
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.scripting.ChoiceSlot
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -40,8 +43,19 @@ class ZephyrimIndependentCertificationTest {
         d.giveMana(p, Color.WHITE)
         d.giveColorlessMana(p, 7)
 
-        assertNull(d.castSpell(p, card).error)
-        d.resolveAll(Choices(yes = true))
+        // Squad is an additional casting cost, not a choice made while resolving.
+        assertNull(
+            d.submit(
+                CastSpell(
+                    playerId = p,
+                    cardId = card,
+                    declaredCostSlot = ChoiceSlot.SQUAD,
+                    declaredCostTimes = 2,
+                    paymentStrategy = PaymentStrategy.FromPool,
+                ),
+            ).error,
+        )
+        d.resolveAll()
 
         val copies = d.permanentsNamed(p, "Zephyrim")
         assertEquals(3, copies.size)
@@ -62,12 +76,14 @@ class ZephyrimIndependentCertificationTest {
         val p = d.player1
         val card = d.putCardInHand(p, "Zephyrim")
         d.giveMana(p, Color.WHITE)
-        d.giveColorlessMana(p, 3)
+        // Extra mana alone must not implicitly purchase Squad copies.
+        d.giveColorlessMana(p, 7)
 
         assertNull(d.castSpell(p, card).error)
-        d.resolveAll(Choices(yes = false))
+        d.resolveAll()
 
         assertEquals(listOf(card), d.permanentsNamed(p, "Zephyrim"))
+        assertEquals(4, d.manaPool(p).colorless)
     }
 
     @Test
