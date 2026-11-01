@@ -1,0 +1,9 @@
+{
+  "key": "warping-wail",
+  "name": "Warping Wail",
+  "issue": 773,
+  "source": "certification/WarpingWailIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.WarpingWailIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
