@@ -1,0 +1,9 @@
+{
+  "key": "chaos-terminator-lord",
+  "name": "Chaos Terminator Lord",
+  "issue": 822,
+  "source": "certification/ChaosTerminatorLordIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ChaosTerminatorLordIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
