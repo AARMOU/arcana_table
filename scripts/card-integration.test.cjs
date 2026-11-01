@@ -369,3 +369,53 @@ test('changed base or policy gets fresh full revalidation, not an unchanged auto
   assert.equal(newBase.autoRetry,undefined);
   assert.equal(m.refs.size,0);
 });
+
+test('another card\'s newly added suite on main does not block publishing; edits, own suite, idle-burst and other control changes still do',async()=>{
+  const live='9'.repeat(40);
+  const setup=files=>{const m=githubMock();const getRef=m.github.rest.git.getRef;
+    m.github.rest.git.getRef=async a=>a.ref==='heads/main'?{data:{object:{sha:live}}}:getRef(a);
+    m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files}});return m;};
+  const p=plan();
+  const added=[{filename:'certification/BaneOfBalaGedIndependentCertificationTest.kt',status:'added'},
+    {filename:'certification/suites/bane-of-bala-ged.json',status:'added'}];
+  const ok=setup(added);
+  assert.equal((await P.publish({...common,github:ok.github,plan:p,...result(p)})).status,'integrated');
+  for(const files of [
+    [...added,{filename:'certification/OtherCardIndependentCertificationTest.kt',status:'modified'}],
+    [{filename:'certification/suites/other-card.json',status:'modified'}],
+    [{filename:suite.source,status:'added'}],
+    [{filename:`certification/suites/${suite.key}.json`,status:'added'}],
+    [{filename:'certification/idle-burst.json',status:'modified'}],
+    [{filename:'certification/BaneOfBalaGedIndependentCertificationTest.kt',status:'removed'}],
+    [{filename:'certification/XIndependentCertificationTest.kt',status:'renamed',previous_filename:'certification/policy.cjs'}],
+    [{filename:'certification/policy.cjs',status:'modified'}],
+    [{filename:'certification/suites.json',status:'modified'}],
+    Array.from({length:300},(_,i)=>({filename:`certification/C${i}IndependentCertificationTest.kt`,status:'added'}))]){
+    const m=setup(files);
+    await assert.rejects(P.publish({...common,github:m.github,plan:p,...result(p)}),/control changed/,JSON.stringify(files).slice(0,120));
+    assert.equal(m.writes.length,0);
+  }
+  assert.equal(P.otherSuiteData(added[0],undefined),false,'unknown plan suite: nothing is exempt');
+});
+
+test('an already-registered card runs once to a visible "already registered" receipt, then stops repeating',async()=>{
+  const registry=t=>({data:{encoding:'base64',content:Buffer.from(t).toString('base64')}});
+  const receipt=reason=>({id:7,html_url:'u',user:{id:41898282,login:'github-actions[bot]'},body:P.MARKER+'\n```json\n'+
+    JSON.stringify({schema:1,pr:410,card:suite.name,sourceSha:source,baseSha:'e'.repeat(40),target:P.TARGET,policyHash:cfg.policyHash,
+      controlSha:control,status:'blocked',runUrl:'https://github.com/AARMOU/arcana_table/actions/runs/1',at:'2026-11-01T00:00:00Z',reason})+'\n```\nblocked'});
+  const present=()=>registry(`        Entry(${paths.symbol}, "SET", POOL),\n`);
+  // No receipt yet: it runs, so a visible disposition is posted (nothing silently skipped).
+  let m=githubMock();m.github.rest.repos.getContent=present;
+  assert.equal((await P.planNext({...common,github:m.github,controlSha:control})).pr,410);
+  // The destination moved since the receipt (as B141 does all day); it says already registered and the registry
+  // still has it: skip instead of re-running.
+  m=githubMock(snapshot(),{comments:[receipt('Card is already registered on destination')]});m.github.rest.repos.getContent=present;
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  // Registry entry removed, or a different symbol with the same prefix: plan again.
+  m=githubMock(snapshot(),{comments:[receipt('Card is already registered on destination')]});
+  m.github.rest.repos.getContent=async()=>registry(`        Entry(${paths.symbol}Token, "SET", POOL),\n`);
+  assert.equal((await P.planNext({...common,github:m.github,controlSha:control})).pr,410);
+  // A different block reason is not affected by this rule.
+  m=githubMock(snapshot(),{comments:[receipt('scenario: 1 failed')]});m.github.rest.repos.getContent=present;
+  assert.notEqual(await P.planNext({...common,github:m.github,controlSha:control,retry:true}),null);
+});

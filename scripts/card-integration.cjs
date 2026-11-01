@@ -155,6 +155,14 @@ async function receiptFor({github,owner,repo,pr,verifyIntegrated=true}) {
   }
   return receipts.filter(r => r.status === 'blocked').at(-1) || null;
 }
+async function registeredOn({github,owner,repo,ref,symbol,cache={}}) {
+  if (!github.rest.repos.getContent) return false;
+  if (cache.text === undefined) {
+    const d = (await github.rest.repos.getContent({owner,repo,path:REGISTRY,ref})).data;
+    cache.text = Buffer.from(d.content || '', d.encoding === 'base64' ? 'base64' : 'utf8').toString('utf8');
+  }
+  return new RegExp('\\bEntry\\(\\s*' + symbol + '\\s*,').test(cache.text);
+}
 async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
   if (!cfg.policy.enabled || !SHA.test(controlSha)) return null;
   const baseSha = (await github.rest.git.getRef({owner,repo,ref:'heads/'+cfg.policy.target})).data.object.sha;
@@ -162,6 +170,7 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     basehead:cfg.policy.targetSeed+'...'+baseSha})).data;
   if (!['ahead','identical'].includes(ancestor.status)) throw Error('Android branch no longer descends from authorized seed');
   const prs = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+  const registryCache = {};
   for (const pr of prs.sort((a,b)=>a.number-b.number)) {
     if (!['copilot','copilot-swe-agent[bot]'].includes(String(pr.user?.login).toLowerCase()) || pr.draft) continue;
     const snap = await snapshot(github,owner,repo,pr.number);
@@ -169,6 +178,12 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     if (!suite) continue;
     const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
     if (receipt?.status === 'integrated') continue;
+    // A card already registered on the destination always blocks ("already registered"). After that blocked
+    // receipt is visible on this exact source commit, re-running only repeats it, so skip until the registry
+    // changes or the PR gets a new commit. The receipt stays as the visible disposition (same code or not);
+    // nothing is suppressed before it exists.
+    if (receipt?.status === 'blocked' && /already registered/i.test(String(receipt.reason || '')) &&
+        await registeredOn({github,owner,repo,ref:baseSha,symbol:paths(suite).symbol,cache:registryCache})) continue;
     // Blocked by the target's engine (e.g. #662 `encore`, #690 registry cards): re-run only when that engine changes,
     // not on every card-only target commit. Non-engine blocks keep re-running when the target moves.
     if (!retry && await require('./destination-preflight.cjs').engineUnchangedSince({github,owner,repo,receipt,baseSha})) continue;
@@ -218,7 +233,7 @@ async function reserveRetry({github,owner,repo,cfg,plan,runAttempt}) {
   if (!plan.autoRetry) return;
   if (runAttempt !== 1 || plan.autoRetry.classification!==RETRY_CLASS || plan.autoRetry.key!==retryKey(plan) ||
       cfg.policyHash!==plan.policyHash || cfg.policy.target!==plan.target ||
-      !await controlUnchanged({github,owner,repo,controlSha:plan.controlSha})) throw Error('Stale or invalid automatic retry');
+      !await controlUnchanged({github,owner,repo,controlSha:plan.controlSha,suite:plan.suite})) throw Error('Stale or invalid automatic retry');
   const snap = await snapshot(github,owner,repo,plan.pr);
   if (snap.pr.head.sha!==plan.sourceSha || sourceEligible(cfg,snap)?.key!==plan.suite.key ||
       ownerDecision(snap.reviews,plan.sourceSha,cfg.policy)?.id!==plan.reviewId) throw Error('Retry approval or source changed');
@@ -251,18 +266,29 @@ const CONTROL_PATHS = ['integration/','certification/','scripts/card-integration
   '.github/workflows/arcana-approved-card-integration.yml'];
 // Unrelated owner merges may advance main during long destination tests. Accept only a
 // fast-forward whose complete changed-file list avoids every control path; else fail closed.
-async function controlUnchanged({github,owner,repo,controlSha}) {
+// Copilot suite merges ADD another card's certification suite (certification/<Card>IndependentCertificationTest.kt
+// plus certification/suites/<key>.json) to main all day. A newly added suite for another card cannot change the
+// gates this plan already ran. Only those additions are exempt: never edits, deletions or renames, never this
+// card's own suite, never any other certification/ file, and nothing at all when the plan's suite is unknown.
+const SUITE_ADDITION = [/^certification\/[A-Z][A-Za-z0-9]+IndependentCertificationTest\.kt$/,
+  /^certification\/suites\/[a-z0-9-]+\.json$/];
+function otherSuiteData(f, suite) {
+  if (!suite?.source || !suite?.key || f.status !== 'added' || f.previous_filename) return false;
+  if (!SUITE_ADDITION.some(r => r.test(f.filename))) return false;
+  return f.filename !== suite.source && f.filename !== `certification/suites/${suite.key}.json`;
+}
+async function controlUnchanged({github,owner,repo,controlSha,suite}) {
   const live = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
   if (live === controlSha) return true;
   const d = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,basehead:controlSha+'...'+live})).data;
   // GitHub truncates compare file lists at 300; a truncated list cannot prove absence.
   if (d.status !== 'ahead' || !Array.isArray(d.files) || d.files.length >= 300) return false;
-  return !d.files.some(f => [f.filename,f.previous_filename].some(n => n &&
+  return !d.files.some(f => !otherSuiteData(f, suite) && [f.filename,f.previous_filename].some(n => n &&
     CONTROL_PATHS.some(p => p.endsWith('/') ? n.startsWith(p) : n === p)));
 }
 async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,runUrl}) {
   validateOutcome(plan,report);
-  if (!await controlUnchanged({github,owner,repo,controlSha:plan.controlSha}))
+  if (!await controlUnchanged({github,owner,repo,controlSha:plan.controlSha,suite:plan.suite}))
     throw Error('Trusted integration control changed on main; revalidate on next pass');
   const snap = await snapshot(github,owner,repo,plan.pr);
   const suite = sourceEligible(cfg,snap);
@@ -292,7 +318,7 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
     receipt.status='integrated'; receipt.destinationSha=result.sha;
   }
   const previous = await receiptFor({github,owner,repo,pr:snap.pr,verifyIntegrated:false});
-  const reason = ((report.gates || []).filter(g=>!g.ok).map(g=>g.name+': '+g.detail).join('\n') || report.reason || 'Validation did not pass')+
+  const reason = ([report.reason,...(report.gates || []).filter(g=>!g.ok).map(g=>g.name+': '+g.detail)].filter(Boolean).join('\n') || 'Validation did not pass')+
     '\n'+(report.failures||[]).slice(0,4).join('\n');
   if (receipt.status==='blocked') {
     receipt.reason=String(reason).slice(0,2000);
@@ -346,6 +372,6 @@ async function reportIntegrationSkips({github,owner,repo,root='.',issue=78}) {
   await github.rest.issues.createComment({owner,repo,issue_number:issue,body});
   return 'posted ' + skipped.length;
 }
-module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,
+module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,registeredOn,otherSuiteData,
   RETRY_CLASS,RETRY_REF,retryKey,retryClassification,retryConsumed,retryAvailable,trustedRetryReceipt,reserveRetry,
   integrationBlockers,reportIntegrationSkips,SKIP_MARKER,sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};
