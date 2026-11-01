@@ -15,7 +15,7 @@ function validateManifest(input) {
   if (!input || input.schema !== 1 || input.base !== 'gpt/arcana-integration-next' ||
       !Array.isArray(input.requiredChecks) ||
       JSON.stringify(input.requiredChecks) !== JSON.stringify(['toolkit','scaffold','cards-and-android']) ||
-      !Array.isArray(input.suites) || input.suites.length < 1 || input.suites.length > 250)
+      !Array.isArray(input.suites) || input.suites.length < 1 || input.suites.length > 1000)
     throw Error('Invalid independent certification manifest');
   const keys = new Set(), names = new Set(), issues = new Set();
   for (const s of input.suites) {
@@ -26,6 +26,8 @@ function validateManifest(input) {
         typeof s.testClass !== 'string' || !TEST_CLASS.test(s.testClass) ||
         !Number.isSafeInteger(s.tests) || s.tests < 3 || s.tests > 100 ||
         !s.testClass.endsWith(s.source.split('/').pop().replace('.kt','')) ||
+        // `target: "build"`: an integrated card, certified against the integration build branch (integration/policy.json).
+        (s.target !== undefined && s.target !== 'build') ||
         keys.has(s.key) || names.has(s.name) || issues.has(s.issue))
       throw Error('Invalid or duplicate certification suite: ' + String(s?.key));
     keys.add(s.key); names.add(s.name); issues.add(s.issue);

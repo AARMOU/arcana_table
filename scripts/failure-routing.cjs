@@ -34,6 +34,10 @@ const RERUN = '<!-- arcana-cert-rerun-v1 -->';
 // lane instead of looping.
 const CONTEST = '<!-- arcana-cert-suite-contest-v1 -->';
 const DEADLOCK = '<!-- arcana-cert-deadlock-v1 -->';
+// An idle-time suite for an integrated card (card PR 0: certified on the build branch) has no card PR to repair.
+// Once its own worker has had a repair turn and it still fails, it is a likely regression in the shipped card:
+// one note on the suite PR and one on #81 for the card lane, then nothing more.
+const REGRESSION = '<!-- arcana-cert-build-regression-v1 -->';
 const isCopilotUser = u => ['copilot', 'copilot-swe-agent[bot]'].includes(String(u?.login || '').toLowerCase());
 function suiteHadItsTurn(comments, repairs) {
   const first = Math.min(...repairs.map(c => Date.parse(c.created_at)).filter(Number.isFinite));
@@ -261,6 +265,18 @@ async function escalateToCard({ github, owner, repo, repoId, run, suitePr, suite
   const failed = jobs.filter(j => j.conclusion === 'failure').map(j => ({ j, m: String(j.name || '').match(CERT_JOB) })).filter(x => x.m);
   if (failed.length !== 1) return { state: 'cert-unattributed', pr: suitePr.number };
   const [, key, cardN, unitN] = failed[0].m;
+  if (Number(cardN) === 0) {
+    const fp = `suite-head:${suitePr.head.sha}`;
+    if (suiteComments.some(c => isOurs(c) && String(c.body || '').startsWith(REGRESSION) && String(c.body).includes(fp)))
+      return { state: 'cert-build-regression-reported', pr: suitePr.number };
+    const job = failed[0].j;
+    const note = [REGRESSION, fp,
+      `Independent certification for **${key}** (an integrated card, run on the build branch) still fails after this suite's own repair turn: run https://github.com/${owner}/${repo}/actions/runs/${run.id}, job ${job.id}.`,
+      'Likely a regression in the shipped card (or an engine gap). Card lane: check the failing assertions against the Oracle text. No further automatic requests for this suite head.'].join('\n\n');
+    await github.rest.issues.createComment({ owner, repo, issue_number: suitePr.number, body: note });
+    try { await github.rest.issues.createComment({ owner, repo, issue_number: 81, body: note + `\n\nSuite PR: #${suitePr.number}` }); } catch { /* the suite PR note stands */ }
+    return { state: 'cert-build-regression', pr: suitePr.number };
+  }
   let card;
   try { card = (await github.rest.pulls.get({ owner, repo, pull_number: Number(cardN) })).data; }
   catch { return { state: 'cert-card-unavailable', pr: Number(cardN) }; }
@@ -380,5 +396,5 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   return results;
 }
 
-module.exports = { escalateToCard, contestToSuite, createRerun, CERT, ESCALATED, RERUN, CONTEST, DEADLOCK, untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+module.exports = { escalateToCard, contestToSuite, createRerun, CERT, ESCALATED, RERUN, CONTEST, DEADLOCK, REGRESSION, untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
 

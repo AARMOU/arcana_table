@@ -457,6 +457,20 @@ test('router: a late untrusted comment withholds the repair before any ledger wr
     const r = await F.routeFailure(x.args);
     assert.equal(r.state, 'cert-contest-withheld'); assert.equal(x.posted.length + x.records.length, 0);
   });
+  test('an integrated-card suite (card PR 0) that still fails is reported once as a regression, never routed to a card', async () => {
+    const jobName = 'Execute trusted independent card scenarios (urzas-saga, 0, 940, integrated card on the build branch, build)';
+    const x = certFixture({ jobName });
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.state, 'cert-build-regression'); assert.equal(r.pr, 611);
+    assert.deepEqual(x.created.map(c => c.issue_number), [611, 81]);
+    assert.ok(x.created.every(c => c.body.startsWith(F.REGRESSION) && !c.body.includes('@')));
+    assert.equal(x.posted.length + x.records.length, 0, 'nothing spent');
+    const again = certFixture({ jobName, suiteComments: [{ body: F.MARKER, user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: '2026-10-31T11:34:00Z' },
+      { body: 'answer', user: { login: 'Copilot' }, created_at: '2026-10-31T11:35:00Z' },
+      { body: `${F.REGRESSION}\n\nsuite-head:${'c'.repeat(40)}`, user: { login: 'github-actions[bot]', type: 'Bot' } }] });
+    assert.equal((await F.routeFailure(again.args)).state, 'cert-build-regression-reported');
+    assert.equal(again.created.length, 0);
+  });
   test('admission, attribution and unit checks fail closed without spending', async () => {
     const denied = certFixture({ authorize: async () => ({ allowed: false, reason: 'capacity: 3 of 3 active' }) });
     const r = await F.routeFailure(denied.args);

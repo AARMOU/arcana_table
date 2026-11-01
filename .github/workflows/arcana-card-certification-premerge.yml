@@ -66,8 +66,19 @@ jobs:
           CANDIDATE_PR: ${{ matrix.pr }}
           CANDIDATE_ISSUE: ${{ matrix.issue }}
           CANDIDATE_TITLE: ${{ matrix.title }}
+          CANDIDATE_TARGET: ${{ matrix.target || '' }}
         with:
           script: |
+            if (process.env.CANDIDATE_TARGET === 'build') {
+              // An integrated card: certify against the integration build branch named by main's policy (never the PR's copy).
+              const f = (await github.rest.repos.getContent({ ...context.repo, path: 'integration/policy.json', ref: 'main' })).data;
+              const target = JSON.parse(Buffer.from(f.content, 'base64').toString('utf8')).target;
+              if (!/^gpt\/[A-Za-z0-9._\/-]+$/.test(String(target || ''))) { core.setFailed('No valid integration build branch in main policy'); return; }
+              const sha = (await github.rest.repos.getBranch({ ...context.repo, branch: target })).data.commit.sha;
+              core.info(`Integrated card: certifying against ${target} @ ${sha}`);
+              core.setOutput('sha', sha);
+              return;
+            }
             const p = (await github.rest.pulls.get({
               owner: context.repo.owner, repo: context.repo.repo, pull_number: Number(process.env.CANDIDATE_PR)
             })).data;

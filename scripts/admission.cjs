@@ -247,11 +247,15 @@ function unitActionable(body, base) {
 }
 
 // A suite request names its card unit, the card PR it certifies, the suite key and the main base.
+// An idle-time suite for an already-integrated card (certification/idle-suites.cjs) has no card unit or
+// PR: both lines read `integrated`, and the suite certifies against the integration build branch.
+const isIntegratedSuite = body => /^Card PR: integrated\s*$/m.test(stripComments(body));
 function suiteActionable(body) {
   const text = stripComments(body), missing = [];
   if (!String(body || '').startsWith(SUITE_MARKER + '\n')) missing.push('suite-marker');
-  if (!/^Card unit: #\d+\s*$/m.test(text)) missing.push('card-unit');
-  if (!/^Card PR: #\d+\s*$/m.test(text)) missing.push('card-pr');
+  const integrated = isIntegratedSuite(body);
+  if (!(integrated ? /^Card unit: integrated\s*$/m : /^Card unit: #\d+\s*$/m).test(text)) missing.push('card-unit');
+  if (!integrated && !/^Card PR: #\d+\s*$/m.test(text)) missing.push('card-pr');
   if (!/^Suite key: [a-z][a-z0-9]*(?:-[a-z0-9]+)*\s*$/m.test(text)) missing.push('suite-key');
   if (!/"oracle_text"/.test(text)) missing.push('oracle-record');
   const line = text.match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
@@ -406,7 +410,7 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     : { allowed: true, reason: 'admitted', budget, capacity };
 }
 
-module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, CARD_WORK_TITLE, CARD_WORK_MARKER, reviewActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, isIntegratedSuite, CARD_WORK_TITLE, CARD_WORK_MARKER, reviewActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   SESSION_STALE_MS, AUTO_RELEASE_MS, INTERRUPT_AUTO_RESOLVE_MS, DEFAULT_BILLING_LAG_HOURS,
   readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot, scaledCapacity, laneDenial,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };

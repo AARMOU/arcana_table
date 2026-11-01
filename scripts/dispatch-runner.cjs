@@ -78,7 +78,7 @@ const INTERRUPT_MARKER = '<!-- arcana-interrupted-attempt-v1 -->';
 function suiteInstructions(n) {
   return [
     `Follow issue #${n}; it is your complete task: write one independent certification suite.`,
-    'Write it strictly from the Oracle record in the issue. Do NOT open, fetch, diff or read the card pull request or its branch; the suite must be independent of that implementation.',
+    'Write it strictly from the Oracle record in the issue. Do NOT open, fetch, diff or read the card pull request or the card\'s implementation and scenario test; the suite must be independent of that implementation. (For an integrated card the issue names a build branch: read only its test helpers there.)',
     'Add exactly two files and nothing else: the test class and the suite registration named in the issue, in the style of certification/CopperGnomesIndependentCertificationTest.kt and certification/suites/copper-gnomes.json.',
     'Cover every ability, cost, restriction and a negative case. No placeholders, no weakened or skipped assertions.',
     `Open one draft pull request against ${A.SUITE_BASE} with "Unit: #${n}" and "Fixes #${n}" in its body. If the card cannot be tested exactly, comment on issue #${n} and do NOT open a pull request.`,
@@ -244,7 +244,9 @@ const skipReason = (u, base, feasible, actionable) => verdictOf(u, base, feasibl
 // work already exists. Blocked, transient and provenance verdicts keep the owner's approval.
 const WITHDRAW = new Set(['invalid', 'claimed']);
 
-const RANK = { suite: 0, card: 1, review: 2 };
+const RANK = { suite: 0, card: 1, review: 2, idle: 3 };
+// Idle-time suites for integrated cards fill spare capacity only: every other kind goes first.
+const rankOf = u => isSuite(u) && A.isIntegratedSuite(u.raw.body) ? RANK.idle : RANK[kindOf(u)];
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
   const verdict = u => u.derived.state === 'queued' ? verdictOf(u, base, feasible, actionable) : { cls: 'other', reason: null };
@@ -274,7 +276,7 @@ function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActi
   // Suite requests go first (each unblocks a finished card PR), then card builds, then reviews by priority
   // (a review only produces future build supply).
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && verdictOf(u, base, feasible, actionable).cls === 'eligible')
-    .sort((a, b) => RANK[kindOf(a)] - RANK[kindOf(b)] || reviewPriority(b) - reviewPriority(a) || a.raw.number - b.raw.number)[0];
+    .sort((a, b) => rankOf(a) - rankOf(b) || reviewPriority(b) - reviewPriority(a) || a.raw.number - b.raw.number)[0];
   return { candidate, labeled, error: null };
 }
 
