@@ -282,10 +282,13 @@ test('router workflow revisits failures after dispatcher success and keeps share
   const yaml=fs.readFileSync('.github/workflows/arcana-ci-failure-router.yml','utf8');
   assert.match(yaml,/workflows:[\s\S]*- Arcana Card Worker Dispatcher/);
   assert.match(yaml,/cron: '8,23,38,53 \* \* \* \*'/);
-  assert.match(yaml,/group: arcana-copilot-control\n  cancel-in-progress: false/);
+  assert.match(yaml,/    concurrency:\n      group: arcana-copilot-control\n      cancel-in-progress: false/);
+  assert.doesNotMatch(yaml,/^concurrency:/m,'workflow-level group would let skipped runs cancel the pending dispatcher');
+  assert.match(yaml,/workflow_id:'arcana-card-dispatcher\.yml'[\s\S]*conclusion==='cancelled'|conclusion==='cancelled'[\s\S]*workflow_id:'arcana-card-dispatcher\.yml'/);
   assert.match(yaml,/runRouter\(\{github,context,env:process.env,readBudget,delivery\}\)/);
   const blocks=[...yaml.matchAll(/          script: \|\n([\s\S]*?)(?=\n {0,11}\S|$)/g)];
-  assert.equal(blocks.length,1);
+  assert.equal(blocks.length,2);
+  blocks.splice(0,blocks.length,...blocks.filter(b=>b[1].includes('runRouter')));
   const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
   new AsyncFunction('github','context','core','require',blocks[0][1].replace(/^            /gm,''));
 });
