@@ -1779,7 +1779,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -4456,7 +4456,7 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Dinosaur Egg",
@@ -4469,6 +4469,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
+    },
+    {
+     "card": "Phyrexian Triniform",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PhyrexianTriniform.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PhyrexianTriniformScenarioTest.kt"
     },
     {
      "card": "Psychomancer",
@@ -4807,6 +4813,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavageOrder.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavageOrderScenarioTest.kt"
+    }
+   ]
+  },
+  "encore()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Phyrexian Triniform",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PhyrexianTriniform.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PhyrexianTriniformScenarioTest.kt"
     }
    ]
   },
@@ -5229,7 +5246,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 151,
+   "count": 152,
    "examples": [
     {
      "card": "Chaos Terminator Lord",

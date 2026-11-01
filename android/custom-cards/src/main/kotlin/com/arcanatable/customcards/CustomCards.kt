@@ -97,6 +97,7 @@ object CustomCards {
         Entry(ConstrictingSliver, "CMM", POOL),
         Entry(CopperGnomes, "USG", POOL),
         Entry(PastInFlames, "MM3", POOL),
+        Entry(PhyrexianTriniform, "CMM", POOL),
         Entry(AllosaurusShepherd, "2X2", POOL),
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
