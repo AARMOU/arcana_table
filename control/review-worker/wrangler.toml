@@ -9,3 +9,16 @@ compatibility_date = "2026-10-27"
 # All OAuth/session/decision responses must be Cache-Control: no-store.
 [cache]
 enabled = true
+
+# Cloudflare Cron Triggers: start the read-only status workflows on time (src/scheduled.mjs).
+# Each cron must match a key of SCHEDULE there. Inert without GITHUB_ACTIONS_DISPATCH_TOKEN.
+[triggers]
+crons = ["*/15 * * * *", "41 * * * *"]
+
+# SUMMON GOOSEGETA: disabled. Bind only to an owner-approved isolated rooms test service.
+# [vars]
+# GOOSEGETA_ENABLED = "false"
+# [[services]]
+# binding = "GOOSEGETA_ROOMS"
+# service = "<approved-isolated-rooms-service>"
+# Secret: GOOSEGETA_CONTROL_KEY (same random >=32-character value in both services).

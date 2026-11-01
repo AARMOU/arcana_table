@@ -15,7 +15,11 @@
 // Owner work authorization separately uses /v1/authorization + /v1/authorize and never certifies rules.
 
 import { publicGithub } from './public-github.mjs';
+import { runScheduled } from './scheduled.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';
+import { goosegeta } from './goosegeta.mjs';
+import { checkInStatus, requestAllHandsCheckIn } from './team-checkin.mjs';
+import { certificationStatus } from './verified-certification.mjs';
 
 const REPO = "AARMOU/arcana_table";
 const OWNER = "aarmou";
@@ -28,6 +32,10 @@ export const FIX_LABEL = "arcana:owner-fix-requested";
 export const DECISION_MARKER = "<!-- arcana-owner-decision-v1 -->";
 const COPILOT = new Set(["copilot", "copilot-swe-agent[bot]"]);
 const GREEN = new Set(["success", "skipped", "neutral"]);
+// Control-plane runs (queue feeder, worker observer) attach to every Copilot PR head and say
+// nothing about the card; a running or quota-failed one made Verify flap. Keep in sync with
+// scripts/card-checks.cjs. All other checks, including certification, must still be green.
+export const CONTROL_PLANE_CHECKS = new Set(["suggest", "publish", "observe"]);
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -87,8 +95,27 @@ function gh(token, fetchImpl) {
       Authorization: "Bearer " + token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "ArcanaReviewWorker/1.0", ...(init.body ? { "Content-Type": "application/json" } : {}) } });
     const body = res.status === 204 ? null : await res.json().catch(() => null);
-    return { ok: res.ok, status: res.status, body };
+    // Never return GitHub's response body, request headers or owner OAuth token to
+    // the browser. Only a bounded, diagnostic classification can leave this proxy.
+    const remaining = res.headers.get("x-ratelimit-remaining");
+    const retryAfter = res.headers.get("retry-after");
+    const message = String(body?.message || "");
+    const rateLimited = (res.status === 403 || res.status === 429) &&
+      (remaining === "0" || retryAfter !== null || /rate limit|secondary rate|abuse detection/i.test(message));
+    return { ok: res.ok, status: res.status, body, rateLimited };
   };
+}
+
+// Owner approval must not hide a real upstream failure behind one generic
+// `pr-unavailable` response. These statuses are diagnostic, never authorization.
+export function prReadFailure(result) {
+  if (result.status === 401) return [401, { error: "github-credential-rejected" }];
+  if (result.status === 403 || result.status === 429) return result.rateLimited
+    ? [503, { error: "github-rate-limited", upstreamStatus: result.status }]
+    : [403, { error: "github-access-denied", upstreamStatus: result.status }];
+  if (result.status === 404) return [404, { error: "github-pr-not-accessible" }];
+  return [502, { error: "github-pr-read-failed",
+    upstreamStatus: Number.isInteger(result.status) ? result.status : null }];
 }
 
 export function cleanNote(note) {
@@ -103,7 +130,7 @@ export async function decide(api, { pr, sha, decision, note }) {
   const text = cleanNote(note);
   if (decision === "request-fix" && text.length < 3) return [400, { error: "describe-the-fix" }];
   const p = await api(`/pulls/${pr}`);
-  if (!p.ok) return [p.status === 404 ? 404 : 502, { error: "pr-unavailable" }];
+  if (!p.ok) return prReadFailure(p);
   if (p.body.state !== "open") return [409, { error: "pr-not-open" }];
   if (!COPILOT.has(String(p.body.user?.login || "").toLowerCase())) return [422, { error: "not-a-copilot-card-pr" }];
   if (p.body.head?.sha !== sha) return [409, { error: "stale-commit", head: p.body.head?.sha || null }];
@@ -119,11 +146,36 @@ export async function decide(api, { pr, sha, decision, note }) {
   if (mine.length && mine[mine.length - 1].state === event)
     return [200, { ok: true, duplicate: true, state: decision === "approve" ? "approved" : "changes-requested", sha }];
   if (decision === "approve") {
+    // The OAuth decision endpoint must enforce the same file-evidence gate as the read-only inbox.
+    // A linked [Arcana Queue] issue or a green check is NOT evidence that a card exists.
+    const changed = await api(`/pulls/${pr}/files?per_page=100`);
+    if (!changed.ok || !Array.isArray(changed.body)) return [502, { error: "changed-files-unavailable" }];
+    const filenames = changed.body.map(f => f.filename);
+    // Pagination must not silently certify a partial file list.
+    if (filenames.length >= 100) return [422, { error: "not-a-verified-card-implementation" }];
+    const hasCardSource = filenames.some(f => /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/.test(f));
+    const hasScenarioTest = filenames.some(f => /^android\/custom-cards\/src\/test\/.+Test\.kt$/.test(f));
+    if (!hasCardSource || !hasScenarioTest) return [422, { error: "not-a-verified-card-implementation" }];
     const checks = await api(`/commits/${sha}/check-runs?per_page=100`);
     if (!checks.ok) return [502, { error: "checks-unavailable" }];
     const runs = checks.body?.check_runs || [];
-    const notGreen = runs.filter(r => r.status !== "completed" || !GREEN.has(r.conclusion)).map(r => r.name);
+    const notGreen = runs.filter(r => !CONTROL_PLANE_CHECKS.has(r.name) && (r.status !== "completed" || !GREEN.has(r.conclusion))).map(r => r.name);
     if (!runs.length || notGreen.length) return [422, { error: "checks-not-green", checks: notGreen.slice(0, 10) }];
+    // A green ordinary job or look-alike check is never a rules certificate.
+    // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
+    const certification = certificationStatus(runs, sha);
+    if (certification !== "certified") return [422, { error: "not-certified", certification }];
+    // Certification only reaches Copilot's own drafts, and the workflow token cannot mark them ready.
+    // Every gate above has passed for this exact head, so the owner's own session does it here;
+    // integration only considers non-draft PRs. If GitHub refuses, nothing is approved.
+    if (p.body.draft) {
+      if (typeof p.body.node_id !== "string" || !p.body.node_id) return [422, { error: "draft-pr" }];
+      const ready = await api("https://api.github.com/graphql", { method: "POST", body: JSON.stringify({
+        query: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }",
+        variables: { id: p.body.node_id } }) });
+      if (!ready.ok || ready.body?.errors || ready.body?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
+        return [502, { error: "ready-for-review-failed" }];
+    }
   }
   const body = [DECISION_MARKER, `sha:${sha}`, decision === "approve"
     ? "**Owner verified this card** (Arcana Control). Sign-off for integration review only: not a merge, build, signing or release approval."
@@ -138,11 +190,16 @@ export async function decide(api, { pr, sha, decision, note }) {
 }
 
 export default {
+  // Cloudflare Cron Triggers (wrangler.toml): start the allowlisted status workflows on time.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || ''), scheduledTime: event.scheduledTime })
+      .then(r => console.log(JSON.stringify(r))));
+  },
   async fetch(request, env, ctx, fetchImpl = fetch) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     if (url.pathname === "/health") return json({ ok: true, service: "arcana-review", protocol: 1 }, 200, origin);
-    if (url.pathname === "/v1/public/github") return publicGithub(request, { fetchImpl });
+    if (url.pathname === "/v1/public/github") return publicGithub(request, { fetchImpl, token: String(env.GITHUB_PUBLIC_READ_TOKEN || "") });
     if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET || String(env.SESSION_SECRET).length < 32)
       return json({ error: "not-configured" }, 503, origin);
 
@@ -194,6 +251,44 @@ export default {
       const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
       if (!session) return json({ error: "sign-in-required" }, 401, origin);
       return json({ ok: true, login: session.login, expiresAt: session.exp }, 200, origin);
+    }
+
+    if (url.pathname === "/v1/goosegeta") {
+      if (request.method === "OPTIONS") return new Response(null, {status: origin === PWA_ORIGIN ? 204 : 403,
+        headers: origin === PWA_ORIGIN ? {"Access-Control-Allow-Origin":PWA_ORIGIN,"Vary":"Origin",
+          "Access-Control-Allow-Methods":"GET, POST","Access-Control-Allow-Headers":"Authorization, Content-Type","Cache-Control":"no-store"} : {"Cache-Control":"no-store"}});
+      if (origin !== PWA_ORIGIN) return json({error:"origin-not-allowed"},403,origin);
+      if (!["GET","POST"].includes(request.method)) return json({error:"wrong-method"},405,origin);
+      const session = await openSession(env.SESSION_SECRET,(request.headers.get("Authorization") || "").replace(/^Bearer\s+/i,""));
+      if (!session || String(session.login).toLowerCase() !== OWNER) return json({error:"sign-in-required"},401,origin);
+      const [status,result] = await goosegeta(request,env);
+      return json(result,status,origin);
+    }
+
+    // Owner-authenticated all-hands status request: one issue #81 comment, no workflow/worker dispatch.
+    if (url.pathname === "/v1/team-checkin") {
+      if (request.method === "OPTIONS") return new Response(null, {
+        status: origin === PWA_ORIGIN ? 204 : 403,
+        headers: origin === PWA_ORIGIN ? {
+          "Access-Control-Allow-Origin": PWA_ORIGIN, "Access-Control-Allow-Methods": "GET, POST",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+          "Access-Control-Max-Age": "600", "Vary": "Origin", "Cache-Control": "no-store"
+        } : { "Cache-Control": "no-store" }
+      });
+      if (request.method !== "GET" && request.method !== "POST") return json({ error: "wrong-method" }, 405, origin);
+      if (origin !== PWA_ORIGIN) return json({ error: "origin-not-allowed" }, 403, origin);
+      const session = await openSession(env.SESSION_SECRET,
+        (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
+      if (!session || String(session.login).toLowerCase() !== OWNER)
+        return json({ error: "sign-in-required" }, 401, origin);
+      try {
+        const [status, result] = request.method === "POST"
+          ? await requestAllHandsCheckIn(gh(session.t, fetchImpl))
+          : await checkInStatus(gh(session.t, fetchImpl));
+        return json(result, status, origin);
+      } catch {
+        return json({ error: "coordination-unavailable" }, 503, origin);
+      }
     }
 
     // Owner-only work permission. An uncached GET pins the live issue before the single tap's

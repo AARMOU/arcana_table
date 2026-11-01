@@ -1,0 +1,8 @@
+{
+  "key": "surge-conductor",
+  "name": "Surge Conductor",
+  "issue": 510,
+  "source": "certification/SurgeConductorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SurgeConductorIndependentCertificationTest",
+  "tests": 7
+}

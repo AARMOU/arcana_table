@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { sealSession, openSession, decide, cleanNote, FIX_LABEL, DECISION_MARKER } from "../src/index.mjs";
+import worker, { sealSession, openSession, decide, prReadFailure, cleanNote, FIX_LABEL, DECISION_MARKER } from "../src/index.mjs";
 
 const SECRET = "s".repeat(40);
 const ENV = { GITHUB_OAUTH_CLIENT_ID: "cid", GITHUB_OAUTH_CLIENT_SECRET: "csecret", SESSION_SECRET: SECRET };
@@ -9,15 +9,29 @@ const PWA = "https://aarmou.github.io";
 const W = "https://arcana-review.example.workers.dev";
 
 // Minimal fake GitHub keeping state, recording every write.
-function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }], reviews = [],
-  author = "Copilot", prState = "open", unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU" } = {}) {
+const CERTIFIED = { name: "Arcana independent certification", status: "completed", conclusion: "success", head_sha: SHA,
+  app: {slug:'github-actions',id:15368},
+  output: {title:'Resurrection Orb: independent rules scenarios passed',
+    summary:'4 trusted-main JUnit scenarios passed against the exact current Copilot PR commit'} };
+function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED], reviews = [],
+  author = "Copilot", prState = "open", draft = false,
+  files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
+    "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt"],
+  unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU",
+  prError = null, readyRefused = false } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
     const u = String(url); const method = init.method || "GET";
     const ok = (body, status = 200) => new Response(body === null ? null : JSON.stringify(body), { status });
     if (u === "https://github.com/login/oauth/access_token") return ok({ access_token: "gho_owner" });
     if (u === "https://api.github.com/user") return ok({ login: user });
-    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u.endsWith("/pulls/360") && method === "GET" && prError) return new Response(
+      JSON.stringify({message:prError.message||"GitHub rejected the request"}),
+      {status:prError.status,headers:prError.headers||{}});
+    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, draft, node_id: "PR_node360", user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u === "https://api.github.com/graphql" && method === "POST") { const b = JSON.parse(init.body); writes.push(["ready", b.variables]);
+      return readyRefused ? ok({ errors: [{ message: "Resource not accessible" }] }) : ok({ data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } } }); }
+    if (u.includes("/pulls/360/files?") && method === "GET") return ok(files.map(filename => ({ filename })));
     if (u.endsWith("/issues/358") && method === "GET") return ok({ state: "open", title: unitTitle });
     if (u.includes("/pulls/360/reviews") && method === "GET") return ok(reviews);
     if (u.includes(`/commits/${SHA}/check-runs`)) return ok({ check_runs: checks });
@@ -186,4 +200,117 @@ test("unconfigured Worker refuses everything but health", async () => {
   assert.equal((await worker.fetch(new Request(W + "/health"), {})).status, 200);
   assert.equal((await worker.fetch(new Request(W + "/v1/decision", { method: "POST" }), {})).status, 503);
   assert.equal(cleanNote("hi @x <!-- y -->"), "hi ＠x  y");
+});
+
+test("approval requires independent certification of the exact head; fix requests stay available", async () => {
+  const toolkit = { name: "toolkit", status: "completed", conclusion: "success" };
+  const cases = [
+    [[toolkit], "not-run"],                                                             // green checks only (PR #344 case)
+    [[toolkit, { ...CERTIFIED, status: "in_progress", conclusion: null }], "running"],
+    [[toolkit, { ...CERTIFIED, conclusion: "failure" }], "failed"],
+    [[toolkit, { ...CERTIFIED, head_sha: "c".repeat(40) }], "not-run"],               // stale: certified an older commit
+  ];
+  for (const [checks, certification] of cases) {
+    const gh = fakeGitHub({ checks });
+    const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+    assert.ok(r.status === 422 && ["not-certified", "checks-not-green"].includes(r.body.error), certification);
+    if (r.body.error === "not-certified") assert.equal(r.body.certification, certification);
+    assert.equal(gh.writes.length, 0, certification);
+    assert.equal((await decision(gh, { pr: 360, sha: SHA, decision: "request-fix", note: "needs rules check" })).status, 200, certification);
+  }
+  const ok = await decision(fakeGitHub({ checks: [toolkit, CERTIFIED] }), { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(ok.status, 200);
+});
+
+test("a certified draft is marked ready with the owner's session, then approved", async () => {
+  const gh = fakeGitHub({ draft: true });
+  const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(gh.writes.map(w => w[0]), ["ready", "review"], "ready only after every gate, before the review");
+  assert.deepEqual(gh.writes[0][1], { id: "PR_node360" });
+  const refused = fakeGitHub({ draft: true, readyRefused: true });
+  const f = await decision(refused, { pr: 360, sha: SHA, decision: "approve" });
+  assert.deepEqual([f.status, f.body.error], [502, "ready-for-review-failed"]);
+  assert.deepEqual(refused.writes.map(w => w[0]), ["ready"], "no approval when GitHub refuses the ready transition");
+  // A draft that fails any gate is never marked ready.
+  const uncertified = fakeGitHub({ draft: true, checks: [{ name: "toolkit", status: "completed", conclusion: "success" }] });
+  assert.equal((await decision(uncertified, { pr: 360, sha: SHA, decision: "approve" })).status, 422);
+  assert.equal(uncertified.writes.length, 0);
+});
+
+test("an audit, engine blocker, or card without executable tests cannot be approved", async () => {
+  const cases = [
+    { draft: true, files: [] },
+    { files: [] },
+    { files: ["tools/cardkit/data/known-blockers.json"] },
+    { files: ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt"] },
+    { files: Array(100).fill("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt") }
+  ];
+  for (const opts of cases) {
+    const gh = fakeGitHub(opts);
+    const response = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+    assert.equal(response.status, 422, JSON.stringify(opts).slice(0, 120));
+    assert.ok(["draft-pr", "not-a-verified-card-implementation"].includes(response.body.error));
+    assert.equal(gh.writes.length, 0);
+  }
+  const gh = fakeGitHub({ files: [] });
+  assert.equal((await decision(gh, { pr: 360, sha: SHA, decision: "request-fix", note: "This is a blocker, not a card" })).status, 200);
+});
+
+test("fake certificate names/apps cannot cause owner approval, even with green CI", async () => {
+  const toolkit={name:'toolkit',status:'completed',conclusion:'success'};
+  const invalid=[
+    {...CERTIFIED,name:'totally-independent-certification'},
+    {...CERTIFIED,app:{slug:'github-actions',id:111}},
+    {...CERTIFIED,app:{slug:'other',id:15368}},
+    {...CERTIFIED,output:{title:'Fake independent cert',summary:'fake tests'}},
+    {...CERTIFIED,head_sha:'b'.repeat(40)}
+  ];
+  for(const cert of invalid){
+    const gh=fakeGitHub({checks:[toolkit,cert]});
+    const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+    assert.deepEqual([r.status,r.body.error],[422,'not-certified']);
+    assert.equal(gh.writes.length,0);
+  }
+  const legitimate=fakeGitHub({checks:[toolkit,CERTIFIED]});
+  assert.equal((await decision(legitimate,{pr:360,sha:SHA,decision:'approve'})).status,200);
+});
+
+test("GitHub PR-read error categorization preserves status but never exposes owner credential or upstream response", async () => {
+  const cases = [
+    [{ status:401, message:"Bad credentials" },401,"github-credential-rejected"],
+    [{ status:403, message:"API rate limit exceeded" },503,"github-rate-limited"],
+    [{ status:403, message:"Access forbidden", headers:{"x-ratelimit-remaining":"0"} },503,"github-rate-limited"],
+    [{ status:403, message:"Resource not accessible by integration" },403,"github-access-denied"],
+    [{ status:429, message:"Rate quota",headers:{"retry-after":"60"} },503,"github-rate-limited"],
+    [{ status:404, message:"Not Found" },404,"github-pr-not-accessible"],
+    [{ status:502, message:"upstream internal failure" },502,"github-pr-read-failed"]
+  ];
+  for(const [prError,code,error] of cases){
+    const gh=fakeGitHub({prError});
+    const r=await decision(gh,{pr:360,sha:SHA,decision:"approve"});
+    assert.equal(r.status,code,JSON.stringify(prError));
+    assert.equal(r.body.error,error,JSON.stringify(prError));
+    assert.equal(gh.writes.length,0,"a failed first read never submits a review");
+    assert.ok(!JSON.stringify(r.body).includes(prError.message),"no upstream details escape");
+  }
+  assert.deepEqual(prReadFailure({status:403,rateLimited:false}),[403,{error:"github-access-denied",upstreamStatus:403}]);
+  assert.deepEqual(prReadFailure({status:503}),[502,{error:"github-pr-read-failed",upstreamStatus:503}]);
+});
+
+test("control-plane feeder/observer runs never block Verify; real failing checks still do", async () => {
+  const base = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED];
+  const noise = [{ name: "suggest", status: "in_progress", conclusion: null },
+    { name: "publish", status: "completed", conclusion: "failure" }, { name: "observe", status: "queued", conclusion: null }];
+  const gh = fakeGitHub({ checks: [...base, ...noise] });
+  const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(r.status, 200);
+  assert.equal(gh.writes.filter(w => w[0] === "review").length, 1);
+  for (const real of [{ name: "cards-and-android", status: "completed", conclusion: "failure" },
+    { name: "coordination-guard", status: "in_progress", conclusion: null }]) {
+    const blocked = fakeGitHub({ checks: [...base, ...noise, real] });
+    const b = await decision(blocked, { pr: 360, sha: SHA, decision: "approve" });
+    assert.deepEqual([b.status, b.body.error, b.body.checks], [422, "checks-not-green", [real.name]]);
+    assert.equal(blocked.writes.length, 0);
+  }
 });

@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080f18">
-<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="preconnect" href="https://arcana-review.arcanamtg.workers.dev" crossorigin><link rel="preconnect" href="https://api.github.com" crossorigin><link rel="icon" href="./icons/icon-192.png" type="image/png">
 <meta name="description" content="Browse Arcana card gaps and submit selected cards for engineering triage."><title>Card Queue — Arcana Control</title>
 <style>
 :root{color-scheme:dark;--bg:#080f18;--panel:#111c29;--line:#2c4352;--ink:#f0f6f9;--muted:#92a8b9;--teal:#7ce8c7}
@@ -62,9 +62,9 @@ input[type=search],input[type=text],select{width:100%;background:#0b1824;border:
 <div id="entries" class="entries" aria-label="Cards to select"></div>
 <button id="showMore" type="button" class="btn" hidden>Show 100 more</button>
 <p class="muted" id="coverageFootnote">An indexed card name is not proof of tested, playable Oracle behavior. Cards not indexed are present only in the deck view.</p></section>
-<section class="panel"><h2>Add another card</h2><p class="muted">Manual entries are unverified, not automatically classified as missing.</p>
+<section class="panel"><h2>Add another card</h2><p class="muted">Search Scryfall and select the correct printed card before adding it.</p>
 <form id="add" class="row"><input id="manual" type="text" maxlength="150" placeholder="Exact card name" aria-label="Card name" required><button type="submit" class="btn">Add to selection</button></form>
-<p class="muted" id="notice" role="status"></p></section>
+<div id="manualMatches" class="entries" role="group" aria-label="Scryfall card matches"></div><p class="muted" id="manualStatus" role="status">Type at least two letters to search Scryfall. Select an exact card before adding it.</p><p class="muted" id="notice" role="status"></p></section>
 <section class="panel"><h2>Verify before submitting</h2>
 <p class="muted">Exact Magic card names are checked live using Scryfall. Copilot readiness is shown from the latest complete, fresh, same-source queue-feeder allowlist, for information only. If the name is abbreviated, confirm the suggested printed name. Cards Copilot cannot take yet can still be requested; they are routed to GPT. Selected names are sent to Scryfall for verification.</p>
 <p id="verificationStatus" class="muted" role="status">Select cards to verify.</p>

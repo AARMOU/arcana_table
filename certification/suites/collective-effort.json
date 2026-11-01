@@ -1,0 +1,8 @@
+{
+  "key": "collective-effort",
+  "name": "Collective Effort",
+  "issue": 555,
+  "source": "certification/CollectiveEffortIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CollectiveEffortIndependentCertificationTest",
+  "tests": 10
+}

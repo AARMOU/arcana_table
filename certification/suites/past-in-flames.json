@@ -1,0 +1,8 @@
+{
+  "key": "past-in-flames",
+  "name": "Past in Flames",
+  "issue": 658,
+  "source": "certification/PastInFlamesIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PastInFlamesIndependentCertificationTest",
+  "tests": 5
+}

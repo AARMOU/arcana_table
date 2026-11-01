@@ -29,7 +29,7 @@ jobs:
       - name: Check page copy, paths and release limitations
         run: node --test tools/verify_site.test.cjs
       - name: Check dashboard regression
-        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs control/review-auth-browser.test.cjs tools/tests/argentum-catalog.test.cjs
       - name: Check out integration deck/index data (data only)
         uses: actions/checkout@v4
         with:

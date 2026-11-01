@@ -7,14 +7,32 @@ const { decideBudget } = require('./usage-budget-policy.cjs');
 const LEDGER = '<!-- arcana-wu-ledger-v1 -->';
 const AUTO_QUEUE_MARKER = '<!-- arcana-auto-queue-v1 -->';
 const ONE_SHOT_LABEL = 'arcana:authorize-once';
+// Certification-suite requests opened by certification/backfill.cjs (see certification/suite-requests.cjs).
+const SUITE_TITLE = '[Arcana Suite] ';
+const SUITE_MARKER = '<!-- arcana-suite-request-v1 -->';
+const SUITE_BASE = 'main';
+// Prioritized [Card Work] items opened by the trusted queue feeder (scripts/queue-feeder.cjs). If no engineer claims
+// one within REVIEW_GRACE_MS, the dispatcher starts a review-only Copilot session (owner decision 2026-10-30:
+// "automatically", "not a process only you can run"). Output is a Cardkit review record or engine blocker, never card code.
+const CARD_WORK_TITLE = '[Card Work] ';
+const CARD_WORK_MARKER = '<!-- arcana-card-work-v1 -->';
 const HALTED_LABEL = 'wu:halted';
 const RESOLVE_LABEL = 'wu:resolve-interrupted';
-const HARD_MAX_UNITS = 2;
+// Owner ceiling for concurrent Copilot units (ARCANA_MAX_ACTIVE_UNITS, 1..3). Effective capacity scales
+// below it with budget headroom (scaledCapacity); demand fills it, because a slot is only taken when an
+// eligible build or repair exists.
+const HARD_MAX_UNITS = 3;
 const CEILING = { assign: 1, repair: 2 };
 const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
 // A Copilot session that started but never reported finishing for this long is reported as stale.
 // It keeps its slot (it may still be spending) until it finishes or the owner releases it.
 const SESSION_STALE_MS = 3 * 60 * 60 * 1000;
+// A slot held only by a timeout is released automatically this long after the stuck event (no owner label
+// needed). A never-started assignment spends nothing; a session silent this long is treated as dead. Billing
+// still reserves for it through recentlyFinished until the lag window passes.
+const AUTO_RELEASE_MS = 6 * 60 * 60 * 1000;
+// An interrupted attempt (authorizing record with no result) is resolved automatically after this long.
+const INTERRUPT_AUTO_RESOLVE_MS = 60 * 60 * 1000;
 // Billing can report a finished session's credits late. Finished units count as pending liabilities
 // for this long (owner variable ARCANA_BILLING_LAG_HOURS, 0-72; 0 disables).
 const DEFAULT_BILLING_LAG_HOURS = 24;
@@ -113,11 +131,19 @@ const latest = (xs, pred) => xs.filter(pred).reduce((m, x) => Math.max(m, x.at),
 function deriveUnit(unit, now = Date.now(), { lagMs = DEFAULT_BILLING_LAG_HOURS * 3600000 } = {}) {
   const d = deriveState(unit, now);
   const finished = latest(unit.sessions || [], s => s.event === 'finished');
+  const repairAt = latest(unit.ledger || [], r => r.op === 'repair-request');
+  // A running repair is reported as "working" by GitHub, like a new build.
+  // Recover its lane from the trusted repair ledger and most recent session finish.
+  // Interrupted authorizations are never mistaken for repairs.
+  const lane = d.holdsSlot ? (d.reason !== 'interrupted' && repairAt > finished ? 'repair' : 'build') : null;
   const recentlyFinished = !d.holdsSlot && finished > -Infinity && now - finished < lagMs;
-  const released = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason) &&
-    (unit.labels || []).includes(HALTED_LABEL);
-  if (released) return { ...d, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
-  return { ...d, recentlyFinished };
+  const timedOut = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason);
+  if (timedOut && (unit.labels || []).includes(HALTED_LABEL))
+    return { ...d, lane: null, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  // Reserve billing for an auto-released unit as if it had just finished.
+  if (timedOut && Number.isFinite(d.since) && now - d.since > AUTO_RELEASE_MS)
+    return { ...d, lane: null, holdsSlot: false, reason: 'auto-released', releasedFrom: d.reason, recentlyFinished: now - d.since < AUTO_RELEASE_MS + lagMs };
+  return { ...d, lane, recentlyFinished };
 }
 
 function deriveState(unit, now) {
@@ -135,12 +161,12 @@ function deriveState(unit, now) {
   const finished = latest(sessions, s => s.event === 'finished');
   const repairAt = latest(ledger, r => r.op === 'repair-request');
   if (started > -Infinity && started > finished) {
-    return now - started > SESSION_STALE_MS ? { ...base, state: 'halted', reason: 'session-stale', holdsSlot: true }
+    return now - started > SESSION_STALE_MS ? { ...base, state: 'halted', reason: 'session-stale', holdsSlot: true, since: started }
       : { ...base, state: 'working', holdsSlot: true };
   }
   if (repairAt > -Infinity && !(finished > repairAt)) {
     const late = now - repairAt > PICKUP_TIMEOUT_MS && !(started > repairAt);
-    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
+    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true, since: repairAt }
       : { ...base, state: 'repairing', holdsSlot: true };
   }
   const maybePaid = ['confirmed', 'error', 'not-confirmed'];
@@ -150,11 +176,16 @@ function deriveState(unit, now) {
   if (assigned && !(started > -Infinity && (paidAt === -Infinity || started >= paidAt))) {
     // Never picked up. A timed-out pickup keeps its slot until the owner reviews it.
     const late = paidAt > -Infinity ? now - paidAt > PICKUP_TIMEOUT_MS : true;
-    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
+    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true, ...(paidAt > -Infinity ? { since: paidAt } : {}) }
       : { ...base, state: 'pending-pickup', holdsSlot: true };
   }
   if (ledger.some(r => r.op === 'halt') || (unit.labels || []).includes(HALTED_LABEL))
     return { ...base, state: 'halted', reason: 'owner-review', holdsSlot: false };
+  // Completion never substitutes for observed session events. The active/repair/
+  // pending/interrupted checks above always win, including a late post-merge start.
+  if (unit.suiteCompletion && assigned) return { ...base, state: 'completed', holdsSlot: false };
+  // Closed suite requests remain in accounting, but cannot be assigned or repaired.
+  if (unit.closed) return { ...base, state: 'halted', reason: 'closed-unit', holdsSlot: false };
   if (assigned) return { ...base, state: 'review', holdsSlot: false };
   // Authorization used but no assignment happened (claim changed, or resolved as not assigned).
   if (assignments) return { ...base, state: 'halted', reason: 'assignment-consumed', holdsSlot: false };
@@ -215,6 +246,29 @@ function unitActionable(body, base) {
   return { ok: missing.length === 0, missing };
 }
 
+// A suite request names its card unit, the card PR it certifies, the suite key and the main base.
+function suiteActionable(body) {
+  const text = stripComments(body), missing = [];
+  if (!String(body || '').startsWith(SUITE_MARKER + '\n')) missing.push('suite-marker');
+  if (!/^Card unit: #\d+\s*$/m.test(text)) missing.push('card-unit');
+  if (!/^Card PR: #\d+\s*$/m.test(text)) missing.push('card-pr');
+  if (!/^Suite key: [a-z][a-z0-9]*(?:-[a-z0-9]+)*\s*$/m.test(text)) missing.push('suite-key');
+  if (!/"oracle_text"/.test(text)) missing.push('oracle-record');
+  const line = text.match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
+  if (!line || line[1] !== SUITE_BASE) missing.push('base-' + (line ? 'mismatch' : 'missing'));
+  return { ok: missing.length === 0, missing };
+}
+
+function reviewActionable(body) {
+  const text = String(body || ''), missing = [];
+  if (!text.startsWith(CARD_WORK_MARKER + '\n')) missing.push('card-work-marker');
+  if (!/source: trusted-main-queue-feeder;[^>]*base-sha:[a-f0-9]{40};[^>]*priority:\d{1,4}/.test(text)) missing.push('feeder-source');
+  const cards = (text.split(/^## Card\s*$/m)[1] || '').split(/^## /m)[0].split('\n').filter(l => /^- \S/.test(l));
+  if (cards.length !== 1) missing.push('one-card');
+  if (!/^ {4}\{.*"oracle_text"/m.test(text)) missing.push('oracle-record');
+  return { ok: missing.length === 0, missing };
+}
+
 // Who may direct paid work. author_association is computed by GitHub from live repository
 // permissions and cannot be set by issue text. The bots are the dispatcher's own ledger writer
 // and Copilot itself.
@@ -236,9 +290,11 @@ function provenance(raw = {}, { needApproval = false, approvers } = {}) {
   const reasons = [];
   // Bot-created queue units are trusted ONLY when emitted unedited by the main feeder;
   // other bot or public issue submissions cannot authorize paid work.
+  const fromFeeder = String(raw.title || '').startsWith('[Arcana Queue]') && String(raw.body || '').startsWith(AUTO_QUEUE_MARKER + '\n');
+  const fromBackfill = String(raw.title || '').startsWith(SUITE_TITLE) && String(raw.body || '').startsWith(SUITE_MARKER + '\n');
+  const fromCardWork = String(raw.title || '').startsWith(CARD_WORK_TITLE) && String(raw.body || '').startsWith(CARD_WORK_MARKER + '\n');
   const trustedAutoQueue = raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot' &&
-    String(raw.title || '').startsWith('[Arcana Queue]') &&
-    String(raw.body || '').startsWith(AUTO_QUEUE_MARKER + '\n') && raw.autoQueueUnedited === true;
+    (fromFeeder || fromBackfill || fromCardWork) && raw.autoQueueUnedited === true;
   if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation) && !trustedAutoQueue) reasons.push('author-untrusted');
   if (!Array.isArray(raw.commenters)) reasons.push('comments-unavailable');
   else if (raw.commenters.some(c => !trustedCommenter(c))) reasons.push('untrusted-comments');
@@ -283,6 +339,25 @@ function budgetWithReservations({ snapshot, active, pendingRepairs, recentFinish
       reportedCredits: Number.isFinite(snapshot.reportedUsed) ? snapshot.reportedUsed : null, allowance: snapshot.allowance } };
 }
 
+// Dynamic capacity (owner 2026-10-30: "scale between 1-3 workers depending on load").
+// normal and warn -> the owner ceiling (warn is a 50% notice, not a spending stop; owner 2026-10-31: "as much usage as
+// I can get"); slow -> 1 (existing rule); paused/unknown -> 0 (budget denies).
+const SCALE_BY_LEVEL = { normal: Infinity, warn: Infinity, slow: 1 };
+function scaledCapacity(ceiling, level) {
+  if (!Number.isSafeInteger(ceiling) || ceiling < 1) return 0;
+  return Math.min(ceiling, SCALE_BY_LEVEL[level] ?? 0);
+}
+// With 2+ slots neither lane may take every slot: builds and repairs each get at most capacity-1,
+// so a red card PR can always be repaired while new cards are building, and the reverse.
+function laneDenial({ op, holders, capacity }) {
+  if (capacity < 2) return null;
+  if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair')) return 'capacity: existing active unit has unknown lane';
+  const lane = op === 'assign' ? 'build' : 'repair';
+  const occupied = holders.filter(u => u.lane === lane);
+  return occupied.length >= capacity - 1
+    ? `capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#' + u.number).join(', ')}` : null;
+}
+
 // op: 'assign' | 'repair'. units: deriveUnit() results for every known unit.
 function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = Date.now() }) {
   const deny = reason => ({ allowed: false, reason });
@@ -314,16 +389,24 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
     return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
   }
+  // Lane capacity at the owner ceiling is decided before budget so budget diagnostics stay complete;
+  // the total-ceiling check above still rejects immediately.
+  const laneDenied = laneDenial({ op, holders, capacity: ready.maxUnits });
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
   const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });
   if (!budget.maxNewAssignments) return { ...deny('budget: ' + budget.level + (budget.reason ? ' (' + budget.reason + ')' : '')), budget };
   if (budget.level === 'slow' && active > 0) return { ...deny('budget: slow allows one operation at a time'), budget };
+  if (laneDenied) return { ...deny(laneDenied), budget };
+  const capacity = scaledCapacity(ready.maxUnits, budget.level);
+  if (active >= capacity) return { ...deny(`capacity: scaled to ${capacity} of ${ready.maxUnits} for budget ${budget.level}`), budget, capacity };
+  const scaledLane = capacity < ready.maxUnits ? laneDenial({ op, holders, capacity }) : null;
+  if (scaledLane) return { ...deny(scaledLane), budget, capacity };
   return dryRun ? { allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', budget }
-    : { allowed: true, reason: 'admitted', budget };
+    : { allowed: true, reason: 'admitted', budget, capacity };
 }
 
-module.exports = { LEDGER, AUTO_QUEUE_MARKER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
-  SESSION_STALE_MS, DEFAULT_BILLING_LAG_HOURS,
-  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
+module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, CARD_WORK_TITLE, CARD_WORK_MARKER, reviewActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+  SESSION_STALE_MS, AUTO_RELEASE_MS, INTERRUPT_AUTO_RESOLVE_MS, DEFAULT_BILLING_LAG_HOURS,
+  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot, scaledCapacity, laneDenial,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };

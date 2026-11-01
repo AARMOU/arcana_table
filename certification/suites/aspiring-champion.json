@@ -1,0 +1,8 @@
+{
+  "key": "aspiring-champion",
+  "name": "Aspiring Champion",
+  "issue": 724,
+  "source": "certification/AspiringChampionIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AspiringChampionIndependentCertificationTest",
+  "tests": 7
+}

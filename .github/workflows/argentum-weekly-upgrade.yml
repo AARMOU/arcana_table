@@ -176,8 +176,15 @@ jobs:
             echo "::error title=Agent docs: $1::$(tail -5 "$RUNNER_TEMP/docs.log" | tr '\n' ' ' | cut -c1-900)"
             exit 1
           }
+          # Keep the previous engine's SDK index: reviews are re-bound only if no SDK member they name was removed.
+          cp docs/agents/generated/sdk-api.json "$RUNNER_TEMP/sdk-api.previous.json"
           python3 engine-upgrade/weekly.py docs argentum-engine 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "weekly.py docs"
           tools/cardkit/cardkit sdk-index 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit sdk-index"
+          # Reviews are bound to the engine JAR hash: carry the still-valid ones onto the new runtime
+          # (stale ones return to automatic card work). Older bases without the command skip it.
+          if tools/cardkit/cardkit restamp --help >/dev/null 2>&1; then
+            tools/cardkit/cardkit restamp --previous-sdk "$RUNNER_TEMP/sdk-api.previous.json" 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit restamp"
+          fi
           tools/cardkit/cardkit docs-check 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit docs-check"
           python3 -m unittest discover -s tools/cardkit/tests 2>&1 | tee "$RUNNER_TEMP/docs.log" || {
             grep -E '^(FAIL|ERROR):' "$RUNNER_TEMP/docs.log" | head -5 | while IFS= read -r l; do echo "::error title=Cardkit test::$l"; done
@@ -224,6 +231,54 @@ jobs:
         continue-on-error: true
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: B140 cards on the candidate engine (report only, never a merge gate)
+        id: b140
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        # Adoption-time compatibility: B140's entire custom-card set (read live from the branch, no card
+        # lists) compiled and scenario-tested on this candidate engine, in a scratch copy of the candidate's
+        # Android tree. Results inform a numbered build (B141 checklist); they never change green or merge.
+        env:
+          B140_BRANCH: gpt/b140-card-request-test-apk-20261028
+        run: |
+          set -uo pipefail
+          d="$RUNNER_TEMP/b140-overlay"; rm -rf "$d"; mkdir -p "$d"
+          git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$B140_BRANCH" >/dev/null 2>&1 || { echo 'B140 fetch failed'; exit 1; }
+          b140=$(git rev-parse FETCH_HEAD)
+          cp -a android "$d/android" && rm -rf "$d/android/custom-cards/src" "$d/android/custom-cards/build"
+          git archive FETCH_HEAD android/custom-cards/src | tar -x -C "$d"
+          ( cd "$d/android" && ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test \
+              --tests 'com.arcanatable.customcards.*ScenarioTest' ) > "$RUNNER_TEMP/b140.log" 2>&1
+          code=$?
+          python3 - "$d/android/custom-cards/build/test-results/test" "$RUNNER_TEMP/b140.log" "$b140" "$code" <<'EOF'
+          import json, pathlib, re, sys, xml.etree.ElementTree as ET
+          res, log, sha, code = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+          cards = {}
+          for f in sorted(res.glob('*.xml')) if res.is_dir() else []:
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  card = re.sub(r'ScenarioTest$', '', tc.get('classname', '').rsplit('.', 1)[-1])
+                  bad = tc.find('failure') is not None or tc.find('error') is not None
+                  c = cards.setdefault(card, {'tests': 0, 'failed': []})
+                  c['tests'] += 1
+                  if bad: c['failed'].append(tc.get('name', '?'))
+          errors = [l.strip() for l in log.read_text(errors='replace').splitlines() if l.startswith('e: ')][:15]
+          failing = sorted(k for k, v in cards.items() if v['failed'])
+          out = pathlib.Path('engine-upgrade/weekly'); out.mkdir(parents=True, exist_ok=True)
+          (out / 'b140.json').write_text(json.dumps({'b140': sha, 'exit': code, 'cards': cards, 'compileErrors': errors}, indent=1))
+          lines = ['### B140 cards on this engine (report only)', '',
+                   f'B140 `{sha[:10]}` custom-card scenario tests on the candidate engine. Not a merge gate: '
+                   'this informs the next numbered build (B141 checklist in `docs/stabilization/CONTROL-PLAN.md`).', '']
+          if errors and not cards:
+              lines += ['❌ **B140 cards do not compile on this engine:**', '', '```', *errors, '```']
+          elif not cards:
+              lines += [f'⚠️ No results (Gradle exit {code}); see the run log.']
+          else:
+              lines += [f"{'✅' if not failing else '❌'} {len(cards) - len(failing)} of {len(cards)} B140 cards pass "
+                        f"({sum(v['tests'] for v in cards.values())} scenarios)."]
+              lines += [f"- **{k}**: {', '.join(cards[k]['failed'][:4])}" for k in failing[:30]]
+          (out / 'b140.md').write_text('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+          EOF
       - name: Count test results
         if: steps.final.outputs.status == 'rebased'
         run: python3 engine-upgrade/weekly.py summary android
@@ -285,6 +340,9 @@ jobs:
               rec = w / 'reconcile.md'
               if rec.is_file():
                   body += ['', rec.read_text()]
+              b140 = w / 'b140.md'
+              if b140.is_file():
+                  body += ['', b140.read_text()]
               body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
                        'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. A green PR means the checks above passed, '
                        'not that every card is Oracle-correct. Debug APK: see the run artifacts.']
@@ -330,7 +388,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/candidate"
           git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum \
             docs/agents/generated/sdk-api.md docs/agents/generated/sdk-api.json docs/agents/argentum-upstream \
-            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py
+            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py tools/cardkit/data/verified-support.json
           git reset -q -- engine-upgrade/weekly engine-upgrade/patch-report.json
           git reset -q -- ':(glob)**/__pycache__/**'
           git diff --cached --binary > "$RUNNER_TEMP/candidate/candidate.patch"
@@ -402,7 +460,7 @@ jobs:
                      'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
                      'android/app/src/main/assets/argentum/', 'docs/agents/generated/sdk-api.',
                      'docs/agents/argentum-upstream/', 'AGENTS.md', 'docs/agents/CARD-WORKFLOW.md',
-                     'tools/cardkit/cardkit_lib/repo.py')
+                     'tools/cardkit/cardkit_lib/repo.py', 'tools/cardkit/data/verified-support.json')
           text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
           headers = re.findall(r'^diff --git .*$', text, re.M)
           pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]

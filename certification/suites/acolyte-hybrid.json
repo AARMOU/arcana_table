@@ -1,0 +1,8 @@
+{
+  "key": "acolyte-hybrid",
+  "name": "Acolyte Hybrid",
+  "issue": 632,
+  "source": "certification/AcolyteHybridIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AcolyteHybridIndependentCertificationTest",
+  "tests": 5
+}

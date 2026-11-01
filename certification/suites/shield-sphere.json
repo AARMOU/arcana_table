@@ -1,0 +1,8 @@
+{
+  "key": "shield-sphere",
+  "name": "Shield Sphere",
+  "issue": 509,
+  "source": "certification/ShieldSphereIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ShieldSphereIndependentCertificationTest",
+  "tests": 4
+}

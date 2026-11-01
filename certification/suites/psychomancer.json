@@ -1,0 +1,8 @@
+{
+  "key": "psychomancer",
+  "name": "Psychomancer",
+  "issue": 148,
+  "source": "certification/PsychomancerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PsychomancerIndependentCertificationTest",
+  "tests": 5
+}

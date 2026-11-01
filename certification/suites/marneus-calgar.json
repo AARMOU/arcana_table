@@ -1,0 +1,8 @@
+{
+  "key": "marneus-calgar",
+  "name": "Marneus Calgar",
+  "issue": 565,
+  "source": "certification/MarneusCalgarIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MarneusCalgarIndependentCertificationTest",
+  "tests": 7
+}

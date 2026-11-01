@@ -5,6 +5,48 @@
 const A = require('./admission.cjs');
 const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
 const F = require('./feasibility.cjs');
+const { calibrateReady } = require('./credit-calibration.cjs');
+
+// A certification-suite request (certification/suite-requests.cjs): test-only work on main.
+const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
+const isReview = u => String(u?.raw?.title || '').startsWith(A.CARD_WORK_TITLE) && String(u?.raw?.body || '').startsWith(A.CARD_WORK_MARKER + '\n');
+const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body)
+  : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.unitActionable(body, base);
+// A card-work item (review OR engine lane) is offered to engineers first: Copilot starts it after REVIEW_GRACE_MS
+// with no engineer CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
+// Owner 2026-10-31: cards must move without requiring a specific engineer; the old 2 h grace was dead time
+// overnight, so a short window remains only to let an active engineer CLAIM first.
+const DEV_CI_WORKFLOW = 'arcana-development-ci.yml';
+// Paths Development CI does not build or test (workflows, control scripts, docs, upgrade tooling, Cardkit review
+// data). If everything since the base's last green CI is inside these, the base is as good as that green run.
+// Anything else (android/, argentum-patches/, certification/, tools/ code, build files) waits for fresh CI.
+const NON_BUILD = /^(?:\.github\/|scripts\/|docs\/|control\/|engine-upgrade\/|tools\/cardkit\/data\/)|^[^/]+\.md$/;
+
+// Every merge into the base used to pause all new assignments for a full CI run (~25 min), even for changes CI
+// never looks at. Two calls: the base branch's recent green runs, then the diff from the newest one to the head.
+async function ciEquivalent({ github, owner, repo, base, baseSha }) {
+  try {
+    const runs = (await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: DEV_CI_WORKFLOW, branch: base,
+      per_page: 30 })).data.workflow_runs || [];  // no status filter: it lags (see the exact-head check)
+    const green = runs.filter(r => r.name === 'Arcana Development CI' && r.conclusion === 'success' && /^[a-f0-9]{40}$/.test(r.head_sha || ''))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (!green || green.head_sha === baseSha) return null;
+    const cmp = (await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: green.head_sha + '...' + baseSha })).data;
+    const files = (cmp.files || []).map(f => f.filename);
+    if (cmp.status !== 'ahead' || !files.length || files.length >= 300 || !Number.isSafeInteger(cmp.ahead_by) || cmp.ahead_by > 50) return null;
+    if (!files.every(f => NON_BUILD.test(f) && !f.includes('..'))) return null;
+    return { greenSha: green.head_sha, run: green.id, files: files.length };
+  } catch { return null; }
+}
+const REVIEW_GRACE_MS = 15 * 60 * 1000;
+const REVIEW_CLAIM_MS = 24 * 60 * 60 * 1000;
+const reviewPriority = u => Number((String(u?.raw?.body || '').match(/priority:(\d{1,4})/) || [])[1]) || 0;
+const kindOf = u => isSuite(u) ? 'suite' : isReview(u) ? 'review' : 'card';
+// Suites need no Cardkit verdict: the card itself already passed Cardkit in its own PR.
+const SUITE_FEASIBLE = { ok: true, code: null, reason: null, cards: [] };
+// Reviews exist because Cardkit cannot clear the card yet; the session's output is a review record, not the card.
+const REVIEW_FEASIBLE = SUITE_FEASIBLE;
+const feasOf = (u, feasible) => isSuite(u) || isReview(u) ? SUITE_FEASIBLE : feasible(u);
 
 // Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
 // body that no longer passes the readiness rules stops the assignment, even if it happened after
@@ -24,7 +66,7 @@ async function revalidate({ github, owner, repo, n, fresh, needApproval, approve
       raw.approval = approvalOf(events, await contentWrittenAt(github, owner, repo, n));
     }
     const p = A.provenance(raw, { needApproval, approvers });
-    const act = A.unitActionable(fresh.body, base);
+    const act = actionableOf(fresh.title, fresh.body, base);
     const reasons = [...p.reasons, ...(act.ok ? [] : ['not-actionable-' + act.missing.join('-')])];
     return { ok: reasons.length === 0, reasons, actor: raw.approval?.actor || null };
   } catch { return { ok: false, reasons: ['revalidation-unavailable'] }; }
@@ -32,6 +74,28 @@ async function revalidate({ github, owner, repo, n, fresh, needApproval, approve
 
 const REPORT_ISSUE = 81;
 const INTERRUPT_MARKER = '<!-- arcana-interrupted-attempt-v1 -->';
+
+function suiteInstructions(n) {
+  return [
+    `Follow issue #${n}; it is your complete task: write one independent certification suite.`,
+    'Write it strictly from the Oracle record in the issue. Do NOT open, fetch, diff or read the card pull request or its branch; the suite must be independent of that implementation.',
+    'Add exactly two files and nothing else: the test class and the suite registration named in the issue, in the style of certification/CopperGnomesIndependentCertificationTest.kt and certification/suites/copper-gnomes.json.',
+    'Cover every ability, cost, restriction and a negative case. No placeholders, no weakened or skipped assertions.',
+    `Open one draft pull request against ${A.SUITE_BASE} with "Unit: #${n}" and "Fixes #${n}" in its body. If the card cannot be tested exactly, comment on issue #${n} and do NOT open a pull request.`,
+    'Never merge, and never change workflows, scripts, production, release or signing configuration.',
+  ].join(' ');
+}
+
+function reviewInstructions(n, base) {
+  return [
+    `Follow issue #${n}; it is your complete task: decide whether the one card it names can be built from existing engine primitives.`,
+    'Use only the Offline Oracle record in the issue as the card text (seed it into tools/cardkit/data/oracle-cache.jsonl with `tools/cardkit/cardkit oracle` only if needed locally).',
+    'Run `tools/cardkit/cardkit classify --verbose -- "<card>"`. For every rules line it reports below 0.88, find an implemented upstream or custom card using the same engine primitive and read its source.',
+    'If every such line is covered, record it with `tools/cardkit/cardkit review` (exact line, primitives, references) and commit tools/cardkit/data/verified-support.json plus the card\'s line in tools/cardkit/data/oracle-cache.jsonl, exactly as the issue record. If a primitive is genuinely missing, record it with `tools/cardkit/cardkit blocker` instead.',
+    'Change no other file: no card code, tests, workflows or scripts. Never guess: if you cannot decide, comment on the issue and do NOT open a pull request.',
+    `Open one draft pull request against ${base} with "Unit: #${n}" in its body. Never merge.`,
+  ].join(' ');
+}
 
 function unitInstructions(n, base) {
   return [
@@ -44,14 +108,15 @@ function unitInstructions(n, base) {
   ].join(' ');
 }
 
-async function assignCopilot({ token, owner, repo, issue_number, base, fetchImpl = fetch }) {
+async function assignCopilot({ token, owner, repo, issue_number, base, suite = false, kind = suite ? 'suite' : 'card', fetchImpl = fetch }) {
   if (!token) return 'error';
   const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/issues/${issue_number}/assignees`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignees: ['copilot-swe-agent[bot]'], agent_assignment: {
-      target_repo: owner + '/' + repo, base_branch: base,
-      custom_instructions: unitInstructions(issue_number, base),
+      target_repo: owner + '/' + repo, base_branch: kind === 'suite' ? A.SUITE_BASE : base,
+      custom_instructions: kind === 'suite' ? suiteInstructions(issue_number) : kind === 'review' ? reviewInstructions(issue_number, base)
+        : unitInstructions(issue_number, base),
       custom_agent: '', model: '' } }),
     signal: AbortSignal.timeout(20000),
   });
@@ -75,11 +140,11 @@ async function reportInterrupted({ github, owner, repo, unit, dry }) {
 
 // Owner-authorized, append-only resolution. Records who applied the label and what is observed
 // now; never deletes or edits earlier ledger records, never retries the assignment.
-async function resolveInterrupted({ github, owner, repo, unit, runId }) {
+async function resolveInterrupted({ github, owner, repo, unit, runId, auto = false }) {
   const n = unit.raw.number;
   const events = await github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number: n, per_page: 100 });
   const labeled = events.filter(e => e.event === 'labeled' && e.label?.name === A.RESOLVE_LABEL).pop();
-  const actor = String(labeled?.actor?.login || 'unknown').replace(/[^A-Za-z0-9_.\-[\]]/g, '');
+  const actor = auto ? 'dispatcher-timeout' : String(labeled?.actor?.login || 'unknown').replace(/[^A-Za-z0-9_.\-[\]]/g, '');
   const closed = new Set(unit.raw.ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => r.run));
   const open = [...new Set(unit.raw.ledger.filter(r => r.op === 'authorizing' && !closed.has(r.run)).map(r => r.run))];
   const observed = unit.raw.assignedToCopilot ? 'assigned' : 'not-assigned';
@@ -87,7 +152,7 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
     await github.rest.issues.createComment({ owner, repo, issue_number: n, body: A.formatLedger({ op: 'resolution',
       issue: n, run, result: observed, reason: `owner-label by ${actor} in run ${runId}`, at: new Date().toISOString() }) });
   }
-  await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.RESOLVE_LABEL });
+  if (unit.raw.labels.includes(A.RESOLVE_LABEL)) await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.RESOLVE_LABEL });
   await github.rest.issues.createComment({ owner, repo, issue_number: REPORT_ISSUE, body: [INTERRUPT_MARKER,
     `resolved issue:${n} runs:${open.join(',')}`,
     `**Interrupted attempt on #${n} resolved** (label applied by ${actor}). Observed: Copilot ${observed === 'assigned' ? 'IS' : 'is NOT'} assigned.`,
@@ -95,9 +160,58 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
   return { issue: n, runs: open, observed, actor };
 }
 
-// One selected owner authorization ALWAYS wins over the ordinary lowest-numbered normal
-// candidate. Without this, a dashboard tap on #379 in normal mode could dispatch #100.
-// Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
+// Zero delivery has several causes (Oracle/network/implementation/engine). Only
+// an explicit engineer-confirmed engine defect with linked evidence enters this
+// lane. Unknown outcomes stay unclassified, with their paid history preserved.
+const ENGINE_GAP_LABEL = 'arcana:engine-gap';
+const ENGINE_GAP_GRACE_MS = 30 * 60 * 1000;
+const DIAGNOSIS_LABEL = 'arcana:needs-diagnosis';
+function zeroDeliveryCandidates(units, now = Date.now()) {
+  return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length && (() => {
+    const last = event => Math.max(-Infinity, ...(u.raw.sessions || []).filter(s => s.event === event).map(s => s.at));
+    return last('finished') > last('started') && now - last('finished') > ENGINE_GAP_GRACE_MS;
+  })());
+}
+async function labelDiagnosis({ github, owner, repo, units, now }) {
+  const confirmed = new Set(engineGapCandidates(units, now).map(u => u.raw.number));
+  const candidates = new Set(zeroDeliveryCandidates(units, now).filter(u => !u.raw.labels.includes(ENGINE_GAP_LABEL) && !confirmed.has(u.raw.number)).map(u => u.raw.number));
+  const changes = [];
+  for (const u of units) {
+    if (changes.length >= 5) break;
+    const labeled = u.raw.labels.includes(DIAGNOSIS_LABEL), needed = candidates.has(u.raw.number);
+    if (labeled === needed) continue;
+    if (needed) await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [DIAGNOSIS_LABEL] });
+    else await github.rest.issues.removeLabel({ owner, repo, issue_number: u.raw.number, name: DIAGNOSIS_LABEL });
+    changes.push(u.raw.number);
+  }
+  return changes;
+}
+function engineGapCandidates(units, now = Date.now()) {
+  return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length &&
+    !u.raw.labels.includes(ENGINE_GAP_LABEL) && u.raw.engineGapEvidence && (() => {
+      const at = s => Math.max(-Infinity, ...(u.raw.sessions || []).filter(x => x.event === s).map(x => x.at));
+      const fin = at('finished');
+      return fin > at('started') && now - fin > ENGINE_GAP_GRACE_MS &&
+        u.raw.engineGapEvidence.at >= at('started') && u.raw.engineGapEvidence.at <= now;
+    })());
+}
+async function labelEngineGaps({ github, owner, repo, units, runId, now }) {
+  const out = [];
+  for (const u of engineGapCandidates(units, now).slice(0, 5)) {
+    try {
+      await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [ENGINE_GAP_LABEL] });
+      await github.rest.issues.createComment({ owner, repo, issue_number: u.raw.number, body: A.formatLedger({ op: 'observation',
+        issue: u.raw.number, run: runId, reason: ('engine gap confirmed: ' + u.raw.engineGapEvidence.reason + ' ' + u.raw.engineGapEvidence.evidence)
+          .replace(/[@\r\n]/g, ' ').slice(0, 500), at: new Date().toISOString() }) });
+      out.push(u.raw.number);
+    } catch { /* retried on the next run */ }
+  }
+  return out;
+}
+
+// Owner-authorized cards have priority over the ordinary lowest-numbered normal
+// candidate. Multiple approvals queue deterministically, one per dispatcher run.
+// Feasibility/provenance/billing/capacity are still checked AFTER selection.
 // The dispatcher's own verdict on a queued unit, from structured checks (never from reason text):
 //   eligible  - assignable now (still subject to CI, capacity and billing admission)
 //   invalid   - the issue itself can never be assigned as written (not a unit, incomplete, no cards)
@@ -109,12 +223,18 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
 const FEAS_CLASS = { 'no-cards': 'invalid', 'auto-override-prohibited': 'invalid', 'not-ready': 'blocked',
   'override-unauthorized': 'blocked', unavailable: 'transient', stale: 'transient' };
 function verdictOf(u, base, feasible, actionable = A.unitActionable) {
-  if (!u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
+  const suite = isSuite(u), review = isReview(u);
+  if (!suite && !review && !u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
   if (u.prs.length) return { cls: 'claimed', reason: 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',') };
   if (!u.derived.provenance?.ok) return { cls: 'provenance', reason: 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',') };
-  const act = actionable(u.raw.body, base);
+  const act = suite ? A.suiteActionable(u.raw.body) : review ? A.reviewActionable(u.raw.body) : actionable(u.raw.body, base);
   if (!act.ok) return { cls: 'invalid', reason: 'not-actionable: ' + (act.missing || []).join(',') };
-  const feas = feasible(u);
+  const feas = feasOf(u, feasible);
+  if (review) {
+    const now = Date.now();
+    if (Number.isFinite(u.raw.claimedAt) && now - u.raw.claimedAt < REVIEW_CLAIM_MS) return { cls: 'engineer-claimed', reason: 'engineer claimed within 24h' };
+    if (!Number.isFinite(u.raw.createdAt) || now - u.raw.createdAt < REVIEW_GRACE_MS) return { cls: 'waiting', reason: 'offered to engineers for 15 min first' };
+  }
   // An unknown/missing code is treated as blocked: the approval is kept, never discarded.
   if (!feas.ok) return { cls: FEAS_CLASS[feas.code] || 'blocked', reason: 'feasibility: ' + (feas.reason || 'not Copilot-ready') };
   return { cls: 'eligible', reason: null };
@@ -124,6 +244,7 @@ const skipReason = (u, base, feasible, actionable) => verdictOf(u, base, feasibl
 // work already exists. Blocked, transient and provenance verdicts keep the owner's approval.
 const WITHDRAW = new Set(['invalid', 'claimed']);
 
+const RANK = { suite: 0, card: 1, review: 2 };
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
   const verdict = u => u.derived.state === 'queued' ? verdictOf(u, base, feasible, actionable) : { cls: 'other', reason: null };
@@ -133,22 +254,27 @@ function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActi
     // Withdrawal dispatches nothing else in the same run; blocked/transient deny and keep the label.
     return WITHDRAW.has(verdict(labeled[0]).cls) ? withdraw(labeled[0]) : { candidate: labeled[0], labeled, error: null };
   }
-  // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
-  // automatic eligibility without treating a pending owner label as a paid assignment.
-  if (mode === 'normal') {
-    if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
-    if (labeled.length === 1) {
-      const cls = verdict(labeled[0]).cls;
-      if (WITHDRAW.has(cls)) return withdraw(labeled[0]);
-      // A temporarily blocked approval keeps its label but does not freeze the queue: ordinary
-      // automatic order continues (the same policy as with no tap) and the approved card is taken
-      // first once Cardkit says it is ready. Everything else keeps the existing priority path.
-      if (cls !== 'blocked') return { candidate: labeled[0], labeled, error: null };
-    }
+  // In normal mode, each owner's authorization is a queued approval, not a demand
+  // for exclusive dispatch. Pick at most one per run and leave all other labels intact.
+  // Use issue number for deterministic priority, regardless of API enumeration order.
+  if (mode === 'normal' && labeled.length) {
+    const ordered = [...labeled].sort((a, b) => a.raw.number - b.raw.number);
+    // Withdraw one permanently ineligible authorization without spending. Others remain
+    // approved for the next run (including if removing this label fails).
+    const obsolete = ordered.find(u => WITHDRAW.has(verdict(u).cls));
+    if (obsolete) return withdraw(obsolete);
+    // A temporarily blocked card must not hold up another authorized, eligible card.
+    const eligible = ordered.find(u => verdict(u).cls === 'eligible');
+    if (eligible) return { candidate: eligible, labeled, error: null };
+    // Preserve fail-closed behavior for unknown/provenance/transient states; only
+    // Cardkit-blocked cards fall back to the ordinary normal-mode queue.
+    const unverified = ordered.find(u => verdict(u).cls !== 'blocked');
+    if (unverified) return { candidate: unverified, labeled, error: null };
   }
-  const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-    !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
-    .sort((a, b) => a.raw.number - b.raw.number)[0];
+  // Suite requests go first (each unblocks a finished card PR), then card builds, then reviews by priority
+  // (a review only produces future build supply).
+  const candidate = allUnits.filter(u => u.derived.state === 'queued' && verdictOf(u, base, feasible, actionable).cls === 'eligible')
+    .sort((a, b) => RANK[kindOf(a)] - RANK[kindOf(b)] || reviewPriority(b) - reviewPriority(a) || a.raw.number - b.raw.number)[0];
   return { candidate, labeled, error: null };
 }
 
@@ -169,12 +295,20 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const data = await loadUnits({ github, owner, repo, now, approvers, lagMs: ready.billingLagMs });
   const units = data.units.map(u => u.derived);
   report.units = units;
+  if (!dry) {
+    report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
+    report.diagnosis = await labelDiagnosis({ github, owner, repo, units: data.units, now: Math.max(now, Date.now()) });
+  }
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
     const resolved = [];
     for (const u of interrupted) {
-      if (!dry && u.raw.labels.includes(A.RESOLVE_LABEL)) {
-        resolved.push(await resolveInterrupted({ github, owner, repo, unit: u, runId: String(context.runId) }));
+      // Resolved by the owner's label, or automatically once the attempt is an hour old. Resolution only
+      // records what is observed; it never retries, so the unit's one assignment stays used either way.
+      const since = Math.max(...u.raw.ledger.filter(r => r.op === 'authorizing').map(r => r.at));
+      const auto = Number.isFinite(since) && Math.max(now, Date.now()) - since > A.INTERRUPT_AUTO_RESOLVE_MS;
+      if (!dry && (u.raw.labels.includes(A.RESOLVE_LABEL) || auto)) {
+        resolved.push(await resolveInterrupted({ github, owner, repo, unit: u, runId: String(context.runId), auto: !u.raw.labels.includes(A.RESOLVE_LABEL) }));
       } else await reportInterrupted({ github, owner, repo, unit: u, dry });
     }
     // Never dispatch in the same run that resolved or reported an interruption.
@@ -186,9 +320,14 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   if (!base || !/^[A-Za-z0-9._\/-]+$/.test(base)) return done('base-not-configured');
   const baseSha = (await github.rest.repos.getBranch({ owner, repo, branch: base })).data.commit.sha;
   report.base = { branch: base, sha: baseSha };
-  const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
-    { owner, repo, head_sha: baseSha, status: 'success', per_page: 100 });
-  if (!runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success')) {
+  // Filter by conclusion here, not with the API's status=success filter: that filtered listing lags behind
+  // (16:17Z: two successful runs for the head, filtered query returned none, dispatcher idled).
+  const runs = (await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
+    { owner, repo, head_sha: baseSha, per_page: 100 })).filter(r => r.conclusion === 'success');
+  const exact = runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success');
+  const equivalent = exact ? null : await ciEquivalent({ github, owner, repo, base, baseSha });
+  if (equivalent) report.ciEquivalent = equivalent;
+  if (!exact && !equivalent) {
     // Say what GitHub actually has for this commit (e.g. a run waiting for approval), not just "no".
     let ciRuns = [];
     try {
@@ -197,7 +336,19 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
         .slice(0, 5).map(r => ({ id: r.id, event: r.event, status: r.status, conclusion: r.conclusion }));
     } catch { ciRuns = null; }
     report.ciRuns = ciRuns;
-    return done('ci-not-ready', { base, baseSha });
+    // Merges made with an app/workflow token do not start CI, which used to stall every slot until someone ran
+    // it by hand. When the base head has NO usable Development CI run, start one (workflow_dispatch is allowed
+    // for GITHUB_TOKEN). Any existing run - queued, running or failed - is left alone: no loops, no retries.
+    // A run waiting for approval (action_required: started by an automation token) never starts by itself, but a
+    // workflow_dispatch from this job's token runs without approval - so it counts as "no usable run" too, once.
+    const usable = Array.isArray(ciRuns) ? ciRuns.filter(r => r.conclusion !== 'action_required') : null;
+    if (!dry && Array.isArray(usable) && usable.length === 0 && !ciRuns.some(r => r.event === 'workflow_dispatch')) {
+      try {
+        await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: DEV_CI_WORKFLOW, ref: base });
+        report.ciStarted = true;
+      } catch (e) { report.ciStarted = false; core.warning('Could not start Arcana Development CI: ' + String(e?.message || e).slice(0, 200)); }
+    }
+    return done('ci-not-ready', { base, baseSha, ciStarted: report.ciStarted ?? null });
   }
 
   // Engine feasibility (Cardkit on this exact base SHA). Missing or stale verdicts fail closed.
@@ -234,10 +385,13 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
 
   const n = candidate.raw.number;
   // authorize-once names its unit explicitly, so the gate denies instead of skipping.
-  const feas = feasible(candidate);
+  const suite = isSuite(candidate);
+  const kind = kindOf(candidate);
+  const feas = feasOf(candidate, feasible);
+  const actionable = actionableOf(candidate.raw.title, candidate.raw.body, base);
   report.candidateFeasibility = { issue: n, ok: feas.ok, reason: feas.reason, cards: feas.cards.map(c => ({ name: c.name, readiness: c.readiness, route: c.route, hint: c.hint || null })) };
   // An incomplete unit is denied by admission with its own, more specific reason.
-  if (!feas.ok && A.unitActionable(candidate.raw.body, base).ok) {
+  if (!feas.ok && actionable.ok) {
     await core.summary.addHeading('Feasibility gate').addCodeBlock(JSON.stringify(report.candidateFeasibility)).write();
     return done('denied', { issue: n, reason: 'feasibility: ' + feas.reason });
   }
@@ -251,9 +405,12 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const billing = await readBudget(env);
   report.billing = billing;
   const { snapshot } = billing;
+  // Measured credits per session (owner: auto-calibrate). Only the source is reported: figures are private.
+  const cal = await calibrateReady({ github, owner, repo, env, ready, snapshot });
+  report.estimateSource = cal.source;
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
-    actionable: A.unitActionable(candidate.raw.body, base) },
-    units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
+    actionable },
+    units, labeledCount: labeled.length, ready: cal.ready, snapshot, now: Math.max(now, Date.now()) });
   report.decision = { issue: n, ...decision };
   // Job summaries of a public repository are public: no usage ratio or credit totals.
   await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, allowed: !!decision.allowed,
@@ -280,7 +437,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   if (claimed) result = 'not-attempted';
   else if (!origin.ok) { result = 'not-attempted'; reason = 'revalidation ' + origin.reasons.join(' '); }
   else {
-    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, fetchImpl }); }
+    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, suite, kind, fetchImpl }); }
     catch { result = 'error'; }
   }
   // 4. Close the record. Missing this step is what the interrupted-attempt check catches.
@@ -290,4 +447,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { ciEquivalent, NON_BUILD, engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };

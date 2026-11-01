@@ -16,6 +16,7 @@ const STATUS_ISSUE = 78;
 const MARKERS = {
   billing: '<!-- arcana-control-status-v1:billing -->',
   dispatcher: '<!-- arcana-control-status-v1:dispatcher -->',
+  workers: '<!-- arcana-control-status-v1:workers -->',
   queue: '<!-- arcana-control-status-v1:queue -->',
   review: '<!-- arcana-control-status-v1:review -->',
 };
@@ -75,6 +76,14 @@ async function publishStatus({ github, owner, repo, kind, payload, summary }) {
 async function previousStatus({ github, owner, repo, kind }) {
   try { const c = await findStatusComment({ github, owner, repo, kind }); return c ? parseStatus(c.body) : null; }
   catch { return null; }
+}
+
+// Display-only status rebuilds are API-expensive and all workflows share one hourly token
+// quota; event bursts exhausted it (403 mid-integration, 2026-10-29). True when the published
+// copy is younger than maxAgeMs. Unreadable or missing status is never fresh.
+async function freshStatus({ github, owner, repo, kind, maxAgeMs, now = Date.now() }) {
+  const at = Date.parse((await previousStatus({ github, owner, repo, kind }))?.checkedAt);
+  return Number.isFinite(at) && now >= at && now - at < maxAgeMs;
 }
 
 // result: readBudget() output. previous: last published billing status (display carry-forward only).
@@ -155,6 +164,7 @@ function ciAction(state, result, report) {
   const failed = runs.find(r => r.status === 'completed' && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'action_required');
   const manual = `run "Arcana Development CI" manually (Run workflow) on ${base}`;
   if (running) return `Wait: Arcana Development CI run ${running.id} for ${base}@${sha} is still ${running.status}.`;
+  if (report?.ciStarted === true && !runs.length) return `Wait: no CI run existed for ${base}@${sha}; the dispatcher started Arcana Development CI automatically.`;
   if (waiting) return `Owner: Arcana Development CI run ${waiting.id} for ${base}@${sha} is waiting for approval (action_required, started by an automation token). Approve it, or ${manual}.`;
   if (failed) return `Fix CI: Arcana Development CI run ${failed.id} for ${base}@${sha} concluded ${failed.conclusion}.`;
   return `Owner: no Arcana Development CI run exists for ${base}@${sha} (pushes made with GITHUB_TOKEN do not start CI). ${manual[0].toUpperCase() + manual.slice(1)}.`;
@@ -168,8 +178,14 @@ function publicDecision(d) {
 }
 // Estimated reservations are configuration x unit counts; the fixed reserve, totals, reported credits
 // and allowance would reveal private usage, so they are dropped.
-function publicLiabilities(l) {
+function publicLiabilities(l, estimateSource = null) {
   if (!l) return null;
+  // A calibrated estimate is derived from private usage: estimate x public session counts would reveal it.
+  if (estimateSource === 'calibrated') {
+    const p = 'private (calibrated from usage)';
+    return { activeUnits: p, pendingRepairs: p, recentlyFinished: p, candidate: p, fixedReserve: 'private (10% of allowance)',
+      estimate: 'calibrated' };
+  }
   return { activeUnits: l.activeUnits, pendingRepairs: l.pendingRepairs, recentlyFinished: l.recentlyFinished, candidate: l.candidate,
     fixedReserve: 'private (10% of allowance)' };
 }
@@ -182,7 +198,7 @@ function summarizeUnits(units = []) {
     running: (counts.working || 0) + (counts.repairing || 0),
     pendingPickup: counts['pending-pickup'] || 0,
     queued: counts.queued || 0,
-    completed: counts.review || 0,
+    completed: (counts.review || 0) + (counts.completed || 0),
     blocked: counts.halted || 0,
     holdingSlots: units.filter(u => u.holdsSlot).map(u => u.number),
     list: units.slice(0, MAX_UNITS_LISTED).map(u => ({ n: u.number, state: u.state, reason: u.reason || null, holdsSlot: !!u.holdsSlot,
@@ -201,7 +217,7 @@ function dispatcherPayload({ result, report = {}, ready, now = new Date(), runId
       errors: ready.errors, billingLagHours: ready.billingLagMs !== undefined ? ready.billingLagMs / 3600000 : null } : null,
     state, reason, action: ciAction(state, result, report) || dispatcherAction(state, reason), issue: result?.issue || null, result: result?.result || null,
     dispatchReady, workers: report.units ? summarizeUnits(report.units) : null,
-    decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities),
+    decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities, report.estimateSource),
     base: report.base || null, ciRuns: report.ciRuns || null,
     feasibility: report.feasibility || null, candidateFeasibility: report.candidateFeasibility || null,
   };
@@ -215,5 +231,5 @@ function dispatcherSummary(p) {
     `Checked: ${p.checkedAt}.`].filter(Boolean);
 }
 
-module.exports = { STATUS_ISSUE, MARKERS, PRIVATE_BILLING_URL, publicDecision, publicLiabilities, formatStatus, parseStatus, publishStatus, previousStatus, billingPayload,
+module.exports = { STATUS_ISSUE, MARKERS, PRIVATE_BILLING_URL, publicDecision, publicLiabilities, formatStatus, parseStatus, publishStatus, previousStatus, freshStatus, billingPayload,
   billingSummary, dispatcherAction, dispatcherPayload, dispatcherSummary, summarizeUnits, clean };

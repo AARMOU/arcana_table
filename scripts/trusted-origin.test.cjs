@@ -154,7 +154,7 @@ function repairGithub({ unitAssociation = 'OWNER', prComments = [] } = {}) {
   const github = { paginate: async (fn, a) => fn(a), rest: {
     issues: { listForRepo: () => [{ number: 67, title: '[Arcana Queue] x', labels: [], assignees: [{ login: 'Copilot' }], author_association: unitAssociation }],
       listComments: a => a.issue_number === 85 ? prComments : [], listEventsForTimeline: () => timeline, createComment: async () => {} },
-    pulls: { list: () => [{ number: 85, body: 'Unit: #67' }] } } };
+    pulls: { list: () => [{ number: 85, body: 'Unit: #67' }], listReviews: () => [], listReviewComments: () => [] } } };
   return github;
 }
 const repairEnv = { ARCANA_AUTOMATION_READY: 'true', ARCANA_REPAIR_MODE: 'request', ARCANA_DISPATCH_MODE: 'off' };

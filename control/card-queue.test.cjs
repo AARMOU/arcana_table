@@ -40,10 +40,11 @@ test('credit calculator is private and guides only authorized GitHub settings ch
  assert.ok(creditJs.includes('Math.ceil(total*0.1)'));
  assert.ok(credits.includes('cannot purchase credits or directly change GitHub'));
 });
-test('app shell never caches scanner, billing or GitHub API data',()=>{
- assert.ok(worker.includes('shellUrls.has(url.href)'));
+test('app shell never caches the scanner data; live GitHub data is network-first with an offline-only copy',()=>{
+ assert.ok(worker.includes('shellUrls.has(key)'));
  assert.ok(!worker.includes("'./card-gaps.json'"));
- assert.ok(!worker.includes("'https://api.github.com"));
+ assert.ok(!worker.includes("'https://api.github.com'"));
+ assert.ok(worker.includes("catch(error){\n  const cached=await caches.match(request,{cacheName:DATA})"));
 });
 
 test('dual source browser labels indexed names as unverified and counts deck gaps separately',()=>{
@@ -57,7 +58,7 @@ test('dual source browser labels indexed names as unverified and counts deck gap
  assert.ok(script.includes('Indexed · rules unverified'));
  assert.ok(script.includes('Outside scanned decks'));
  assert.ok(workflow.includes('--json _site/control/argentum-catalog.json'));
- assert.ok(worker.includes('shellUrls.has(url.href)'));
+ assert.ok(worker.includes('shellUrls.has(key)'));
  assert.ok(!worker.includes("'./argentum-catalog.json'"));
 });
 
@@ -129,4 +130,25 @@ test('priority inbox shows trusted owner and public demand separately, without a
  assert.ok(script.includes('Public app requests (votes only; no automatic approval)'));
  assert.ok(script.includes('Not Copilot-ready'));
  assert.ok(!/\b(?:POST|PUT|PATCH|DELETE)\b/.test(script));
+});
+
+test('one-tap authorization reconciles live owner state on refresh and fails closed on lookup errors',()=>{
+ const auth=read('authorize.js');
+ assert.ok(auth.includes("call('/v1/authorization?issue=' + unit.n, token, 'GET')"));
+ assert.ok(auth.includes("if (info.authorized)"));
+ assert.ok(auth.includes("if (info.claimed)"));
+ assert.ok(auth.includes("button.disabled = true;"));
+ assert.ok(auth.includes('Live authorization status unavailable'));
+ assert.ok(auth.includes('worker slot occupied'));
+ assert.ok(!auth.includes("button.disabled = false; message.textContent = 'Issue details unavailable"));
+});
+
+test('manual entry uses Scryfall suggestions and requires exact verification',()=>{
+ assert.ok(page.includes('id="manualMatches"'));
+ assert.ok(page.includes('id="manualStatus"'));
+ assert.ok(script.includes('api.scryfall.com/cards/autocomplete?q='));
+ assert.ok(script.includes('Preflight.verifyPrintedCard(fetch,name)'));
+ assert.ok(script.includes('Select and verify a Scryfall suggestion before adding.'));
+ assert.ok(script.includes('manualSeq++'));
+ assert.doesNotThrow(()=>new vm.Script(script));
 });

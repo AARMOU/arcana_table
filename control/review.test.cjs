@@ -13,16 +13,29 @@ test('all seven status categories have owner-facing labels', () => {
     'Independently Certified', 'Integrated', 'Owner Approved'].sort());
 });
 
-test('only reviewable cards can be decided; approve needs green or certified', () => {
-  const item = s => ({ pr: 360, headSha: SHA, state: s });
-  assert.equal(R.canApprove(item('awaiting-review')), true);
-  assert.equal(R.canApprove(item('certified')), true);
+test('only reviewable cards can be decided; approve needs independent certification', () => {
+  const item = (s, certification) => ({ pr: 360, headSha: SHA, state: s, certification, kind: 'card', hasTest: true, draft: false });
+  assert.equal(R.canApprove(item('certified', 'certified')), true);
+  assert.equal(R.approveBlocked(item('certified', 'certified')), null);
+  // Green checks without certification (e.g. PR #344): missing, running, failed all fail closed.
+  for (const c of [undefined, 'not-run', 'running', 'failed']) {
+    assert.equal(R.canApprove(item('awaiting-review', c)), false, String(c));
+    assert.match(R.approveBlocked(item('awaiting-review', c)), /independent certification[\s\S]*request a fix/, String(c));
+    assert.equal(R.canDecide(item('awaiting-review', c)), true, 'Request Fix stays available');
+  }
+  assert.match(R.decisionMessage(422, { error: 'not-certified', certification: 'running' }).text, /not passed independent certification \(running\)/);
   for (const s of ['checks-failed', 'checks-running', 'approved', 'changes-requested']) {
     assert.equal(R.canApprove(item(s)), false, s);
     assert.equal(R.canDecide(item(s)), true, s);
   }
   assert.equal(R.canDecide(item('integrated')), false);
   assert.equal(R.canDecide({ pr: 360, headSha: 'short', state: 'awaiting-review' }), false);
+  assert.equal(R.canApprove({ ...item('certified', 'certified'), draft: true }), true, 'Approve marks a certified draft ready');
+  assert.equal(R.canApprove({ ...item('checks-running', 'not-run'), draft: true }), false);
+  assert.equal(R.canApprove({ ...item('certified', 'certified'), hasTest: false }), false);
+  assert.equal(R.canApprove({ ...item('certified', 'certified'), kind: 'audit' }), false);
+  assert.equal(R.canDecide({ ...item('certified', 'certified'), kind: 'engine' }), false);
+  assert.equal(R.isReadyForOwner({ ...item('certified', 'certified'), kind: undefined }), false);
 });
 
 test('decision outcomes: success, duplicate, auth failure, stale commit, failed checks', () => {
@@ -34,6 +47,9 @@ test('decision outcomes: success, duplicate, auth failure, stale commit, failed 
   assert.equal(stale.stale, true); assert.match(stale.text, /Nothing was recorded/);
   assert.match(R.decisionMessage(422, { error: 'checks-not-green', checks: ['cards-and-android'] }).text, /cards-and-android/);
   assert.equal(R.decisionMessage(0, null).ok, false);
+  assert.match(R.decisionMessage(422, { error: 'draft-pr' }).text, /draft/);
+  assert.match(R.decisionMessage(502, { error: 'ready-for-review-failed' }).text, /no approval was recorded/);
+  assert.match(R.decisionMessage(422, { error: 'not-a-verified-card-implementation' }).text, /No verified card source/);
 });
 
 test('sign-in session arrives in the URL fragment only and is then stripped', () => {
@@ -61,7 +77,8 @@ test('owner sign-in button is actually hidden by dashboard CSS after authenticat
 test('dashboard loads it, the shell caches it and Pages publishes it', () => {
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.ok(html.includes('<script src="./review.js" defer></script>'));
-  assert.ok(html.includes('window.ArcanaReview.render(list,r,reviewBadge)'));
+  assert.ok(html.includes('window.ArcanaReview.render(list,r,cardReviewChanged)'));
   assert.ok(fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8').includes("'./review.js'"));
   assert.ok(fs.readFileSync(path.join(__dirname, '../.github/workflows/pages.yml'), 'utf8').includes('cp control/review.js _site/control/review.js'));
 });
+

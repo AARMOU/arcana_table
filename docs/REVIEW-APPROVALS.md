@@ -53,3 +53,11 @@ standard Cloudflare Workers request rate; review that operational cost before de
 The worker is deployed **manually only**, via the owner-confirmed deployment
 workflow; merging a site change does not deploy the Worker. Deploy the Worker
 from the merged commit before expecting the site to use its cached endpoints.
+
+## Optional: faster dashboard data (read-only feed token)
+
+The Worker's public status feed (`/v1/public/github`) normally calls GitHub anonymously, sharing the 60 requests/hour limit of its Cloudflare egress IP, so it caches each feed for 15 minutes and Refresh often shows old data. To fix that, create a **fine-grained personal access token** with *Repository access: Public repositories (read-only)* and **no permissions**, save it as the repository secret `REVIEW_PUBLIC_READ_TOKEN`, then run *Deploy Arcana Control review Worker*. The Worker then reads with its own 5000/hour allowance and caches feeds for 60 seconds. The token can only read public data and never reaches the browser; without it nothing changes.
+
+## Optional: on-time status refresh (Actions dispatch token)
+
+GitHub runs this repository's scheduled workflows only every few hours, so Control's Verify report shows "Not current" for long stretches. The review Worker has Cloudflare Cron Triggers that fire on time: every 15 minutes it starts *Arcana Card Review Inbox Refresh*, at :15 and :45 *Arcana Queue Feeder* (opens at most one queue issue, never while one is waiting), at :00 and :30 *Arcana Card Worker Dispatcher* (its admission, billing and authorization gates still decide whether anything is assigned), and hourly at :41 it starts *Arcana Certification Backfill* (as a scheduled run, so it only retries failures). To enable it, create a **fine-grained personal access token** with *Repository access: Only select repositories → `AARMOU/arcana_table`* and *Repository permissions → Actions: Read and write* (nothing else). Save it as the repository secret `REVIEW_ACTIONS_DISPATCH_TOKEN`, then run *Deploy Arcana Control review Worker*. The token can only start or re-run workflows; it cannot approve, merge, change code or settings. Each workflow still applies all of its own gates. Without the secret the timer starts nothing.

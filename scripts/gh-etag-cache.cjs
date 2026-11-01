@@ -1,0 +1,134 @@
+'use strict';
+// Conditional-request cache for workflow GitHub API reads.
+//
+// Every Arcana control workflow shares one GITHUB_TOKEN quota (1,000 requests/hour per repository), and the
+// unit, inbox and integration scans re-read the same issue timelines, comments, PR files and check runs on
+// every run. GitHub does not count a conditional request that returns 304 Not Modified against the rate
+// limit, so each GET is sent with the ETag last seen for that exact URL; on 304 the cached body is returned.
+// The data is exactly what GitHub would have returned (it confirmed it is unchanged), so no logic changes.
+//
+// GitHub's ETags are specific to the token, and GITHUB_TOKEN is new for every job, so cross-run 304s need
+// a stable token. When ARCANA_READ_TOKEN (a fine-grained, read-only token) is set, GETs are sent with it:
+// reads then use that token's own hourly budget instead of the shared GITHUB_TOKEN one, and its stable
+// ETags make repeat reads free. Writes always keep the workflow's GITHUB_TOKEN and its permissions.
+//
+// The store is a gzip JSON file restored/saved with actions/cache by the workflow
+// (.gh-etag-cache/cache.json.gz). Missing or corrupt cache = plain requests. Only GETs are touched.
+const fs = require('node:fs');
+const path = require('node:path');
+const zlib = require('node:zlib');
+
+const DEFAULT_FILE = path.join('.gh-etag-cache', 'cache.json.gz');
+const MAX_ENTRIES = 4000;
+const MAX_AGE_MS = 3 * 864e5;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+// Only endpoints whose 304s proved reliable are cached: issues, pull requests and their comments, timelines,
+// reviews and files. Actions run/job lists, check runs, statuses, branches, refs and commits change state in
+// place and GitHub answered 304 with stale data for them (2026-10-31 16:23Z: the dispatcher saw no CI run for a
+// base head that had three successful ones, idled and started a duplicate). Those are always fetched fresh
+// (still through the read token, so they stay off the shared quota).
+const CACHEABLE = /^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/(?:issues|pulls)(?:[/?]|$)/;
+const cacheable = url => CACHEABLE.test(url) && !/\/(?:check-runs|check-suites|status(?:es)?)(?:[/?]|$)/.test(url);
+
+function load(file) {
+  try {
+    const store = JSON.parse(zlib.gunzipSync(fs.readFileSync(file)).toString('utf8'));
+    return store && typeof store === 'object' && store.v === 1 && store.entries && typeof store.entries === 'object'
+      ? store.entries : {};
+  } catch { return {}; }
+}
+
+function keyOf(endpoint) {
+  const h = endpoint.headers || {};
+  return endpoint.url + '|' + String(h.accept || '') + '|' + String(h['x-github-api-version'] || '');
+}
+
+// Endpoint options carry the main client's request hook (options.request.hook); handing that to the
+// reader would re-enter this wrapper. Drop it (and any job-token header) so the reader uses its own auth.
+function forReader(options) {
+  const { request: req, ...rest } = options;
+  const headers = { ...(rest.headers || {}) };
+  delete headers.authorization;
+  const out = { ...rest, headers };
+  if (req) { const { hook, ...other } = req; out.request = other; }
+  return out;
+}
+
+function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.now(), saveOnExit = true,
+  readToken = process.env.ARCANA_READ_TOKEN, reader = null } = {}) {
+  if (!github?.hook?.wrap || !github?.request?.endpoint?.parse) return null;
+  if (github.__arcanaEtagCache) return github.__arcanaEtagCache;
+  if (!reader && readToken && typeof github.constructor === 'function') reader = new github.constructor({ auth: readToken });
+  // ETags from different tokens never match: keep the two stores apart.
+  const scope = reader ? 'read|' : 'job|';
+  const previous = load(file);
+  const touched = {};
+  const stats = { hits: 0, misses: 0, uncached: 0, fallback: 0, readToken: !!reader };
+  github.hook.wrap('request', async (request, options) => {
+    const method = String(options.method || 'GET').toUpperCase();
+    const headers = options.headers || {};
+    if (method !== 'GET' || headers['if-none-match'] || headers['If-None-Match']) { stats.uncached++; return request(options); }
+    let key, parsed;
+    try { parsed = github.request.endpoint.parse(options); key = scope + keyOf(parsed); } catch { stats.uncached++; return request(options); }
+    if (!cacheable(parsed.url)) {
+      stats.uncached++;
+      if (!reader) return request(options);
+      try { return await reader.request(forReader(options)); } catch (error) {
+        if (![401, 403, 404].includes(Number(error?.status))) throw error;
+        stats.fallback++;
+        return request(options);
+      }
+    }
+    const hit = touched[key] || previous[key];
+    // before-after-hook binds this same options object for every wrapped hook (auth included), so the
+    // header must be set on it in place; passing a new object to request() would be ignored.
+    if (hit?.etag) options.headers = Object.assign(options.headers || {}, { 'if-none-match': hit.etag });
+    try {
+      let res;
+      if (reader) {
+        try { res = await reader.request(forReader(options)); } catch (error) {
+          // The read token lacks access (or hit its own limit): this request uses the job token as before.
+          if (![401, 403, 404].includes(Number(error?.status))) throw error;
+          stats.fallback++;
+          if (options.headers) delete options.headers['if-none-match'];
+          return request(options);
+        }
+      } else res = await request(options);
+      stats.misses++;
+      const etag = res?.headers?.etag;
+      if (etag && res.status === 200) {
+        const body = JSON.stringify(res.data);
+        if (body !== undefined && body.length <= MAX_BODY_BYTES)
+          touched[key] = { etag, data: res.data, link: res.headers.link || null, at: now() };
+      }
+      return res;
+    } catch (error) {
+      if (Number(error?.status) !== 304 || !hit) throw error;
+      stats.hits++;
+      touched[key] = { ...hit, at: now() };
+      const h = { ...(error.response?.headers || {}), etag: hit.etag };
+      delete h.link;
+      if (hit.link) h.link = hit.link;
+      return { status: 200, url: error.response?.url || options.url, headers: h, data: hit.data };
+    }
+  });
+  const save = () => {
+    try {
+      const t = now();
+      const merged = { ...previous, ...touched };
+      const entries = Object.entries(merged).filter(([, e]) => e && e.etag && t - Number(e.at || 0) <= MAX_AGE_MS)
+        .sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, MAX_ENTRIES);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, zlib.gzipSync(JSON.stringify({ v: 1, entries: Object.fromEntries(entries) })));
+      if (core) (core.notice || core.info)(`GitHub API ETag cache: ${stats.hits} not-modified (free), ${stats.misses} fetched, ${stats.uncached} uncached, ${stats.fallback} job-token fallbacks; ${entries.length} entries saved; reads via ${stats.readToken ? 'ARCANA_READ_TOKEN' : 'GITHUB_TOKEN'}.`);
+    } catch (error) {
+      if (core) core.warning('GitHub API ETag cache not saved: ' + String(error?.message || error).slice(0, 200));
+    }
+  };
+  if (saveOnExit) process.on('exit', save);
+  const api = { stats, save };
+  Object.defineProperty(github, '__arcanaEtagCache', { value: api });
+  return api;
+}
+
+module.exports = { install, load, keyOf, cacheable, DEFAULT_FILE };

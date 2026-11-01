@@ -7,15 +7,26 @@ on:
   workflow_run:
     workflows:
       - Arcana Development CI
+      - Arcana Cardkit
+      - Arcana Card Certification Premerge
       - Argentum six-precon isolated worker regression
       - Isolated B131 shared-mechanics compatibility
       - Six-precon worker integration — full custom card regressions
+      # Recheck failures withheld while a builder was finishing, even if the
+      # dispatcher completed successfully with nothing eligible to build.
+      - Arcana Card Worker Dispatcher
     types: [completed]
   schedule:
-    # Backfill observations for failures whose router run was dropped from the queue.
-    - cron: '23 */2 * * *'
+    # Backfill missed failures. Paid requests still require repair=request and admission.
+    - cron: '8,23,38,53 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Observe only; false permits repairs through existing admission gates'
+        type: boolean
+        default: true
 permissions:
-  actions: read
+  actions: write
   contents: read
   pull-requests: write
   issues: write
@@ -24,7 +35,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   route-failure:
-    if: ${{ github.event_name == 'schedule' || github.event.workflow_run.conclusion == 'failure' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' || (github.event.workflow_run.name == 'Arcana Card Worker Dispatcher' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -32,9 +43,18 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
+          # Owner identity is required for Copilot PR-comment instructions; the bot still writes ledgers.
+          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
@@ -46,19 +66,23 @@ jobs:
           ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {readBudget}=require('./scripts/billing-monitor.cjs');
-            const {routeFailure,reconcileFailures,createAuthorizer}=require('./scripts/failure-routing.cjs');
-            const {readiness}=require('./scripts/admission.cjs');
-            const ready=readiness(process.env);
-            if(ready.repair==='off'){core.info('Repair mode off; router disabled.');return;}
-            let result;
-            if(context.eventName==='schedule'){
-              result=await reconcileFailures({github,context});
-            }else{
-              const {owner,repo}=context.repo;
-              const authorize=createAuthorizer({github,owner,repo,env:process.env,readBudget});
-              result=await routeFailure({github,context,authorize});
-            }
+            const {runRouter}=require('./scripts/failure-routing.cjs');
+            const {createCopilotDelivery}=require('./scripts/copilot-delivery.cjs');
+            const {owner,repo}=context.repo;
+            const delivery=createCopilotDelivery({owner,repo,token:process.env.COPILOT_DISPATCH_TOKEN});
+            const result=await runRouter({github,context,env:process.env,readBudget,delivery});
             core.info(JSON.stringify(result));
             await core.summary.addHeading('Failure routing evidence').addCodeBlock(JSON.stringify(result)).write();
-            if(result.state==='permission-blocked')core.setFailed('PR comment permission missing; no retry issued.');
+            const outcomes=Array.isArray(result)?result:[result];
+            if(outcomes.some(r=>r.state==='permission-blocked'))core.setFailed('PR comment permission missing; no retry issued.');
+            if(outcomes.some(r=>r.state==='delivery-uncertain'))core.setFailed('Owner-authenticated Copilot handoff unconfirmed; attempt reserved; owner review required.');
+            if(outcomes.some(r=>r.state==='observation-unavailable'))core.setFailed('GitHub observation write unavailable; other PRs were still reconciled; no write retried.');
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+

@@ -1,0 +1,209 @@
+name: Arcana Independent Card Certification
+# Shared verifier. The trusted-main registry selects a verified JUnit suite for
+# each card; unregistered cards are never silently certified. No paid agents.
+on:
+  workflow_run:
+    workflows:
+      - Arcana Cardkit
+      - Arcana Development CI
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  gate:
+    name: Match trusted current-head card and registered suite
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+    outputs:
+      eligible: ${{ steps.inspect.outputs.eligible }}
+      pr: ${{ steps.inspect.outputs.pr }}
+      sha: ${{ steps.inspect.outputs.sha }}
+      key: ${{ steps.inspect.outputs.key }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
+      - name: Match current PR, trusted queue unit, required CI, and suite registry
+        id: inspect
+        uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const P = require('./certification/policy.cjs');
+            const manifest = P.readManifest('./certification/suites.json');
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const full = owner + '/' + repo;
+            const run = context.payload.workflow_run;
+            if (!P.workflowEventEligible(run, full)) return;
+            const prs = await github.paginate(github.rest.pulls.list,
+              { owner, repo, state:'open', per_page:100 });
+            // If two PRs claim the same exact head, do not guess ownership.
+            const matches = prs.filter(p => p.head.sha === run.head_sha);
+            if (matches.length !== 1) return;
+            const pr = matches[0];
+            const n = P.issueFromBody(pr.body);
+            if (!n || !manifest.suites.some(s => s.issue === n)) return;
+            const issue = (await github.rest.issues.get({owner,repo,issue_number:n})).data;
+            const checks = await github.paginate(github.rest.checks.listForRef,
+              {owner,repo,ref:pr.head.sha,per_page:100});
+            const suite = P.candidate(manifest,{pr,issue,sha:run.head_sha,checks,repository:full});
+            if (!suite) return;
+            core.setOutput('eligible','true');
+            core.setOutput('pr',String(pr.number));
+            core.setOutput('sha',run.head_sha);
+            core.setOutput('key',suite.key);
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+
+  independent-scenarios:
+    name: Execute registered independent rules scenarios
+    needs: gate
+    if: needs.gate.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: trusted
+          persist-credentials: false
+      - name: Inject only main-approved JUnit scenarios
+        id: suite
+        shell: bash
+        env:
+          SUITE_KEY: ${{ needs.gate.outputs.key }}
+        run: |
+          set -euo pipefail
+          python3 trusted/certification/runner.py prepare \
+            --manifest trusted/certification/suites.json --key "$SUITE_KEY" \
+            --trusted trusted --candidate candidate --github-output "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Exercise pinned engine against the trusted scenarios
+        working-directory: candidate/android
+        env:
+          TEST_CLASS: ${{ steps.suite.outputs.testClass }}
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests "$TEST_CLASS"
+      - name: Confirm every independently registered scenario really passed
+        env:
+          SUITE_KEY: ${{ needs.gate.outputs.key }}
+        run: |
+          python3 trusted/certification/runner.py verify \
+            --manifest trusted/certification/suites.json --key "$SUITE_KEY" --candidate candidate
+
+  publish:
+    name: Publish exact-head independent certification
+    needs: [gate, independent-scenarios]
+    if: always() && needs.gate.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
+      - name: Recheck live head and publish independently performed result
+        uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
+          EXPECTED_PR: ${{ needs.gate.outputs.pr }}
+          EXPECTED_SHA: ${{ needs.gate.outputs.sha }}
+          EXPECTED_KEY: ${{ needs.gate.outputs.key }}
+          SCENARIOS_RESULT: ${{ needs.independent-scenarios.result }}
+          # GITHUB_TOKEN cannot run markPullRequestReadyForReview on Copilot's PRs: every certified card
+          # (#560, #564, #586) stayed a draft. Use the same person token as the review/suite auto-merges.
+          READY_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const P = require('./certification/policy.cjs');
+            const manifest = P.readManifest('./certification/suites.json');
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const number = Number(process.env.EXPECTED_PR), sha = process.env.EXPECTED_SHA;
+            const pr = (await github.rest.pulls.get({owner,repo,pull_number:number})).data;
+            const n = P.issueFromBody(pr.body);
+            if (!n || !manifest.suites.some(s => s.issue === n)) return;
+            const issue = (await github.rest.issues.get({owner,repo,issue_number:n})).data;
+            const checks = await github.paginate(github.rest.checks.listForRef,
+              {owner,repo,ref:sha,per_page:100});
+            const suite = P.candidate(manifest,{pr,issue,sha,checks,repository:owner+'/'+repo});
+            if (!suite || suite.key !== process.env.EXPECTED_KEY) return;
+            const ok = process.env.SCENARIOS_RESULT === 'success';
+            const output = P.certOutput(suite,ok);
+            const previous = checks.find(c => c.name === P.CHECK_NAME &&
+              c.head_sha === sha && c.app?.slug === 'github-actions');
+            if (previous) {
+              await github.rest.checks.update({owner,repo,check_run_id:previous.id,
+                status:'completed',conclusion:ok?'success':'failure',output});
+            } else {
+              await github.rest.checks.create({owner,repo,head_sha:sha,
+                name:P.CHECK_NAME,status:'completed',
+                conclusion:ok?'success':'failure',output});
+            }
+            core.info('Independent certification: '+suite.name+' '+(ok?'PASS':'FAIL')+' @ '+sha);
+            // The check is already published for this exact source head. Only a
+            // successful result may expose the Copilot draft to owner review.
+            // The existing review-inbox workflow runs on this workflow's completion.
+            if (ok) {
+              try {
+                const writer = process.env.READY_TOKEN ? new github.constructor({ auth: process.env.READY_TOKEN }) : github;
+                const ready = await P.markReadyAfterCertification({
+                  github: writer, owner, repo, number, sha, certified:ok
+                });
+                core.info(ready
+                  ? 'Certified Copilot PR #'+number+' marked ready for OWNER review.'
+                  : 'No ready transition: source is no longer an eligible current Copilot draft.');
+              } catch (error) {
+                // Certification remains factually valid; a permission/GraphQL error
+                // must not invent approval or block the normal inbox refresh.
+                core.warning('Certification passed, but GitHub could not mark PR #'+number+
+                  ' ready for review (HTTP '+(Number(error?.status)||'unknown')+'): '+String(error?.message||error).slice(0,200));
+              }
+            }
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

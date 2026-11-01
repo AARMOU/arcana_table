@@ -50,11 +50,51 @@ const statusText = (status, body) => {
   if (status === 409 && body?.error === 'already-assigned') return 'Copilot already has this card. No new work was authorized.';
   return 'Authorization refused (' + (body?.error || 'HTTP ' + status) + '). No work was launched.';
 };
-function render(container, units) {
+// In normal dispatch mode the guarded dispatcher starts every eligible card by itself, so the owner has nothing to
+// approve: show what is happening instead of an approval button (owner 2026-10-31: a greyed-out "Do it" was confusing).
+async function publicIssue(n) {
+  const pub = await fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + n)).catch(() => null);
+  let info = pub?.ok ? await pub.json().catch(() => null) : null;
+  if (!info || info.number !== n) {
+    const direct = await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/' + n,
+      { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
+    info = direct?.ok ? await direct.json().catch(() => null) : null;
+  }
+  return info?.number === n ? info : null;
+}
+const COPILOT_LOGINS = ['copilot', 'copilot-swe-agent[bot]'];
+function automaticText(unit, info, verdict, age) {
+  if (info && info.state !== 'open') return 'Finished or closed · nothing to do';
+  if (info && (info.assignees || []).some(a => COPILOT_LOGINS.includes(String(a.login || '').toLowerCase())))
+    return 'Copilot is working on this · started automatically';
+  if (verdict.ok) return 'Starts automatically when a worker slot is free · nothing to approve' + age;
+  return verdict.reason + age;
+}
+function renderAutomatic(container, queued, age) {
+  for (const unit of queued) {
+    const row = el('div', 'list-row');
+    const main = el('div', 'row-main');
+    const link = el('a', 'row-title', 'Card work #' + unit.n);
+    link.href = issueUrl(unit.n); link.target = '_blank'; link.rel = 'noopener noreferrer';
+    const verdict = eligibility(unit);
+    const message = el('div', 'row-sub', automaticText(unit, null, verdict, age));
+    main.append(link, message); row.append(main); container.append(row);
+    publicIssue(unit.n).then(info => {
+      if (!info) return;
+      link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\[[^\]]*\]\s*/, '');
+      message.textContent = automaticText(unit, info, verdict, age);
+    }).catch(() => {});
+  }
+}
+function render(container, units, checkedAt, mode) {
+  // How old the dispatcher verdicts are; shown so a stale snapshot never looks freshly verified.
+  const ageMin = Math.round((Date.now() - Date.parse(checkedAt || '')) / 60000);
+  const age = Number.isFinite(ageMin) && ageMin >= 0 ? ' · checked ' + (ageMin < 1 ? 'just now' : ageMin + ' min ago') : '';
   if (!container) return;
   container.replaceChildren();
   const queued = (Array.isArray(units) ? units : []).filter(u => safeNumber(u?.n) && u.state === 'queued').slice(0,25);
   if (!queued.length) { container.append(el('div', 'empty', 'No queued card units currently waiting. Check back when new work appears.')); return; }
+  if (mode === 'normal') { renderAutomatic(container, queued, age); return; }
   for (const unit of queued) {
     const row = el('div', 'list-row');
     row.style.cssText = 'flex-wrap:wrap;gap:10px';
@@ -70,31 +110,83 @@ function render(container, units) {
     button.setAttribute('aria-label', 'Authorize card work issue ' + unit.n);
     row.append(main, button); container.append(row);
 
-    // The cached public issue is display-only. A tap always re-fetches the current issue through
-    // the authenticated Worker and uses that timestamp; cached values cannot authorize spending.
-    fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + unit.n), { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null).then(info => {
-        if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
-          throw Error('No verified queue issue');
-        link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
-        if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+    // Authenticated owner status is authoritative and uncached. The public GitHub proxy can
+    // lag after a label write, so it must never re-enable a previously authorized card.
+    // If the live owner check fails, fail closed instead of inviting duplicate approvals.
+    (async () => {
+      // Certification-suite requests are dispatched automatically (no owner tap); the authorize endpoint
+      // accepts card units only, so show them as automatic instead of offering a button that is refused.
+      const pub = await fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + unit.n)).catch(() => null);
+      const pubInfo = pub?.ok ? await pub.json().catch(() => null) : null;
+      if (pubInfo?.number === unit.n && String(pubInfo.title || '').startsWith('[Arcana Suite]')) {
+        link.textContent = '#' + unit.n + ' · ' + String(pubInfo.title).replace(/^\[Arcana Suite\]\s*/, '');
+        button.remove();
+        message.textContent = 'Certification suite · starts automatically, no tap needed' + age;
+        return;
+      }
+      const token = session();
+      if (token) {
+        const live = await call('/v1/authorization?issue=' + unit.n, token, 'GET');
+        if (live.status !== 200 || !live.body?.ok) throw Error('Owner status unavailable');
+        const info = live.body;
+        link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\[Arcana Queue\]\s*/, '');
+        if (info.authorized) {
           button.disabled = true; button.textContent = 'Authorized';
-          // An approval can wait (e.g. Cardkit not ready yet); say why instead of a bare "waiting".
-          message.textContent = verdict.ok || !unit?.skip ? 'Authorized — waiting for safe dispatcher pickup.'
-            : 'Approved — waiting: ' + reasonText(unit.skip);
-        } else if (!verdict.ok) {
-          button.disabled = true;
-          button.textContent = 'Not eligible';
-          message.textContent = verdict.reason;
-        } else if ((info.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
-          button.disabled = true;
-          button.textContent = 'Already assigned';
+          message.textContent = 'Authorization recorded — waiting for guarded dispatcher' +
+            (unit.skip && /^capacity/.test(unit.skip) ? ' (worker slot occupied).' : '.');
+        } else if (info.claimed) {
+          button.disabled = true; button.textContent = 'Already assigned';
           message.textContent = 'Copilot already has this work.';
+        } else if (!verdict.ok) {
+          button.disabled = true; button.textContent = 'Not eligible';
+          message.textContent = verdict.reason + age;
         } else {
           button.disabled = false;
-          message.textContent = 'Eligible queue unit · owner authorization required';
+          message.textContent = 'Eligible queue unit · owner authorization required' + age;
         }
-      }).catch(() => { message.textContent = 'Issue details unavailable — authorization disabled for safety.'; });
+        return;
+      }
+      // Signed-out visitors may see public status, but cannot authorize without login.
+      const response = await fetch(API + '/v1/public/github?path=' +
+        encodeURIComponent('/issues/' + unit.n)).catch(() => null);
+      let info = response?.ok ? await response.json().catch(() => null) : null;
+      // Edge GitHub quota can fail while the owner's browser can still read the
+      // public issue. Always verify current live issue state BEFORE offering any
+      // authorization: a cached issue alone must never enable duplicate approval.
+      if (!info || (info.state === 'open' && verdict.ok &&
+          !(info.labels || []).some(l => l.name === 'arcana:authorize-once'))) {
+        const direct = await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/' +
+          unit.n, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
+        if (!direct?.ok) throw Error('Fresh issue state unavailable');
+        info = await direct.json();
+      }
+      if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
+        throw Error('No verified queue issue');
+      if (info.state !== 'open') {
+        row.remove();
+        if (!container.children.length) container.append(el('div', 'empty', 'No queued card units currently waiting.'));
+        return;
+      }
+      link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
+      if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+        button.disabled = true; button.textContent = 'Authorized';
+        message.textContent = 'Authorization recorded — waiting for guarded dispatcher.';
+      } else if ((info.assignees || []).some(a =>
+        ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
+        button.disabled = true; button.textContent = 'Already assigned';
+        message.textContent = 'Copilot already has this work.';
+      } else if (!verdict.ok) {
+        button.disabled = true; button.textContent = 'Not eligible';
+        message.textContent = verdict.reason + age;
+      } else {
+        button.disabled = false;
+        button.textContent = 'Sign in to authorize';
+        message.textContent = 'Eligible queue unit · GitHub sign-in required' + age;
+      }
+    })().catch(() => {
+      button.disabled = true;
+      message.textContent = 'Live authorization status unavailable — refresh later. Duplicate approval blocked.';
+    });
 
     button.addEventListener('click', async () => {
       if (button.disabled) return;
@@ -125,7 +217,7 @@ function render(container, units) {
     });
   }
 }
-const api = { render, statusText, eligibility, reasonText };
+const api = { render, statusText, eligibility, reasonText, automaticText };
 root.ArcanaAuthorize = api;
 if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis === 'object' ? globalThis : this);

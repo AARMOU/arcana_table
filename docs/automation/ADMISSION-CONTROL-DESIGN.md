@@ -51,7 +51,7 @@ An operation is allowed only if the master switch is `true` **and** its own mode
 
 Capacity counts **work units**, not GitHub objects (§4). A unit occupies one slot while it is `pending-pickup`, `working`, or `repairing`. Its issue, assignment, PR and repair comments all count as that **one** slot.
 
-- `ARCANA_MAX_ACTIVE_UNITS` (owner variable, default `1`, hard ceiling `2` in code).
+- `ARCANA_MAX_ACTIVE_UNITS` (owner variable, default `1`, hard ceiling `3` in code). It is the owner's **ceiling**; effective capacity scales with budget level: `normal` → ceiling, `warn` → at most 2, `slow` → 1, `paused`/`unknown` → 0. Slots fill only when an eligible build or repair exists, so 1–3 workers run depending on load. With 2+ slots, builds and repairs each take at most capacity−1, so neither lane starves the other (owner request 2026-10-30).
 - A unit stays `pending-pickup` from assignment until a `copilot_work_started` event appears, or until a pickup timeout (default 30 min). A unit that never starts is marked `halted` and reported in #81; it is **not** silently freed or reassigned.
 
 ### 3.3 Budget — *can this work finish within the allowance?*
@@ -232,7 +232,94 @@ and reads its comments, so every paid path now requires that all of it comes fro
 - **Repairs:** the unit, the PR author (Copilot, or a trusted person) and every PR comment must be trusted.
 
 Known limits: direct `@copilot` mentions by people bypass the dispatcher entirely (process rule: GPT and
-Claude never post them); a comment *deleted* after approval can't be detected through the REST API; PR
-review comments are not yet checked on the repair path, and the repair gate is not re-run right before its
-agent-triggering comment, so `ARCANA_REPAIR_MODE` stays `off`/`observe` until a follow-up PR covers both;
+Claude never post them); a comment *deleted* after approval can't be detected through the REST API. The repair path checks the
+whole PR conversation (issue comments, review bodies and inline review comments) and re-runs that check
+immediately before its ledger write and agent-triggering comment (`untrustedConversation` in
+`scripts/failure-routing.cjs`, 2026-10-30), so `ARCANA_REPAIR_MODE=request` is an owner decision rather
+than blocked;
 branch protection on `main` is an owner setting (section 10).
+
+## 16. Certification-suite units (added 2026-10-30)
+
+A card PR cannot be certified until `certification/suites/<key>.json` and its test are on `main`.
+Suite authoring is now an ordinary admitted unit:
+
+- **Request.** `certification/backfill.cjs` (hourly and on certification pushes) calls
+  `certification/suite-requests.cjs` for every open Copilot card PR with card code but no suite whose
+  queue issue is not `arcana:engine-gap`. It opens one issue titled `[Arcana Suite] <card> — …` as
+  `github-actions[bot]`, body starting `<!-- arcana-suite-request-v1 -->` plus `arcana-suite-for-unit:<N>`,
+  with `Card unit:`, `Card PR:`, `Suite key:`, `Base: main` and the feeder's Oracle record. An existing
+  request (open or closed) is never duplicated; units naming several cards or lacking an Oracle record are
+  only reported on #81. Opening a request spends nothing.
+- **Trust.** `provenance()` trusts such an issue exactly like a feeder unit: bot author, marker first,
+  body never edited (`contentWrittenAt`). Comments follow the normal rules. `suiteActionable()` replaces
+  `unitActionable()`; no Cardkit verdict is needed (the card passed Cardkit in its own PR).
+- **Dispatch.** `loadUnits` includes `[Arcana Suite]` issues. In `normal` mode an eligible suite request is
+  picked before card units. `admit()` is unchanged: same ceiling, capacity, lanes (build) and budget.
+  `assignCopilot` uses `base_branch: main` and suite-only instructions (write only the two suite files,
+  strictly from the Oracle record, never read the card PR).
+- **Merge.** `.github/workflows/arcana-suite-automerge.yml` runs on each completed premerge. It merges only
+  when `mergeBlockers()` is empty: green run on the PR's exact head, same repository, Copilot PR on `main`,
+  linked to an open bot suite request, exactly the two requested files (both added), a registration whose
+  key, unit and source match the request, and the scenario job actually ran green. Then it runs the backfill
+  on the new `main` (a `GITHUB_TOKEN` merge starts no push workflow), which re-runs the card PR's CI and so
+  certification. A red premerge goes back to Copilot through normal repair, or stays for a person.
+
+
+## 17. No step waits on an unassigned person (added 2026-10-30, owner: "fix it")
+
+- **Stuck slots release themselves.** A slot held only by `pickup-timeout` or `session-stale` is released
+  `AUTO_RELEASE_MS` (6 h) after the stuck event (`reason: auto-released`). Billing keeps reserving for it via
+  `recentlyFinished` for the lag window. `wu:halted` still releases at once.
+- **Interrupted attempts resolve themselves.** One hour after the `authorizing` record, the dispatcher appends
+  the same append-only `resolution` the owner label would (`by dispatcher-timeout`), with the observed
+  assignment, and dispatches nothing that run. Never a retry; `wu:resolve-interrupted` still works sooner.
+- **`arcana:engine-gap` is applied automatically.** A queue unit whose Copilot session finished, on which
+  Copilot commented, and which has no open PR (Copilot's instructions say to comment instead of opening a PR
+  when the card can't be implemented exactly) is labeled by the dispatcher, with a ledger observation.
+  Known limit: a unit whose card PR was *closed* without merging also has no open PR and could be labeled;
+  removing the label returns it.
+- **The GPT engine lane has an owner and a deadline.** Every 15 min the #78 stall report lists `[Card Work]`
+  issues and `arcana:engine-gap` queue units with no activity for 48 h: owner Work GPT, with the next action.
+- **B140 → numbered build has a trigger.** The same report lists B140 when its head has changes newer than
+  the latest GitHub release for 72 h: owner AARMOU, next action the B141 checklist. Publishing the build
+  as a release clears it. (Building, signing and releasing stay owner-only.)
+
+**§16 update (2026-10-30):** GitHub refuses `markPullRequestReadyForReview` from the workflow token, so the
+suite auto-merge marks ready and merges with `ARCANA_SUITE_MERGE_TOKEN` if set, else `COPILOT_DISPATCH_TOKEN`.
+If GitHub still refuses, it posts one notice on the suite PR with the owner's two clicks (Ready for review,
+Squash and merge) instead of stalling silently. A red premerge is now routed back to Copilot like card CI
+(`Arcana Card Certification Premerge` is in failure routing's workflow set; repair mode still applies).
+
+
+## 18. Merged suite completion and billing retention (#526 / #529)
+
+`loadUnits` recovers a suite request's explicitly connected PR even after the PR leaves the
+open-PR list. The durable completion record is read from GitHub on each observation: same-repository
+Copilot PR merged into `main`, exact two added suite files, matching registration at the immutable
+merge commit, and a successful premerge on the exact head whose matching scenario job actually
+executed the shared verification step before the merge. PR text, issue closure and completion
+comments are not proof. No new completion comments or issue-closing writes are necessary.
+
+After the real session started and finished, a validated suite becomes `completed`, independent
+of whether GitHub auto-closed its request. It cannot be assigned or repaired again. A new session
+start, pending repair or interrupted authorization still wins and retains/reclaims capacity.
+A merge never fabricates a session finish. Unavailable GitHub evidence fails the read closed.
+
+Closed bot-authored suite requests remain in the accounting input, so `recentlyFinished` continues
+reserving credits for `ARCANA_BILLING_LAG_HOURS` (24 h default). Closing a request cannot erase its
+liability. The normal billing-lag expiry is unchanged. No capacity setting, admission ceiling,
+paid assignment, owner approval, merge token or auto-merge policy is changed by this reconciliation.
+
+The closed-request read deliberately has no time cutoff: a late session event on its PR need not
+update the issue timestamp. This adds historical suite reads to each existing bounded observer tick;
+API failures stop admission rather than substituting zero liabilities. If suite history grows large,
+compact it only with a durable settled-liability/session reconciliation design, not a timestamp-only
+cutoff that can hide late work. Existing event-refresh throttling and router load reuse still apply.
+
+Validation: regressions cover open/closed requests, duplicate observations, billing lag, late sessions
+and repairs, missing timelines, wrong merge/source/suite/job evidence and forged comments. A read-only
+replay of real #526/#529 at 2026-10-30 19:47 UTC changes baseline `pending-pickup` / slot held / no recent
+liability to patched `completed` / no slot / recent liability, including simulated issue closure.
+The replay uses captured GitHub responses, not live production dispatch. #531's merge-token path
+still requires the next naturally admitted real suite PR; a no-op run does not verify that path.

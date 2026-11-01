@@ -6,6 +6,10 @@ name: Arcana Card Worker Dispatcher
 on:
   schedule:
     - cron: '*/30 * * * *'
+  # A finished Copilot session frees a slot: look for the next unit right away instead of at the next tick.
+  workflow_run:
+    workflows: ['Running Copilot cloud agent']
+    types: [completed]
   # GitHub runs this schedule only every few hours in practice (observed 3.5-5 h gaps, Oct 2026),
   # so owner label actions also start a run instead of waiting for the next scheduled slot.
   issues:
@@ -46,10 +50,17 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: ctl
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: List card names in open queue issues (trusted main code)
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {collectNames}=require('./ctl/scripts/feasibility.cjs');
             const issues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
             const names=collectNames(issues);
@@ -69,6 +80,9 @@ jobs:
           git -C base rev-parse HEAD > base-sha.txt
           mapfile -t names < names.txt
           if [ "${#names[@]}" -eq 0 ]; then echo '[]' > classified.json; exit 0; fi
+          # Same Oracle text the feeder classified with; a failed fetch leaves cards NEEDS_REVIEW (refused).
+          (cd base && python3 -I tools/cardkit/cardkit.py oracle fetch -- "${names[@]}" >&2) \
+            || echo '::warning::Oracle fetch incomplete; uncached cards stay NEEDS_REVIEW.'
           (cd base && python3 -I tools/cardkit/cardkit.py classify --json -- "${names[@]}") > classified.json
       - id: verdicts
         name: Build verdicts (trusted main code)
@@ -76,6 +90,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs=require('fs');const {buildVerdicts}=require('./ctl/scripts/feasibility.cjs');
             let v=null;
             try{v=buildVerdicts({baseSha:fs.readFileSync('base-sha.txt','utf8').trim(),classified:JSON.parse(fs.readFileSync('classified.json','utf8'))});}catch(e){core.warning('Cardkit output unreadable: '+e.message);}
@@ -83,6 +98,12 @@ jobs:
             core.setOutput('verdicts',JSON.stringify(v));
             const summary=Object.values(v.cards).map(c=>c.name+': '+c.readiness+(c.route?' / '+c.route:'')).join('\n');
             await core.summary.addHeading('Cardkit feasibility @ '+v.baseSha.slice(0,7)).addCodeBlock(summary||'(no queue cards)').write();
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
   dispatch:
     needs: feasibility
     # Runs even if the feasibility job failed: the gate then fails closed with a stated reason.
@@ -91,13 +112,25 @@ jobs:
       contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed","arcana:owner-fix-requested"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write   # start the next dispatcher run after a confirmed assignment (fills free slots)
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
           ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
           ARCANA_REPAIR_MODE: ${{ vars.ARCANA_REPAIR_MODE }}
@@ -113,10 +146,18 @@ jobs:
           ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
           # Retired; read only to warn when it is still set.
           ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
-          # Used only for the Copilot assignment call; all reads and ledger writes use GITHUB_TOKEN.
+          # Used for Copilot issue assignments AND owner-verified PR repair delivery;
+          # all ordinary reads, ledgers and observations still use GITHUB_TOKEN.
           COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           ARCANA_FEASIBILITY: ${{ needs.feasibility.outputs.verdicts }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {dispatcher}=require('./scripts/control-workflows.cjs');
             await dispatcher({github,context,core,env:process.env});
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

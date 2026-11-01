@@ -1,6 +1,17 @@
 # Stabilization control plan — 2026-10-23
 
-Control issue: https://github.com/AARMOU/arcana_table/issues/81. All work is isolated. No merges, main/production changes, APK release or signing changes are authorized.
+> **Historical snapshot (status as of 2026-10-30).** The sections from *Verified baseline and backup*
+> through *Six-deck measurement and resumption gate* record the 2026-10-23 stabilization and are **not
+> current instructions**. Since then the owner has enabled automation and authorized automation merges
+> and Worker deploys. The dispatcher runs with live AI-credit billing gates (50% warn / 75% slow /
+> 90% pause), currently in `ARCANA_DISPATCH_MODE=normal`; certified cards reach B140 through owner
+> Verify and approved-card integration. Do **not** act on this file's 2026-10-23 instructions to keep
+> `ARCANA_AUTOMATION_READY` unset or to disable the dispatcher. Current state and decisions live on
+> [#81](https://github.com/AARMOU/arcana_table/issues/81) and in the repository variables; the last
+> section, *Card flow backlog*, is current. APK release, signing and production changes still need
+> explicit owner authorization.
+
+Control issue: https://github.com/AARMOU/arcana_table/issues/81. As of 2026-10-23: all work is isolated. No merges, main/production changes, APK release or signing changes were authorized at that time.
 
 ## Verified baseline and backup
 
@@ -53,3 +64,28 @@ PR #59 current SHA `562cf57f215e6376a13417a492d31f99fa12378e`, run `39996157477`
 Index presence recomputed against both the pinned B131 indexes and current card base gives Imperium 74/100, Tyranid 68/100, Necron 70/100, Ruinous Powers 68/100, Eldrazi Unbound 70/100 and Eldrazi Incursion 69/100: 176 distinct names / 181 deck slots missing. This is index presence only; it is not executable rules coverage. Unintegrated worker PRs are not included.
 
 No new paid worker was launched, no repeated CI retry was requested, and no new card batch was started while the usage and shared-CI gates remain unresolved. Resume only after #82's full suite, exact-head worker evidence, correct ownership and verified usage controls. Every new card needs full Oracle source, scenario tests of all abilities and actual exported-registry parity. Combined runtime validation remains mandatory after any isolated integration.
+
+## Card flow backlog — 2026-10-30
+
+Card throughput is set by the slowest stage of `queue → Copilot implements → certification suite → certify → owner Verify → integrate`. Today that is the certification suite step, which is manual and one at a time. Items 3–5 of the [#81 proposal](https://github.com/AARMOU/arcana_table/issues/81#issuecomment-6515701359) are owner-approved: queue cleanup, dispatcher on the Worker timer, and the ready-to-Verify alert (#491). The rest is recorded here so it is not lost. **None of it is authorized until the owner says so.**
+
+1. **Suite authoring as an admitted, budget-capped step — built 2026-10-30 (owner said go).** When the backfill finds a Copilot card PR with card code and no suite (queue issue not labeled `arcana:engine-gap`), it opens one `[Arcana Suite]` issue per card unit (marker `arcana-suite-for-unit:<N>`, never duplicated or reopened), carrying the feeder's Oracle record. The dispatcher assigns it to a **separate** Copilot session on `main` (suites go before cards) through the same provenance, capacity (`ARCANA_MAX_ACTIVE_UNITS`) and budget admission; the instructions forbid reading the card PR. `arcana-suite-automerge.yml` squash-merges the suite PR only after a green `Arcana Card Certification Premerge` run that executed exactly that suite against the card PR, then runs the backfill so certification starts. Cards that cannot be requested (several cards in one unit, no Oracle record, closed request) stay on the #81 list for a person. See ADMISSION-CONTROL-DESIGN.md §16.
+2. **Raise parallelism once suites keep up.** Move from `ARCANA_DISPATCH_MODE=authorize-once` + `ARCANA_MAX_ACTIVE_UNITS=1` to `normal` with a hard budget cap and 2–3 active units. More than that cannot help while suites are the slowest stage. These are owner settings, changed only after item 1 has worked on a few cards.
+3. **Throughput in Control.** Cards per day per stage, so the next bottleneck is visible without manual investigation. Estimate: ~1–2 h.
+
+## Engine versions and numbered builds — 2026-10-30
+
+Three separate events. Only the last one reaches a device.
+
+**1. Upstream changes** (Argentum moves almost daily). Visibility only: one note on #78, edited in place, shows upstream `HEAD` and how far the adopted engine and B140's pin are behind (`scripts/engine-watch.cjs`). Nothing is built, tested or merged because upstream moved.
+
+**2. Arcana adopts an engine version** (`argentum-weekly-upgrade.yml`: scheduled Mondays with Mon/Tue retries, or a manual run). The candidate must be fully green before it merges into `gpt/arcana-integration-next`: patches rebased and audited, imported cards resolve, every custom card on that branch compiles and passes its scenarios (collisions reconciled into `custom-overrides.txt`), app test suite, test APK, agent docs and Cardkit SDK current. A report-only step also scenario-tests **B140's entire custom-card set** on the candidate and appends a per-card table to the upgrade report; it never blocks the merge. A red run opens a `(needs work)` issue. That is **Claude's engine lane by default**, followed through to a green dry run (fix on the base via a `gpt/argentum-weekly-fix-*` branch; the dry run regenerates the candidate), and the #78 stall report flags it after 24 h.
+
+**3. Arcana cuts a numbered Android build (B141 and later).** Owner-scheduled; never to chase upstream. All gates in order:
+1. **Pick the engine:** an adopted version from step 2 whose upgrade run was green **and** whose B140 compatibility section shows every B140 card passing. Record the upstream SHA and the Arcana base SHA.
+2. **Cut the branch** from the chosen Arcana base (the card branch at that adoption), bringing over B140's integrated cards. No card may be dropped; any that fail are fixed first (card lane), never weakened or skipped.
+3. **Agree everywhere:** engine JARs, `engine-upgrade/preview-config.json` pin, Cardkit SDK index and agent docs, and `integration/policy.json` (`target`, `targetSeed`, engine-pin hashes) all name the same engine and branch. Re-point dependent pins (e.g. deck-gap audit #393, branch-only probes such as #357).
+4. **Full suites green on the exact head:** custom-card scenarios (every card), app unit tests (debug and release-exclusion), test APK build, and integration's destination tests against the new target.
+5. **Owner device test** on the debug APK, then an **explicit owner release decision**. Signing and distribution only with separate owner authorization.
+
+If any gate is red: stop, report exact failures on #81, and fix. Never move the target or loosen a gate to get green.

@@ -4,6 +4,7 @@ const ACCOUNT='AARMOU', API='https://api.github.com';
 const MARKER='<!-- arcana-billing-alert-v1 -->';
 const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
 const SETUP='docs/BILLING-SETUP.md';
+const EMPTY_MONTH_START_DAYS=3;
 // Owner-facing next step for every fail-closed billing reason. Never includes secrets or response bodies.
 function billingAction(reason,env={}){
  const legacy=env.ARCANA_PREMIUM_REQUEST_BUDGET!==undefined&&env.ARCANA_PREMIUM_REQUEST_BUDGET!==null&&env.ARCANA_PREMIUM_REQUEST_BUDGET!=='';
@@ -17,7 +18,7 @@ function billingAction(reason,env={}){
  if(r==='billing-http-404')return 'Owner: GitHub did not find personal AI-credit billing for AARMOU. Confirm the token belongs to AARMOU and Copilot is billed to that personal account.';
  if(/^billing-http-5\d\d$|^billing-timeout$|^billing-network-error$/.test(r))return 'None: GitHub billing was temporarily unavailable (retried once). The next scheduled check retries.';
  if(/^billing-http-4\d\d$/.test(r))return 'Owner: GitHub rejected the billing request ('+r+'). Check the token and '+SETUP+'.';
- if(r==='empty-billing-usage-items')return 'Wait: GitHub reports no AI-credit usage for this month yet (normal right after the 1st, UTC). Dispatch stays blocked until usage is reported.';
+ if(r==='empty-billing-usage-items')return 'Wait: GitHub reports no AI-credit usage for this month, and either it is past the first '+EMPTY_MONTH_START_DAYS+' days of the month or last month showed no Copilot AI credits billed to AARMOU. Dispatch stays blocked until usage is reported; check where Copilot is billed.';
  if(r==='no-copilot-usage-items'||r==='unrecognized-copilot-sku')return 'Engineer: the billing report has no recognizable Copilot AI-credit rows. Inspect the report format before trusting any figure.';
  if(r==='wrong-account'||r==='wrong-period'||r==='wrong-unit-or-quantity'||r==='invalid-billing-response'||r==='overflow')
   return 'Engineer: the billing response failed validation ('+r+'). Do not trust or substitute figures; inspect the API contract.';
@@ -84,11 +85,26 @@ async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl
  const response=await fetchReport({url,token,fetchImpl,retryDelayMs});
  let body;
  try{body=await response.json();}catch{throw Error('invalid-billing-response');}
- const measured=usageQuantity(body,now);
+ let measured,basis;
+ try{measured=usageQuantity(body,now);}
+ catch(e){
+  // Month rollover: GitHub returns an empty report until the new month's first usage is metered, and nothing gets
+  // metered while dispatch is blocked, so "empty = unknown" deadlocked the whole pipeline on Nov 1 2026. An empty
+  // report may also mean Copilot is billed elsewhere, so treat it as zero ONLY in the first days of the month AND
+  // only when last month's report proves Copilot AI credits are billed to this account. Otherwise stay fail-closed.
+  if(e.message!=='empty-billing-usage-items'||now.getUTCDate()>EMPTY_MONTH_START_DAYS)throw e;
+  const prev=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),0,12));
+  const prevResponse=await fetchReport({url:API+'/users/'+ACCOUNT+'/settings/billing/ai_credit/usage?year='+
+   prev.getUTCFullYear()+'&month='+(prev.getUTCMonth()+1),token,fetchImpl,retryDelayMs});
+  let prevBody;
+  try{prevBody=await prevResponse.json();}catch{throw e;}
+  try{if(!(usageQuantity(prevBody,prev)>0))throw e;}catch{throw e;}
+  measured=0;basis='new-month-empty-report; previous month billed Copilot AI credits to this account';
+ }
  const snapshot={account:ACCOUNT,metric:'ai_credits',source:'github-billing-api',
  sourceUrl:API+'/users/'+ACCOUNT+'/settings/billing/ai_credit/usage',
  period,allowanceSource:'owner-configured-budget',used:measured+pendingReserve,
- allowance,measuredAt:now.toISOString(),reportedUsed:measured,reserved:pendingReserve};
+ allowance,measuredAt:now.toISOString(),reportedUsed:measured,reserved:pendingReserve,...(basis?{basis}:{})};
  const status=budgetFromEnv(JSON.stringify(snapshot),now.getTime());
  if(status.level==='unknown')throw Error('unverified-snapshot');
  return {snapshot,status};

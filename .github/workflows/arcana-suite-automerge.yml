@@ -1,0 +1,76 @@
+name: Arcana Suite Auto-merge
+# A Copilot suite PR answering an [Arcana Suite] request (opened by the certification backfill,
+# assigned by the dispatcher) merges into main only after Arcana Card Certification Premerge ran
+# that exact suite green against its card PR, and the PR adds exactly the requested suite files.
+# Then the backfill re-runs the card PR's CI so certification runs on the new suite.
+# Never touches card PRs, never approves, verifies or integrates anything.
+on:
+  workflow_run:
+    workflows: [Arcana Card Certification Premerge]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: arcana-suite-automerge
+  cancel-in-progress: false
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
+      - id: merge
+        uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
+          # The workflow token cannot mark a draft ready for review; a person-scoped token can.
+          MERGE_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const { mergeSuitePr } = require('./certification/suite-automerge.cjs');
+            // github-script v7 exposes no getOctokit; build a second client from the same Octokit class.
+            const writer = process.env.MERGE_TOKEN ? new github.constructor({ auth: process.env.MERGE_TOKEN }) : github;
+            const r = await mergeSuitePr({ github, writer, ...context.repo, run: context.payload.workflow_run, core });
+            core.info(JSON.stringify(r));
+            await core.summary.addHeading('Suite auto-merge').addCodeBlock(JSON.stringify(r, null, 1)).write();
+            core.setOutput('merged', String(!!r.merged));
+      # A merge made with GITHUB_TOKEN starts no push workflows, so run the backfill here, on the new main.
+      - if: steps.merge.outputs.merged == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: fresh
+          persist-credentials: false
+      - if: steps.merge.outputs.merged == 'true'
+        uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const { backfill } = require('./fresh/certification/backfill.cjs');
+            const r = await backfill({ github, ...context.repo, root: './fresh', scheduled: false, report: true });
+            core.info(JSON.stringify(r));
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

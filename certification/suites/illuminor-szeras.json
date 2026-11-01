@@ -1,0 +1,8 @@
+{
+  "key": "illuminor-szeras",
+  "name": "Illuminor Szeras",
+  "issue": 557,
+  "source": "certification/IlluminorSzerasIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.IlluminorSzerasIndependentCertificationTest",
+  "tests": 7
+}

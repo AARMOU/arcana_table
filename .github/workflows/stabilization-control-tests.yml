@@ -18,4 +18,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --test scripts/*.test.cjs control/*.test.cjs control/review-worker/tests/*.test.mjs
+      - run: python3 -m unittest discover -s scripts/tests -v
       - run: git diff --check

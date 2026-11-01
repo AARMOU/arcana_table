@@ -1,0 +1,152 @@
+name: Arcana Card Destination Preflight (NO APK)
+# Before the owner is asked to Verify a certified card, run its destination gates on the CURRENT integration target
+# with the same runner the approved-card integration uses, and post a receipt bound to (card head, target, target
+# engine). The review inbox only lists the card as ready for the owner once that receipt passed. This never integrates,
+# merges, approves, reserves retries, builds an APK or spends. See scripts/destination-preflight.cjs.
+on:
+  workflow_run:
+    workflows: ['Arcana Card Review Inbox Refresh']
+    types: [completed]
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: arcana-card-destination-preflight
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main' && vars.ARCANA_DESTINATION_PREFLIGHT != 'off'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      issues: read
+    outputs:
+      eligible: ${{ steps.plan.outputs.eligible }}
+      plan: ${{ steps.plan.outputs.plan }}
+      base: ${{ steps.plan.outputs.base }}
+      control: ${{ steps.plan.outputs.control }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
+      - uses: actions/github-script@v7
+        id: plan
+        env:
+          ARCANA_READ_TOKEN: ${{ secrets.ARCANA_READ_TOKEN }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const I = require('./scripts/card-integration.cjs');
+            const DP = require('./scripts/destination-preflight.cjs');
+            const fs = require('node:fs');
+            const controlSha = require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+            const plan = await DP.planPreflight({ github, ...context.repo, cfg: I.config(), controlSha });
+            if (!plan) { await core.summary.addRaw('No certified, unapproved card is waiting for a destination preflight on the current target engine.').write(); return; }
+            fs.mkdirSync('preflight-plan', { recursive: true });
+            fs.writeFileSync('preflight-plan/plan.json', JSON.stringify(plan));
+            core.setOutput('eligible', 'true');
+            core.setOutput('plan', Buffer.from(JSON.stringify(plan)).toString('base64'));
+            core.setOutput('base', plan.baseSha);
+            core.setOutput('control', controlSha);
+            await core.summary.addRaw(`Preflight PR #${plan.pr} (${plan.suite.name}) on target ${plan.baseSha}. NO APK, no integration.`).write();
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.eligible == 'true'
+        with:
+          name: card-integration-plan
+          path: preflight-plan/plan.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+
+  destination-tests:
+    needs: plan
+    if: needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.base }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-integration-plan
+          path: plan
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute every destination gate on the current target (NO APK, nothing published to the target)
+        run: python3 trusted/integration/runner.py validate --plan plan/plan.json --trusted trusted --candidate candidate --output result
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: card-preflight-result
+          path: result/
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, destination-tests]
+    # Publish a receipt whether the gates passed or blocked; a job failure (no report) publishes nothing.
+    if: always() && needs.plan.outputs.eligible == 'true' && needs.destination-tests.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-preflight-result
+          path: result
+      - uses: actions/github-script@v7
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const DP = require('./scripts/destination-preflight.cjs');
+            const plan = JSON.parse(Buffer.from(process.env.PLAN_B64, 'base64').toString());
+            const report = JSON.parse(fs.readFileSync('result/report.json', 'utf8'));
+            const r = await DP.publish({ github, ...context.repo, plan, report,
+              runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+            core.info(JSON.stringify(r));
+            await core.summary.addHeading(`PR #${plan.pr} destination preflight: ${r.status || r.state}`).addRaw(String(r.reason || '')).write();
+            // Refresh the owner's inbox now, so a passed card shows up without waiting for the next schedule.
+            if (r.state === 'published') await github.rest.actions.createWorkflowDispatch({ ...context.repo,
+              workflow_id: 'arcana-card-review-inbox-refresh.yml', ref: 'main' }).catch(e => core.warning('Inbox refresh dispatch failed: ' + e.message));

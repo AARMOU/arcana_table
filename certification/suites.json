@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "base": "gpt/arcana-integration-next",
+  "requiredChecks": [
+    "toolkit",
+    "scaffold",
+    "cards-and-android"
+  ],
+  "suites": [
+    {
+      "key": "resurrection-orb",
+      "name": "Resurrection Orb",
+      "issue": 408,
+      "source": "certification/ResurrectionOrbIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.ResurrectionOrbIndependentCertificationTest",
+      "tests": 4
+    },
+    {
+      "key": "poxwalkers",
+      "name": "Poxwalkers",
+      "issue": 406,
+      "source": "certification/PoxwalkersIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.PoxwalkersIndependentCertificationTest",
+      "tests": 6
+    },
+    {
+      "key": "blood-for-the-blood-god",
+      "name": "Blood for the Blood God!",
+      "issue": 352,
+      "source": "certification/BloodForTheBloodGodIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.BloodForTheBloodGodIndependentCertificationTest",
+      "tests": 4
+    },
+    {
+      "key": "sporocyst",
+      "name": "Sporocyst",
+      "issue": 417,
+      "source": "certification/SporocystIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.SporocystIndependentCertificationTest",
+      "tests": 5
+    },
+    {
+      "key": "verdant-suns-avatar",
+      "name": "Verdant Sun's Avatar",
+      "issue": 462,
+      "source": "certification/VerdantSunsAvatarIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.VerdantSunsAvatarIndependentCertificationTest",
+      "tests": 5
+    }
+  ]
+}

@@ -22,7 +22,7 @@ test('readiness defaults are off and malformed values fail closed', () => {
   const r = A.readiness({});
   assert.deepEqual([r.master, r.dispatch, r.repair, r.maxUnits, r.estSession, r.estRepair],
     [false, 'off', 'observe', 1, 60, 30]);
-  for (const bad of [{ ARCANA_DISPATCH_MODE: 'on' }, { ARCANA_MAX_ACTIVE_UNITS: '3' },
+  for (const bad of [{ ARCANA_DISPATCH_MODE: 'on' }, { ARCANA_MAX_ACTIVE_UNITS: '4' },
     { ARCANA_MAX_ACTIVE_UNITS: '0' }, { ARCANA_EST_CREDITS_PER_SESSION: '-1' }, { ARCANA_REPAIR_MODE: 'yes' }]) {
     const ready = A.readiness(env(bad));
     assert.ok(ready.errors.length, JSON.stringify(bad));
@@ -69,7 +69,48 @@ test('capacity counts work units once, including pending pickups and repairs', (
   // Finished sessions (issue + its PR) are one unit in review, holding no slot.
   assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [review(63), review(64)], ready, snapshot: snap(), now: NOW }).allowed, true);
   const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
-  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).reason, /builder slot occupied/);
+  assert.equal(A.admit({ op: 'repair', unit: review(67), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('two-worker mode separates a builder and a repair reservation', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const builder = working(1);
+  const waitingRepair = review(67, { ledger: A.parseLedger([bot(A.formatLedger({
+    op: 'repair-request', issue: 67, run: 100, at: iso(NOW - 5 * MIN) }))]) });
+  assert.equal(builder.lane, 'build');
+  assert.equal(waitingRepair.lane, 'repair');
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [waitingRepair], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /repair slot occupied/);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [builder, waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /capacity: 2 of 2/);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [builder, waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /capacity: 2 of 2/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [review(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('a working repair retains the repair lane and cannot be duplicated', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const u = A.deriveUnit({ number: 67, assignedToCopilot: true,
+    sessions: [
+      { event: 'started', at: NOW - 60 * MIN },
+      { event: 'finished', at: NOW - 30 * MIN },
+      { event: 'started', at: NOW - 5 * MIN },
+    ],
+    ledger: A.parseLedger([bot(A.formatLedger({
+      op: 'repair-request', issue: 67, run: 101, at: iso(NOW - 8 * MIN) }))]),
+  }, NOW);
+  assert.deepEqual([u.state, u.holdsSlot, u.lane], ['working', true, 'repair']);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [u], ready: two, snapshot: snap(), now: NOW }).reason, /repair slot occupied/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [u], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('stalled and unknown lane reservations fail closed', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const stale = A.deriveUnit({ number: 1, assignedToCopilot: true }, NOW);
+  assert.equal(stale.lane, 'build');
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [stale], ready: two, snapshot: snap(), now: NOW }).reason, /builder slot occupied/);
+  assert.match(A.admit({ op: 'repair', unit: review(67), units: [{holdsSlot:true}], ready: two, snapshot: snap(), now: NOW }).reason, /unknown lane/);
+  const released = A.deriveUnit({ number: 1, assignedToCopilot:true, labels:['wu:halted'] }, NOW);
+  assert.deepEqual([released.holdsSlot, released.lane], [false, null]);
 });
 
 test('legacy assignment without a session holds a slot as an unreviewed pickup timeout', () => {
@@ -249,4 +290,43 @@ test('ambiguous PR links block admission for the unit', () => {
   assert.match(A.admit({ op: 'assign', unit, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /ambiguous/);
   const rep = { ...review(67), ambiguousLink: true };
   assert.match(A.admit({ op: 'repair', unit: rep, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /ambiguous/);
+});
+
+test('a slot held only by a timeout is released automatically after AUTO_RELEASE_MS, still reserving billing', () => {
+  const t0 = Date.parse('2026-10-30T00:00:00Z');
+  const ledger = [{ op: 'authorizing', run: '1', at: t0 }, { op: 'attempt-result', run: '1', result: 'confirmed', at: t0 }];
+  const unit = { number: 9, labels: [], assignedToCopilot: true, ledger, sessions: [] };
+  const held = A.deriveUnit(unit, t0 + A.PICKUP_TIMEOUT_MS + 1);
+  assert.equal(held.reason, 'pickup-timeout'); assert.equal(held.holdsSlot, true);
+  const freed = A.deriveUnit(unit, t0 + A.AUTO_RELEASE_MS + 1);
+  assert.equal(freed.reason, 'auto-released'); assert.equal(freed.holdsSlot, false); assert.equal(freed.recentlyFinished, true);
+  const stale = A.deriveUnit({ ...unit, sessions: [{ event: 'started', at: t0 }] }, t0 + A.AUTO_RELEASE_MS + 1);
+  assert.equal(stale.reason, 'auto-released'); assert.equal(stale.releasedFrom, 'session-stale');
+  // An interrupted attempt is never auto-released here; the dispatcher resolves it explicitly.
+  assert.equal(A.deriveUnit({ ...unit, ledger: ledger.slice(0, 1) }, t0 + 99 * A.AUTO_RELEASE_MS).blocksAll, true);
+});
+
+test('dynamic capacity: up to 3 workers, lanes never take every slot, budget scales down', () => {
+  const three = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '3' }));
+  assert.deepEqual([three.maxUnits, three.errors], [3, []]);
+  const repairing = n => review(n, { ledger: A.parseLedger([bot(A.formatLedger({ op: 'repair-request', issue: n, run: 100 + n, at: iso(NOW - 5 * MIN) }))]) });
+  const normal = snap(100);
+  // Two builds may run together; the third slot is kept for a repair.
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: normal, now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2)], ready: three, snapshot: normal, now: NOW }).reason, /builder slot occupied by #1, #2/);
+  assert.equal(A.admit({ op: 'repair', unit: review(66), units: [working(1), working(2)], ready: three, snapshot: normal, now: NOW }).allowed, true);
+  // Two repairs may run together; the third slot is kept for a build.
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [repairing(61), repairing(62)], ready: three, snapshot: normal, now: NOW }).reason, /repair slot occupied/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [repairing(61), repairing(62)], ready: three, snapshot: normal, now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2), repairing(61)], ready: three, snapshot: normal, now: NOW }).reason, /capacity: 3 of 3/);
+  // warn (50-75%) keeps the full ceiling: two builds + one repair.
+  const warn = snap(800);
+  assert.equal(A.budgetWithReservations({ snapshot: warn, active: 0, pendingRepairs: 0, candidate: 'assign', ready: three, now: NOW }).level, 'warn');
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: warn, now: NOW }).allowed, true);
+  assert.equal(A.admit({ op: 'repair', unit: review(66), units: [working(1), working(2)], ready: three, snapshot: warn, now: NOW }).allowed, true);
+  // slow keeps the existing one-at-a-time rule.
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: snap(1150), now: NOW }).reason, /slow/);
+  assert.equal(A.scaledCapacity(3, 'normal'), 3); assert.equal(A.scaledCapacity(2, 'normal'), 2);
+  assert.equal(A.scaledCapacity(3, 'warn'), 3); assert.equal(A.scaledCapacity(3, 'slow'), 1);
+  assert.equal(A.scaledCapacity(3, 'paused'), 0); assert.equal(A.scaledCapacity(3, 'unknown'), 0);
 });
