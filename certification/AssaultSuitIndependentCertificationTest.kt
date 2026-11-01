@@ -114,25 +114,25 @@ class AssaultSuitIndependentCertificationTest {
         assertNull(equip(d, player, suit, creature).error)
         d.resolveAll()
 
-        assertEquals(player, d.getController(creature))
+        assertEquals(player, d.projected.getController(creature))
         d.tapPermanent(creature)
         assertTrue(d.isTapped(creature))
         d.passPriorityUntil(Step.UPKEEP, activePlayer = opponent)
         assertTrue(d.isTapped(creature))
         d.resolveAll(Choices(yes = true))
 
-        assertEquals(opponent, d.getController(creature))
+        assertEquals(opponent, d.projected.getController(creature))
         assertFalse(d.isTapped(creature))
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to player)).error)
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to planeswalker)).error)
         d.removeSummoningSickness(otherCreature)
         assertNull(d.declareAttackers(opponent, mapOf(otherCreature to planeswalker)).error)
-        assertEquals(opponent, d.getController(creature))
+        assertEquals(opponent, d.projected.getController(creature))
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = player)
         d.resolveAll()
-        assertEquals(player, d.getController(creature))
+        assertEquals(player, d.projected.getController(creature))
     }
 
     @Test
@@ -152,7 +152,7 @@ class AssaultSuitIndependentCertificationTest {
         assertTrue(d.isTapped(creature))
         d.resolveAll(Choices(yes = false))
 
-        assertEquals(player, d.getController(creature))
+        assertEquals(player, d.projected.getController(creature))
         assertTrue(d.isTapped(creature))
     }
 
