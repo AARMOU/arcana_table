@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy-isolated-bounded:
-    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    if: ${{ false }} # Owner parked Goosegeta; archive holds original rollout.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production

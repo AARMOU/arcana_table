@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy-workers:
-    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    if: ${{ false }} # Owner parked Goosegeta; archive holds original rollout.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: production
@@ -114,7 +114,7 @@ jobs:
         if: failure() && steps.review.outputs.changed == 'true'
         run: cloud-source/android/cloud-room/node_modules/.bin/wrangler rollback --name arcana-review --yes
   test-apk:
-    if: github.repository == 'AARMOU/arcana_table'
+    if: ${{ false }} # Owner parked Goosegeta; archive holds original rollout.
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -185,7 +185,7 @@ jobs:
           path: test-output/
   publish-control:
     needs: deploy-workers
-    if: needs.deploy-workers.outputs.ready == 'true'
+    if: ${{ false }} # Owner parked Goosegeta; archive holds original rollout.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
