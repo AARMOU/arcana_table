@@ -121,6 +121,11 @@
       "reason": "no trigger for 'whenever an opponent taps an artifact for mana': EventPattern.LandTappedForMana / Triggers.*.tapsLandForMana only cover lands, tappedForMana() is SELF/ATTACHED only, and taps(filter) is not mana-specific",
       "source": "AARMOU/arcana_table#589",
       "verified": false
+    },
+    "Opal Palace": {
+      "reason": "The pinned SDK has no dynamic amount for the number of times this commander was cast from the command zone this game. SpellsCastThisGame counts every spell from any zone, so it cannot supply the exact +1/+1 counter count for the mana-spent commander spell.",
+      "source": "AARMOU/arcana_table#671; pinned SDK inventory at c1c04ca3265c61df913af6db65460ad4ce409614 (docs/agents/generated/sdk-api.md DynamicAmount entries and docs/agents/argentum-upstream/sdk-index.md); inspected PathOfAncestry.kt and ManaSpellRider/EntersWithDynamicCounters language reference.",
+      "verified": true
     }
   },
   "keywords": {
