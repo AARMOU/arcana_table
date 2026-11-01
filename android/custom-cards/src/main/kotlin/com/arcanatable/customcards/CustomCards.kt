@@ -275,6 +275,7 @@ object CustomCards {
         Entry(HormagauntHorde, "40K", "Six WotC precons"),
         Entry(CollectiveEffort, "MSC", "Six WotC precons"),
         Entry(ArcoFlagellant, "40K", "Six WotC precons"),
+        Entry(Zephyrim, "40K", "Six WotC precons"),
         Entry(UltramarinesHonourGuard, "40K", "Six WotC precons"),
         Entry(CommissarSeverinaRaine, "40K", "Six WotC precons"),
         Entry(BoneSabres, "40K", "Six WotC precons"),
