@@ -255,6 +255,17 @@ internal fun TableController.TableMainLayout() {
                                         topMenuSection = null
                                         saveOfflineGame()
                                     })
+                                if (argentumEnabled && gameStartedOnline && !gameEndedOnline &&
+                                    wifiRole in setOf("host", "online-host", "guest", "online-guest")) {
+                                    DropdownMenuItem(
+                                        text = { Text("View lobby") },
+                                        onClick = {
+                                            topMenuExpanded = false
+                                            topMenuSection = null
+                                            activeLobbyViewerOpen = true
+                                        },
+                                    )
+                                }
                                 DropdownMenuItem(text = { Text("Home screen") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
                                 if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
