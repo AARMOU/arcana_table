@@ -2,7 +2,10 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.OblivionSower
 import com.arcanatable.customcards.support.*
-import com.wingedsheep.engine.core.ChooseTargetsDecision
+import com.wingedsheep.engine.handlers.TargetingSourceType
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
+import com.wingedsheep.engine.state.components.stack.TargetsComponent
+import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.*
@@ -49,22 +52,26 @@ class OblivionSowerIndependentCertificationTest {
             opponent,
             listOf("Forest", "Grizzly Bears", "Island", "Mountain", "Swamp"),
         )
-        d.castSower()
+        val sower = d.castSower()
 
+        // A sole legal opponent is selected automatically, before trigger resolution.
         assertTrue(d.zoneNames(opponent, Zone.EXILE).isEmpty())
-        // Cast triggers can reach their target prompt only after priority advances.
-        repeat(30) {
-            if (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) {
-                assertNull(d.bothPass().error)
-            }
+        val triggerId = d.state.stack.single { id ->
+            d.state.getEntity(id)?.get<TriggeredAbilityOnStackComponent>()?.sourceId == sower
         }
-        val decision = d.state.pendingDecision as? ChooseTargetsDecision
-        assertNotNull("the cast trigger must choose its target before resolving", decision)
-        val legalTargets = decision!!.legalTargets.values.flatten()
-        assertFalse(legalTargets.contains(player))
-        assertTrue(legalTargets.contains(opponent))
-        assertNotNull(d.submitTargetSelection(player, listOf(player)).error)
-        assertNull(d.submitTargetSelection(player, listOf(opponent)).error)
+        val binding = d.state.getEntity(triggerId)!!.get<TargetsComponent>()!!
+        assertEquals(listOf(ChosenTarget.Player(opponent)), binding.targets)
+        assertTrue("a target requirement must be recorded", binding.targetRequirements.isNotEmpty())
+        assertNotNull(d.services.targetValidator.validateTargets(
+            state = d.state, targets = listOf(ChosenTarget.Player(player)),
+            requirements = binding.targetRequirements, casterId = player,
+            sourceId = sower, targetingSourceType = TargetingSourceType.ABILITY,
+        ))
+        assertNull(d.services.targetValidator.validateTargets(
+            state = d.state, targets = listOf(ChosenTarget.Player(opponent)),
+            requirements = binding.targetRequirements, casterId = player,
+            sourceId = sower, targetingSourceType = TargetingSourceType.ABILITY,
+        ))
         d.resolveAll(Choices(pick = emptyList()))
 
         assertEquals(
