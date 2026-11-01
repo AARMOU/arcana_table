@@ -39,25 +39,24 @@ class AspiringChampionScenarioTest {
 
     @Test
     fun combatDamageSacrificesChampionAndDealsDemonPowerToEachOpponent() {
-        val d = CardPool.driver("Pestilence Demon").apply {
-            initMultiplayer(List(3) { Deck.of("Plains" to 40) })
-            passPriorityUntil(Step.PRECOMBAT_MAIN)
-        }
-        val player = d.player1
+        val d = CardPool.driver("Pestilence Demon")
+        val (player, defendingPlayer, otherOpponent) =
+            d.initMultiplayer(List(3) { Deck.of("Plains" to 40) })
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN)
         val champion = d.putCreatureOnBattlefield(player, "Aspiring Champion")
         d.putCardOnTopOfLibrary(player, "Pestilence Demon")
         d.putCardOnTopOfLibrary(player, "Plains")
         d.removeSummoningSickness(champion)
 
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = player)
-        assertNull(d.declareAttackers(player, listOf(champion), d.player2).error)
+        assertNull(d.declareAttackers(player, listOf(champion), defendingPlayer).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN, activePlayer = player)
         d.resolveAll()
 
         assertFalse(champion in d.getPermanents(player))
         assertTrue(d.getPermanents(player).any { d.getCardName(it) == "Pestilence Demon" })
-        assertEquals(10, d.getLifeTotal(d.player2))
-        assertEquals(13, d.getLifeTotal(d.player3))
+        assertEquals(10, d.getLifeTotal(defendingPlayer))
+        assertEquals(13, d.getLifeTotal(otherOpponent))
     }
 
     @Test
