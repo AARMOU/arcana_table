@@ -97,6 +97,7 @@ object CustomCards {
         Entry(AllosaurusShepherd, "2X2", POOL),
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
+        Entry(KnucklesTheEchidna, "SLD", POOL),
         Entry(BlightsteelColossus, "MBS", POOL),
         Entry(NekusarTheMindrazer, "CMM", POOL),
         Entry(MichelangeloTheHeart, "TMC", POOL),
