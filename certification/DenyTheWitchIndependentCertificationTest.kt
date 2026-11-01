@@ -172,6 +172,7 @@ class DenyTheWitchIndependentCertificationTest {
         val d = customScenario(DenyTheWitch, "Shock")
         val p = d.player1
         val opponent = d.player2
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         val shock = d.putCardInHand(opponent, "Shock")
         d.giveMana(opponent, Color.RED)
         assertNull(d.castSpell(opponent, shock, listOf(p)).error)
