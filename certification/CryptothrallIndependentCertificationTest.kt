@@ -3,6 +3,7 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.Cryptothrall
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
 import org.junit.Test
@@ -33,6 +34,7 @@ class CryptothrallIndependentCertificationTest {
         val murder = d.putCardInHand(d.player2, "Murder")
         d.giveMana(d.player2, Color.BLACK, 2)
         d.giveColorlessMana(d.player2, 1)
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
 
         assertNotNull(d.castSpell(d.player2, murder, listOf(protectedArtifact)).error)
         assertTrue(d.permanentsNamed(d.player1, "Ornithopter").contains(protectedArtifact))
@@ -63,6 +65,7 @@ class CryptothrallIndependentCertificationTest {
         val murder = d.putCardInHand(d.player2, "Murder")
         d.giveMana(d.player2, Color.BLACK, 2)
         d.giveColorlessMana(d.player2, 1)
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
 
         assertNull(d.castSpell(d.player2, murder, listOf(cryptothrall)).error)
         d.resolveAll()
@@ -79,6 +82,7 @@ class CryptothrallIndependentCertificationTest {
         val murder = d.putCardInHand(d.player2, "Murder")
         d.giveMana(d.player2, Color.BLACK, 2)
         d.giveColorlessMana(d.player2, 1)
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
 
         assertNull(d.castSpell(d.player2, murder, listOf(bear)).error)
         d.resolveAll()
