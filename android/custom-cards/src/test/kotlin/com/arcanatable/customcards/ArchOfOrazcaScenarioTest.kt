@@ -34,6 +34,8 @@ class ArchOfOrazcaScenarioTest {
         assertEquals(5, d.manaPool(p).colorless)
 
         d.putPermanentOnBattlefield(p, "Forest")
+        assertNull(d.passPriority(p).error)
+        assertNull(d.passPriority(d.player2).error)
         assertTrue(d.state.getEntity(p)!!.has<PlayerCitysBlessingComponent>())
         val handSize = d.getHand(p).size
         assertNull(d.activate(p, land, index = 1).error)
