@@ -1,0 +1,8 @@
+{
+  "key": "anrakyr-the-traveller",
+  "name": "Anrakyr the Traveller",
+  "issue": 716,
+  "source": "certification/AnrakyrTheTravellerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AnrakyrTheTravellerIndependentCertificationTest",
+  "tests": 9
+}
