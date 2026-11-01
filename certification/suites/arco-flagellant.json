@@ -1,0 +1,9 @@
+{
+  "key": "arco-flagellant",
+  "name": "Arco-Flagellant",
+  "issue": 782,
+  "source": "certification/ArcoFlagellantIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ArcoFlagellantIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
