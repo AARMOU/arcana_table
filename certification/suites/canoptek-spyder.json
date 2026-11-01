@@ -1,0 +1,9 @@
+{
+  "key": "canoptek-spyder",
+  "name": "Canoptek Spyder",
+  "issue": 815,
+  "source": "certification/CanoptekSpyderIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CanoptekSpyderIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
