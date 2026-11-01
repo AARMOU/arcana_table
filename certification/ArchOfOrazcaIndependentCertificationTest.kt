@@ -34,7 +34,7 @@ class ArchOfOrazcaIndependentCertificationTest {
 
     @Test
     fun ascendGrantsTheBlessingAtTenPermanentsAndEnablesTheDrawAbility() {
-        val d = customScenario(ArchOfOrazca, "Grizzly Bears")
+        val d = customScenario(ArchOfOrazca, "Grizzly Bears", "Sol Ring")
         val p = d.player1
         repeat(9) { d.putPermanentOnBattlefield(p, "Sol Ring") }
         val arch = d.playArch(p)
@@ -68,7 +68,7 @@ class ArchOfOrazcaIndependentCertificationTest {
 
     @Test
     fun drawAbilityRequiresAllFiveGenericMana() {
-        val d = customScenario(ArchOfOrazca, "Grizzly Bears")
+        val d = customScenario(ArchOfOrazca, "Grizzly Bears", "Sol Ring")
         val p = d.player1
         repeat(9) { d.putPermanentOnBattlefield(p, "Sol Ring") }
         val arch = d.playArch(p)
@@ -84,7 +84,7 @@ class ArchOfOrazcaIndependentCertificationTest {
 
     @Test
     fun theCitysBlessingRemainsAfterFallingBelowTenPermanents() {
-        val d = customScenario(ArchOfOrazca, "Grizzly Bears", "Murder")
+        val d = customScenario(ArchOfOrazca, "Grizzly Bears", "Murder", "Sol Ring")
         val p = d.player1
         repeat(8) { d.putPermanentOnBattlefield(p, "Sol Ring") }
         val bear = d.putCreatureOnBattlefield(p, "Grizzly Bears")
