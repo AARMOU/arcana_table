@@ -152,3 +152,82 @@ jobs:
           path: |
             android/app/build/test-results/test/
             android/app/build/reports/tests/testDebugUnitTest/
+
+  b141-nullifier-compatibility:
+    # Source-only compatibility probe: checkout B141's existing candidate JARs,
+    # overlay ONLY the existing #357 implementation and its 37 strict tests.
+    # No engine/JAR replacement, card registration change, or release action.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/b141-candidate-20261101
+          persist-credentials: false
+      - name: Record exact B141 test-build source
+        run: |
+          echo "B141_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "B141 candidate source: $(git rev-parse HEAD)"
+      - name: Overlay only #357 Nullifier card and real-engine regressions
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin ${{ github.sha }}
+          card=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt
+          testfile=android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt
+          for path in "$card" "$testfile"; do
+            git show "${{ github.sha }}:$path" > "$path"
+            test "$(git hash-object "$path")" = "$(git rev-parse "${{ github.sha }}:$path")"
+          done
+          diff -u <(printf '%s\n' "$card" "$testfile" | sort) <(git diff --name-only | sort)
+          test -z "$(git diff --name-only -- android/app/libs)"
+          echo "Candidate runtime/JARs untouched; only Nullifier source + tests overlaid."
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run all 37 #357 real-engine scenarios on B141 candidate runtime
+        id: b141_tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
+      - name: Require all 37 passing, without privacy waivers
+        if: ${{ !cancelled() && steps.b141_tests.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UlamogsNullifierScenarioTest.xml')
+          assert report.is_file(), f'B141 compatibility JUnit XML missing: {report}'
+          root = ET.parse(report).getroot()
+          stats = {k: int(root.get(k, '0')) for k in ('tests', 'failures', 'errors', 'skipped')}
+          failed = [c.get('name', '<unnamed>') for c in root.findall('testcase')
+                    if c.find('failure') is not None or c.find('error') is not None]
+          print(f"B141 source {os.environ['B141_SOURCE_SHA']}; Nullifier #357 {os.environ['GITHUB_SHA']}; {stats}; failed: {failed}")
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write(f"### B141 Nullifier compatibility (not release certification)\n\nB141 {os.environ['B141_SOURCE_SHA']} + #357 {os.environ['GITHUB_SHA']}\n\n{stats}\n\n")
+              for name in failed:
+                  out.write(f"- FAIL: {name}\n")
+          assert stats == {'tests': 37, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
+          PY
+      - name: Reject stale B141 branch during this probe
+        if: always()
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin gpt/b141-candidate-20261101
+          current=$(git rev-parse FETCH_HEAD)
+          test "$current" = "$B141_SOURCE_SHA" || {
+            echo "::error::B141 candidate advanced from $B141_SOURCE_SHA to $current; rerun against the newer head."
+            exit 1
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b141-nullifier-compat-${{ github.sha }}
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/test/
+            android/custom-cards/build/reports/tests/test/
