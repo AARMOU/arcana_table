@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101711">
-<meta name="description" content="Arcana Table brings Commander-style card battles to Android. Play offline against AI, explore curated decks, and join the closed test.">
+<meta name="description" content="Arcana Table is an Android card game with offline AI, two-player games, premade Commander decks, and a free mulligan.">
 <meta property="og:title" content="Arcana Table — The table is yours">
 <meta property="og:description" content="A Commander table in your pocket. Bring a deck. Challenge the AI. Play with your pod.">
 <meta property="og:type" content="website">
@@ -47,11 +47,11 @@ h1 span{display:block;color:var(--green)}
 .btn.secondary{border-color:#ffffff35;color:var(--ink);background:#ffffff08}
 .hero-note{margin:15px 0 0;color:#8f9d91;font-size:12px}
 .hero-visual{position:relative;min-width:0}
-.hero-frame{position:relative;padding:10px;border:1px solid #ffffff22;border-radius:12px;background:#0b100c;box-shadow:0 28px 90px #0008;transform:rotate(1deg)}
-.hero-frame:after{position:absolute;inset:10px;content:"";border:1px solid #ffffff10;border-radius:6px;pointer-events:none}
-.hero-frame img{width:100%;aspect-ratio:800 / 1424;object-fit:contain;border-radius:5px}
+.hero-frame{position:relative;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid #ffffff22;border-radius:12px;background:#0b100c;box-shadow:0 28px 90px #0008;transform:none}
+.hero-frame:after{display:none;content:none}
+.hero-frame img{width:auto;height:min(72vh,640px);max-width:100%;aspect-ratio:2 / 3;object-fit:contain;border-radius:11px}
 .image-label{position:absolute;right:23px;bottom:22px;padding:8px 11px;border:1px solid #ffffff36;border-radius:4px;background:#101711dd;color:#dce7da;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
-.hero-visual:before{position:absolute;z-index:0;inset:24px -18px -18px 24px;border:1px solid #d7bd7940;border-radius:12px;content:""}
+.hero-visual:before{content:none}
 .hero-frame{z-index:1}
 .proofline{display:flex;gap:22px;align-items:center;margin-top:31px;color:#aeb9ae;font-size:11px;letter-spacing:.09em;text-transform:uppercase}
 .proofline span+span{padding-left:22px;border-left:1px solid #ffffff30}
@@ -95,7 +95,7 @@ section{scroll-margin-top:30px}
 .footer-links{display:flex;gap:17px;flex-wrap:wrap}.footer a{color:#abb7ac}
 .footer .boneknuckles{width:35px;height:38px;object-fit:contain;opacity:.85}
 @media(max-width:820px){.hero{padding:54px 0 66px}.hero-grid{grid-template-columns:1fr;gap:38px}.hero-copy{max-width:600px}.hero-visual{width:min(760px,94%);margin:0 auto}.proofline{margin-top:22px}.section{padding:70px 0}.section-head{display:block}.section-intro{margin-top:13px}.gallery{grid-template-columns:1fr 1fr}.shot:nth-child(2){grid-column:1/-1;grid-row:1}.shot:nth-child(2) figure{max-height:600px}.shot:nth-child(2) img{max-height:570px}.shot:not(:nth-child(2)) img{max-height:420px}.status{padding-bottom:70px}.join-grid{grid-template-columns:1fr;gap:27px}.join-panel{max-width:500px}}
-@media(max-width:560px){.wrap{width:min(var(--max),calc(100% - 32px))}.nav{min-height:66px}.brand{font-size:11px}.brand img{width:35px;height:35px}.navlinks{gap:13px;font-size:12px}.navlinks a:first-child{display:none}.hero{padding:45px 0 53px}h1{font-size:clamp(48px,15vw,70px)}.hero-copy{font-size:16px}.actions{gap:10px}.btn{min-height:46px;padding-inline:16px;font-size:13px}.proofline{gap:11px;font-size:9px}.proofline span+span{padding-left:11px}.hero-frame{padding:6px}.hero-frame:after{inset:6px}.image-label{right:14px;bottom:14px;font-size:8px}.section{padding:60px 0}.features{grid-template-columns:1fr}.feature,.feature+.feature{min-height:0;padding:21px 0;border-left:0}.feature+.feature{border-top:1px solid var(--line)}.feature h3{margin:9px 0 4px}.gallery{gap:14px}.shot figure{padding:7px}.shot:nth-child(2) figure{padding:6px}.shot:nth-child(2) img{max-height:410px}.shot:not(:nth-child(2)) img{max-height:270px}.shot-caption{padding-top:10px}.shot strong{font-size:13px}.shot span{font-size:11px}.status{padding-bottom:60px}.status-card{grid-template-columns:1fr;padding:22px}.status-badge{font-size:11px}.join{padding:65px 0}.join h2{font-size:clamp(40px,12vw,56px)}.join-panel{padding:19px}.footer-row{align-items:flex-start}.footer-row>div:first-child{max-width:230px}.footer-links{gap:11px}.footer .boneknuckles{width:29px;height:32px}}
+@media(max-width:560px){.wrap{width:min(var(--max),calc(100% - 32px))}.nav{min-height:66px}.brand{font-size:11px}.brand img{width:35px;height:35px}.navlinks{gap:13px;font-size:12px}.navlinks a:first-child{display:none}.hero{padding:45px 0 53px}h1{font-size:clamp(48px,15vw,70px)}.hero-copy{font-size:16px}.actions{gap:10px}.btn{min-height:46px;padding-inline:16px;font-size:13px}.proofline{gap:11px;font-size:9px}.proofline span+span{padding-left:11px}.hero-frame{padding:0}.hero-frame:after{display:none}.hero-frame img{height:min(70vh,560px)}.image-label{right:14px;bottom:14px;font-size:8px}.section{padding:60px 0}.features{grid-template-columns:1fr}.feature,.feature+.feature{min-height:0;padding:21px 0;border-left:0}.feature+.feature{border-top:1px solid var(--line)}.feature h3{margin:9px 0 4px}.gallery{gap:14px}.shot figure{padding:7px}.shot:nth-child(2) figure{padding:6px}.shot:nth-child(2) img{max-height:410px}.shot:not(:nth-child(2)) img{max-height:270px}.shot-caption{padding-top:10px}.shot strong{font-size:13px}.shot span{font-size:11px}.status{padding-bottom:60px}.status-card{grid-template-columns:1fr;padding:22px}.status-badge{font-size:11px}.join{padding:65px 0}.join h2{font-size:clamp(40px,12vw,56px)}.join-panel{padding:19px}.footer-row{align-items:flex-start}.footer-row>div:first-child{max-width:230px}.footer-links{gap:11px}.footer .boneknuckles{width:29px;height:32px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}.btn:hover{transform:none}}
 </style>
 </head>
@@ -118,7 +118,7 @@ section{scroll-margin-top:30px}
 <div class="proofline"><span>Offline AI</span><span>Commander decks</span><span>Two-player play</span></div>
 </div>
 <div class="hero-visual">
-<div class="hero-frame"><img src="./assets/arcana-battlefield.webp" width="800" height="1424" alt="Real Arcana Table gameplay showing a card battlefield, player areas, and game controls" fetchpriority="high"><span class="image-label">Real gameplay · Android</span></div>
+<div class="hero-frame"><img src="./assets/arcana-battlefield-upscaled.webp" width="1024" height="1536" alt="Arcana Table gameplay showing its battlefield and Bello, Bard of the Brambles, a raccoon creature card" fetchpriority="high"><span class="image-label">Gameplay capture · earlier UI</span></div>
 </div>
 </div>
 </section>
@@ -127,7 +127,7 @@ section{scroll-margin-top:30px}
 <div class="section-head"><div><div class="eyebrow">Made for the table</div><h2 id="reasons-title">Your game. Your pace. Your people.</h2></div><p class="section-intro">A familiar card-table experience reshaped for a phone, whether you have a minute or a whole evening.</p></div>
 <div class="features">
 <article class="feature"><span class="feature-index">01 / PLAY ANYWHERE</span><h3>Your next game can be offline.</h3><p>Play against local AI opponents without needing an internet connection.</p></article>
-<article class="feature"><span class="feature-index">02 / BRING A DECK</span><h3>Start with Commander.</h3><p>Choose from curated premade decks and settle into a mobile-first battlefield.</p></article>
+<article class="feature"><span class="feature-index">02 / BRING A DECK</span><h3>Start with Commander.</h3><p>Choose a premade Commander deck and take one free mulligan to find a better opening hand.</p></article>
 <article class="feature"><span class="feature-index">03 / PLAY TOGETHER</span><h3>Save a seat for your pod.</h3><p>Two-player games are available in testing. Four-player play is in development.</p></article>
 </div>
 </div>
@@ -137,13 +137,13 @@ section{scroll-margin-top:30px}
 <div class="section-head"><div><div class="eyebrow">A closer look</div><h2 id="gameplay-title">The game, in your hands.</h2></div><p class="section-intro">Real captures from the app. A hand to consider, a battlefield to read, and a table made for touch.</p></div>
 <div class="gallery">
 <article class="shot"><figure><img src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table deck selection screen with premade Commander decks"></figure><div class="shot-caption"><strong>Choose your deck</strong><span>Find a list and get to the table.</span></div></article>
-<article class="shot"><figure><img src="./assets/arcana-battlefield.webp" width="800" height="1424" loading="lazy" alt="Arcana Table battlefield during a game against an AI opponent"></figure><div class="shot-caption"><strong>Play the board</strong><span>Track your game as it unfolds.</span></div></article>
+<article class="shot"><figure><img src="./assets/arcana-battlefield-upscaled.webp" width="1024" height="1536" loading="lazy" alt="Arcana Table battlefield during an AI game, showing Bello, Bard of the Brambles"></figure><div class="shot-caption"><strong>Play the board</strong><span>Track your game as it unfolds.</span></div></article>
 <article class="shot"><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Arcana Table opening hand with cards ready to play"></figure><div class="shot-caption"><strong>Make your opening move</strong><span>Inspect your hand and plan a line.</span></div></article>
 </div>
 </div>
 </section>
 <section class="status" id="status" aria-labelledby="status-title">
-<div class="wrap status-card"><div><div class="eyebrow">Honest status</div><h2 id="status-title">A table still being built.</h2><p>Arcana Table is in Android closed testing. Offline AI and two-player games are available to testers. Card interactions and multiplayer reliability are still being refined, and four-player support is in development.</p></div><div class="status-badge">Android closed test</div></div>
+<div class="wrap status-card"><div><div class="eyebrow">Honest status</div><h2 id="status-title">A table still being built.</h2><p>Arcana Table is in Android closed testing. Build 141 is the current Android test build. Offline AI and two-player games are available in testing, and the opening hand includes one free mulligan. Premade decks are available; deck import is off for the public test. Four-player support is in development.</p></div><div class="status-badge">Build 141 · Android test</div></div>
 </section>
 <section class="join" id="join" aria-labelledby="join-title">
 <div class="wrap join-grid">
