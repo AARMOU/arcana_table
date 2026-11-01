@@ -1,0 +1,9 @@
+{
+  "key": "endless-atlas",
+  "name": "Endless Atlas",
+  "issue": 772,
+  "source": "certification/EndlessAtlasIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EndlessAtlasIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
