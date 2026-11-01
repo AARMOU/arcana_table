@@ -180,7 +180,7 @@ fun opponentBlockers(players: List<TablePlayer>, you: Int): List<Pair<String, Li
  * toughness and blocking keywords. Hold a card to see it large.
  */
 @Composable
-internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>) {
+internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>, cardWidth: androidx.compose.ui.unit.Dp = 56.dp) {
     var zoomed by remember { mutableStateOf<PickCard?>(null) }
     Column(Modifier.fillMaxWidth().padding(top = 4.dp).testTag("opponent-blockers")) {
         groups.forEach { (name, cards) ->
@@ -188,7 +188,7 @@ internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 cards.forEach { card ->
                     val shape = RoundedCornerShape(6.dp)
-                    Column(Modifier.width(56.dp)) {
+                    Column(Modifier.width(cardWidth)) {
                         Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(shape).background(Color(0xFF1C2523))
                             .border(1.dp, Color.White.copy(alpha = 0.2f), shape)
                             .combinedClickable(onClick = {}, onLongClick = {

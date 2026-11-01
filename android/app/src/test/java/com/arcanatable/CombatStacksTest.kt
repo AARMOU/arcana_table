@@ -138,4 +138,41 @@ class CombatStacksTest {
         assertNotNull(plan)
         assertEquals(mapOf("a1" to "me", "a2" to "jonah"), plan!!.attackTargets)
     }
+
+    @Test fun blockOutcomesCoverTradesChumpsAndUnblocked() {
+        val board = Board(
+            "bear" to card(1, "Grizzly Bears", "2", "2"), "angel" to card(2, "Serra Angel", "4", "4", keywords = listOf("FLYING")),
+            "cub" to card(3, "Badgermole Cub", "2", "2"), "goose" to card(4, "Gilded Goose", "0", "2", keywords = listOf("FLYING")),
+            "wall" to card(5, "Wall of Blossoms", "0", "4"), "elf" to card(6, "Llanowar Elves", "1", "1"),
+            "snake" to card(7, "Deathtouch Snake", "1", "1", keywords = listOf("DEATHTOUCH")),
+        )
+        assertEquals(BlockOutcome.UNBLOCKED, blockResult("bear", emptyMap(), board.piece).outcome)
+        assertEquals(BlockOutcome.TRADE, blockResult("bear", mapOf("cub" to listOf("bear")), board.piece).outcome)
+        val chump = blockResult("angel", mapOf("goose" to listOf("angel")), board.piece)
+        assertEquals(BlockOutcome.CHUMP, chump.outcome)
+        assertEquals(listOf("goose"), chump.blockersDying)
+        assertEquals(BlockOutcome.HELD_OFF, blockResult("bear", mapOf("wall" to listOf("bear")), board.piece).outcome)
+        assertEquals(BlockOutcome.ATTACKER_DIES, blockResult("elf", mapOf("cub" to listOf("elf")), board.piece).outcome)
+        // Deathtouch kills a much bigger attacker; two blockers share the attacker's damage in order.
+        assertTrue(blockResult("angel", mapOf("snake" to listOf("angel")), board.piece).attackerDies)
+        assertEquals(listOf("cub"), blockResult("angel", mapOf("cub" to listOf("angel"), "wall" to listOf("angel")), board.piece).blockersDying)
+    }
+
+    @Test fun attackRiskNamesTradesDeathsAndEvasion() {
+        val elves = card(10, "Llanowar Elves", "1", "1")
+        val birds = card(11, "Birds of Paradise", "0", "1", keywords = listOf("FLYING"))
+        assertEquals(AttackRisk("Could trade with Llanowar Elves", true), attackRisk(card(1, "Saproling", "1", "1"), listOf(elves, birds)))
+        assertEquals(AttackRisk("Survives any one blocker", false), attackRisk(card(2, "Badgermole Cub", "2", "2"), listOf(elves, birds)))
+        assertEquals(AttackRisk("0 power: deals no damage", true), attackRisk(card(3, "Gilded Goose", "0", "2"), listOf(elves)))
+        assertEquals(AttackRisk("Could die to Wall of Spikes", true), attackRisk(card(4, "Elf", "1", "1"), listOf(card(12, "Wall of Spikes", "1", "5"))))
+        // Only a flyer can block a flyer, and tapped creatures can't block.
+        assertEquals(AttackRisk("Could trade with Birds of Paradise", true), attackRisk(card(5, "Bird", "1", "1", keywords = listOf("FLYING")), listOf(elves, card(13, "Birds of Paradise", "1", "1", keywords = listOf("FLYING")))))
+        assertEquals(AttackRisk("Nothing they have can block it", false), attackRisk(card(6, "Drake", "2", "2", keywords = listOf("FLYING")), listOf(elves, elves.copy(id = 14, tapped = true))))
+        assertNull(attackRisk(null, listOf(elves)))
+    }
+
+    @Test fun summaryNamesAreCounted() {
+        assertEquals("Nothing", namesWithCounts(emptyList()))
+        assertEquals("2 × Goblin Token, Elf", namesWithCounts(listOf("Goblin Token", "Elf", "Goblin Token")))
+    }
 }

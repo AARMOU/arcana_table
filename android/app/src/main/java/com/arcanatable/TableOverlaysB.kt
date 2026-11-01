@@ -1029,7 +1029,7 @@ internal fun TableController.TableOverlaysB() {
         respondGlow = respondGlow, onRespondGlow = { v -> respondGlow = v; optionPrefs.edit().putBoolean("adjust_respond_glow", v).apply() },
         autoOpenHand = autoOpenHand, onAutoOpenHand = { v -> autoOpenHand = v; optionPrefs.edit().putBoolean("adjust_auto_open_hand", v).apply() },
         popupSeconds = playedPopupSeconds, onPopupSeconds = { v -> playedPopupSeconds = v.coerceIn(1f, 8f); optionPrefs.edit().putFloat("adjust_notice_seconds", playedPopupSeconds).apply() },
-        combatSize = combatCardScale, onCombatSize = { v -> combatCardScale = v.coerceIn(.65f, 1.35f); optionPrefs.edit().putFloat("adjust_combat_card_scale", combatCardScale).apply() },
+        combatSize = combatCardScale, onCombatSize = { v -> combatCardScale = v.coerceIn(MIN_COMBAT_ZOOM, MAX_COMBAT_ZOOM); optionPrefs.edit().putFloat(COMBAT_ZOOM_KEY, combatCardScale).apply() },
         onReset = {
             cardSizeScale = 1f; boardSpacingScale = 1f; handSheetHeightFraction = .52f; footerButtonScale = 1f; handCardScale = 1f; handArrangement = HandArrangement.AUTO_FIT
             quickActionOrderRaw = defaultQuickActionOrder

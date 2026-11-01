@@ -286,3 +286,74 @@ internal fun attackTargetsFrom(state: org.json.JSONObject?, attackers: List<Stri
         target.takeIf { it.isNotBlank() && it != "null" }?.let { id to it }
     }.toMap()
 }
+
+/** What a declared block is likely to do, from the defender's side. */
+enum class BlockOutcome(val label: String) {
+    UNBLOCKED("Unblocked"), TRADE("Trade"), ATTACKER_DIES("Kills it"), CHUMP("Chump block"), HELD_OFF("Held off"),
+}
+
+/** [blockersDying] = blocker ids the attacker's damage would destroy. */
+internal data class BlockResult(val outcome: BlockOutcome, val attackerDies: Boolean, val blockersDying: List<String>)
+
+private fun lethalTo(target: GameCard?, from: GameCard?, power: Int): Boolean =
+    target != null && power > 0 && !target.has("indestructible") &&
+        (from?.has("deathtouch") == true || power >= combatToughness(target))
+
+/**
+ * The likely result of the blocks on [attacker] in [selection]: every blocker's power against the
+ * attacker, and the attacker's power (twice with double strike) spread over its blockers in order,
+ * one point each with deathtouch. First strike and damage-order choices aren't modelled, so this
+ * is a label for the screen, never a rules decision; Argentum resolves the real combat.
+ */
+internal fun blockResult(attacker: String, selection: Map<String, List<String>>, piece: (String) -> CombatPiece): BlockResult {
+    val blockers = selection.filterValues { attacker in it }.keys.toList()
+    if (blockers.isEmpty()) return BlockResult(BlockOutcome.UNBLOCKED, false, emptyList())
+    val a = piece(attacker).card
+    val attackerDies = a != null && !a.has("indestructible") && blockers.any { b ->
+        val card = piece(b).card
+        card?.has("deathtouch") == true && combatPower(card) > 0
+    } || lethalTo(a, null, blockers.sumOf { combatPower(piece(it).card) })
+    var left = combatPower(a) * (if (a?.has("double strike") == true) 2 else 1)
+    val dying = mutableListOf<String>()
+    for (b in blockers) {
+        val card = piece(b).card ?: continue
+        if (card.has("indestructible")) continue
+        val need = if (a?.has("deathtouch") == true) 1 else combatToughness(card)
+        if (need in 1..left) { dying += b; left -= need }
+    }
+    val outcome = when {
+        attackerDies && dying.isNotEmpty() -> BlockOutcome.TRADE
+        attackerDies -> BlockOutcome.ATTACKER_DIES
+        dying.isNotEmpty() -> BlockOutcome.CHUMP
+        else -> BlockOutcome.HELD_OFF
+    }
+    return BlockResult(outcome, attackerDies, dying)
+}
+
+/** A short warning (or all-clear) for an attacker against the creatures that could block it. */
+internal data class AttackRisk(val text: String, val warn: Boolean)
+
+/**
+ * What could happen to [attacker] if one of [blockers] blocks it: a trade, death, or nothing
+ * worse than a bounce. Blockers that can't legally block it (evasion) are left out. A single-
+ * blocker estimate for the screen only.
+ */
+internal fun attackRisk(attacker: GameCard?, blockers: List<GameCard>): AttackRisk? {
+    if (attacker == null) return null
+    val power = combatPower(attacker) * (if (attacker.has("double strike")) 2 else 1)
+    if (power == 0) return AttackRisk("0 power: deals no damage", true)
+    val able = blockers.filter { !it.tapped && blockProblem(attacker, it) == null }
+    if (able.isEmpty()) return AttackRisk("Nothing they have can block it", false)
+    val killers = able.filter { lethalTo(attacker, it, combatPower(it)) }
+    val trade = killers.firstOrNull { lethalTo(it, attacker, power) }
+    return when {
+        trade != null -> AttackRisk("Could trade with ${trade.name}", true)
+        killers.isNotEmpty() -> AttackRisk("Could die to ${killers.first().name}", true)
+        else -> AttackRisk("Survives any one blocker", false)
+    }
+}
+
+/** "2 × Goblin Token, Llanowar Elves" for a summary line; "Nothing" when empty. */
+internal fun namesWithCounts(names: List<String>): String =
+    if (names.isEmpty()) "Nothing"
+    else names.groupingBy { it }.eachCount().entries.joinToString { (name, n) -> if (n > 1) "$n × $name" else name }
