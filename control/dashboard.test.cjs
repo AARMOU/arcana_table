@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10617)
-Total output lines: 618
-
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -260,7 +257,46 @@ test('an approved card that cannot run yet says why it is waiting',()=>{
 });
 test('closed issues are never shown as candidates and verdict age is shown',()=>{
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
-…617 tokens truncated…Review\?\.openNext\?\.\(\)/);
+  assert.ok(src.includes("if (info.state !== 'open') {"));
+  assert.ok(src.includes('row.remove();'));
+  assert.ok(src.includes('function render(container, units, checkedAt, mode)'));
+  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt,d.readiness?.dispatch);"));
+});
+test('stale public feed falls back to fresh GitHub without polling',()=>{
+  assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){"));
+  assert.ok(html.includes("fetch('https://api.github.com/repos/'+REPO+path"));
+  assert.ok(html.includes("if(fresh?.ok){res=fresh;directAt=Date.now();}"));
+  assert.equal((html.match(/isStaleFeed\(res\)/g)||[]).length,1);
+});
+test('source time survives the stale bypass and a hidden custom header',()=>{
+  // A bypassed read records its own check time; never GitHub's Last-Modified.
+  assert.ok(html.includes("const source=directAt??feedCheckedAt(res);"));
+  assert.ok(html.includes("r.headers.get('x-arcana-checked-at')||r.headers.get('last-modified')"));
+  // Review freshness reports the observer's checkedAt, not the client page-read time.
+  assert.ok(html.includes("sourceTimes.push(newer);"));
+  assert.ok(!html.includes("sourceTimes.push(Date.now())"));
+});
+test('signed-out approval checks GitHub live before showing a button',()=>{
+  const auth=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(auth.includes("https://api.github.com/repos/AARMOU/arcana_table/issues/"));
+  assert.ok(auth.includes("if (!direct?.ok) throw Error('Fresh issue state unavailable')"));
+  assert.ok(auth.includes("button.textContent = 'Sign in to authorize'"));
+});
+
+test('installed PWA refreshes when an updated service worker activates',()=>{
+  assert.ok(html.includes("updateViaCache: 'none'"));
+  assert.ok(html.includes("registration.update()"));
+  assert.ok(html.includes("addEventListener('controllerchange'"));
+  assert.ok(html.includes('if (reloading) return'));
+  assert.ok(html.includes('location.reload()'));
+  assert.ok(html.includes("updateViaCache: 'none'"));
+});
+
+test('operations hub replaces marketing banner with real owner review and authorization entry points', () => {
+  assert.doesNotMatch(html,/All systems\. One command center\./);
+  for (const id of ['quickVerify','quickDoIt','quickVerifyCount','quickDoItCount','opsWorkers','opsWorkerCount','dailyCardCount','dailyBars','dailyFresh'])
+    assert.match(html,new RegExp('id="'+id+'"'),id);
+  assert.match(script,/ArcanaReview\?\.openNext\?\.\(\)/);
   assert.match(script,/authorizationList/);
   assert.match(script,/renderOpsWorkers\(workerReport\)/);
   assert.match(script,/renderDailyCards\(r\)/);
