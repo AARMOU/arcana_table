@@ -1259,13 +1259,19 @@
    ]
   },
   "Effects.AttachTargetEquipmentToCreature": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Cranial Plating",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt"
+    },
+    {
+     "card": "Armory Automaton",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArmoryAutomaton.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArmoryAutomatonScenarioTest.kt"
     },
     {
      "card": "Sigarda's Aid",
@@ -1972,13 +1978,19 @@
    ]
   },
   "Effects.ForEachTarget": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Immoral Bargain",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImmoralBargain.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImmoralBargainScenarioTest.kt"
+    },
+    {
+     "card": "Armory Automaton",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArmoryAutomaton.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArmoryAutomatonScenarioTest.kt"
     },
     {
      "card": "Dismantling Wave",
@@ -2231,7 +2243,7 @@
    ]
   },
   "Effects.May": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Dinosaur Egg",
@@ -2258,16 +2270,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ConstrictingSliverScenarioTest.kt"
     },
     {
+     "card": "Armory Automaton",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArmoryAutomaton.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArmoryAutomatonScenarioTest.kt"
+    },
+    {
      "card": "Tataru Taru",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TataruTaru.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TataruTaruScenarioTest.kt"
-    },
-    {
-     "card": "Primal Amulet",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 71,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
   },
@@ -3726,8 +3738,14 @@
    ]
   },
   "Triggers.or": {
-   "count": 3,
+   "count": 4,
    "examples": [
+    {
+     "card": "Armory Automaton",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArmoryAutomaton.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArmoryAutomatonScenarioTest.kt"
+    },
     {
      "card": "Smuggler's Copter",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SmugglersCopter.kt",
@@ -3749,7 +3767,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -3887,7 +3905,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4539,7 +4557,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5858,7 +5876,7 @@
  },
  "targeting": {
   "EffectTarget.ContextTarget": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -5877,6 +5895,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LavabellySliver.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LavabellySliverScenarioTest.kt"
+    },
+    {
+     "card": "Armory Automaton",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArmoryAutomaton.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArmoryAutomatonScenarioTest.kt"
     },
     {
      "card": "Dismantling Wave",
@@ -6044,7 +6068,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6225,7 +6249,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Skorpekh Destroyer",
