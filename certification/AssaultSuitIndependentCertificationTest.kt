@@ -127,7 +127,7 @@ class AssaultSuitIndependentCertificationTest {
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to player)).error)
         assertNotNull(d.declareAttackers(opponent, mapOf(creature to planeswalker)).error)
         d.removeSummoningSickness(otherCreature)
-        assertNull(d.declareAttackers(opponent, mapOf(otherCreature to planeswalker)).error)
+        assertNull(d.declareAttackers(opponent, mapOf(otherCreature to player)).error)
         assertEquals(opponent, d.projected.getController(creature))
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = player)
