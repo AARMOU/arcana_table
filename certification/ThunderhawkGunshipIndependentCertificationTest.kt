@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.ThunderhawkGunship
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CrewVehicle
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -70,8 +71,8 @@ class ThunderhawkGunshipIndependentCertificationTest {
         d.removeSummoningSickness(bear)
 
         assertFalse(d.projected.isCreature(gunship))
-        assertNull(d.activate(player, gunship).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertNull(d.submit(CrewVehicle(player, gunship, listOf(bear))).error)
+        d.resolveAll()
 
         assertTrue(d.isTapped(bear))
         assertFalse(d.isTapped(gunship))
@@ -95,8 +96,8 @@ class ThunderhawkGunshipIndependentCertificationTest {
         d.removeSummoningSickness(elf)
         d.removeSummoningSickness(opposingBear)
 
-        assertNotNull(d.activate(player, gunship).error)
-        assertNotNull(d.activate(opponent, gunship).error)
+        assertNotNull(d.submit(CrewVehicle(player, gunship, listOf(elf))).error)
+        assertNotNull(d.submit(CrewVehicle(opponent, gunship, listOf(opposingBear))).error)
 
         assertFalse(d.isTapped(elf))
         assertFalse(d.isTapped(opposingBear))
@@ -120,8 +121,8 @@ class ThunderhawkGunshipIndependentCertificationTest {
         val opposingCreature = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
         listOf(gunship, crew, attacker, bystander, opposingCreature).forEach(d::removeSummoningSickness)
 
-        assertNull(d.activate(player, gunship).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertNull(d.submit(CrewVehicle(player, gunship, listOf(crew))).error)
+        d.resolveAll()
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(player, listOf(gunship, attacker), opponent).error)
         d.resolveAll()
