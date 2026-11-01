@@ -38,6 +38,7 @@ MANDATORY = [
     "0019-devoid-sdk-surface.patch",
     "0020-temple-projected-source-subtypes.patch",
     "0021-azlask-exact-colors-trigger.patch",
+    "0022-cant-be-sacrificed-by-effects.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
