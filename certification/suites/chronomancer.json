@@ -1,0 +1,9 @@
+{
+  "key": "chronomancer",
+  "name": "Chronomancer",
+  "issue": 825,
+  "source": "certification/ChronomancerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ChronomancerIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
