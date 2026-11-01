@@ -115,7 +115,7 @@ class AbaddonTheDespoilerIndependentCertificationTest {
 
     @Test
     fun aSpellCastFromTheGraveyardDoesNotGetCascade() {
-        val d = customScenario(AbaddonTheDespoiler, "Shock", "Past in Flames", "Llanowar Elves")
+        val d = customScenario(AbaddonTheDespoiler, "Shock", "Think Twice", "Llanowar Elves")
         val player = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(player, "Abaddon the Despoiler")
@@ -125,18 +125,15 @@ class AbaddonTheDespoilerIndependentCertificationTest {
         d.resolveAll()
         assertEquals(18, d.getLifeTotal(opponent))
 
-        val pastInFlames = d.putCardInHand(player, "Past in Flames")
-        d.giveMana(player, Color.RED)
-        d.giveColorlessMana(player, 3)
-        assertNull(d.castSpell(player, pastInFlames).error)
-        d.resolveAll()
-
-        d.giveMana(player, Color.RED)
-        assertNull(d.castSpell(player, shock, listOf(opponent)).error)
+        val thinkTwice = d.putCardInGraveyard(player, "Think Twice")
+        d.giveMana(player, Color.BLUE)
+        d.giveColorlessMana(player, 2)
+        assertNull(d.castSpell(player, thinkTwice).error)
         assertEquals(1, d.stackSize)
         d.resolveAll()
 
-        assertEquals(16, d.getLifeTotal(opponent))
+        assertEquals(18, d.getLifeTotal(opponent))
+        assertTrue(d.zoneNames(player, Zone.EXILE).contains("Think Twice"))
     }
 
     @Test
@@ -148,7 +145,7 @@ class AbaddonTheDespoilerIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         val signInBlood = d.putCardInHand(opponent, "Sign in Blood")
         d.giveMana(opponent, Color.BLACK)
-        d.giveColorlessMana(opponent, 1)
+        d.giveMana(opponent, Color.BLACK)
         assertNull(d.castSpell(opponent, signInBlood, listOf(opponent)).error)
         d.resolveAll()
         assertEquals(18, d.getLifeTotal(opponent))
