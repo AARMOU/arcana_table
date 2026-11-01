@@ -122,6 +122,7 @@ object CustomCards {
         Entry(SpittingDilophosaurus, "REX", POOL),
         Entry(DescendantsPath, "TLE", POOL),
         Entry(CloudExSoldier, "FIC", POOL),
+        Entry(WhiptongueHydra, "NEC", POOL),
         Entry(LeonardoTheBalance, "TMC", POOL),
         Entry(WakkaDevotedGuardian, "FIC", POOL),
         Entry(CaptainJamesTKirk, "TRK", POOL),
