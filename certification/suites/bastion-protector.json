@@ -1,0 +1,9 @@
+{
+  "key": "bastion-protector",
+  "name": "Bastion Protector",
+  "issue": 791,
+  "source": "certification/BastionProtectorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BastionProtectorIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
