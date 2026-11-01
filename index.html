@@ -3,115 +3,125 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0d1513">
-<meta name="description" content="Arcana Table for Android: Argentum-powered Magic with AI opponents, Commander decks, an interactive tutorial, and early Wi-Fi / online multiplayer. Explore the Build 138 closed-test candidate.">
-<meta property="og:title" content="Arcana Table — Magic on your terms">
-<meta property="og:description" content="Build 138: Commander decks, interactive lessons, deck tools, offline AI, and four-seat Wi-Fi / internet multiplayer preview on Android.">
+<meta name="theme-color" content="#101711">
+<meta name="description" content="Arcana Table is a two-player Android card game with offline AI, premade Commander decks, and one free mulligan. Build 141 is in testing.">
+<meta property="og:title" content="Arcana Table — A commander table in your pocket">
+<meta property="og:description" content="Play offline against AI, bring a friend, and find your next line. Build 141 is in Android testing.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aarmou.github.io/arcana_table/">
-<meta property="og:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
 <meta property="og:site_name" content="Arcana Table">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
-<link rel="icon" type="image/png" href="./assets/arcana-logo.png">
-<title>Arcana Table — Android Commander and Multiplayer Preview · Build 138</title>
+<title>Arcana Table — Android card game</title>
+<link rel="icon" href="./assets/arcana-logo.png">
 <style>
-:root{color-scheme:dark;--bg:#0c1412;--panel:#14221d;--panel2:#192c24;--ink:#edf8f1;--muted:#a2b6ab;--line:#2c4539;--mint:#90ebbe;--gold:#f2cc7d}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#294c35 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:4px}
-.wrap{width:min(1140px,calc(100% - 44px));margin-inline:auto}.nav{display:flex;gap:24px;justify-content:space-between;align-items:center;min-height:80px;border-bottom:1px solid #ffffff12}
-.brand{display:flex;gap:12px;align-items:center;font-size:17px;letter-spacing:.09em;font-weight:850;text-decoration:none}.brand img{width:45px;height:45px;object-fit:contain;border-radius:10px}
-.navlinks{display:flex;gap:20px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}.navlinks a{text-decoration:none}.navlinks a:hover{color:var(--mint)}
-.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 20px;border-radius:11px;text-decoration:none;font-weight:760;border:1px solid #506f5e;background:#ffffff07;transition:transform .2s,border-color .2s}
-.btn:hover{transform:translateY(-2px);border-color:var(--mint)}.btn.primary{background:var(--mint);border-color:var(--mint);color:#10241a}.actions{display:flex;gap:12px;flex-wrap:wrap}
-.hero{padding:76px 0 45px}.eyebrow{color:var(--mint);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:800}.hero h1{font-size:clamp(42px,6vw,70px);line-height:1.05;letter-spacing:-.052em;max-width:860px;margin:18px 0}.hero h1 em{color:var(--mint);font-style:normal}
-.hero .intro{display:flex;justify-content:space-between;align-items:end;gap:38px;margin-bottom:38px}.hero p{font-size:19px;color:var(--muted);max-width:610px;margin:0}
-.hero-visual{margin:0;position:relative;overflow:hidden;border:1px solid #426044;border-radius:23px;background:linear-gradient(125deg,#10271a,#172015);box-shadow:0 28px 90px #0006}
-.hero-visual img{display:block;width:100%;height:auto;aspect-ratio:2/1;object-fit:cover}.hero-visual figcaption{position:absolute;left:20px;bottom:18px;padding:6px 11px;border-radius:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#edf9ec;background:#0a140bc9}
-.strip{display:flex;justify-content:center;gap:13px;flex-wrap:wrap;padding:24px 0 10px}.strip span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c3d5c8;padding:8px 15px;border:1px solid #344b39;border-radius:30px;background:#ffffff04}
-section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-title h2{font-size:clamp(30px,4.2vw,48px);line-height:1.12;letter-spacing:-.04em;margin:10px 0}.section-title p{color:var(--muted);margin:0;font-size:17px}
-.feature-row{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center;padding:35px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(120deg,#183126,#111c18);margin-top:18px;min-height:450px}
-.feature-row.alt{background:linear-gradient(120deg,#121e1b,#1a2b24)}.feature-copy{padding:16px 30px}.feature-copy .number{color:var(--gold);font-weight:850;font-size:12px;letter-spacing:.16em}.feature-copy h3{font-size:clamp(26px,3.8vw,42px);line-height:1.13;letter-spacing:-.045em;margin:12px 0}.feature-copy p{color:var(--muted);max-width:455px}.feature-copy .detail{color:var(--mint);font-size:13px;font-weight:750}.feature-copy .upcoming{color:var(--gold);font-size:14px;font-weight:650;margin:15px 0}
-.screenshot{margin:0;display:flex;align-items:center;justify-content:center;min-width:0}.phone{display:block;width:min(290px,100%);max-height:540px;object-fit:contain;border:7px solid #111d1b;border-radius:27px;background:#0b1311;box-shadow:0 20px 48px #0007}
-.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.gallery article{border:1px solid var(--line);border-radius:19px;padding:25px;background:linear-gradient(170deg,#182820,#101b17)}.gallery figure{margin:0 auto 25px;text-align:center}.gallery img{display:block;width:min(240px,100%);height:345px;object-fit:cover;object-position:top center;border-radius:15px;border:4px solid #07120e;margin:auto}.gallery h3{font-size:20px;letter-spacing:-.025em;margin:10px 0 7px}.gallery p{color:var(--muted);margin:0;font-size:14px}
-.notice{border-left:3px solid var(--gold);padding:15px 20px;background:#f2cc7d0b;color:#d0ddd2;font-size:14px;margin-top:23px;border-radius:0 12px 12px 0}
-.cta{padding:34px;border:1px solid #557959;border-radius:20px;background:linear-gradient(120deg,#223e2b,#17241c);display:flex;align-items:center;justify-content:space-between;gap:28px}
-.cta h2{font-size:30px;line-height:1.2;letter-spacing:-.035em;margin:0 0 8px}.cta p{margin:0;color:#bccfc1;max-width:620px}
-.bottom-links{margin:22px 0 0;color:var(--muted);font-size:14px}footer{position:relative;border-top:1px solid #ffffff12;padding:26px 0 40px;color:#849b8c;font-size:13px}.footrow{display:flex;flex-wrap:wrap;justify-content:space-between;gap:15px}
-.boneknuckles-egg{position:absolute;right:10px;bottom:2px;width:35px;height:auto;opacity:.68;pointer-events:none;user-select:none;transform-origin:50% 100%;animation:boneknuckles-peek 12s ease-in-out infinite}
-@keyframes boneknuckles-peek{0%,84%,100%{transform:translateY(4px) rotate(0)}88%{transform:translateY(-3px) rotate(-7deg)}92%{transform:translateY(-2px) rotate(7deg)}96%{transform:translateY(4px) rotate(0)}}
-@media(prefers-reduced-motion:reduce){.boneknuckles-egg{animation:none;transform:none}}
-@media(max-width:760px){.wrap{width:calc(100% - 28px)}.nav{align-items:flex-start;flex-wrap:wrap;gap:10px;padding:13px 0}.navlinks{gap:11px}.hero{padding:42px 0 28px}.hero .intro{display:block}.hero h1{font-size:46px}.hero p{font-size:17px;margin-bottom:22px}.hero-visual{border-radius:14px}.hero-visual figcaption{font-size:9px;left:9px;bottom:9px}.feature-row{grid-template-columns:1fr;padding:18px;min-height:0;gap:12px}.feature-copy{padding:10px 5px}.feature-row.alt .screenshot{order:2}.phone{width:min(265px,100%)}.gallery{grid-template-columns:1fr}.gallery article{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;padding:15px}.gallery figure{margin:0;grid-row:span 2}.gallery img{width:130px;height:200px}.gallery h3{margin:0 0 6px}.gallery p{font-size:13px}.cta{display:block;padding:24px}.cta .actions{margin-top:23px}section{padding:47px 0}}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
+:root{color-scheme:dark;--bg:#101711;--panel:#17211a;--ink:#f1f5ed;--muted:#abb7ac;--green:#b9ef7b;--gold:#d7bd79;--line:#ffffff1b;--max:1120px}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:inherit}
+a:focus-visible{outline:2px solid var(--green);outline-offset:4px}
+.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+header{border-bottom:1px solid var(--line)}
+.nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-size:13px;font-weight:850;letter-spacing:.15em}
+.brand img{width:40px;height:40px;object-fit:contain}
+.nav a:last-child{font-size:13px;color:var(--green);text-decoration:none;font-weight:750}
+.hero{padding:78px 0 80px;background:radial-gradient(ellipse at 82% 10%,#2c472c70 0,transparent 42%),linear-gradient(180deg,#131c15,var(--bg))}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:54px}
+.eyebrow{display:flex;align-items:center;gap:10px;color:var(--green);font-size:11px;font-weight:850;letter-spacing:.18em;text-transform:uppercase}
+.eyebrow:before{content:"";width:23px;height:1px;background:var(--gold)}
+h1,h2,h3,p{margin-top:0}
+h1{max-width:680px;margin:17px 0;font-size:clamp(48px,7.5vw,84px);line-height:.97;letter-spacing:-.075em}
+h1 span{display:block;color:var(--green)}
+.lead{max-width:580px;margin:0;color:var(--muted);font-size:18px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:27px}
+.btn{display:inline-flex;min-height:48px;align-items:center;justify-content:center;padding:0 19px;border:1px solid transparent;border-radius:7px;font-size:14px;font-weight:800;text-decoration:none}
+.btn.primary{background:var(--green);color:#14200f}
+.btn.secondary{border-color:#ffffff35;background:#ffffff08}
+.note{margin:13px 0 0;color:#8f9d91;font-size:12px}
+.hero-card{position:relative;min-height:310px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;padding:25px;border:1px solid #ffffff24;border-radius:10px;background:linear-gradient(145deg,#1d2a20,#121914)}
+.hero-card:after{position:absolute;right:-70px;bottom:-135px;width:310px;height:310px;border:1px solid #d7bd7948;border-radius:50%;content:""}
+.hero-mark{width:75px;height:75px;object-fit:contain}
+.build-tag{position:relative;z-index:1;align-self:flex-start;margin-top:26px;padding:6px 9px;border:1px solid #b9ef7b67;border-radius:3px;color:var(--green);font-size:10px;font-weight:800;letter-spacing:.12em}
+.hero-card strong{position:relative;z-index:1;max-width:300px;font-size:clamp(25px,3vw,36px);line-height:1.08;letter-spacing:-.045em}
+.hero-card small{position:relative;z-index:1;color:var(--muted);font-size:12px}
+.section{padding:77px 0}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:25px;margin-bottom:27px}
+.section-head h2{max-width:620px;margin:8px 0 0;font-size:clamp(32px,4vw,48px);line-height:1.03;letter-spacing:-.055em}
+.section-intro{max-width:380px;margin:0;color:var(--muted);font-size:14px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.feature{min-height:174px;padding:23px 24px 24px 0}
+.feature+.feature{padding-left:24px;border-left:1px solid var(--line)}
+.feature .index{color:var(--gold);font-size:10px;font-weight:800;letter-spacing:.14em}
+.feature h3{margin:17px 0 7px;font-size:19px;letter-spacing:-.025em}
+.feature p{max-width:300px;margin:0;color:var(--muted);font-size:14px}
+.status{padding:0 0 78px}
+.status-card{display:grid;grid-template-columns:1fr auto;gap:25px;align-items:center;padding:25px 28px;border:1px solid #d7bd7950;border-radius:8px;background:linear-gradient(110deg,#1d2a20,#17211a)}
+.status-card h2{margin:7px 0 6px;font-size:25px;letter-spacing:-.04em}
+.status-card p{max-width:690px;margin:0;color:var(--muted);font-size:14px}
+.status-pill{padding:8px 11px;border:1px solid #ffffff2b;border-radius:4px;color:#e3eadf;font-size:11px;white-space:nowrap}
+.status-pill b{color:var(--green)}
+.limits{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:23px 0;border-top:1px solid var(--line)}
+.limits h3{margin:0 0 6px;font-size:14px}
+.limits p{margin:0;color:var(--muted);font-size:13px}
+.join{padding:76px 0;background:radial-gradient(ellipse at 85% 50%,#33482a67 0,transparent 45%),#121a14}
+.join-grid{display:grid;grid-template-columns:1fr .72fr;align-items:center;gap:45px}
+.join h2{max-width:600px;margin:9px 0 12px;font-size:clamp(38px,5.2vw,60px);line-height:1;letter-spacing:-.06em}
+.join-copy{max-width:580px;color:var(--muted)}
+.join-panel{padding:22px;border:1px solid #ffffff24;border-radius:8px;background:#17211ad9}
+.join-panel .btn{width:100%}
+.join-panel p{margin:12px 0 0;color:#9eaa9f;font-size:12px}
+.join-panel a:not(.btn){color:var(--green)}
+footer{position:relative;padding:23px 0;border-top:1px solid var(--line);color:#89968b;font-size:12px}
+.footer-row{display:flex;justify-content:space-between;align-items:center;gap:18px}
+.footer-links{display:flex;flex-wrap:wrap;gap:15px}.footer a{color:#abb7ac}
+.boneknuckles{width:35px;height:38px;object-fit:contain;opacity:.82}
+@media(max-width:760px){.wrap{width:calc(100% - 32px)}.hero{padding:54px 0 60px}.hero-grid{grid-template-columns:1fr;gap:28px}.hero-card{min-height:240px}.section{padding:58px 0}.section-head{display:block}.section-intro{margin-top:12px}.features{grid-template-columns:1fr}.feature,.feature+.feature{min-height:0;padding:19px 0;border-left:0}.feature+.feature{border-top:1px solid var(--line)}.feature h3{margin:8px 0 5px}.status{padding-bottom:58px}.status-card{grid-template-columns:1fr;padding:21px}.status-pill{justify-self:start}.limits{grid-template-columns:1fr;gap:17px}.join{padding:60px 0}.join-grid{grid-template-columns:1fr;gap:22px}.join-panel{max-width:500px}}
+@media(max-width:480px){.nav{min-height:65px}.brand{font-size:11px}.brand img{width:35px;height:35px}.nav a:last-child{font-size:11px}h1{font-size:clamp(46px,14vw,62px)}.lead{font-size:16px}.hero-card{min-height:215px;padding:20px}.hero-mark{width:58px;height:58px}.build-tag{margin-top:15px}.status-pill{white-space:normal}.footer-row{align-items:flex-start}.footer-row>div:first-child{max-width:210px}.footer-links{gap:10px}.boneknuckles{width:29px;height:32px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
-<style>
-.release-state{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 20px}.release-pill{display:inline-block;border:1px solid #60896b;background:#15372a;padding:6px 12px;border-radius:99px;color:var(--mint);font-size:12px;letter-spacing:.04em;font-weight:800}.release-state small{color:var(--muted);font-size:13px}.feature-grid,.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.feature-card{background:linear-gradient(155deg,#1a3026,#101d18);border:1px solid var(--line);border-radius:18px;padding:24px}.feature-card h3{font-size:20px;line-height:1.3;margin:7px 0}.feature-card p{color:var(--muted);font-size:15px;margin:8px 0 0}.feature-card .kicker{font-size:11px;letter-spacing:.16em;font-weight:850;text-transform:uppercase;color:var(--gold)}.notes-list{margin:0;padding:0;list-style:none;display:grid;gap:14px}.notes-list li{border:1px solid var(--line);background:#17251e;border-radius:14px;padding:20px 23px}.notes-list strong{display:block;color:var(--ink);margin-bottom:5px}.notes-list p{margin:0;color:var(--muted)}.source-note{font-size:13px;color:var(--muted);margin-top:22px}.source-note a{color:var(--mint)}.faq article{border-top:1px solid var(--line);padding:17px 0}.faq h3{font-size:17px;margin:0 0 7px}.faq p{color:var(--muted);margin:0}.testing-status{border:1px solid #476d54;background:#192a20;border-radius:15px;padding:18px 23px;margin-top:18px}.testing-status strong{color:var(--mint)}.testing-status p{color:var(--muted);margin:5px 0 0;font-size:14px}@media(max-width:760px){.feature-grid,.faq{grid-template-columns:1fr}.feature-card{padding:19px}.notes-list li{padding:17px}.release-state{align-items:flex-start}}
-</style>
-<style>.beta-signup-panel{min-width:260px;flex:1;padding:20px;border:1px solid #527c5d;border-radius:15px;background:#0a170f70}.beta-signup-panel .actions{margin:0 0 14px}.beta-fine{font-size:13px;color:#b6c6ba;margin:0}@media(max-width:850px){.cta{display:block}.beta-signup-panel{margin-top:20px}}</style></head>
+</head>
 <body>
-<header class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
-<nav class="navlinks" aria-label="Main navigation"><a href="#experience">App</a><a href="#new-in-138">What’s new</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
+<header><nav class="wrap nav" aria-label="Main navigation">
+<a class="brand" href="./" aria-label="Arcana Table home"><img src="./assets/arcana-logo.png" width="40" height="40" alt=""><span>ARCANA TABLE</span></a>
+<a href="#testing">Android testing <span aria-hidden="true">↗</span></a>
+</nav></header>
 <main>
-<div class="wrap hero">
-<div class="eyebrow">Android · Commander · Powered by Argentum</div>
-<div class="release-state"><span class="release-pill">Build 138 · Closed-test release candidate</span><small>Signed bundle ready for Google Play submission; rollout is not yet confirmed.</small></div>
-<h1>A whole Magic table.<br><em>Right in your hand.</em></h1>
-<div class="intro"><p>Bring your Commander decks to a touch-friendly table: play offline against AI, learn with guided practice, or try a four-seat multiplayer lobby over Wi-Fi or internet. Argentum handles game rules, actions, and turn flow.</p>
-<div class="actions"><a class="btn primary" href="#testing">Join closed testing ↓</a><a class="btn" href="#screenshots">See the app ↓</a></div></div>
-<figure class="hero-visual"><img src="./assets/arcana-hero-four-player.svg" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Earlier-build screenshot · Interface has evolved</figcaption></figure>
-<div class="strip"><span>Commander premades</span><span>Offline AI</span><span>Four-seat lobby preview</span><span>Deck editor &amp; import</span><span>20 tutorial chapters</span></div>
+<section class="hero" aria-labelledby="hero-title"><div class="wrap hero-grid">
+<div>
+<div class="eyebrow">Android · Build 141 testing</div>
+<h1 id="hero-title">A commander table.<span>In your pocket.</span></h1>
+<p class="lead">Play offline against AI, bring a friend, and take one free mulligan. Arcana Table is a two-player card game for Android, with premade Commander decks and rules-assisted play.</p>
+<div class="actions"><a class="btn primary" href="#testing">Request test access</a><a class="btn secondary" href="#what-works">See what’s in the build</a></div>
+<p class="note">Build 141 is a development test build, not a public release.</p>
 </div>
-<section class="wrap" id="experience">
-<div class="section-title"><div class="eyebrow">Inside Arcana</div><h2>From choosing your commander to casting your first spell.</h2><p>A closer look at the real app—not another collection of decorative mockups.</p></div>
-<div class="feature-row">
-<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Pick a deck. Start a game.</h3><p>Choose from categorized Commander premades, or use the re-enabled deck importer and editor in the Build 138 candidate. Pick a commander and jump into an AI game.</p><p class="upcoming"><strong>In testing:</strong> Online and local multiplayer now use a four-seat lobby; wider device and network acceptance is still underway.</p><span class="detail">Android-first, including Fold layouts</span></div>
-<figure class="screenshot"><img class="phone" src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table home screen showing Sliver Overlord selected and the green Play button"></figure>
+<div class="hero-card" aria-label="Build 141 Android test build status">
+<img class="hero-mark" src="./assets/arcana-logo.png" width="75" height="75" alt="">
+<span class="build-tag">CURRENT DEVELOPMENT BUILD</span>
+<strong>Two players.<br>One more game.</strong>
+<small>Offline AI · Premade decks · One free mulligan</small>
 </div>
-<div class="feature-row alt">
-<figure class="screenshot"><img class="phone" src="./assets/arcana-ai.webp" width="800" height="1424" loading="lazy" alt="Arcana offline AI game setup, showing player count and opponent deck options"></figure>
-<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game with AI players, select a deck for the first opponent, or leave the selection to chance. No internet connection is needed for offline AI play.</p><span class="detail">Local Argentum rules engine · No network required for offline AI</span></div>
-</div>
-</section>
-<section class="wrap" id="new-in-138">
-<div class="section-title"><div class="eyebrow">Build 138 update</div><h2>A lot has changed since Build 121.</h2><p>A more capable Commander table, with integrated multiplayer, deck tools, a full tutorial, and targeted usability repairs. These features are present in the Build 138 candidate; physical multiplayer acceptance is ongoing.</p></div>
-<div class="feature-grid">
-<article class="feature-card"><div class="kicker">01 · Multiplayer preview</div><h3>Start at the table, not in setup pop-ups.</h3><p>Host directly into a four-seat friends lobby, adjust seats before starting, share an online room code or Wi-Fi address, and have guests ready up. Two-to-four-seat room flows are in active testing.</p></article>
-<article class="feature-card"><div class="kicker">02 · Stay connected</div><h3>Room chat and private hands.</h3><p>In-room chat has returned for Wi-Fi and internet sessions. Opening-hand and mulligan flows use guest-private card data, and a background-host guard helps keep an active room alive. Reconnect and device testing remain important.</p></article>
-<article class="feature-card"><div class="kicker">03 · Your decks</div><h3>Premades, import, edit.</h3><p>Browse categorized decks from Arcana, Wizards precon content, and Argentum selections. The deck import entry and deck editor are enabled in this test candidate. Card legality and individual interactions remain subject to engine support.</p></article>
-<article class="feature-card"><div class="kicker">04 · Learning the table</div><h3>20 chapters of guided play.</h3><p>Follow interactive lessons through the opening hand, battlefield, combat, stack and controls. Lessons include real Argentum-powered practice states, with improved guidance placement for smaller and folding screens.</p></article>
-<article class="feature-card"><div class="kicker">05 · More readable play</div><h3>Refined table and menus.</h3><p>Touch-friendly hand, stack, turn and commander views; adjustable layouts and notifications; cleaner menu flows. The obsolete separate “Online with Argentum” menu entry has been removed, leaving direct Host and Join actions.</p></article>
-<article class="feature-card"><div class="kicker">06 · Release polish</div><h3>Original identity, useful diagnostics.</h3><p>The original Arcana launcher logo is retained. The optional in-game “engine running” indicator lives under Help &amp; Diagnostics; the required Android foreground-service notice is separate. Release assets and branding are checked during CI.</p></article>
-<article class="feature-card"><div class="kicker">07 · Cards and rules</div><h3>Growing Argentum coverage.</h3><p>More custom-card behaviors, Eldrazi work, and engine regressions are covered by automated tests. The original Eldrazi Incursion index reached 94 of 100 card-name slots in the build evidence; indexed does not mean fully gameplay-certified.</p></article>
-<article class="feature-card"><div class="kicker">08 · Build quality</div><h3>Release candidate tested.</h3><p>The Build 138 production-package job completed with 427 Android tests, zero failures and five skips, plus custom-card, engine, release-lint and branding checks. Passing CI does not replace real-device playtesting.</p></article>
-</div>
-<div class="testing-status"><strong>Release status — October 27, 2026</strong><p>The Build 138 Android App Bundle has been compiled and signed for the existing <code>com.arcanatable</code> Play listing. Google Play acceptance or closed-testing rollout has not been confirmed. Tester access remains invitation-based.</p></div>
-</section>
-<section class="wrap" id="changelog">
-<div class="section-title"><div class="eyebrow">Development milestones</div><h2>From Build 121 to Build 138.</h2><p>Major player-facing workstreams, rather than a claim that every individual bug or card has been fully resolved.</p></div>
-<ul class="notes-list">
-<li><strong>Builds 121–131 · Engine and play foundations</strong><p>Argentum integration, additional card scenarios and regression coverage, targeting and combat investigations, improvements to hand/table usability, and expanded Eldrazi testing. Some complex game interactions remain active issues.</p></li>
-<li><strong>Builds 132–136 · Release and multiplayer groundwork</strong><p>Original launcher branding, Help &amp; Diagnostics cleanup, the interactive tutorial, local and internet room infrastructure, multi-seat host and guest flows, and the new full-screen waiting lobby.</p></li>
-<li><strong>Builds 137–138 · Integrated test candidate</strong><p>Four-seat friends lobby without redundant host setup, guest-private opening hands, in-room chat, background-host improvements, Fold tutorial placement, and simplified online menu. Build 138 additionally passed production-ID APK/AAB validation and signing.</p></li>
-</ul>
-<p class="source-note">See <a href="https://github.com/AARMOU/arcana_table/issues/81">development coordination and release evidence</a>, <a href="https://github.com/AARMOU/arcana_table/actions/runs/40512660878">Build 138 CI results</a>, and <a href="https://github.com/AARMOU/arcana_table">source code</a>. Source tests, candidate availability, and live Play Store status are different milestones.</p>
-</section>
-<section class="wrap" id="screenshots">
-<div class="section-title"><div class="eyebrow">Genuine app captures · Earlier build</div><h2>What playing looks like.</h2><p>Real app screenshots from an earlier Android build, not newly captured Build 138 images. Menus and layouts have evolved in the release candidate.</p></div>
-<div class="gallery">
-<article><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Seven-card opening hand showing Hedge Maze and Sliver cards in the Argentum game"></figure><div><h3>Real opening hands</h3><p>See your seven cards, inspect their artwork, and make your opening decisions.</p></div></article>
-<article><figure><img src="./assets/arcana-battlefield.webp" width="800" height="1424" loading="lazy" alt="Arcana Table battlefield interface with phase controls, life totals, and a Bello card played by an AI opponent"></figure><div><h3>A live battlefield</h3><p>Track phases, boards, the stack, and AI actions while the game unfolds.</p></div></article>
-<article><figure><img src="./assets/arcana-settings.webp" width="800" height="1424" loading="lazy" alt="Arcana gameplay settings screen with card size, player following, AI action, timer, and background alert controls"></figure><div><h3>Settings that matter</h3><p>Adjust card size, UI layout, turn behavior, and game notifications to suit your play style.</p></div></article>
-</div>
-<div class="notice"><strong>Closed-test limitations:</strong> Build 138 includes an early two-to-four-seat multiplayer implementation, but Wi-Fi/internet host, guest, chat, reconnect, and private-hand behavior still require device acceptance. Some cards and rules interactions remain under development. The standalone Iron Spider, Lunar Whale, Ulalek, and Eldrazi Displacer debugging presets exist in debug builds only; they are <strong>not included in the Play release</strong>. Guided tutorial practice is included.</div>
-</section>
-<section class="wrap" id="faq"><div class="section-title"><div class="eyebrow">Before you join</div><h2>What to expect in testing.</h2></div><div class="faq">
-<article><h3>Can I play without internet?</h3><p>Yes. Offline games against local AI run on your device.</p></article>
-<article><h3>Does Build 138 support four friends?</h3><p>The four-seat lobby and local/internet room paths are implemented as a testing preview, not a guarantee of finished cross-network reliability. Testers are helping verify real devices and reconnection.</p></article>
-<article><h3>Are deck importing and editing available?</h3><p>Both are enabled in the Build 138 candidate. Premade decks are still a quick way to get started; individual imported cards depend on current Argentum rules support.</p></article>
-<article><h3>Are the development test scenarios included?</h3><p>No. Dedicated debugging boards are excluded from the Play release. Interactive tutorial lessons and their practice exercises are included.</p></article>
 </div></section>
-<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist for upcoming Build 138 testing. Leave your email through our form; we will contact you if an invitation is available. Submitting the form does not install the app.</p></div><div class="beta-signup-panel"><div class="actions"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request beta access ↗</a></div><p class="beta-fine">Sign up securely using Google Forms. We’ll use your email for closed-test invitations and essential updates. Signing up does not automatically grant access. <a href="./privacy.html">Privacy policy</a>.</p></div></div>
-<p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p></section>
+<section class="section" id="what-works" aria-labelledby="works-title"><div class="wrap">
+<div class="section-head"><div><div class="eyebrow">What’s in the current test build</div><h2 id="works-title">The table, without the guesswork.</h2></div><p class="section-intro">A focused Android card-table experience. The page only lists capabilities confirmed for the current test cycle.</p></div>
+<div class="features">
+<article class="feature"><span class="index">01 / PLAY</span><h3>Go offline against AI.</h3><p>Start a local game against AI opponents without an internet connection.</p></article>
+<article class="feature"><span class="index">02 / OPENING HAND</span><h3>Take one free mulligan.</h3><p>Review your opening hand and take the free mulligan included in Build 141.</p></article>
+<article class="feature"><span class="index">03 / DECKS</span><h3>Choose a premade deck.</h3><p>Premade Commander decks are available in testing. Public deck import is turned off.</p></article>
+</div>
+</div></section>
+<section class="status" aria-labelledby="status-title"><div class="wrap status-card">
+<div><div class="eyebrow">Current status</div><h2 id="status-title">Build 141 · Android test APK</h2><p>The latest development APK is a debug test build. It has not been uploaded to Google Play or released publicly. Two-player play is the current scope; four-player support is still in development.</p></div>
+<div class="status-pill"><b>Testing</b> · Invitation required</div>
+</div></section>
+<section class="wrap limits" aria-label="Current scope and limitations">
+<div><h3>What works now</h3><p>Offline AI, two-player games, premade Commander decks, and one free mulligan are in the current test cycle.</p></div>
+<div><h3>What’s still in progress</h3><p>Four-player support and additional card interactions are still being developed. Deck import is off for the public test.</p></div>
+</section>
+<section class="join" id="testing" aria-labelledby="join-title"><div class="wrap join-grid">
+<div><div class="eyebrow">Android closed testing</div><h2 id="join-title">Want to try the table?</h2><p class="join-copy">Request an invitation to the Android closed test. A request does not guarantee an invitation, grant Play Store access, or install the app.</p></div>
+<div class="join-panel"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request a test invitation <span aria-hidden="true">↗</span></a><p>Your email is used for closed-test invitations and essential updates. Read the <a href="./privacy.html">privacy policy</a>.</p></div>
+</div></section>
 </main>
-<footer><div class="wrap footrow"><span>Arcana Table · Build 138 candidate · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a> · <a href="./assets/about-the-developers.webp">about the developers</a></span></div><img class="boneknuckles-egg" src="./assets/boneknuckles-peek.svg" width="35" height="38" alt="" aria-hidden="true" loading="lazy"></footer>
-</body></html>
+<footer><div class="wrap footer-row"><div>Arcana Table · Independent fan-made project.<br>Magic: The Gathering is owned by Wizards of the Coast.</div><div class="footer-links"><a href="./privacy.html">Privacy</a><a href="./assets/about-the-developers.webp">About the developers</a><a href="https://github.com/AARMOU/arcana_table">Source</a></div><img class="boneknuckles" src="./assets/boneknuckles-peek.svg" width="35" height="38" alt="" aria-hidden="true" loading="lazy"></div></footer>
+</body>
+</html>
