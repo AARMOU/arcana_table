@@ -1,0 +1,8 @@
+{
+  "key": "abaddon-the-despoiler",
+  "name": "Abaddon the Despoiler",
+  "issue": 713,
+  "source": "certification/AbaddonTheDespoilerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AbaddonTheDespoilerIndependentCertificationTest",
+  "tests": 7
+}
