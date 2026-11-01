@@ -1,0 +1,22 @@
+{
+ "argentum-mtg-sdk.jar": {
+  "from": "d0da1c9bd4159f700d5b0390dd0458135695794e46758bfbe7138cff67c03d22",
+  "to": "01471521dfe4f85e15e1038bdd9b4a5613a1aba571f57d42f09f4f3cdf0975c6",
+  "classMajor": 61
+ },
+ "argentum-mtg-sdk-tooling.jar": {
+  "from": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
+  "to": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
+  "classMajor": 61
+ },
+ "argentum-rules-engine.jar": {
+  "from": "efeb8b51e9902562c5026e0f58e8622c870a72f1af358522c66eacd4d5918309",
+  "to": "cea818712fcb997507c19756987236cdd56e41efe10318f589c9db604725bc4f",
+  "classMajor": 61
+ },
+ "argentum-ai.jar": {
+  "from": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
+  "to": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
+  "classMajor": 61
+ }
+}
