@@ -236,42 +236,38 @@ class ReadinessTests(unittest.TestCase):
 
 
     def test_reviewed_line_makes_card_supported_only_for_exact_wording(self):
-        with mock.patch.object(readiness, "implementation_state", return_value=(None, [], None)):
-            v = readiness.classify("Ancient Stone Idol")
-            self.assertEqual((v["readiness"], v["route"], v.get("reviewed")), ("SUPPORTED", "copilot", True), v["reasons"])
-            entry = dict(readiness.verified_support()[repo.normalize_name("Ancient Stone Idol")])
-            entry["reviewedLines"] = [{"line": "When this creature dies, create a 6/6 token.", "primitives": ["x"]}]
-            with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
-                self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")
-            entry["reviewedLines"] = [{"line": readiness.classify("Ancient Stone Idol")["lines"][-1]["text"]}]
-            with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
-                self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
+        v = readiness.classify("Ancient Stone Idol")
+        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")), ("SUPPORTED", "copilot", True), v["reasons"])
+        entry = dict(readiness.verified_support()[repo.normalize_name("Ancient Stone Idol")])
+        entry["reviewedLines"] = [{"line": "When this creature dies, create a 6/6 token.", "primitives": ["x"]}]
+        with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
+            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")
+        entry["reviewedLines"] = [{"line": readiness.classify("Ancient Stone Idol")["lines"][-1]["text"]}]
+        with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
+            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
 
     def test_review_binding_rejects_numeric_cost_or_unreviewed_line_changes(self):
         import copy
         original = oracle.cached("Ancient Stone Idol")
-        with mock.patch.object(readiness, "implementation_state", return_value=(None, [], None)):
-            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "SUPPORTED")
-            for changes in ({"oracle_text": original["oracle_text"].replace("6/12", "6/13")},
-                            {"mana_cost": "{9}"},
-                            {"oracle_text": original["oracle_text"] + "\nDraw a card."}):
-                changed = {**copy.deepcopy(original), **changes}
-                with mock.patch.object(oracle, "cached", return_value=changed):
-                    result = readiness.classify("Ancient Stone Idol")
-                    self.assertEqual(result["readiness"], "NEEDS_REVIEW", changes)
-                    self.assertFalse(result.get("reviewed"))
+        self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "SUPPORTED")
+        for changes in ({"oracle_text": original["oracle_text"].replace("6/12", "6/13")},
+                        {"mana_cost": "{9}"},
+                        {"oracle_text": original["oracle_text"] + "\nDraw a card."}):
+            changed = {**copy.deepcopy(original), **changes}
+            with mock.patch.object(oracle, "cached", return_value=changed):
+                result = readiness.classify("Ancient Stone Idol")
+                self.assertEqual(result["readiness"], "NEEDS_REVIEW", changes)
+                self.assertFalse(result.get("reviewed"))
 
     def test_review_binding_requires_runtime_base_reviewer_and_full_oracle_hash(self):
         key = repo.normalize_name("Ancient Stone Idol")
         original = readiness.verified_support()[key]
         for changes in ({"runtimeHash": "0" * 64}, {"oracleHash": "0" * 64},
                         {"baseSha": "short"}, {"verifiedBy": ""}, {"references": []}):
-            with mock.patch.object(readiness, "implementation_state", return_value=(None, [], None)):
-                with mock.patch.object(readiness, "verified_support", return_value={key: {**original, **changes}}):
-                    self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW", changes)
-        with mock.patch.object(readiness, "implementation_state", return_value=(None, [], None)):
-            with mock.patch.object(readiness, "review_runtime_hash", return_value=None):
-                self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")
+            with mock.patch.object(readiness, "verified_support", return_value={key: {**original, **changes}}):
+                self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW", changes)
+        with mock.patch.object(readiness, "review_runtime_hash", return_value=None):
+            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")
 
     def test_every_reviewed_line_names_primitives(self):
         for name, entry in readiness.verified_support().items():
