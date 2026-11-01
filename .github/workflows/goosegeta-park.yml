@@ -13,7 +13,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   park:
-    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    if: false # Runtime shutdown completed and authenticated in run 41264632755.
+    # Previous guard: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
@@ -51,4 +52,34 @@ jobs:
           name: Goosegeta-Parking-Evidence
           path: GOOSEGETA-PARKING-RESULT.json
           if-no-files-found: warn
+          retention-days: 90
+
+  preserve:
+    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bundle preserved original refs with complete ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p goosegeta-archive
+          git for-each-ref --format='%(refname) %(objectname)' refs/remotes/origin/archive/goosegeta/2026-10-31/ > goosegeta-archive/REFS.txt
+          test "$(wc -l < goosegeta-archive/REFS.txt)" -eq 10
+          mapfile -t refs < <(cut -d ' ' -f 1 goosegeta-archive/REFS.txt)
+          git bundle create goosegeta-archive/Goosegeta-Original-Source.bundle "${refs[@]}"
+          git bundle verify goosegeta-archive/Goosegeta-Original-Source.bundle
+          sha256sum goosegeta-archive/Goosegeta-Original-Source.bundle > goosegeta-archive/SHA256SUMS
+          printf '%s\n' 'Complete ancestry and source objects for the ten original archive refs.' 'No gameplay build, deploy, API inference, secret export or storage mutation.' 'Original UI and workflows are historical; do not rerun them without new owner approval.' > goosegeta-archive/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Goosegeta-Source-Preservation
+          path: goosegeta-archive/
+          if-no-files-found: error
           retention-days: 90
