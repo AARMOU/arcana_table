@@ -66,7 +66,7 @@ jobs:
           if [ -n "${PUSH_KV_ID:-}" ] && [ -n "${VAPID_PUBLIC:-}" ] && [ -n "${VAPID_PRIVATE:-}" ]; then
             [[ "$PUSH_KV_ID" =~ ^[0-9a-f]{32}$ ]] || { echo 'Invalid REVIEW_CARD_PUSH_KV_ID'; exit 1; }
             [[ "$VAPID_PUBLIC" =~ ^[A-Za-z0-9_-]{87}$ ]] || { echo 'Invalid VAPID public key'; exit 1; }
-            printf '\\n[[kv_namespaces]]\\nbinding = "CARD_PUSH"\\nid = "%s"\\n' "$PUSH_KV_ID" >> control/review-worker/wrangler.toml
+            printf '\n[[kv_namespaces]]\nbinding = "CARD_PUSH"\nid = "%s"\n' "$PUSH_KV_ID" >> control/review-worker/wrangler.toml
           else
             echo 'Card-ready Web Push not configured. Review Worker retains existing features.'
           fi
