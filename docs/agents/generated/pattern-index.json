@@ -108,6 +108,17 @@
     }
    ]
   },
+  "Conditions.Delirium": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
   "Conditions.EmptyHand": {
    "count": 2,
    "examples": [
@@ -700,7 +711,7 @@
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Defile",
@@ -737,6 +748,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DenyTheWitch.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyTheWitchScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.capturedAtCast": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
   },
@@ -1992,6 +2014,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PantlazaSunFavored.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PantlazaSunFavoredScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.DividedDamage": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
   },
@@ -3387,7 +3420,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 31,
+   "count": 32,
    "examples": [
     {
      "card": "Venomthrope",
@@ -4586,7 +4619,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -4976,7 +5009,7 @@
    ]
   },
   "spell { }": {
-   "count": 50,
+   "count": 51,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5052,7 +5085,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 59,
+   "count": 60,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5093,7 +5126,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 148,
+   "count": 149,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5177,7 +5210,7 @@
  },
  "field": {
   "condition": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -5204,16 +5237,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NutCollectorScenarioTest.kt"
     },
     {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    },
+    {
      "card": "Tallyman of Nurgle",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
-    },
-    {
-     "card": "Forge of Heroes",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ForgeOfHeroes.kt",
-     "lines": 50,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ForgeOfHeroesScenarioTest.kt"
     }
    ]
   },
@@ -5788,6 +5821,17 @@
     }
    ]
   },
+  "Patterns.Library.surveil": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
   "Step.BEGIN_COMBAT": {
    "count": 4,
    "examples": [
@@ -6299,7 +6343,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -6460,7 +6504,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -6501,13 +6545,19 @@
    ]
   },
   "MustAttack": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Ulamog's Crusher",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt"
+    },
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
     }
    ]
   },
@@ -6889,6 +6939,17 @@
     }
    ]
   },
+  "Filters.Self": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
   "GameObjectFilter.Any": {
    "count": 18,
    "examples": [
@@ -7059,7 +7120,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 108,
+   "count": 109,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7197,8 +7258,14 @@
    ]
   },
   "GameObjectFilter.Noncreature": {
-   "count": 2,
+   "count": 3,
    "examples": [
+    {
+     "card": "Dragon's Rage Channeler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    },
     {
      "card": "The Cabbage Merchant",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheCabbageMerchant.kt",
@@ -7605,7 +7672,7 @@
    ]
   },
   "Player.You": {
-   "count": 39,
+   "count": 40,
    "examples": [
     {
      "card": "Defile",
@@ -7720,7 +7787,7 @@
    ]
   },
   "TargetFilter.Creature": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Defile",
@@ -8138,7 +8205,7 @@
    ]
   },
   "targets(\u2026)": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -8159,6 +8226,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/InversionBehemothScenarioTest.kt"
     },
     {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
+    },
+    {
      "card": "Continue?",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ContinueQuestion.kt",
      "lines": 38,
@@ -8169,12 +8242,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
-    },
-    {
-     "card": "Dismantling Wave",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DismantlingWave.kt",
-     "lines": 44,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DismantlingWaveScenarioTest.kt"
     }
    ]
   }
