@@ -292,6 +292,7 @@ object CustomCards {
         Entry(Scaretiller, "ELD", "Six WotC precons"),
         Entry(GoliathTruck, "40K", "Six WotC precons"),
         Entry(IlluminorSzeras, "40K", "Six WotC precons"),
+        Entry(ThunderhawkGunship, "40K", "Six WotC precons"),
         Entry(EldraziConscription, "M3C", "Six WotC precons"),
         // Eldrazi Incursion.
         Entry(EldraziDisplacer, "OGW", "Eldrazi Incursion"),
