@@ -30,7 +30,7 @@ class EndlessAtlasIndependentCertificationTest {
         val d = customScenario(EndlessAtlas)
         val p = d.player1
         val atlas = d.putPermanentOnBattlefield(p, "Endless Atlas")
-        repeat(3) { d.putLandOnBattlefield(p, "Plains") }
+        repeat(3) { d.tapPermanent(d.putLandOnBattlefield(p, "Plains")) }
         d.giveColorlessMana(p, 1)
         val handBefore = d.getHandSize(p)
 
