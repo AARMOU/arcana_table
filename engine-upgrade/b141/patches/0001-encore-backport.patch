@@ -1,0 +1,943 @@
+From 6051e4c8fe40202559e873254bf66ef0e7f2e72c Mon Sep 17 00:00:00 2001
+From: Vincent Bons <2526796+wingedsheep@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 16:47:15 +0100
+Subject: [PATCH] [agent-loop: claude-opus-5-5] Encore keyword for Commander
+ staples (#3829)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Add encore (CR 702.141) and player-directed attack requirements
+
+MarkMustAttackEffect gains a `defender` axis — "attacks that opponent this turn
+if able" — stored as MustAttackPlayerThisTurnComponent and enforced through
+DirectedAttackRequirements beside Public Enemy (bound only while the creature
+could attack that player, CR 508.1d). Encore composes from it: per opponent, a
+token copy under the activator's control that gains haste, is marked to attack
+that opponent, and is sacrificed at the next end step.
+
+Impulsive Pilferer (CMR #185) is the first card.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+* Clear attacks-this-turn marks when a creature leaves the battlefield; doc fixes
+
+Review follow-ups: the directed and undirected must-attack-this-turn marks belong
+to the object (CR 400.7); SDK reference badge wording and helper list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ docs/card-sdk-language-reference.md           |  19 +-
+ docs/sdk-index.md                             |   2 +-
+ .../com/wingedsheep/sdk/core/Keyword.kt       |  13 ++
+ .../kotlin/com/wingedsheep/sdk/dsl/Effects.kt |   7 +
+ .../sdk/dsl/mechanics/EncoreDsl.kt            |  78 ++++++++
+ .../sdk/scripting/effects/CombatEffects.kt    |  26 ++-
+ .../cmr/cards/ImpulsivePilferer.kt            |  45 +++++
+ .../ImpulsivePilfererScenarioTest.kt          |  76 ++++++++
+ .../test/resources/snapshots/cards/CMR.json   | 108 +++++++++++
+ .../engine/core/CleanupPhaseManager.kt        |   8 +-
+ .../wingedsheep/engine/core/Serialization.kt  |   1 +
+ .../handlers/effects/ZoneMovementUtils.kt     |   3 +
+ .../effects/combat/MarkMustAttackExecutor.kt  |  22 ++-
+ .../combat/DirectedAttackRequirements.kt      |  21 ++-
+ .../components/combat/CombatComponents.kt     |  13 ++
+ .../projection/CardActiveEffectsProjector.kt  |  15 ++
+ .../engine/multiplayer/EncoreTest.kt          | 173 ++++++++++++++++++
+ web-client/src/types/enums.ts                 |   2 +
+ 18 files changed, 620 insertions(+), 12 deletions(-)
+ create mode 100644 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/EncoreDsl.kt
+ create mode 100644 mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/cmr/cards/ImpulsivePilferer.kt
+ create mode 100644 mtg-sets/2017-2022/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ImpulsivePilfererScenarioTest.kt
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/EncoreTest.kt
+
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 3da5ba7c3..8ee2dad35 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -3332,6 +3332,13 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
+   enforced by `AttackPhaseManager` and removed during cleanup. It composes with the token pipeline for “that
+   token attacks this combat if able”: create the token, then target
+   `PipelineTarget(CREATED_TOKENS, 0)` with this facade.
++- `Effects.MarkMustAttackThisTurn(target, defender)` (`MarkMustAttackEffect.defender`, `ThisTurn` window only) —
++  "it attacks **that player** this turn if able" (encore's token copies, CR 702.141a). `defender` is resolved
++  to a player when the effect resolves and stored on the creature as `MustAttackPlayerThisTurnComponent`, which
++  `DirectedAttackRequirements` reads beside the Public Enemy static: the creature is bound only while it could
++  attack that player at no cost (CR 508.1d), and only an attack on that player — not their planeswalker or
++  battle, nor another player — obeys it. If it can't attack that player it is under no requirement at all.
++  Removed during cleanup or when the creature leaves the battlefield; its "Must Attack" badge names the player.
+ - `Effects.MarkMustAttackNextCombat(target)` (`MarkMustAttackEffect`, window
+   `MustAttackWindow.ControllersNextCombat`) — "that creature attacks during its controller's next combat
+   phase if able" (Sizzling Soloist). The mark waits across turns for that player's next combat phase, binds
+@@ -12536,7 +12543,7 @@ copy of it (CR 707.10e). The activated-ability analogue of the spell-level `cant
+ > **Where set-mechanic helpers live.** The `card { … }` keyword helpers below for *set-specific*
+ > mechanics — `mayBeginGameOnBattlefield()`, `flurry { }`, `mobilize(…)`, `firebending(n)`, `sneak(cost)`, `webSlinging(cost)`, `mayhem(cost)`, `madness(cost)`, `decayed()`,
+ > `vividEtb { }` / `vividCostReduction()`, `convergeEntersWithCounters(counterType?)`,
+-> `impending(time, cost)`, `renew(cost) { }`, `embalm(cost)`, `unearth(cost)`, `enduring()`,
++> `impending(time, cost)`, `renew(cost) { }`, `embalm(cost)`, `unearth(cost)`, `encore(cost)`, `enduring()`,
+ > `craft(filter, cost)`, `station()`, `jobSelect()`, `forMirrodin()`, `gift(kind)` — are `CardBuilder` **extension functions** in
+ > `mtg-sdk/.../dsl/mechanics/` (one file per mechanic), not methods on the core `CardBuilder`. They
+ > stay in package `com.wingedsheep.sdk.dsl`, so the call syntax is unchanged, but a card file that
+@@ -14120,6 +14127,16 @@ composite abilities).
+   EXILE))` (entry-timestamp tracked, so a blinked permanent is a new object the old trigger ignores) +
+   `GrantExileOnLeave(Self)` (a component, not an ability — it survives "loses all abilities", per the unearth rulings).
+   Declares `Keyword.UNEARTH` for display.
++- `Encore(cost)` — `card { encore(cost) }` builder helper (CR 702.141, Commander Legends). "[Cost], Exile this card
++  from your graveyard: For each opponent, create a token that's a copy of this card that attacks that opponent this
++  turn if able. The tokens gain haste. Sacrifice them at the beginning of the next end step. Activate only as a
++  sorcery." Composed by the `encoreAbility(cost)` factory: `AbilityCost.Composite(Mana(cost), ExileSelf)` +
++  `activateFromZone = Zone.GRAVEYARD` + `timing = SorcerySpeed`, whose effect is `ForEachPlayer(EachOpponent, [
++  CreateTokenCopyOfTarget(Self, sacrificeAtStep = END, controller = PlayerRef(ControllerOfSource)),
++  ForEachInCollection(CreatedTokens, GrantKeyword(HASTE, IterationEntity, Permanent) then
++  MarkMustAttackThisTurn(IterationEntity, defender = PlayerRef(You)))])` — each visit rebinds "you" to that
++  opponent, so the copy is pinned to the activator and the mark names the visited opponent. Haste is *gained*, not
++  a copiable value. Declares `Keyword.ENCORE` for display (Impulsive Pilferer).
+ - `scavengeAbility(cost: ManaCost? = null)` — the Scavenge ability (CR 702.97, Return to Ravnica) as an
+   `ActivatedAbility` factory, for printed scavenge and whole-graveyard grants alike. "[Cost], Exile this card
+   from your graveyard: Put a number of +1/+1 counters equal to the power of the card you exiled on target creature.
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index b16ede574..3f817624c 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -952,7 +952,7 @@ Families:
+ - `MarkEnduringReturnEffect` — Stamps the source permanent as having returned via its Enduring ability (Duskmourn Glimmer cycle).
+ - `MarkExileControllerGraveyardOnDeathEffect(target: EffectTarget)` — Mark target creature so that when it dies this turn, its controller's graveyard is exiled.
+ - `MarkExileOnDeathEffect(target: EffectTarget)` — Mark target creature so that if it would die this turn, it goes to exile instead of graveyard.
+-- `MarkMustAttackEffect(target: EffectTarget, window: MustAttackWindow)` — Mark a creature as required to attack if able, for the window named — "target creature attacks this turn if able" (Walking Desecration, via `ForEachInGroup` over a group) or "that creature attacks…
++- `MarkMustAttackEffect(target: EffectTarget, window: MustAttackWindow, defender: EffectTarget?)` — Mark a creature as required to attack if able, for the window named — "target creature attacks this turn if able" or "that creature attacks during its controller's next combat phase if able" (Sizzl…
+ - `MarkMustBlockThisTurnEffect(target: EffectTarget)` — Mark a creature as "blocks this turn if able" (Culvert Ambusher).
+ - `MarkSpellExileWithCountersEffect(target: EffectTarget, counterType: CounterType, count: Int)` — Mark a spell on the stack so that, when it resolves, it is exiled with the specified counters on it instead of being put into its owner's graveyard.
+ - `MarkSpellPlotOnResolveEffect(target: EffectTarget)` — Mark a spell on the stack so that, when it resolves, it is exiled instead of put into its owner's graveyard and **becomes plotted** (CR 718).
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+index 7deb41a74..dca75e8b4 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+@@ -631,6 +631,19 @@ enum class Keyword(val displayName: String) {
+      */
+     UNEARTH("Unearth"),
+ 
++    /**
++     * Encore [cost] (CR 702.141, Commander Legends). "[Cost], Exile this card from your graveyard:
++     * For each opponent, create a token that's a copy of this card that attacks that opponent this
++     * turn if able. The tokens gain haste. Sacrifice them at the beginning of the next end step.
++     * Activate only as a sorcery."
++     *
++     * Like [EMBALM], a graveyard-activated ability composed of existing primitives — a per-opponent
++     * token copy, a permanent haste grant, a player-directed must-attack mark and a delayed
++     * sacrifice. Wired in one call via the `encore(cost)` helper on
++     * [com.wingedsheep.sdk.dsl.CardBuilder]; the keyword itself is display-only.
++     */
++    ENCORE("Encore"),
++
+     /**
+      * Ascend (Ixalan, CR 702.131). On a permanent spell, means "When this permanent
+      * enters, if you control ten or more permanents, you get the city's blessing
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+index 40a63cbe9..24ccf73f8 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+@@ -6142,6 +6142,13 @@ object Effects {
+     fun MarkMustAttackThisTurn(target: EffectTarget): Effect =
+         MarkMustAttackEffect(target)
+ 
++    /**
++     * "[target] attacks [defender] this turn if able" — the requirement names the player to attack
++     * (encore's token copies, CR 702.141a). Bound only while the creature could attack that player.
++     */
++    fun MarkMustAttackThisTurn(target: EffectTarget, defender: EffectTarget): Effect =
++        MarkMustAttackEffect(target, MustAttackWindow.ThisTurn, defender)
++
+     /**
+      * "That creature attacks during its controller's next combat phase if able" (Sizzling
+      * Soloist) — the requirement waits for that player's next combat, across turns.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/EncoreDsl.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/EncoreDsl.kt
+new file mode 100644
+index 000000000..9aef3a62c
+--- /dev/null
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/EncoreDsl.kt
+@@ -0,0 +1,78 @@
++package com.wingedsheep.sdk.dsl
++
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.scripting.AbilityCost
++import com.wingedsheep.sdk.scripting.AbilityId
++import com.wingedsheep.sdk.scripting.ActivatedAbility
++import com.wingedsheep.sdk.scripting.Duration
++import com.wingedsheep.sdk.scripting.TimingRule
++import com.wingedsheep.sdk.scripting.costs.CostAtom
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++
++/**
++ * The Encore ability (CR 702.141a):
++ *
++ *   "[Cost], Exile this card from your graveyard: For each opponent, create a token that's a copy
++ *    of this card that attacks that opponent this turn if able. The tokens gain haste. Sacrifice
++ *    them at the beginning of the next end step. Activate only as a sorcery."
++ *
++ * Like [embalmAbility], an ordinary graveyard-activated ability composed of existing primitives:
++ *  - the mana [cost] plus [AbilityCost.ExileSelf], `activateFromZone = Zone.GRAVEYARD` and
++ *    `timing = TimingRule.SorcerySpeed`;
++ *  - `ForEachPlayer(EachOpponent)` — each visit rebinds "you" to that opponent, so the token copy
++ *    is created under the source's controller (`Player.ControllerOfSource`, which for the exiled
++ *    card is its owner — the player who activated it), and `Player.You` names "that opponent";
++ *  - `CreateTokenCopyOfTarget(Self, sacrificeAtStep = END)` — a copy of the card itself (it is in
++ *    exile by now), sacrificed at the beginning of the next end step;
++ *  - over every token that copy made (a token doubler can make more — "the tokens"): a permanent
++ *    haste grant — the tokens *gain* haste, it isn't a copiable value, so a copy of one doesn't
++ *    have it — and `MarkMustAttackThisTurn(it, that opponent)`, the player-directed attack
++ *    requirement, bound only while the token could attack that player (CR 508.1d).
++ */
++fun encoreAbility(cost: ManaCost): ActivatedAbility = ActivatedAbility(
++    id = AbilityId("encore_$cost"),
++    cost = AbilityCost.Composite(
++        listOf(AbilityCost.Atom(CostAtom.Mana(cost)), AbilityCost.ExileSelf)
++    ),
++    effect = Effects.ForEachPlayer(
++        Player.EachOpponent,
++        listOf(
++            Effects.CreateTokenCopyOfTarget(
++                target = EffectTarget.Self,
++                sacrificeAtStep = Step.END,
++                controller = EffectTarget.PlayerRef(Player.ControllerOfSource),
++            ),
++            Effects.ForEachInCollection(
++                CollectionSlot.CreatedTokens,
++                Effects.GrantKeyword(Keyword.HASTE, EffectTarget.IterationEntity, Duration.Permanent) then
++                    Effects.MarkMustAttackThisTurn(
++                        EffectTarget.IterationEntity,
++                        defender = EffectTarget.PlayerRef(Player.You),
++                    ),
++            ),
++        ),
++    ),
++    timing = TimingRule.SorcerySpeed,
++    activateFromZone = Zone.GRAVEYARD,
++    descriptionOverride = "Encore $cost ($cost, Exile this card from your graveyard: For each " +
++        "opponent, create a token copy that attacks that opponent this turn if able. They gain " +
++        "haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
++)
++
++/**
++ * Add Encore [cost] (CR 702.141, Commander Legends) to a creature card.
++ *
++ * ```kotlin
++ * encore("{3}{U}")
++ * ```
++ *
++ * See [encoreAbility] for how the ability is composed.
++ */
++fun CardBuilder.encore(cost: String) {
++    activatedAbilities.add(encoreAbility(ManaCost.parse(cost)))
++    keywordSet.add(Keyword.ENCORE)
++}
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/CombatEffects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/CombatEffects.kt
+index 2829bf8ee..23357aed0 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/CombatEffects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/CombatEffects.kt
+@@ -668,18 +668,38 @@ data class RemoveFromCombatEffect(
+  * creature attacks during its controller's next combat phase if able" (Sizzling Soloist).
+  *
+  * The requirement is on the creature, not on any effect source: it survives the source leaving
+- * the battlefield, and it doesn't care which defender the creature attacks.
++ * the battlefield. With no [defender] it doesn't care which defender the creature attacks.
++ *
++ * [defender] names the **player** the creature must attack — "a token that's a copy of this card
++ * that attacks that opponent this turn if able" (encore, CR 702.141a). The creature is then bound
++ * only while it could attack that player at no cost (CR 508.1d): attacking that player's
++ * planeswalker or battle, or another player, breaks the requirement; if it can't attack that
++ * player at all (that player has left the game, or a "can't attack you" effect protects them), it
++ * is under no requirement and may attack anyone or not attack. Only [MustAttackWindow.ThisTurn]
++ * takes a defender.
+  *
+  * @property target The creature to mark (typically EffectTarget.IterationEntity within ForEachInGroup)
+  * @property window How long the requirement binds — see [MustAttackWindow].
++ * @property defender The player it must attack, resolved when the effect resolves; null for any defender.
+  */
+ @SerialName("MarkMustAttack")
+ @Serializable
+ data class MarkMustAttackEffect(
+     val target: EffectTarget = EffectTarget.Self,
+-    val window: MustAttackWindow = MustAttackWindow.ThisTurn
++    val window: MustAttackWindow = MustAttackWindow.ThisTurn,
++    val defender: EffectTarget? = null
+ ) : Effect {
+-    override val description: String = "${target.description} attacks ${window.phrase} if able"
++    init {
++        require(defender == null || window == MustAttackWindow.ThisTurn) {
++            "MarkMustAttackEffect names a defender only for MustAttackWindow.ThisTurn"
++        }
++    }
++
++    override val description: String = buildString {
++        append("${target.description} attacks ")
++        if (defender != null) append("${defender.description} ")
++        append("${window.phrase} if able")
++    }
+ }
+ 
+ /** When a [MarkMustAttackEffect] requirement binds. */
+diff --git a/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/cmr/cards/ImpulsivePilferer.kt b/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/cmr/cards/ImpulsivePilferer.kt
+new file mode 100644
+index 000000000..5aa930a6d
+--- /dev/null
++++ b/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/cmr/cards/ImpulsivePilferer.kt
+@@ -0,0 +1,45 @@
++package com.wingedsheep.mtg.sets.definitions.cmr.cards
++
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.Triggers
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.dsl.encore
++import com.wingedsheep.sdk.model.Rarity
++
++/**
++ * Impulsive Pilferer — Commander Legends #185
++ * {R} · Creature — Goblin Pirate 1/1 · Common
++ *
++ * When this creature dies, create a Treasure token.
++ * Encore {3}{R}
++ *
++ * Each encore token is a copy of the card, so it carries the dies trigger too: sacrificed at the
++ * next end step, every token leaves a Treasure behind.
++ */
++val ImpulsivePilferer = card("Impulsive Pilferer") {
++    manaCost = "{R}"
++    colorIdentity = "R"
++    typeLine = "Creature — Goblin Pirate"
++    power = 1
++    toughness = 1
++    oracleText = "When this creature dies, create a Treasure token. (It's an artifact with \"{T}, " +
++        "Sacrifice this token: Add one mana of any color.\")\n" +
++        "Encore {3}{R} ({3}{R}, Exile this card from your graveyard: For each opponent, create a " +
++        "token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them " +
++        "at the beginning of the next end step. Activate only as a sorcery.)"
++
++    triggeredAbility {
++        trigger = Triggers.self.dies()
++        effect = Effects.CreateTreasure()
++        description = "When this creature dies, create a Treasure token."
++    }
++
++    encore("{3}{R}")
++
++    metadata {
++        rarity = Rarity.COMMON
++        collectorNumber = "185"
++        artist = "Jakub Kasper"
++        imageUri = "https://cards.scryfall.io/normal/front/5/5/55ba9bea-5549-45cf-896c-501a1c81fd5a.jpg?1783928813"
++    }
++}
+diff --git a/mtg-sets/2017-2022/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ImpulsivePilfererScenarioTest.kt b/mtg-sets/2017-2022/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ImpulsivePilfererScenarioTest.kt
+new file mode 100644
+index 000000000..7e2109d1f
+--- /dev/null
++++ b/mtg-sets/2017-2022/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ImpulsivePilfererScenarioTest.kt
+@@ -0,0 +1,76 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.ActivateAbility
++import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.Phase
++import com.wingedsheep.sdk.core.Step
++import io.kotest.assertions.withClue
++import io.kotest.matchers.collections.shouldBeEmpty
++import io.kotest.matchers.collections.shouldHaveSize
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * Impulsive Pilferer (CMR #185) — "When this creature dies, create a Treasure token. Encore {3}{R}"
++ *
++ * The encore token is a copy of the card, so when it is sacrificed at the end step its own dies
++ * trigger makes a Treasure.
++ */
++class ImpulsivePilfererScenarioTest : ScenarioTestBase() {
++
++    init {
++        context("Impulsive Pilferer") {
++
++            test("encore: a hasty copy must attack the opponent, then dies at the end step for a Treasure") {
++                val game = scenario()
++                    .withPlayers("Player1", "Player2")
++                    .withCardInGraveyard(1, "Impulsive Pilferer")
++                    .withLandsOnBattlefield(1, "Mountain", 4)
++                    .withActivePlayer(1)
++                    .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
++                    .build()
++
++                val cardId = game.findCardsInGraveyard(1, "Impulsive Pilferer").single()
++                val encore = game.getLegalActions(1).mapNotNull { it.action as? ActivateAbility }
++                    .single { it.sourceId == cardId }
++                game.execute(encore).error shouldBe null
++                game.resolveStack()
++
++                withClue("the card left the graveyard as part of the cost") {
++                    game.findCardsInGraveyard(1, "Impulsive Pilferer").shouldBeEmpty()
++                }
++                game.findPermanents("Impulsive Pilferer") shouldHaveSize 1
++
++                game.passUntilPhase(Phase.COMBAT, Step.DECLARE_ATTACKERS)
++                withClue("the token must attack the opponent") {
++                    game.declareAttackers(emptyMap()).error shouldNotBe null
++                }
++                withClue("it has haste, so it can") {
++                    game.declareAttackers(mapOf("Impulsive Pilferer" to 2)).error shouldBe null
++                }
++
++                game.passUntilPhase(Phase.ENDING, Step.END)
++                game.resolveStack()
++                game.findPermanents("Impulsive Pilferer").shouldBeEmpty()
++                withClue("the sacrificed copy's dies trigger made a Treasure") {
++                    game.findPermanents("Treasure") shouldHaveSize 1
++                }
++            }
++
++            test("dies: create a Treasure") {
++                val game = scenario()
++                    .withPlayers("Player1", "Player2")
++                    .withCardOnBattlefield(1, "Impulsive Pilferer")
++                    .withCardInHand(2, "Lightning Bolt")
++                    .withLandsOnBattlefield(2, "Mountain", 1)
++                    .withActivePlayer(2)
++                    .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
++                    .build()
++
++                game.castSpell(2, "Lightning Bolt", game.findPermanent("Impulsive Pilferer")!!).error shouldBe null
++                game.resolveStack()
++                game.findPermanents("Treasure") shouldHaveSize 1
++            }
++        }
++    }
++}
+diff --git a/mtg-sets/src/test/resources/snapshots/cards/CMR.json b/mtg-sets/src/test/resources/snapshots/cards/CMR.json
+index 093073895..f1971f24b 100644
+--- a/mtg-sets/src/test/resources/snapshots/cards/CMR.json
++++ b/mtg-sets/src/test/resources/snapshots/cards/CMR.json
+@@ -419,6 +419,114 @@
+     ]
+ }
+ 
++// Impulsive Pilferer
++{
++    "name": "Impulsive Pilferer",
++    "manaCost": "{R}",
++    "typeLine": "Creature — Goblin Pirate",
++    "oracleText": "When this creature dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nEncore {3}{R} ({3}{R}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
++    "creatureStats": {
++        "power": 1,
++        "toughness": 1
++    },
++    "keywords": [
++        "ENCORE"
++    ],
++    "script": {
++        "triggeredAbilities": [
++            {
++                "id": "Impulsive Pilferer:1",
++                "trigger": {
++                    "type": "ZoneChangeEvent",
++                    "from": "Battlefield",
++                    "to": "Graveyard"
++                },
++                "effect": {
++                    "type": "CreatePredefinedToken",
++                    "tokenType": "Treasure"
++                },
++                "descriptionOverride": "When this creature dies, create a Treasure token."
++            }
++        ],
++        "activatedAbilities": [
++            {
++                "id": "encore_{3}{R}",
++                "cost": {
++                    "type": "CostComposite",
++                    "costs": [
++                        {
++                            "type": "CostAtomWrapper",
++                            "atom": {
++                                "type": "AtomMana",
++                                "cost": "{3}{R}"
++                            }
++                        },
++                        "CostExileSelf"
++                    ]
++                },
++                "effect": {
++                    "type": "ForEach",
++                    "space": {
++                        "type": "IterationSpace.Players",
++                        "players": "EachOpponent"
++                    },
++                    "body": {
++                        "type": "Composite",
++                        "effects": [
++                            {
++                                "type": "CreateTokenCopyOfTarget",
++                                "target": "Self",
++                                "sacrificeAtStep": "END",
++                                "controller": {
++                                    "type": "PlayerRef",
++                                    "player": "ControllerOfSource"
++                                }
++                            },
++                            {
++                                "type": "ForEach",
++                                "space": {
++                                    "type": "IterationSpace.Collection",
++                                    "collection": "createdTokens"
++                                },
++                                "body": {
++                                    "type": "Composite",
++                                    "effects": [
++                                        {
++                                            "type": "GrantKeyword",
++                                            "keyword": "HASTE",
++                                            "target": "IterationEntity",
++                                            "duration": "Permanent"
++                                        },
++                                        {
++                                            "type": "MarkMustAttack",
++                                            "target": "IterationEntity",
++                                            "defender": {
++                                                "type": "PlayerRef",
++                                                "player": "You"
++                                            }
++                                        }
++                                    ]
++                                }
++                            }
++                        ]
++                    }
++                },
++                "timing": "SorcerySpeed",
++                "activateFromZone": "Graveyard",
++                "descriptionOverride": "Encore {3}{R} ({3}{R}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)"
++            }
++        ]
++    },
++    "metadata": {
++        "collectorNumber": "185",
++        "artist": "Jakub Kasper",
++        "imageUri": "https://cards.scryfall.io/normal/front/5/5/55ba9bea-5549-45cf-896c-501a1c81fd5a.jpg?1783928813"
++    },
++    "colorIdentityOverride": [
++        "RED"
++    ]
++}
++
+ // Ingenuity Engine
+ {
+     "name": "Ingenuity Engine",
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CleanupPhaseManager.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CleanupPhaseManager.kt
+index c8a7e239e..c3e249235 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CleanupPhaseManager.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CleanupPhaseManager.kt
+@@ -29,6 +29,7 @@ import com.wingedsheep.engine.state.components.combat.BlockedOrWasBlockedByLegen
+ import com.wingedsheep.engine.state.components.combat.CanAttackDespiteDefenderThisTurnComponent
+ import com.wingedsheep.engine.state.components.combat.GoadedComponent
+ import com.wingedsheep.engine.state.components.combat.MustAttackThisTurnComponent
++import com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent
+ import com.wingedsheep.engine.state.components.combat.PlayerAttackedThisTurnComponent
+ import com.wingedsheep.engine.state.components.combat.PlayerAttackersLastTurnComponent
+ import com.wingedsheep.engine.state.components.combat.BlockedThisTurnComponent
+@@ -1417,11 +1418,14 @@ class CleanupPhaseManager(
+             }
+ 
+             // Remove MustAttackThisTurnComponent from all creatures (Walking Desecration effect)
++            // and the player-directed MustAttackPlayerThisTurnComponent (encore tokens).
+             val creaturesWithMustAttack = newState.entities.filter { (_, container) ->
+-                container.has<MustAttackThisTurnComponent>()
++                container.has<MustAttackThisTurnComponent>() || container.has<MustAttackPlayerThisTurnComponent>()
+             }.keys
+             for (entityId in creaturesWithMustAttack) {
+-                newState = newState.updateEntity(entityId) { it.without<MustAttackThisTurnComponent>() }
++                newState = newState.updateEntity(entityId) {
++                    it.without<MustAttackThisTurnComponent>().without<MustAttackPlayerThisTurnComponent>()
++                }
+             }
+ 
+             // Remove CanAttackDespiteDefenderThisTurnComponent (Krotiq Nestguard's "can attack
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+index 13ff1fc14..ef46b6688 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+@@ -722,6 +722,7 @@ val engineSerializersModule = SerializersModule {
+         subclass(BlockersDeclaredThisCombatComponent::class)
+         subclass(MustAttackPlayerComponent::class)
+         subclass(MustAttackThisTurnComponent::class)
++        subclass(MustAttackPlayerThisTurnComponent::class)
+         subclass(MustAttackNextCombatComponent::class)
+         subclass(GoadedComponent::class)
+         subclass(CanAttackDespiteDefenderThisTurnComponent::class)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/ZoneMovementUtils.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/ZoneMovementUtils.kt
+index a33a5c6fd..447299bbf 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/ZoneMovementUtils.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/ZoneMovementUtils.kt
+@@ -562,6 +562,9 @@ object ZoneMovementUtils {
+             .without<com.wingedsheep.engine.state.components.battlefield.AbilityResolutionCountThisTurnComponent>()
+             // "Attacks during its controller's next combat phase" binds this object only (CR 400.7).
+             .without<com.wingedsheep.engine.state.components.combat.MustAttackNextCombatComponent>()
++            // So do "attacks this turn if able" marks, directed (encore) or not.
++            .without<com.wingedsheep.engine.state.components.combat.MustAttackThisTurnComponent>()
++            .without<com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent>()
+             // Exert (CR 701.43a) is a fact about the old object; a new one is unexerted.
+             .without<com.wingedsheep.engine.state.components.battlefield.ExertedComponent>()
+             .without<com.wingedsheep.engine.state.components.battlefield.ExertedThisTurnComponent>()
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/combat/MarkMustAttackExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/combat/MarkMustAttackExecutor.kt
+index 8c9caf39a..d6c8e5137 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/combat/MarkMustAttackExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/combat/MarkMustAttackExecutor.kt
+@@ -5,7 +5,9 @@ import com.wingedsheep.engine.handlers.EffectContext
+ import com.wingedsheep.engine.handlers.effects.EffectExecutor
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.engine.state.components.combat.MustAttackNextCombatComponent
++import com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent
+ import com.wingedsheep.engine.state.components.combat.MustAttackThisTurnComponent
++import com.wingedsheep.engine.state.components.identity.PlayerComponent
+ import com.wingedsheep.sdk.core.Phase
+ import com.wingedsheep.sdk.core.Step
+ import com.wingedsheep.sdk.scripting.effects.MarkMustAttackEffect
+@@ -15,7 +17,8 @@ import kotlin.reflect.KClass
+ /**
+  * Executor for [MarkMustAttackEffect]: puts the requirement for its window on the target creature
+  * — [MustAttackThisTurnComponent] for this turn, [MustAttackNextCombatComponent] for its
+- * controller's next combat phase.
++ * controller's next combat phase, or [MustAttackPlayerThisTurnComponent] when the effect names the
++ * player to attack (encore).
+  */
+ class MarkMustAttackExecutor : EffectExecutor<MarkMustAttackEffect> {
+ 
+@@ -34,7 +37,22 @@ class MarkMustAttackExecutor : EffectExecutor<MarkMustAttackEffect> {
+         }
+ 
+         val newState = when (effect.window) {
+-            MustAttackWindow.ThisTurn -> state.updateEntity(targetId) { it.with(MustAttackThisTurnComponent) }
++            MustAttackWindow.ThisTurn -> {
++                val defenderTarget = effect.defender
++                if (defenderTarget == null) {
++                    state.updateEntity(targetId) { it.with(MustAttackThisTurnComponent) }
++                } else {
++                    // "Attacks that opponent this turn if able" names a player. A player who has
++                    // since left the game binds nothing: the attack check only counts opponents still in it.
++                    val defenderId = context.resolvePlayerTarget(defenderTarget, state)
++                        ?.takeIf { state.getEntity(it)?.has<PlayerComponent>() == true }
++                        ?: return EffectResult.success(state)
++                    state.updateEntity(targetId) { container ->
++                        val existing = container.get<MustAttackPlayerThisTurnComponent>()?.defenderIds.orEmpty()
++                        container.with(MustAttackPlayerThisTurnComponent(existing + defenderId))
++                    }
++                }
++            }
+             MustAttackWindow.ControllersNextCombat -> {
+                 // Past the beginning of combat on the controller's own turn, this combat's attackers
+                 // are already declared, so it is not the "next" combat phase.
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/DirectedAttackRequirements.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/DirectedAttackRequirements.kt
+index 5a3687e9a..b6345480f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/DirectedAttackRequirements.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/DirectedAttackRequirements.kt
+@@ -4,6 +4,7 @@ import com.wingedsheep.engine.handlers.PredicateEvaluator
+ import com.wingedsheep.engine.registry.CardRegistry
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.engine.state.components.battlefield.AttachedToComponent
++import com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent
+ import com.wingedsheep.sdk.model.EntityId
+ import com.wingedsheep.sdk.scripting.MustAttack
+ import com.wingedsheep.sdk.scripting.MustAttackDefender
+@@ -15,6 +16,11 @@ import com.wingedsheep.sdk.scripting.MustAttackDefender
+  * controller of whatever the ability's holder is attached to. A holder attached to nothing names
+  * nobody.
+  *
++ * It also reads the per-creature mark a resolved effect leaves naming the player to attack —
++ * encore's "a token … that attacks that opponent this turn if able" (CR 702.141a,
++ * [MustAttackPlayerThisTurnComponent]). Both are the same kind of requirement: attack this player
++ * if able.
++ *
+  * This only says whom the requirements *name*; [AttackPhaseManager] decides which of them can
+  * bind the creature this combat (an opponent it could attack at no cost — CR 508.1d).
+  * Build once per declaration, ask per creature, like [GoadRules].
+@@ -28,13 +34,22 @@ class DirectedAttackRequirements(
+         (ability as? MustAttack)?.takeIf { it.defender == MustAttackDefender.EnchantedCreatureController }
+     }
+ 
++    private val hasMarks: Boolean = state.getBattlefield().any {
++        state.getEntity(it)?.has<MustAttackPlayerThisTurnComponent>() == true
++    }
++
+     /** No such requirement is in play — the overwhelmingly common case. */
+-    val isEmpty: Boolean get() = entries.isEmpty()
++    val isEmpty: Boolean get() = entries.isEmpty() && !hasMarks
+ 
+     /** Players [creatureId] is told to attack. */
+     fun namedDefendersOf(creatureId: EntityId): Set<EntityId> {
+-        if (entries.isEmpty()) return emptySet()
+-        return entries.mapNotNullTo(mutableSetOf()) { entry ->
++        val marked = if (hasMarks) {
++            state.getEntity(creatureId)?.get<MustAttackPlayerThisTurnComponent>()?.defenderIds.orEmpty()
++        } else {
++            emptySet()
++        }
++        if (entries.isEmpty()) return marked
++        return entries.mapNotNullTo(marked.toMutableSet()) { entry ->
+             if (!CombatStaticScan.covers(state, predicates, entry.holder, entry.controller, entry.ability.filter, creatureId)) {
+                 return@mapNotNullTo null
+             }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/combat/CombatComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/combat/CombatComponents.kt
+index 03ca97801..ddef52c5b 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/combat/CombatComponents.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/combat/CombatComponents.kt
+@@ -263,6 +263,19 @@ data class MustAttackPlayerComponent(
+ @Serializable
+ data object MustAttackThisTurnComponent : Component
+ 
++/**
++ * Marks a creature that attacks a **named player** this turn if able — encore's token copies,
++ * "attacks that opponent this turn if able" (CR 702.141a), put there by a
++ * [com.wingedsheep.sdk.scripting.effects.MarkMustAttackEffect] with a `defender`.
++ *
++ * Unlike [MustAttackThisTurnComponent] the requirement is directed: it binds the creature only
++ * while it could attack one of [defenderIds] at no cost (CR 508.1d), and then only an attack on
++ * that player — not their planeswalker or battle — obeys it. `DirectedAttackRequirements` reads it
++ * alongside the Public Enemy static. Removed at end of turn during cleanup.
++ */
++@Serializable
++data class MustAttackPlayerThisTurnComponent(val defenderIds: Set<EntityId>) : Component
++
+ /**
+  * Marks a creature that attacks during its controller's next combat phase if able (Sizzling
+  * Soloist) — [com.wingedsheep.sdk.scripting.effects.MustAttackWindow.ControllersNextCombat].
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
+index 3b2783dfc..993c79f5d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
+@@ -568,6 +568,21 @@ internal class CardActiveEffectsProjector(
+             )
+         }
+ 
++        // Player-directed mark (encore tokens): "attacks <player> this turn if able".
++        state.getEntity(entityId)?.get<MustAttackPlayerThisTurnComponent>()?.let { mark ->
++            val names = mark.defenderIds
++                .mapNotNull { state.getEntity(it)?.get<PlayerComponent>()?.name }
++                .ifEmpty { listOf("a chosen player") }
++            effects.add(
++                ClientCardEffect(
++                    effectId = "must_attack_player_this_turn",
++                    name = "Must Attack",
++                    description = "This creature must attack ${names.joinToString(" or ")} this turn if able",
++                    icon = "must-attack"
++                )
++            )
++        }
++
+         if (state.getEntity(entityId)?.has<MustAttackNextCombatComponent>() == true) {
+             effects.add(
+                 ClientCardEffect(
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/EncoreTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/EncoreTest.kt
+new file mode 100644
+index 000000000..57cebd2f5
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/EncoreTest.kt
+@@ -0,0 +1,173 @@
++package com.wingedsheep.engine.multiplayer
++
++import com.wingedsheep.engine.core.ActivateAbility
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent
++import com.wingedsheep.engine.state.components.identity.ControllerComponent
++import com.wingedsheep.engine.state.components.identity.TokenComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.dsl.encore
++import com.wingedsheep.sdk.dsl.encoreAbility
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.CantAttackYou
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.collections.shouldBeEmpty
++import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
++import io.kotest.matchers.collections.shouldHaveSize
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * Encore (CR 702.141a): "[Cost], Exile this card from your graveyard: For each opponent, create a
++ * token that's a copy of this card that attacks that opponent this turn if able. The tokens gain
++ * haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery." — and
++ * the player-directed attack requirement it is built on (`MarkMustAttackEffect.defender`).
++ */
++class EncoreTest : FunSpec({
++
++    val encoreBear = card("Test Encore Bear") {
++        manaCost = "{1}{R}"
++        typeLine = "Creature — Bear"
++        power = 2
++        toughness = 2
++        encore("{2}{R}")
++    }
++
++    val wall = card("Test Pacifism Field") {
++        manaCost = "{W}"
++        typeLine = "Enchantment"
++        staticAbility { ability = CantAttackYou(GroupFilter.AllCreatures) }
++    }
++
++    val ability = encoreAbility(ManaCost.parse("{2}{R}"))
++
++    fun driver(players: Int): Pair<GameTestDriver, List<EntityId>> {
++        val d = GameTestDriver()
++        d.registerCards(TestCards.all + listOf(encoreBear, wall))
++        val ids = d.initMultiplayer(List(players) { Deck.of("Mountain" to 40) })
++        d.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return d to ids
++    }
++
++    fun GameTestDriver.tokensOf(player: EntityId): List<EntityId> =
++        getCreatures(player).filter { state.getEntity(it)?.has<TokenComponent>() == true }
++
++    fun GameTestDriver.resolveStack() {
++        var guard = 0
++        while (pendingDecision == null && stackSize > 0 && guard++ < 50) passPriority(priorityPlayer!!)
++    }
++
++    /** Put the card in [player]'s graveyard, pay for encore, activate it and resolve. */
++    fun GameTestDriver.encore(player: EntityId): EntityId {
++        val cardId = putCardInGraveyard(player, "Test Encore Bear")
++        giveMana(player, Color.RED, 3)
++        submit(ActivateAbility(player, cardId, ability.id)).error shouldBe null
++        resolveStack()
++        return cardId
++    }
++
++    /** Which opponent each token is required to attack. */
++    fun GameTestDriver.requiredDefender(token: EntityId): Set<EntityId> =
++        state.getEntity(token)?.get<MustAttackPlayerThisTurnComponent>()?.defenderIds.orEmpty()
++
++    test("one hasty token copy per opponent under the activator's control; the card is exiled") {
++        val (d, p) = driver(4)
++        val (p1, p2, p3, p4) = p
++        val cardId = d.encore(p1)
++
++        withClue("exiling the card is part of the cost") { d.getExile(p1) shouldBe listOf(cardId) }
++        val tokens = d.tokensOf(p1)
++        tokens shouldHaveSize 3
++        tokens.forEach { token ->
++            d.getCardName(token) shouldBe "Test Encore Bear"
++            d.state.getEntity(token)!!.get<ControllerComponent>()!!.playerId shouldBe p1
++            withClue("the tokens gain haste") { d.state.projectedState.hasKeyword(token, Keyword.HASTE) shouldBe true }
++        }
++        tokens.map { d.requiredDefender(it).single() } shouldContainExactlyInAnyOrder listOf(p2, p3, p4)
++    }
++
++    test("each token must attack its own opponent: omitting it or attacking another player is illegal") {
++        val (d, p) = driver(3)
++        val (p1, p2, p3) = p
++        d.encore(p1)
++        val tokens = d.tokensOf(p1)
++        val toP2 = tokens.single { d.requiredDefender(it) == setOf(p2) }
++        val toP3 = tokens.single { d.requiredDefender(it) == setOf(p3) }
++
++        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        withClue("not attacking at all breaks the requirement") {
++            d.declareAttackers(p1, emptyMap()).error shouldNotBe null
++        }
++        withClue("swapping the opponents breaks both requirements") {
++            d.declareAttackers(p1, mapOf(toP2 to p3, toP3 to p2)).error shouldNotBe null
++        }
++        d.declareAttackers(p1, mapOf(toP2 to p2, toP3 to p3)).error shouldBe null
++    }
++
++    test("a token that can't attack its opponent is under no requirement (CR 508.1d)") {
++        val (d, p) = driver(3)
++        val (p1, p2, p3) = p
++        d.putPermanentOnBattlefield(p2, "Test Pacifism Field")
++        d.encore(p1)
++        val toP2 = d.tokensOf(p1).single { d.requiredDefender(it) == setOf(p2) }
++        val toP3 = d.tokensOf(p1).single { d.requiredDefender(it) == setOf(p3) }
++
++        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        withClue("the token bound for p2 may stay home or attack p3") {
++            d.declareAttackers(p1, mapOf(toP2 to p3, toP3 to p3)).error shouldBe null
++        }
++    }
++
++    test("the tokens are sacrificed at the beginning of the next end step") {
++        val (d, p) = driver(3)
++        val (p1, _, _) = p
++        d.encore(p1)
++        val tokens = d.tokensOf(p1)
++        tokens shouldHaveSize 2
++
++        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        d.declareAttackers(p1, tokens.associateWith { d.requiredDefender(it).single() }).error shouldBe null
++        d.passPriorityUntil(Step.END)
++        d.resolveStack()
++        d.tokensOf(p1).shouldBeEmpty()
++    }
++
++    test("activate only as a sorcery: not offered outside the main phase") {
++        val (d, p) = driver(2)
++        val (p1, _) = p
++        val cardId = d.putCardInGraveyard(p1, "Test Encore Bear")
++        d.giveMana(p1, Color.RED, 3)
++        val offered = { d.legalActions(p1).any { (it.action as? ActivateAbility)?.sourceId == cardId } }
++        offered() shouldBe true
++
++        d.passPriorityUntil(Step.BEGIN_COMBAT)
++        d.giveMana(p1, Color.RED, 3)
++        offered() shouldBe false
++    }
++
++    test("the directed mark ends in the cleanup step") {
++        val (d, p) = driver(2)
++        val (p1, p2) = p
++        val bear = d.putCreatureOnBattlefield(p1, "Test Encore Bear")
++        val effect = Effects.MarkMustAttackThisTurn(EffectTarget.Self, defender = EffectTarget.Controller)
++        val result = d.services.effectExecutorRegistry.execute(
++            d.state, effect, EffectContext(sourceId = bear, controllerId = p2)
++        )
++        d.replaceState(result.state)
++        d.requiredDefender(bear) shouldBe setOf(p2)
++
++        d.passPriorityUntil(Step.UPKEEP, p2)
++        d.requiredDefender(bear) shouldBe emptySet()
++    }
++})
+diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
+index 50fad0d55..8d6a1b96b 100644
+--- a/web-client/src/types/enums.ts
++++ b/web-client/src/types/enums.ts
+@@ -296,6 +296,7 @@ export enum Keyword {
+   RENEW = 'RENEW',
+   EMBALM = 'EMBALM',
+   UNEARTH = 'UNEARTH',
++  ENCORE = 'ENCORE',
+   ANNIHILATOR = 'ANNIHILATOR',
+   BUSHIDO = 'BUSHIDO',
+   RAMPAGE = 'RAMPAGE',
+@@ -435,6 +436,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
+   [Keyword.RENEW]: 'Renew',
+   [Keyword.EMBALM]: 'Embalm',
+   [Keyword.UNEARTH]: 'Unearth',
++  [Keyword.ENCORE]: 'Encore',
+   [Keyword.ANNIHILATOR]: 'Annihilator',
+   [Keyword.BUSHIDO]: 'Bushido',
+   [Keyword.RAMPAGE]: 'Rampage',
+-- 
+2.43.0
+

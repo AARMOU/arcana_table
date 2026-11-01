@@ -1,0 +1,132 @@
+name: B141 engine runtime - B140 engine + targeted backports (NO APK)
+# Builds the B141 engine as one coherent bundle: the exact B140 engine source plus engine-upgrade/b141/patches
+# (engine-upgrade/b141/apply_engine.sh). It rebuilds all four Argentum JARs from that one source, runs the engine's own
+# rules tests (including each backport's tests) and every existing Arcana custom-card test on the new JARs, then stages
+# the JARs on this candidate branch only when all of that is green. B140 is never modified. No APK, no release.
+on:
+  push:
+    branches: ['gpt/b141-candidate-*']
+    paths:
+      - engine-upgrade/b141/**
+      - .github/workflows/b141-engine-runtime.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b141-engine-runtime-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Candidate descends from the B140 rollback tip, which stays untouched
+        run: |
+          set -euo pipefail
+          b140=$(git ls-remote https://github.com/AARMOU/arcana_table.git refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)
+          git merge-base --is-ancestor 94456e8d76da033ecf9fef8842e74874d5b73756 HEAD
+          echo "B140 tip $b140 (unchanged by this workflow)"
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply the B140 engine series plus B141 backports (fail closed)
+        run: bash engine-upgrade/b141/apply_engine.sh
+      - name: Engine rules tests (B140's plus the backports' own) and all four runtime JARs
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh b141-engine \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Confirm the Encore engine test actually ran and passed
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          paths=list(Path("argentum-engine/rules-engine/build/test-results/test").glob("TEST-*EncoreTest*.xml"))
+          assert paths, "EncoreTest did not run"
+          for p in paths:
+            r=E.parse(p).getroot(); c={k:int(r.get(k,"0")) for k in ("tests","failures","errors")}
+            print(p.name,c); assert c["tests"]>0 and c["failures"]==0 and c["errors"]==0, c
+          PY
+      - name: Replace all four JARs in the workspace from the one engine source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile,struct,shutil,json
+          mods={"argentum-mtg-sdk.jar":"mtg-sdk","argentum-mtg-sdk-tooling.jar":"mtg-sdk-tooling",
+                "argentum-rules-engine.jar":"rules-engine","argentum-ai.jar":"ai"}
+          out={}
+          for dest,mod in mods.items():
+            jars=[p for p in Path(f"argentum-engine/{mod}/build/libs").glob("*.jar")
+                  if not any(s in p.name for s in ("sources","javadoc","test"))]
+            assert len(jars)==1,(mod,jars)
+            with zipfile.ZipFile(jars[0]) as z:
+              v=max(struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class"))
+            assert v<=61,(mod,v)   # Java 17 bytecode for Android
+            d=Path("android/app/libs")/dest
+            old=hashlib.sha256(d.read_bytes()).hexdigest()
+            shutil.copyfile(jars[0],d)
+            out[dest]={"from":old,"to":hashlib.sha256(d.read_bytes()).hexdigest(),"classMajor":v}
+          Path("b141-jars.json").write_text(json.dumps(out,indent=1))
+          print(json.dumps(out,indent=1))
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Every existing Arcana custom-card test on the new engine (unchanged tests)
+        working-directory: android
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh b141-custom-cards \
+            ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - name: Card test results are real passes, not compile-only
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=e=0
+          for p in Path("android/custom-cards/build/test-results/test").glob("TEST-*.xml"):
+            r=E.parse(p).getroot(); t+=int(r.get("tests","0")); f+=int(r.get("failures","0")); e+=int(r.get("errors","0"))
+          print({"tests":t,"failures":f,"errors":e}); assert t>500 and f==0 and e==0
+          PY
+      - name: Stage the verified JARs on this candidate branch (never B140)
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cp b141-jars.json engine-upgrade/b141/runtime-jars.json
+          cp engine-source.txt engine-upgrade/b141/engine-source.txt
+          git add -f android/app/libs/argentum-*.jar engine-upgrade/b141/runtime-jars.json engine-upgrade/b141/engine-source.txt
+          git diff --cached --quiet && { echo "JARs unchanged"; exit 0; }
+          git commit -m "B141: stage engine JARs built from B140 engine + engine-upgrade/b141 backports (run ${{ github.run_id }})"
+          git push origin HEAD:${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b141-engine-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            engine-source.txt
+            b141-jars.json
+            gradle-logs/
+            argentum-engine/rules-engine/build/test-results/test/TEST-*Encore*.xml
