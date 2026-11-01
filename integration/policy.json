@@ -3,13 +3,13 @@
   "enabled": true,
   "repository": "AARMOU/arcana_table",
   "ownerId": 132252902,
-  "target": "gpt/b140-card-request-test-apk-20261028",
-  "targetSeed": "310f7dd6a7f1829aa90955af02c2cd48fb8d1a61",
-  "authorization": "Owner said Do it on 2026-10-28 Mountain after the card-only automatic integration/merge proposal. No APK, signing, release, runtime JAR replacement or paid worker authorization.",
+  "target": "gpt/b141-candidate-20261101",
+  "targetSeed": "a4d219d3b1f06b10b366e86d881c8bbd28d21c1e",
+  "authorization": "Owner said Do it on 2026-10-28 Mountain after the card-only automatic integration/merge proposal. Destination moved from B140 to the B141 candidate on 2026-11-01 after the owner chose B141 on the upstream engine (Option A) and asked Claude to fix why approved cards were not reaching the app. Seed = B141 with Zephyrim and Aspiring Champion carried over from B140. No APK, signing, release, runtime JAR replacement or paid worker authorization.",
   "engineJars": {
-    "argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
-    "argentum-mtg-sdk-tooling.jar": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
-    "argentum-mtg-sdk.jar": "d0da1c9bd4159f700d5b0390dd0458135695794e46758bfbe7138cff67c03d22",
-    "argentum-rules-engine.jar": "efeb8b51e9902562c5026e0f58e8622c870a72f1af358522c66eacd4d5918309"
+    "argentum-ai.jar": "e7681328e4979a00c19c5b126130b231680af39d09645c7565ae6efa837bf654",
+    "argentum-mtg-sdk-tooling.jar": "c5677903637efaff3d57043a3f925a05b063f243e38cfbbfd8b7241de3af2fa0",
+    "argentum-mtg-sdk.jar": "9e10d6294cd72cec6c79d30f70301d5b2ed37310a274076d323bf0744443dc59",
+    "argentum-rules-engine.jar": "754745310725e7304b2689ddba29ecf8154ed334ed44eee466eec1a591d81ef1"
   }
 }

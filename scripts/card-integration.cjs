@@ -7,7 +7,7 @@ const V = require('./verified-certification.cjs');
 const { isCardCheck } = require('./card-checks.cjs');
 const MARKER = '<!-- arcana-card-integration-v1 -->';
 const SHA = /^[a-f0-9]{40}$/;
-const TARGET = 'gpt/b140-card-request-test-apk-20261028';
+const TARGET = 'gpt/b141-candidate-20261101';
 const REGISTRY = 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt';
 const GENERATED = ['android/app/src/main/assets/argentum/custom-cards.jsonl',
   'android/app/src/main/assets/argentum/custom-cards.index.tsv',

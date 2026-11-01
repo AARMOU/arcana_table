@@ -45,7 +45,7 @@ class ForwardPortTests(unittest.TestCase):
         self.candidate = self.root / 'candidate'
         subprocess.run(['git', 'clone', '-q', '-b', 'android', str(self.origin), str(self.candidate)], check=True)
         self.plan = {'sourceSha': self.head, 'sourceBase': self.ancestor, 'baseSha': self.base,
-                     'controlSha': 'c' * 40, 'target': 'gpt/b140-card-request-test-apk-20261028',
+                     'controlSha': 'c' * 40, 'target': 'gpt/b141-candidate-20261101',
                      'paths': {'symbol': 'Example', 'source': self.source, 'scenario': self.scenario, 'registry': self.registry},
                      'sourceFiles': [self.source, self.scenario, self.registry]}
 

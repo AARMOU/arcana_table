@@ -63,12 +63,12 @@ jobs:
           ref: gpt/arcana-integration-next
           path: integration-source
           persist-credentials: false
-      - name: Check out B140 card indexes (data only)
-        # Approved cards are integrated into B140 and never merge back into the card branch, so a card
-        # counts as present when either branch indexes it; otherwise integrated cards show as missing.
+      - name: Check out B141 card indexes (data only)
+        # Approved cards are integrated into the build branch (B141 since 2026-11-01; integration/policy.json) and never
+        # merge back into the card branch, so a card counts as present when either branch indexes it.
         uses: actions/checkout@v4
         with:
-          ref: gpt/b140-card-request-test-apk-20261028
+          ref: gpt/b141-candidate-20261101
           path: b140-source
           persist-credentials: false
           sparse-checkout: android/app/src/main/assets/argentum

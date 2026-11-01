@@ -39,7 +39,7 @@ def validate_plan(plan):
     for field in ('sourceSha', 'sourceBase', 'baseSha', 'controlSha'):
         if not re.fullmatch('[a-f0-9]{40}', plan.get(field, '')):
             raise Blocked('Invalid exact commit pin: ' + field)
-    if plan.get('target') != 'gpt/b140-card-request-test-apk-20261028':
+    if plan.get('target') != 'gpt/b141-candidate-20261101':
         raise Blocked('Unapproved destination branch')
     symbol = plan.get('paths', {}).get('symbol', '')
     if not re.fullmatch('[A-Z][A-Za-z0-9]+', symbol):
