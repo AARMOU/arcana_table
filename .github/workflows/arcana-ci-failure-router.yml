@@ -30,12 +30,15 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
-concurrency:
-  group: arcana-copilot-control
-  cancel-in-progress: false
 jobs:
   route-failure:
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' || (github.event.workflow_run.name == 'Arcana Card Worker Dispatcher' && github.event.workflow_run.conclusion == 'success') }}
+    # Shared with the dispatcher so repair and assignment admission never race. Job-level, so the many
+    # skipped runs never enter the group: GitHub keeps one pending run per group and cancels the rest,
+    # which was silently cancelling the dispatcher's queued follow-up run (2026-11-01).
+    concurrency:
+      group: arcana-copilot-control
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -79,6 +82,19 @@ jobs:
             if(outcomes.some(r=>r.state==='permission-blocked'))core.setFailed('PR comment permission missing; no retry issued.');
             if(outcomes.some(r=>r.state==='delivery-uncertain'))core.setFailed('Owner-authenticated Copilot handoff unconfirmed; attempt reserved; owner review required.');
             if(outcomes.some(r=>r.state==='observation-unavailable'))core.setFailed('GitHub observation write unavailable; other PRs were still reconciled; no write retried.');
+      - name: Restart the dispatcher if this run displaced it
+        # A router run entering the shared group can still cancel a pending dispatcher run. Start a fresh one
+        # when the newest dispatcher run was cancelled and none is queued or running. Never assigns anything itself.
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs=(await github.rest.actions.listWorkflowRuns({...context.repo,workflow_id:'arcana-card-dispatcher.yml',per_page:5})).data.workflow_runs||[];
+            const live=runs.some(r=>r.status!=='completed');
+            if(!live&&runs[0]?.conclusion==='cancelled'){
+              await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
+              core.info('Dispatcher run '+runs[0].id+' was cancelled; started a new one.');
+            }
       - name: Save GitHub API ETag cache
         if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
         uses: actions/cache/save@v4

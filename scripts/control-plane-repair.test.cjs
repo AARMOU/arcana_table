@@ -320,7 +320,8 @@ test('budget denial status carries the billing owner action', async () => {
 test('concurrent dispatch: every paid workflow shares one serialized group; status never feeds admission', () => {
   for (const f of ['arcana-card-dispatcher', 'arcana-ci-failure-router']) {
     const y = fs.readFileSync(`.github/workflows/${f}.yml`, 'utf8');
-    assert.match(y, /concurrency:\n  group: arcana-copilot-control\n  cancel-in-progress: false/, f);
+    // Dispatcher: workflow-level. Router: job-level (skipped runs must not displace a pending dispatcher run).
+    assert.match(y, /concurrency:\n( *)group: arcana-copilot-control\n\1cancel-in-progress: false/, f);
   }
   for (const f of ['admission.cjs', 'dispatch-runner.cjs', 'failure-routing.cjs', 'units.cjs'])
     assert.doesNotMatch(fs.readFileSync(require.resolve('./' + f), 'utf8'), /control-status|parseStatus/, f);
