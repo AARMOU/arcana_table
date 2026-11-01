@@ -1,0 +1,62 @@
+name: B141 View Current Room focused regression (NO APK)
+# Owner approval: test only; never package an APK/AAB, sign, deploy, merge, or release.
+on:
+  push:
+    branches:
+      - gpt/b141-view-current-room-menu-20261101
+    paths:
+      - .github/workflows/b141-view-current-room-regression-no-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused-room-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Confirm exactly the isolated UI lane
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "gpt/b141-view-current-room-menu-20261101"
+          echo "Source: $(git rev-parse HEAD)"
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install compile-only SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export card index (no APK)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Execute two focused UI regression tests (NO APK)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ActiveMultiplayerRoomViewerTest'
+      - name: Verify JUnit XML actually reports two tests, zero failures or skips
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p = Path('android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.ActiveMultiplayerRoomViewerTest.xml')
+          assert p.is_file(), f"Missing executed test XML: {p}"
+          suite = ET.parse(p).getroot()
+          assert int(suite.get('tests', '0')) == 2, suite.attrib
+          for k in ('failures', 'errors', 'skipped'):
+              assert int(suite.get(k, '0')) == 0, (k, suite.attrib)
+          print('PASS: 2 focused current-room tests; zero failures/errors/skips; no APK')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b141-view-current-room-junit-xml-no-apk
+          retention-days: 14
+          if-no-files-found: ignore
+          path: android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.ActiveMultiplayerRoomViewerTest.xml
