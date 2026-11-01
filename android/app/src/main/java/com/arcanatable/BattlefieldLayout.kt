@@ -134,7 +134,11 @@ fun saveTableZoom(context: Context, widthDp: Int, heightDp: Int, zoom: Float) {
  * Two-finger pinch on the board changes [zoom]. One finger is left alone, so scrolling, tapping and
  * holding cards work exactly as before; [onEnd] runs when the fingers lift (to save the zoom).
  */
-fun Modifier.pinchToZoom(zoom: MutableFloatState, onEnd: (Float) -> Unit): Modifier = pointerInput(Unit) {
+fun Modifier.pinchToZoom(zoom: MutableFloatState, onEnd: (Float) -> Unit): Modifier =
+    pinchToZoom(zoom, MIN_BOARD_ZOOM..MAX_BOARD_ZOOM, onEnd)
+
+/** [pinchToZoom] with its own limits (the combat screens use a narrower range). */
+fun Modifier.pinchToZoom(zoom: MutableFloatState, range: ClosedFloatingPointRange<Float>, onEnd: (Float) -> Unit): Modifier = pointerInput(range) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var zoomed = false
@@ -143,7 +147,7 @@ fun Modifier.pinchToZoom(zoom: MutableFloatState, onEnd: (Float) -> Unit): Modif
             if (event.changes.count { it.pressed } >= 2) {
                 val factor = event.calculateZoom()
                 if (factor != 1f) {
-                    zoom.floatValue = (zoom.floatValue * factor).coerceIn(MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)
+                    zoom.floatValue = (zoom.floatValue * factor).coerceIn(range.start, range.endInclusive)
                     zoomed = true
                 }
                 event.changes.forEach { it.consume() }

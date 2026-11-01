@@ -144,7 +144,7 @@ internal fun AdjustUiPage(
                     AdjustToggle("Buzz on your turn", "Give a short buzz when your turn begins.", turnBuzz, onTurnBuzz)
                     AdjustToggle("Stack identical cards", "Show matching battlefield cards as one stack.", stackCards, onStackCards)
                     AdjustToggle("Glow when you can respond", "Highlight the pass button when Argentum is waiting for your response.", respondGlow, onRespondGlow)
-                    AdjustSlider("Combat card size", combatSize, .65f..1.35f, { "${(it * 100).toInt()}%" }, onCombatSize)
+                    AdjustSlider("Combat card size", combatSize, MIN_COMBAT_ZOOM..MAX_COMBAT_ZOOM, { "${(it * 100).toInt()}%" }, onCombatSize)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("layout-reset")) { Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
