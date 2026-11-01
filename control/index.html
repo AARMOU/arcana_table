@@ -149,23 +149,9 @@
               <div class="ops-cell"><div class="ops-cell-head"><h3>Daily card count</h3><span class="ops-counter-label">Merged</span></div><div class="ops-total"><strong id="dailyCardCount">—</strong><span>today · Mountain Time</span></div><div class="ops-bars" id="dailyBars" aria-label="Last seven days of merged Copilot card pull requests"></div><p id="dailyFresh">Awaiting card integration activity.</p></div>
             </div>
           </section>
-          <section class="ops-hub" aria-label="Goosegeta opponent">
-            <div class="ops-header"><h2>🪿 Goosegeta</h2><span class="tag amber">Experimental · setup required</span></div>
-            <p>Host an Internet Commander room with an open Friend seat. Use the host’s test invite, then summon here.</p>
-            <form id="gooseForm" class="ops-cell goose-controls">
-              <label>Room code <input id="gooseCode" maxlength="8" pattern="[A-Za-z0-9]{6,8}" autocomplete="off" required></label>
-              <label>Private host invitation <input id="gooseInvite" type="password" maxlength="100" autocomplete="off" required></label>
-              <label>Goosegeta’s deck <select id="gooseDeck"><option value="goosegeta-flock">Baylen · Token flock</option><option value="goosegeta-glue">Bello · Glue factory</option></select></label>
-              <label>Trash talk <select id="gooseChat"><option value="muted">Muted</option><option value="basic">Playful · I opt in</option><option value="ruthless">Ruthless · I opt in to profane table roasts</option></select></label>
-              <button class="btn" id="gooseApplyChat" type="button" disabled>Apply chat / mute</button>
-              <p>Free mode uses limited canned banter. OpenAI mode generates replies within the game budget. Extra human guests automatically mute banter until individual consent is supported.</p>
-              <label class="goose-optin"><input id="gooseModel" type="checkbox"> Use OpenAI · requires separate spending approval and setup</label>
-              <div class="ops-buttons"><button class="btn accent" id="gooseSummon" type="submit">Summon Goosegeta</button>
-                <button class="btn" id="gooseRefresh" type="button">Check status</button>
-                <button class="btn" id="gooseRecover" type="button" disabled>Retry stalled decision</button>
-                <button class="btn" id="gooseDismiss" type="button" disabled>Dismiss</button></div>
-              <p id="gooseStatus" role="status" aria-live="polite">Idle · model off. Cloud hosting has not been enabled by this draft.</p>
-            </form>
+          <section class="ops-hub" aria-label="Goosegeta parked">
+            <div class="ops-header"><h2>🪿 Goosegeta</h2><span class="tag gray">Parked</span></div>
+            <p>The experimental opponent is on hold. Its code and design are preserved for later.</p>
           </section>
           <div class="metrics">
             <div class="metric"><div class="metric-top"><span class="metric-label">Open pull requests</span><span class="metric-icon teal">↗</span></div><div class="metric-num" id="prCount">—</div><p class="metric-sub" id="prSub">Checking GitHub…</p></div>

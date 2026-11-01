@@ -4,7 +4,7 @@ The dashboard displays **public read-only status** for `AARMOU/arcana_table`, wi
 
 ## All Hands — Check In (owner only)
 
-The Overview action beside Verify and Do It uses the existing encrypted GitHub OAuth owner session. Its `POST /v1/team-checkin` endpoint adds **one coordination-only owner comment on issue #81**, requesting separate status reports from Goosegeta, Claude, and Boneknuckles/GPT Work. The service checks the most recent #81 comments first and reuses a request from the last 30 minutes to prevent accidental spam.
+The Overview action beside Verify and Do It uses the existing encrypted GitHub OAuth owner session. Its `POST /v1/team-checkin` endpoint adds **one coordination-only owner comment on issue #81**, requesting separate status reports from Goose / Project Goose, Claude, and Boneknuckles/GPT Work. The service checks the most recent #81 comments first and reuses a request from the last 30 minutes to prevent accidental spam.
 
 The dashboard `GET /v1/team-checkin` shows the latest request and only properly keyed, trusted-author **self-reported** acknowledgments. It cannot prove agent presence or wake a closed ChatGPT/Claude session. Missing reports remain unconfirmed. Errors fail closed; if an HTTP write is uncertain, inspect #81 before retrying. Neither endpoint launches paid agents, edits billing, grants card authorization, merges, deploys or releases anything.
 

@@ -232,7 +232,7 @@ test('service worker opens the shell from cache, revalidates it, and every deplo
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.ok(sw.includes("fetch(request,{cache:'no-cache'})"));
   assert.ok(sw.includes('if(cached){event.waitUntil(network.catch(()=>{}));return cached;}'),'instant open from cache');
-  assert.ok(sw.includes("const BUILD='dev';")&&sw.includes("'arcana-control-shell-v19-'+BUILD"));
+  assert.ok(sw.includes("const BUILD='dev';")&&sw.includes("'arcana-control-shell-v20-'+BUILD"));
   const pages=fs.readFileSync(path.join(__dirname,'..','.github','workflows','pages.yml'),'utf8');
   assert.ok(pages.includes("s/^const BUILD='dev';/const BUILD='${GITHUB_SHA::12}';/"),'deploy stamps the build');
   assert.match(html,/controllerchange[\s\S]*location\.reload\(\)/,'page moves onto a new deploy');
@@ -353,7 +353,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v19-'));
+  assert.ok(sw.includes('arcana-control-shell-v20-'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{

@@ -12,7 +12,7 @@
   const link = document.getElementById('allHandsIssue');
   if (!button || !status || !agents || !link) return;
   const label = button.textContent;
-  const roles = [['goosegeta', 'Goosegeta'], ['claude', 'Claude'], ['boneknuckles', 'Boneknuckles / GPT Work']];
+  const roles = [['goosegeta', 'Goose / Project Goose'], ['claude', 'Claude'], ['boneknuckles', 'Boneknuckles / GPT Work']];
   function session() {
     for (const kind of ['localStorage', 'sessionStorage']) {
       try { const v = window[kind]?.getItem(KEY); if (v) return v; } catch {}
