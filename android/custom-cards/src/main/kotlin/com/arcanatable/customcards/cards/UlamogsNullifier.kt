@@ -28,13 +28,19 @@ val UlamogsNullifier = card("Ulamog's Nullifier") {
         // The ETB must target a spell, even if the controller declines processing.
         target(TargetFilter.SpellOnStack)
         effect = Effects.Pipeline {
-            // Check actual ownership, not the controller of the effect that exiled a card.
-            val eligible = gather(
-                CardSource.FromZone(
-                    zone = Zone.EXILE,
-                    player = Player.Each,
-                    filter = GameObjectFilter.Any.ownedByOpponent(),
-                ),
+            // Exile ownership is public even when a card's face is hidden.
+            // B141's filtered EXILE gather requires look permission before
+            // evaluating even ownership-only predicates, excluding legal
+            // face-down opponent-owned cards. Gather the zone unfiltered, then
+            // apply the supported ownership-only collection filter. The
+            // selection UI still masks identities via DecisionMasker.
+            val allExiles = gather(
+                CardSource.FromZone(zone = Zone.EXILE, player = Player.Each),
+                name = "nullifierAllExiles",
+            )
+            val eligible = filter(
+                from = allExiles,
+                filter = GameObjectFilter.Any.ownedByOpponent(),
                 name = "nullifierEligibleOpponentOwnedExiles",
             )
             ifNotEmpty(eligible, minSize = 2) {
