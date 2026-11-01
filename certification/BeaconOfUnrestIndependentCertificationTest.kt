@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.BeaconOfUnrest
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
@@ -17,7 +18,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK, 2)
 
-        assertNull(d.castSpell(player, beacon, listOf(creature)).error)
+        assertNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(creature, player, Zone.GRAVEYARD))).error)
         d.resolveAll()
 
         assertTrue(d.getPermanents(player).contains(creature))
@@ -36,7 +37,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK, 2)
 
-        assertNull(d.castSpell(player, beacon, listOf(artifact)).error)
+        assertNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(artifact, opponent, Zone.GRAVEYARD))).error)
         d.resolveAll()
 
         assertTrue(d.getPermanents(player).contains(artifact))
@@ -56,7 +57,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK)
 
-        assertNotNull(d.castSpell(player, beacon, listOf(creature)).error)
+        assertNotNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(creature, player, Zone.GRAVEYARD))).error)
         assertTrue(d.zoneNames(player, Zone.HAND).contains("Beacon of Unrest"))
         assertTrue(d.getGraveyard(player).contains(creature))
     }
@@ -70,7 +71,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 2)
         d.giveMana(player, Color.BLACK, 2)
 
-        assertNotNull(d.castSpell(player, beacon, listOf(creature)).error)
+        assertNotNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(creature, player, Zone.GRAVEYARD))).error)
         assertTrue(d.zoneNames(player, Zone.HAND).contains("Beacon of Unrest"))
         assertTrue(d.getGraveyard(player).contains(creature))
     }
@@ -84,7 +85,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK, 2)
 
-        assertNotNull(d.castSpell(player, beacon, listOf(land)).error)
+        assertNotNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(land, player, Zone.GRAVEYARD))).error)
         assertTrue(d.zoneNames(player, Zone.HAND).contains("Beacon of Unrest"))
         assertTrue(d.getGraveyard(player).contains(land))
     }
@@ -111,7 +112,7 @@ class BeaconOfUnrestIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK, 2)
 
-        assertNotNull(d.castSpell(player, beacon, listOf(creature)).error)
+        assertNotNull(d.castSpellWithTargets(player, beacon, listOf(ChosenTarget.Card(creature, player, Zone.GRAVEYARD))).error)
         assertTrue(d.zoneNames(player, Zone.HAND).contains("Beacon of Unrest"))
         assertTrue(d.getGraveyard(player).contains(creature))
     }
