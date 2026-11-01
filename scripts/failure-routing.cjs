@@ -22,6 +22,8 @@ const DISPATCHER = 'Arcana Card Worker Dispatcher';
 const CERT = 'Arcana Card Certification Premerge';
 const CERT_JOB = /^Execute trusted independent card scenarios \(([a-z0-9]+(?:-[a-z0-9]+)*), (\d+), (\d+), /;
 const ESCALATED = '<!-- arcana-cert-card-repair-v1 -->';
+const CERT_WORKFLOW_FILE = 'arcana-card-certification-premerge.yml';
+const CERT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RERUN = '<!-- arcana-cert-rerun-v1 -->';
 const isCopilotUser = u => ['copilot', 'copilot-swe-agent[bot]'].includes(String(u?.login || '').toLowerCase());
 function suiteHadItsTurn(comments, repairs) {
@@ -272,6 +274,16 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   const since = new Date(now - windowMs).toISOString();
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, created: '>=' + since, per_page: 100 });
+  // A red independent-certification run waits on capacity/budget for the CARD repair; while the suite PR head is
+  // unchanged it stays the current evidence, so it must not age out after 24 h (2026-11-01: #559's 06:05Z run was
+  // about to). Certification premerge runs only, 7 days, one extra listing.
+  try {
+    const certSince = new Date(now - CERT_WINDOW_MS).toISOString();
+    const older = await github.paginate(github.rest.actions.listWorkflowRuns,
+      { owner, repo, workflow_id: CERT_WORKFLOW_FILE, created: '>=' + certSince, per_page: 100 });
+    const seenIds = new Set(runs.map(r => r.id));
+    for (const r of older) if (!seenIds.has(r.id)) runs.push(r);
+  } catch { /* the 24 h window still applies */ }
   // Pre-filter stale commits and duplicate runs before potentially expensive admission.
   const openPrs = await github.paginate(github.rest.pulls.list,
     { owner, repo, state:'open', per_page:100 });

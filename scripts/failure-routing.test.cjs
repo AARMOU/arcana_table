@@ -412,3 +412,17 @@ test('router: a late untrusted comment withholds the repair before any ledger wr
     for (const d of [denied, wrong]) assert.equal(d.posted.length, 0);
   });
 }
+
+test('reconcile keeps red certification runs older than 24 h in view (7-day window, that workflow only)', async () => {
+  const x = fixture({ runs: [] });
+  const certRun = { id: 99, workflow_id: 4, name: 'Arcana Card Certification Premerge', conclusion: 'failure', event: 'pull_request',
+    head_branch: 'copilot/cards', head_sha: sha, head_repository: { id: 1 }, created_at: new Date(Date.now() - 30 * 3600e3).toISOString() };
+  const asked = [];
+  x.github.rest.actions.listWorkflowRuns = 'certRuns';
+  const paginate = x.github.paginate;
+  x.github.paginate = async (name, args) => { if (name === 'certRuns') { asked.push(args); return [certRun]; } return paginate(name, args); };
+  const r = await reconcileFailures({ github: x.github, context: x.context, now: Date.now() });
+  assert.equal(asked[0].workflow_id, 'arcana-card-certification-premerge.yml');
+  assert.ok(Date.now() - Date.parse(asked[0].created.slice(2)) > 6 * 24 * 3600e3);
+  assert.deepEqual(r.map(x => x.run), [99]);
+});
