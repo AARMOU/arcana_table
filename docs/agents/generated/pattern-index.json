@@ -1648,7 +1648,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Noise Marine",
@@ -1669,6 +1669,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SanguinaryPriestScenarioTest.kt"
     },
     {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
+    },
+    {
      "card": "Bituminous Blast",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BituminousBlast.kt",
      "lines": 35,
@@ -1679,17 +1685,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnightPaladin.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnightPaladinScenarioTest.kt"
-    },
-    {
-     "card": "Keeper of Secrets",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KeeperOfSecrets.kt",
-     "lines": 36,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KeeperOfSecretsScenarioTest.kt"
     }
    ]
   },
   "Effects.Destroy": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -1716,16 +1716,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GreyKnightParagonScenarioTest.kt"
     },
     {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
+    },
+    {
      "card": "Necron Deathmark",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NecronDeathmark.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NecronDeathmarkScenarioTest.kt"
-    },
-    {
-     "card": "Rise of the Eldrazi",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RiseOfTheEldrazi.kt",
-     "lines": 32,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RiseOfTheEldraziScenarioTest.kt"
     }
    ]
   },
@@ -1908,7 +1908,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Mutilate",
@@ -1921,6 +1921,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Exterminatus.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ExterminatusScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     },
     {
      "card": "For the Emperor!",
@@ -1939,12 +1945,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisChaplain.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
-    },
-    {
-     "card": "Bile Blight",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BileBlight.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BileBlightScenarioTest.kt"
     }
    ]
   },
@@ -4422,7 +4422,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5945,7 +5945,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Mutilate",
@@ -5958,6 +5958,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Exterminatus.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ExterminatusScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     },
     {
      "card": "For the Emperor!",
@@ -5976,12 +5982,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisChaplain.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
-    },
-    {
-     "card": "Bile Blight",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BileBlight.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BileBlightScenarioTest.kt"
     }
    ]
   },
@@ -6395,6 +6395,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BeaconOfUnrest.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BeaconOfUnrestScenarioTest.kt"
+    }
+   ]
+  },
+  "GameObjectFilter.CreatureOrPlaneswalker": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     }
    ]
   },
@@ -7058,13 +7069,19 @@
    ]
   },
   "TargetFilter.Land": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Rewind",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     }
    ]
   },
@@ -7239,7 +7256,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
