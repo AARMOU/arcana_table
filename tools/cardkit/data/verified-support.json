@@ -495,6 +495,32 @@
       "baseSha": "bc20a025ba8857f1a5dab41ca8c84d138cde047b",
       "oracleHash": "63177c9660b62d94fb0d886ebbd66c99d6ef6f3545ca62d4ee8fde589252b02b",
       "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Anrakyr the Traveller": {
+      "summary": "Triggers.self.attacks plus gather from multiple zones (HAND and GRAVEYARD), filter artifacts, choose up to one, then Effects.CastFromCollectionByPaying with Costs.additional.PayLifeEqualToManaValueOfSpell supplies the life-equals-mana-value alternative cost. Surtland Elementalist shows attack-trigger gather/choose/cast; Amped Raptor uses CastFromCollectionByPaying with an AdditionalCost during a trigger; Nashi uses the exact mana-value life cost.",
+      "verifiedBy": "Copilot, source inspection 2026-11-01 (argentum-engine@c1c04ca3265c61df913af6db65460ad4ce409614)",
+      "references": [
+        "upstream mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/khm/cards/SurtlandElementalist.kt",
+        "upstream mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh3/cards/AmpedRaptor.kt",
+        "upstream mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/neo/cards/NashiMoonSagesScion.kt",
+        "docs/agents/argentum-upstream/sdk-index.md CardSource.FromMultipleZones"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Lord of the Pyrrhian Legions — Whenever Anrakyr the Traveller attacks, you may cast an artifact spell from your hand or graveyard by paying life equal to its mana value rather than paying its mana cost.",
+          "primitives": [
+            "Triggers.self.attacks",
+            "CardSource.FromMultipleZones",
+            "GameObjectFilter.Artifact",
+            "chooseUpTo(1)",
+            "Effects.CastFromCollectionByPaying",
+            "Costs.additional.PayLifeEqualToManaValueOfSpell"
+          ]
+        }
+      ],
+      "baseSha": "7999edca6725a93fc1d273d7dbf9e17f73da3793",
+      "oracleHash": "6fcf58d8ce11908606ef33519bc5811f3157c1a5c21e6ed20d2008a624061880",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
