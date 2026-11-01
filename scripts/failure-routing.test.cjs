@@ -402,6 +402,61 @@ test('router: a late untrusted comment withholds the repair before any ledger wr
     assert.equal(r.state, 'repair-requested');
     assert.match(x.posted[0].body, new RegExp(`card-${CARD_B}`));
   });
+  const T = m => `2026-11-01T0${m}:00:00Z`;
+  const esc = (head, h) => ({ ...escalation(head), created_at: T(h) });
+  const cardSays = (h, body = 'The suite calls d.activate for Crew; Crew is a special action. ＠someone') => ({ body, user: { login: 'Copilot' }, created_at: T(h) });
+  const baseSuite = [{ body: F.MARKER, user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: '2026-10-31T11:34:00Z' },
+    { body: 'answer', user: { login: 'Copilot' }, created_at: '2026-10-31T11:35:00Z' }];
+  const contestOf = (head, h) => ({ body: `${F.CONTEST}\ncontest:run-77:card-${head}`, user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: T(h) });
+
+  test('card worker answered without changing the card: the SUITE gets a bounded repair with that answer', async () => {
+    const x = certFixture({ suiteComments: [...baseSuite], cardComments: [esc(CARD_A, 1), cardSays(2, 'Line 1 @copilot\n> quoted request\nNine Sol Rings pay {5}.')] });
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.state, 'repair-requested'); assert.equal(r.pr, 611);
+    assert.deepEqual(x.records, [611], 'charged to the suite unit');
+    assert.equal(x.posted[0].issue_number, 611);
+    assert.match(x.posted[0].body, new RegExp(`contest:run-77:card-${CARD_A}`));
+    assert.match(x.posted[0].body, /Nine Sol Rings pay \{5\}/);
+    assert.doesNotMatch(x.posted[0].body, /quoted request/, 'quoted text is dropped');
+    assert.equal(x.posted[0].body.match(/@/g).length, 1, 'exactly one mention; relayed handles are neutralised');
+  });
+  test('no card answer yet: still waiting on the card, nothing sent', async () => {
+    const x = certFixture({ cardComments: [esc(CARD_A, 1)] });
+    assert.equal((await F.routeFailure(x.args)).state, 'cert-already-escalated');
+    assert.equal(x.posted.length + x.records.length, 0);
+  });
+  test('contested and the suite has not answered: wait; answered with no change: one deadlock note, then quiet', async () => {
+    const cards = [esc(CARD_A, 1), cardSays(2)];
+    const wait = certFixture({ cardComments: cards, suiteComments: [...baseSuite, contestOf(CARD_A, 3)] });
+    assert.equal((await F.routeFailure(wait.args)).state, 'cert-contested-waiting-suite');
+    assert.equal(wait.posted.length + wait.records.length + wait.created.length, 0);
+    const dead = certFixture({ cardComments: cards, suiteComments: [...baseSuite, contestOf(CARD_A, 3), { body: 'The suite is right.', user: { login: 'Copilot' }, created_at: T(4) }] });
+    assert.equal((await F.routeFailure(dead.args)).state, 'cert-deadlock');
+    assert.equal(dead.created.length, 1); assert.match(dead.created[0].body, new RegExp(F.DEADLOCK.replace(/[-]/g, '\\-')));
+    assert.equal(dead.created[0].body.includes('@'), false, 'the deadlock note mentions nobody');
+    assert.equal(dead.posted.length + dead.records.length, 0);
+    const again = certFixture({ cardComments: cards, suiteComments: [...baseSuite, contestOf(CARD_A, 3), { body: 'x', user: { login: 'Copilot' }, created_at: T(4) },
+      { body: `${F.DEADLOCK}\n\ncontest:run-77:card-${CARD_A}`, user: { login: 'github-actions[bot]', type: 'Bot' }, created_at: T(5) }] });
+    assert.equal((await F.routeFailure(again.args)).state, 'cert-deadlock');
+    assert.equal(again.created.length, 0);
+  });
+  test('changed card failed again after its re-run: the suite gets its turn first, then the card', async () => {
+    const reran = { body: `${F.RERUN}\n\nrun:77 card-head:${CARD_B} attempt:1`, user: { login: 'github-actions[bot]', type: 'Bot' }, created_at: T(3) };
+    const x = certFixture({ cardComments: [esc(CARD_A, 1), cardSays(2)], cardHead: CARD_B, attempt: 2, suiteComments: [...baseSuite, reran] });
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.pr, 611); assert.match(x.posted[0].body, new RegExp(`card-${CARD_B}`));
+    const waiting = certFixture({ cardComments: [esc(CARD_A, 1), cardSays(2)], cardHead: CARD_B, attempt: 2, suiteComments: [...baseSuite, reran, contestOf(CARD_B, 4)] });
+    assert.equal((await F.routeFailure(waiting.args)).state, 'cert-contested-waiting-suite');
+    const back = certFixture({ cardComments: [esc(CARD_A, 1), cardSays(2)], cardHead: CARD_B, attempt: 2,
+      suiteComments: [...baseSuite, reran, contestOf(CARD_B, 4), { body: 'suite is right', user: { login: 'Copilot' }, created_at: T(5) }] });
+    const rb = await F.routeFailure(back.args);
+    assert.equal(rb.state, 'repair-requested'); assert.equal(rb.pr, 609, 'back to the card, bounded by its ceiling');
+  });
+  test('a withheld suite turn spends nothing', async () => {
+    const x = certFixture({ cardComments: [esc(CARD_A, 1), cardSays(2)], authorize: async () => ({ allowed: false, reason: 'ceiling: 2 of 2 repairs' }) });
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.state, 'cert-contest-withheld'); assert.equal(x.posted.length + x.records.length, 0);
+  });
   test('admission, attribution and unit checks fail closed without spending', async () => {
     const denied = certFixture({ authorize: async () => ({ allowed: false, reason: 'capacity: 3 of 3 active' }) });
     const r = await F.routeFailure(denied.args);

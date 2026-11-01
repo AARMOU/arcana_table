@@ -25,6 +25,15 @@ const ESCALATED = '<!-- arcana-cert-card-repair-v1 -->';
 const CERT_WORKFLOW_FILE = 'arcana-card-certification-premerge.yml';
 const CERT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RERUN = '<!-- arcana-cert-rerun-v1 -->';
+// The return path (2026-11-01: #611 Thunderhawk, #732 Arch of Orazca, #739 Assault Suit all stuck). When the card
+// worker has answered a certification repair and certification still fails for the card's current head, the card
+// worker usually said the SUITE is wrong (Crew is a special action, not activatedAbilities[0]; nine Sol Rings can pay
+// {5}; control change is projected). Nothing sent that back, so the unit waited forever. The suite worker now gets
+// its turn with the card worker's answer, once per (run, card head), charged to the suite unit's own repair ceiling.
+// If the suite worker also answers without changing the suite, the disagreement is posted once for the owner/engine
+// lane instead of looping.
+const CONTEST = '<!-- arcana-cert-suite-contest-v1 -->';
+const DEADLOCK = '<!-- arcana-cert-deadlock-v1 -->';
 const isCopilotUser = u => ['copilot', 'copilot-swe-agent[bot]'].includes(String(u?.login || '').toLowerCase());
 function suiteHadItsTurn(comments, repairs) {
   const first = Math.min(...repairs.map(c => Date.parse(c.created_at)).filter(Number.isFinite));
@@ -202,6 +211,50 @@ function createRerun({ github, owner, repo, token, fetchImpl = fetch }) {
   };
 }
 
+const at = c => Date.parse(c?.created_at || '');
+// The card worker's latest answer after the latest certification-repair request for this run, or null.
+function cardAnswer(cardComments, escalations) {
+  const last = Math.max(...escalations.map(at).filter(Number.isFinite));
+  if (!Number.isFinite(last)) return null;
+  return cardComments.filter(c => isCopilotUser(c.user) && at(c) > last).sort((a, b) => at(b) - at(a))[0] || null;
+}
+const quote = text => String(text || '').replace(/^> .*$/gm, '').replace(/@/g, '＠').replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/\n{3,}/g, '\n\n').trim().slice(0, 1800).split('\n').map(l => '> ' + l).join('\n');
+
+// Give the suite worker its turn (see CONTEST). Returns a router result, or null to continue with the card path.
+async function contestToSuite({ github, owner, repo, run, suitePr, suiteComments, card, answer, authorize, delivery, waitIfContested }) {
+  const key = `contest:run-${run.id}:card-${card.head.sha}`;
+  const ownerComment = c => String(c.user?.login || '').toLowerCase() === owner.toLowerCase() && A.TRUSTED_ASSOCIATIONS.includes(c.author_association);
+  const contested = suiteComments.filter(c => (isOurs(c) || ownerComment(c)) && String(c.body || '').startsWith(CONTEST) && String(c.body).includes(key));
+  if (contested.length) {
+    const reply = suiteComments.some(c => isCopilotUser(c.user) && at(c) > Math.max(...contested.map(at).filter(Number.isFinite)));
+    if (!reply) return { state: 'cert-contested-waiting-suite', pr: suitePr.number, card: card.number };
+    if (!waitIfContested) return null; // the card changed and the suite answered: the card's turn again (its ceiling bounds it)
+    // Same run means the suite head did not change: both workers answered and certification still fails.
+    if (!suiteComments.some(c => isOurs(c) && String(c.body || '').startsWith(DEADLOCK) && String(c.body).includes(key)))
+      await github.rest.issues.createComment({ owner, repo, issue_number: suitePr.number, body: [DEADLOCK, key,
+        `Certification is deadlocked: the card worker on #${card.number} and the suite worker here both answered, neither changed their side, and run ${run.id} still fails for card head \`${card.head.sha}\`. No further automatic requests. Needs an owner or engine-lane decision (a contested assertion, or an engine gap).`].join('\n\n') });
+    return { state: 'cert-deadlock', pr: suitePr.number, card: card.number };
+  }
+  const sender = delivery || createCopilotDelivery({ owner, repo, token: null });
+  const proof = authorize === observeOnly ? { ok: true } : await sender.preflight();
+  const decision = proof.ok ? await authorize({ pr: suitePr, run }) : { allowed: false, reason: proof.reason };
+  if (!decision.allowed) return { state: 'cert-contest-withheld', pr: suitePr.number, reason: String(decision.reason || '').replace(/[@\r\n]/g, ' ') };
+  const body = [CONTEST, key,
+    `@copilot Independent certification run ${run.id} still fails for card PR #${card.number} at head \`${card.head.sha}\`. The card's worker answered the repair request and says the problem is in this suite. Their answer:`,
+    quote(answer.body),
+    'Check every assertion they cite against the exact Oracle text and the engine/test-driver behaviour. Where they are right, fix the suite on this branch so it tests the same rule correctly (replace a wrong assertion or setup with a correct one; never drop coverage of Oracle behaviour, never touch the card). Where the card is wrong, change nothing and say exactly which assertion is correct and why. If a rule cannot be tested because the engine lacks it, keep the assertion and say so: that is engine work, not a suite fix.',
+    `Repair request ${decision.attempt} of ${A.CEILING.repair} for unit #${decision.unit}. Report the exact commit and commands. Never merge, release, change main/production or signing.`].join('\n\n');
+  const current = (await github.rest.pulls.get({ owner, repo, pull_number: suitePr.number })).data;
+  if (current.head.sha !== run.head_sha || current.state !== 'open') return { state: 'stale-or-unmatched', pr: suitePr.number };
+  const late = typeof decision.recheck === 'function' ? await decision.recheck() : 'untrusted-origin: recheck-missing';
+  if (late) return { state: 'withheld-at-trigger', pr: suitePr.number, reason: late };
+  await decision.record();
+  const delivered = await sender.post({ issue_number: suitePr.number, body });
+  if (!delivered.ok) return { state: 'delivery-uncertain', pr: suitePr.number, reason: delivered.reason };
+  return { state: 'repair-requested', pr: suitePr.number, reason: 'card worker contested the suite; routed to suite', card: card.number };
+}
+
 async function escalateToCard({ github, owner, repo, repoId, run, suitePr, suiteComments, authorize, delivery, rerun }) {
   const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { owner, repo, run_id: run.id, per_page: 100 });
   // The job name comes from the trusted premerge matrix: (suite key, card PR, card unit, title).
@@ -223,6 +276,11 @@ async function escalateToCard({ github, owner, repo, repoId, run, suitePr, suite
     // is due; otherwise wait for the card worker (or the ceiling, which admission enforces).
     const reran = suiteComments.filter(c => isOurs(c) && String(c.body || '').startsWith(RERUN) &&
       String(c.body).includes(`card-head:${card.head.sha}`) && String(c.body).includes(`run:${run.id}`));
+    const answer = cardAnswer(cardComments, escalations.filter(c => String(c.body).includes(`card-${card.head.sha}`)));
+    if (answer) {
+      const r = await contestToSuite({ github, owner, repo, run, suitePr, suiteComments, card, answer, authorize, delivery, waitIfContested: true });
+      if (r) return r;
+    }
     return { state: reran.length ? 'cert-failed-again-waiting' : 'cert-already-escalated', pr: card.number };
   }
   if (heads.length) {
@@ -240,6 +298,12 @@ async function escalateToCard({ github, owner, repo, repoId, run, suitePr, suite
       const r = await rerun(run.id);
       return { state: r.ok ? 'cert-rerun-requested' : 'cert-rerun-failed', pr: suitePr.number, card: card.number, reason: r.via || r.reason };
     }
+  }
+  // A card that changed but still fails: if its worker answered, the suite gets its turn first (once per head).
+  const answer = heads.length ? cardAnswer(cardComments, escalations) : null;
+  if (answer) {
+    const r = await contestToSuite({ github, owner, repo, run, suitePr, suiteComments, card, answer, authorize, delivery, waitIfContested: false });
+    if (r) return r;
   }
   const sender = delivery || createCopilotDelivery({ owner, repo, token: null });
   const proof = authorize === observeOnly ? { ok: true } : await sender.preflight();
@@ -316,5 +380,5 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   return results;
 }
 
-module.exports = { escalateToCard, createRerun, CERT, ESCALATED, RERUN, untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+module.exports = { escalateToCard, contestToSuite, createRerun, CERT, ESCALATED, RERUN, CONTEST, DEADLOCK, untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
 
