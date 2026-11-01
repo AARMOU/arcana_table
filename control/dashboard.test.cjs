@@ -516,7 +516,7 @@ test('Verify count keeps the last published count after five minutes and labels 
   const ctx=vm.createContext({Date,window:{ArcanaReview:actual}});
   vm.runInContext(script.slice(start,end)+'\nconst REVIEW_CURRENT_MS=15*60*1000;this.countLabel=reviewCountLabel;',ctx);
   const now=Date.parse('2026-10-29T05:52:00Z');
-  const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified'};
+  const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified',readyForOwner:true,preflight:{status:'passed'}};
   const review=(min,items=[card])=>({checkedAt:new Date(now-min*60000).toISOString(),items});
   assert.equal(ctx.countLabel(review(2),now),'1 ready');
   assert.equal(ctx.countLabel(review(6),now),'1 ready','5-minute aging does not hide Verify count');

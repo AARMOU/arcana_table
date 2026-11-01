@@ -18,7 +18,7 @@ function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "complete
   files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
     "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt"],
   unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU",
-  prError = null, readyRefused = false } = {}) {
+  prError = null, readyRefused = false, preflight = "passed" } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
     const u = String(url); const method = init.method || "GET";
@@ -38,6 +38,8 @@ function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "complete
     if (u.endsWith("/pulls/360/reviews") && method === "POST") { const b = JSON.parse(init.body); writes.push(["review", b]);
       reviews.push({ user: { login: "AARMOU" }, commit_id: b.commit_id, state: b.event === "APPROVE" ? "APPROVED" : "CHANGES_REQUESTED" });
       return ok({ id: 991 }); }
+    if (u.includes("/issues/360/comments?") && method === "GET") return ok(preflight === null ? [] : [{ user: { id: 41898282, login: "github-actions[bot]" },
+      body: "<!-- arcana-destination-preflight-v1 -->\n```json\n" + JSON.stringify({ schema: 1, pr: 360, sourceSha: SHA, status: preflight }) + "\n```" }]);
     if (u.endsWith("/issues/358/labels") && method === "POST") { writes.push(["label", JSON.parse(init.body)]); return ok([]); }
     return ok({ message: "unexpected " + method + " " + u }, 500);
   };
@@ -368,4 +370,14 @@ test('malformed quota headers are omitted and cannot carry response text to Cont
     'x-ratelimit-resource':'private token value','x-github-request-id':'private token value'}}});
   const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
   assert.deepEqual(r.body,{error:'github-rate-limited',upstreamStatus:403,stage:'pr'});
+});
+
+test("approve fails closed without a passed destination preflight for the exact head", async () => {
+  for (const preflight of [null, "blocked"]) {
+    const gh = fakeGitHub({ preflight });
+    const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+    assert.equal(r.status, 422, String(preflight));
+    assert.equal(r.body.error, "preflight-not-passed");
+    assert.equal(gh.writes.length, 0, "nothing approved or marked ready");
+  }
 });

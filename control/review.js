@@ -17,8 +17,11 @@ const SHA = /^[0-9a-f]{40}$/;
 const sessionFromHash = hash => { const m = String(hash || '').match(/(?:^#|&)review-session=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
 // A linked work unit is insufficient evidence that this PR implements a card.
 // A certified Copilot draft is ready: approving marks it ready for review with the owner's session.
-const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true && !i.shapeProblem &&
+// Ready to Verify = certified on this head AND the inbox's destination preflight passed on the current
+// build target (same predicate as scripts/review-inbox.cjs readyToVerify). Missing fields fail closed.
+const isCertified = i => !!i && i.kind === 'card' && i.hasTest === true && !i.shapeProblem &&
   i.state === 'certified' && i.certification === 'certified';
+const isReadyForOwner = i => isCertified(i) && i.readyForOwner === true && i.preflight?.status === 'passed';
 const canDecide = i => !!i && i.kind === 'card' && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
 // Approval needs independent rules certification on this head, not just green checks. The Worker
 // enforces the same rule on the live head; this only disables the button and explains why.
@@ -27,6 +30,7 @@ const approveBlocked = i => canApprove(i) ? null
   : !canDecide(i) ? 'This is not a verified card implementation. Review its GitHub PR as engineering or audit work.'
       : !i.hasTest ? 'Executable card scenario tests are missing. You can still request a fix.'
         : i.shapeProblem ? String(i.shapeProblem) + '. The card lane must fix the PR first; you can still request a fix.'
+        : isCertified(i) ? 'Waiting for the build-target compatibility check (destination preflight) to pass on this commit. You can still request a fix.'
         : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
 // Only the single-card queue identity is a lookup key; PR titles are work descriptions.
 const cardName = item => typeof item?.name === 'string' ? item.name.trim() : '';

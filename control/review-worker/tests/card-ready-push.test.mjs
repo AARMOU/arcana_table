@@ -8,7 +8,7 @@ globalThis.crypto ||= webcrypto;
 const SHA = 'a'.repeat(40), NEXT = 'b'.repeat(40);
 const now = Date.parse('2026-11-01T16:00:00Z');
 const card = (sha=SHA) => ({ pr: 777, headSha: sha, kind: 'card', hasTest: true,
-  state: 'certified', certification: 'certified', shapeProblem: null });
+  state: 'certified', certification: 'certified', shapeProblem: null, readyForOwner: true, preflight: { status: 'passed' } });
 const report = (items, clock=now) => ({ kind: 'review', checkedAt: new Date(clock).toISOString(), items });
 const comments = value => [{ user: { login: 'github-actions[bot]', type: 'Bot' },
   body: '<!-- arcana-control-status-v1:review -->\n```json\n' + JSON.stringify(value) + '\n```' }];
@@ -75,4 +75,12 @@ test('push once per new certified PR head; stale reports and failures never mark
   current=report([card(NEXT)], now - 25 * 60 * 1000);
   assert.deepEqual(await runCardReadyPush(e, { fetchImpl, clock:now }), { skipped:'review-feed-invalid-or-stale' });
   assert.equal(pushes,3);
+});
+
+test('no honk until destination preflight passed: pending, blocked, unknown, missing or held all fail closed', () => {
+  for (const extra of [{ readyForOwner: false, preflight: { status: 'pending' } }, { readyForOwner: false, preflight: { status: 'blocked' } },
+    { readyForOwner: false, preflight: { status: 'unknown' } }, { readyForOwner: true, preflight: undefined },
+    { readyForOwner: undefined, preflight: { status: 'passed' } }, { readyForOwner: true, preflight: { status: 'blocked' } }])
+    assert.deepEqual(readyIds(report([{ ...card(), ...extra }]), now), [], JSON.stringify(extra));
+  assert.deepEqual(readyIds(report([card()]), now), ['777:' + SHA]);
 });

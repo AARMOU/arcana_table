@@ -12,6 +12,8 @@ export function readyIds(report, clock = Date.now()) {
     time > clock + 60000 || clock - time > MAX_AGE_MS) return null;
   return [...new Set(report.items.filter(i => i?.kind === 'card' && i.hasTest === true &&
     !i.shapeProblem && i.state === 'certified' && i.certification === 'certified' &&
+    // Same predicate as the inbox's readyToVerify: destination preflight passed, else no honk.
+    i.readyForOwner === true && i.preflight?.status === 'passed' &&
     Number.isSafeInteger(i.pr) && i.pr > 0 && /^[0-9a-f]{40}$/.test(String(i.headSha || '')))
     .map(i => i.pr + ':' + i.headSha))];
 }

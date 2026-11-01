@@ -143,6 +143,22 @@ export function cleanNote(note) {
 }
 
 // Core decision logic. api: authenticated-as-owner GitHub caller.
+const PREFLIGHT_MARKER = "<!-- arcana-destination-preflight-v1 -->";
+/** Status of the newest trusted destination-preflight receipt for [sha] ("passed" / "blocked"), or null. */
+export function latestPreflight(comments, sha) {
+  let status = null;
+  for (const c of Array.isArray(comments) ? comments : []) {
+    if (c?.user?.id !== 41898282 || c?.user?.login !== "github-actions[bot]") continue;
+    const body = String(c.body || "");
+    if (!body.startsWith(PREFLIGHT_MARKER + "\n```json\n")) continue;
+    try {
+      const r = JSON.parse(body.split("\n```json\n")[1].split("\n```")[0]);
+      if (r?.schema === 1 && r.sourceSha === sha && ["passed", "blocked"].includes(r.status)) status = r.status;
+    } catch { /* malformed receipt is not evidence */ }
+  }
+  return status;
+}
+
 export async function decide(api, { pr, sha, decision, note }) {
   if (!Number.isSafeInteger(pr) || pr < 1 || !/^[0-9a-f]{40}$/.test(String(sha)) || !["approve", "request-fix"].includes(decision))
     return [400, { error: "bad-request" }];
@@ -186,6 +202,12 @@ export async function decide(api, { pr, sha, decision, note }) {
     // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
     const certification = certificationStatus(runs, sha);
     if (certification !== "certified") return [422, { error: "not-certified", certification }];
+    // Same gate as the inbox's readyToVerify: the newest destination preflight for this exact head must be a
+    // trusted bot receipt that passed. None, pending or blocked fails closed; integration still re-checks the target.
+    const comments = await api(`/issues/${pr}/comments?per_page=100`);
+    if (!comments.ok) return decisionFailure(comments, "preflight", [502, { error: "preflight-unavailable" }]);
+    const preflight = latestPreflight(comments.body, sha);
+    if (preflight !== "passed") return [422, { error: "preflight-not-passed", preflight: preflight || "none" }];
     // Certification only reaches Copilot's own drafts, and the workflow token cannot mark them ready.
     // Every gate above has passed for this exact head, so the owner's own session does it here;
     // integration only considers non-draft PRs. If GitHub refuses, nothing is approved.

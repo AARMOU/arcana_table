@@ -60,7 +60,7 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
     addEventListener(name,fn){(listeners[name] ||= []).push(fn);},
   };
   vm.runInNewContext(src,sandbox,{filename:'review.js'});
-  const item={ pr:360, headSha:'a'.repeat(40), state:'certified', certification:'certified',
+  const item={ pr:360, headSha:'a'.repeat(40), state:'certified', certification:'certified', readyForOwner:true, preflight:{status:'passed'},
     card:'Test Card',kind:'card',hasTest:true,draft:false,checks:[],checkRuns:[],problems:[],abilities:[],...reviewItem };
   const host = new Element('div');
   const open = () => {

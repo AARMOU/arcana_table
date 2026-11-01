@@ -14,7 +14,8 @@ test('all seven status categories have owner-facing labels', () => {
 });
 
 test('only reviewable cards can be decided; approve needs independent certification', () => {
-  const item = (s, certification) => ({ pr: 360, headSha: SHA, state: s, certification, kind: 'card', hasTest: true, draft: false });
+  const item = (s, certification) => ({ pr: 360, headSha: SHA, state: s, certification, kind: 'card', hasTest: true, draft: false,
+    readyForOwner: true, preflight: { status: 'passed' } });
   assert.equal(R.canApprove(item('certified', 'certified')), true);
   assert.equal(R.approveBlocked(item('certified', 'certified')), null);
   // Green checks without certification (e.g. PR #344): missing, running, failed all fail closed.
@@ -131,4 +132,16 @@ test('quota errors show a bounded recovery time and the failed approval stage', 
   assert.match(text,/Retry in about [23] minute/);
   assert.match(text,/No approval recorded/);
   assert.doesNotMatch(R.decisionMessage(503,{error:'github-rate-limited',upstreamStatus:429,stage:'<private>',retryAt:'invalid'}).text,/<private>|NaN|Invalid Date/);
+});
+
+test('certified but destination preflight not passed is never ready to Verify (fails closed)', () => {
+  const base = { pr: 360, headSha: SHA, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false };
+  for (const extra of [{}, { readyForOwner: false, preflight: { status: 'pending' } }, { readyForOwner: false, preflight: { status: 'blocked' } },
+    { readyForOwner: false, preflight: { status: 'unknown' } }, { readyForOwner: true }, { readyForOwner: true, preflight: { status: 'blocked' } }]) {
+    const i = { ...base, ...extra };
+    assert.equal(R.isReadyForOwner(i), false, JSON.stringify(extra));
+    assert.equal(R.canApprove(i), false, JSON.stringify(extra));
+    assert.match(R.approveBlocked(i), /destination preflight/);
+  }
+  assert.equal(R.canApprove({ ...base, readyForOwner: true, preflight: { status: 'passed' } }), true);
 });
