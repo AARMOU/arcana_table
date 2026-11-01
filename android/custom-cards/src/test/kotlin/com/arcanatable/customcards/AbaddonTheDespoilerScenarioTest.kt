@@ -6,6 +6,7 @@ import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.model.Deck
+import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -36,6 +37,7 @@ class AbaddonTheDespoilerScenarioTest {
         assertNull(d.castSpell(p, firstShock, listOf(opponent1)).error)
         d.resolveAll()
 
+        d.passPriorityTo(p)
         d.putCardOnTopOfLibrary(p, "Ornithopter")
         val secondShock = d.putCardInHand(p, "Shock")
         d.giveMana(p, Color.RED)
@@ -43,6 +45,7 @@ class AbaddonTheDespoilerScenarioTest {
         d.resolveAll(Choices(yes = true))
         assertEquals(1, d.permanentsNamed(p, "Ornithopter").size)
 
+        d.passPriorityTo(p)
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
         val powerstone = d.putCardInHand(p, "Worn Powerstone")
         d.giveColorlessMana(p, 3)
@@ -86,6 +89,7 @@ class AbaddonTheDespoilerScenarioTest {
         assertNull(d.castSpell(p, shock, listOf(d.player2)).error)
         d.resolveAll()
 
+        d.passPriorityTo(p)
         d.putCardOnTopOfLibrary(p, "Ornithopter")
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
         val heralds = d.putCardInHand(p, "Heralds of Tzeentch")
@@ -112,9 +116,8 @@ class AbaddonTheDespoilerScenarioTest {
         assertNull(d.castSpell(opponent1, opponentShock, listOf(opponent2)).error)
         d.resolveAll()
 
+        d.passPriorityTo(p)
         d.putCardOnTopOfLibrary(p, "Ornithopter")
-        assertNull(d.passPriority(opponent1).error)
-        assertNull(d.passPriority(opponent2).error)
         val shock = d.putCardInHand(p, "Shock")
         d.giveMana(p, Color.RED)
         assertNull(d.castSpell(p, shock, listOf(opponent1)).error)
@@ -122,4 +125,13 @@ class AbaddonTheDespoilerScenarioTest {
 
         assertTrue(d.permanentsNamed(p, "Ornithopter").isEmpty())
     }
+}
+
+private fun GameTestDriver.passPriorityTo(player: EntityId) {
+    repeat(4) {
+        if (priorityPlayer == player) return
+        val current = priorityPlayer ?: error("No player has priority")
+        assertNull(passPriority(current).error)
+    }
+    assertEquals(player, priorityPlayer)
 }
