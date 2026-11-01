@@ -206,6 +206,20 @@ class ArgentumWaitingLobbyTest {
         assertFalse(room.resize(3))
     }
 
+    @Test fun activeGameLobbyExposesOnlyTheCurrentShareableRoomCode() {
+        // The code remains on ArgentumCloudMultiHost even after the waiting-lobby
+        // field is cleared at game start. Never use an unrelated guest code.
+        assertEquals("GOOSE1", activeGameRoomCode("online-host", "goose1", "OTHER1"))
+        assertEquals("OTHER1", activeGameRoomCode("online-guest", "GOOSE1", "other1"))
+        assertNull(activeGameRoomCode("online-host", null, "OTHER1"))
+        assertNull(activeGameRoomCode("online-guest", "GOOSE1", ""))
+        assertNull(activeGameRoomCode("host", "GOOSE1", "OTHER1"))
+        assertNull(activeGameRoomCode(null, "GOOSE1", "OTHER1"))
+        // Never mistake a host invitation or other long secret for a room locator.
+        assertNull(activeGameRoomCode("online-host", "GOOSE1.secret-capability", "OTHER1"))
+        assertNull(activeGameRoomCode("online-host", "https://example.test", "OTHER1"))
+    }
+
     @Test fun lobbyMessageCarriesReadinessWithoutDecks() {
         val room = lobby(3)
         room.setKind(1, ArgentumWaitingLobby.Kind.FRIEND)

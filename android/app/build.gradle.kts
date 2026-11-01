@@ -55,6 +55,10 @@ android {
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
                 test.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+                // Opt-in CI prefetch prevents Robolectric's independent JVM HTTP download from
+                // failing behind runner network controls; never changes normal developer tests.
+                providers.gradleProperty("arcana.robolectricJarDir").orNull?.takeIf { it.isNotBlank() }
+                    ?.let { test.systemProperty("robolectric.dependency.dir", it) }
                 test.systemProperty("arcana.screenshots", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
             }
         }

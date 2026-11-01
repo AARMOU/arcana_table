@@ -166,6 +166,8 @@ internal fun TableController.TableOverlaysB() {
 
 
 
+    if (activeGameLobbyOpen) ActiveGameLobbyDialog(onDismiss = { activeGameLobbyOpen = false })
+
     if (lobbyOpen) LobbyDialog(
         players = players,
         roomCreated = lobbyCreated || roomConnected,
