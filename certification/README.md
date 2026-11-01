@@ -21,6 +21,19 @@ Add one **trusted-main** manifest entry (key, exact Magic card name, its queue i
 
 Resurrection Orb (#408 / Copilot PR #410) is the initial four-scenario example. Its premerge engine run [#40800975564](https://github.com/AARMOU/arcana_table/actions/runs/40800975564) passed four independent tests against PR #410's exact source SHA `56f1842`. This is evidence for that card, not a general claim that every supported card already has coverage.
 
+## Integrated cards (idle-time work)
+
+Most custom cards the app plays were integrated before this pipeline existed. When the dispatcher has nothing
+eligible, `certification/idle-suites.cjs` (run hourly by the backfill workflow) opens one `[Arcana Suite]` request
+for such a card. The owner approved this on 2026-11-01, capped at 6 a day.
+- **Order:** deck cards first. Only while billing is normal, with at most one request waiting at a time.
+- **Request:** its `Card unit` / `Card PR` lines read `integrated`. The suite registers `"issue": <the request's
+  number>` and `"target": "build"`.
+- **Premerge:** runs it against the integration build branch named in main's `integration/policy.json`.
+- **Dispatcher:** ranks these after every other kind of work.
+- **If it fails:** the suite worker gets its repair turn first. If it still fails, the router posts a one-time
+  regression note (suite PR and #81) for the card lane, instead of looking for a card PR.
+
 ## Safeguards and limits
 
 ### Celestine certification (#81)

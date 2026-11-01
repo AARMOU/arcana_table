@@ -28,9 +28,16 @@ function changedSuites(manifest, changedFiles) {
 
 // `blocking` lists changed suites with no runnable candidate: premerge must fail rather than
 // pass without executing them. Unchanged suites without an open card PR are only reported.
+// A `target: "build"` suite (an integrated card) runs against the integration build branch, not a card PR
+// (pr 0 in the matrix). Only when the PR adds or changes it: there are many, and the build moves rarely.
 function planPremerge({ manifest, changedFiles, openPrs }) {
   const include = [], missing = [];
+  const own = new Set(changedSuites(manifest, changedFiles).map(s => s.key));
   for (const s of selectSuites(manifest, changedFiles)) {
+    if (s.target === 'build') {
+      if (own.has(s.key)) include.push({ key: s.key, pr: 0, issue: s.issue, title: 'integrated card on the build branch', target: 'build' });
+      continue;
+    }
     const pr = cardPr(manifest, s, openPrs);
     if (pr) include.push({ key: s.key, pr: pr.number, issue: s.issue, title: pr.title });
     else missing.push(s.key);

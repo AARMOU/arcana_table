@@ -47,3 +47,16 @@ test('a changed suite without a runnable candidate blocks premerge; unchanged on
   assert.deepEqual(infra.include, []);
   assert.deepEqual(infra.blocking, []);
 });
+
+test('a build-target suite (integrated card) runs on the build branch only when the PR adds or changes it', () => {
+  const build = { key: 'urzas-saga', name: "Urza's Saga", issue: 9001, source: 'certification/UrzasSagaIndependentCertificationTest.kt',
+    testClass: 'com.arcanatable.customcards.UrzasSagaIndependentCertificationTest', tests: 5, target: 'build' };
+  const m = P.validateManifest({ ...manifest, suites: [...manifest.suites, build] });
+  const own = planPremerge({ manifest: m, changedFiles: [build.source, 'certification/suites/urzas-saga.json'], openPrs: [] });
+  assert.deepEqual(own.include, [{ key: 'urzas-saga', pr: 0, issue: 9001, title: 'integrated card on the build branch', target: 'build' }]);
+  assert.deepEqual(own.blocking, [], 'no card PR is needed');
+  const infra = planPremerge({ manifest: m, changedFiles: ['certification/policy.cjs'], openPrs: open });
+  assert.ok(!infra.include.some(i => i.key === 'urzas-saga'), 'infrastructure changes do not re-run every integrated-card suite');
+  assert.ok(!infra.missing.includes('urzas-saga'));
+  assert.throws(() => P.validateManifest({ ...manifest, suites: [...manifest.suites, { ...build, target: 'elsewhere' }] }));
+});

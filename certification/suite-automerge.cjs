@@ -2,7 +2,7 @@
 // Merges a Copilot suite PR that answers an [Arcana Suite] request, only after a green
 // Arcana Card Certification Premerge run on its exact head actually executed the suite against
 // the card PR. See .github/workflows/arcana-suite-automerge.yml. Never touches card PRs.
-const { SUITE_TITLE, SUITE_MARKER, SUITE_BASE } = require('../scripts/admission.cjs');
+const { SUITE_TITLE, SUITE_MARKER, SUITE_BASE, isIntegratedSuite } = require('../scripts/admission.cjs');
 
 const PREMERGE = 'Arcana Card Certification Premerge';
 const SCENARIOS = 'Execute trusted independent card scenarios';
@@ -25,7 +25,11 @@ function mergeBlockers({ run, pr, request, files, jobs, suite }) {
   const names = (files || []).map(f => f.filename);
   const test = names.find(f => /^certification\/[A-Z][A-Za-z0-9]*IndependentCertificationTest\.kt$/.test(f));
   if (names.length !== 2 || !names.includes(json) || !test || (files || []).some(f => f.status !== 'added')) r.push('files-not-exactly-the-new-suite');
-  if (!suite || suite.key !== key || suite.issue !== unit || suite.source !== test) r.push('suite-registration-mismatch');
+  // An integrated card's suite (no card unit) registers its own request issue and certifies on the build branch.
+  const integrated = isIntegratedSuite(request?.body);
+  const expectedIssue = integrated ? request?.number : unit;
+  if (!suite || suite.key !== key || suite.issue !== expectedIssue || suite.source !== test ||
+      (integrated ? suite.target !== 'build' : suite.target !== undefined)) r.push('suite-registration-mismatch');
   const ran = (jobs || []).filter(j => String(j.name || '').startsWith(SCENARIOS));
   if (!ran.length || ran.some(j => j.conclusion !== 'success') || (jobs || []).some(j => !['success', 'skipped'].includes(j.conclusion))) r.push('suite-not-executed');
   return r;

@@ -56,6 +56,15 @@ jobs:
             const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule' || context.payload.inputs?.scheduled === 'true' || context.payload.inputs?.scheduled === true, report: true });
             core.info(JSON.stringify(r));
             await core.summary.addHeading('Certification backfill').addCodeBlock(JSON.stringify(r, null, 1)).write();
+            // Idle-time work (owner, 2026-11-01, cap 6/day): one suite request for an integrated card when the
+            // dispatcher has nothing eligible. Never assigns or spends; the dispatcher does that, after all other work.
+            try {
+              const P = require('./certification/policy.cjs');
+              const { requestIdleSuite } = require('./certification/idle-suites.cjs');
+              const idle = await requestIdleSuite({ github, ...context.repo, root: '.', manifest: P.readManifest('./certification/suites.json') });
+              core.info('Idle suite: ' + JSON.stringify(idle));
+              await core.summary.addHeading('Idle suite request').addCodeBlock(JSON.stringify(idle, null, 1)).write();
+            } catch (e) { core.warning('Idle suite request skipped: ' + String(e?.message || e).slice(0, 300)); }
       - name: Save GitHub API ETag cache
         if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
         uses: actions/cache/save@v4
