@@ -737,7 +737,7 @@ class UlamogsNullifierScenarioTest {
                     d.state.pendingDecision + " stack=" + d.getStackSpellNames() +
                     " opponentExile=" + d.getExileCardNames(d.player2)
             )
-        assertTrue("The hidden opponent-owned card must be eligible", hidden in choice.options)
+        assertTrue("The hidden opponent-owned card must be eligible; hidden=$hidden options=${choice.options} opponentExile=${d.getExileCardNames(d.player2)}", hidden in choice.options)
 
         val visibility = com.wingedsheep.engine.view.Visibility(
             d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
@@ -1069,7 +1069,7 @@ class UlamogsNullifierScenarioTest {
         val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
         assertFalse("Grant must authorize its named viewer",
             visibility.isCardIdentityHiddenFrom(d.state, granted, d.player1))
-        assertTrue("Unrelated hidden exile stays concealed",
+        assertTrue("Unrelated hidden exile stays concealed; id=$unrelated viewer=${d.player1} zone=${d.state.zones.entries.firstOrNull { unrelated in it.value }?.key} visibleName=${visibility.cardNameFor(d.state, unrelated, d.player1)}",
             visibility.isCardIdentityHiddenFrom(d.state, unrelated, d.player1))
         val permitted = masker.maskFor(choice, d.state, d.player1)
             as com.wingedsheep.engine.core.SelectCardsDecision
