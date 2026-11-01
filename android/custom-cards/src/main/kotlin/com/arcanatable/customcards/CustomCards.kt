@@ -184,6 +184,7 @@ object CustomCards {
         Entry(TallymanOfNurgle, "40K", "Six WotC precons"),
         Entry(NecronDeathmark, "40K", "Six WotC precons"),
         Entry(SeaGateWreckage, "CMM", "Six WotC precons"),
+        Entry(ArchOfOrazca, "LCC", "Six WotC precons"),
         Entry(BeaconOfUnrest, "40K", "Six WotC precons"),
         Entry(GeierReachSanitarium, "CMM", "Six WotC precons"),
         Entry(DeployToTheFront, "40K", "Six WotC precons"),

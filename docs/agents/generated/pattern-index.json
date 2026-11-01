@@ -294,20 +294,26 @@
    ]
   },
   "Conditions.YouHaveCitysBlessing": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Wayward Swordtooth",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WaywardSwordtooth.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WaywardSwordtoothScenarioTest.kt"
+    },
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 39,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
   }
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -404,7 +410,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -582,7 +588,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 38,
+   "count": 39,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1075,7 +1081,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1805,7 +1811,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2734,6 +2740,17 @@
   }
  },
  "Keyword": {
+  "Keyword.ASCEND": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 39,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
+    }
+   ]
+  },
   "Keyword.CASCADE": {
    "count": 5,
    "examples": [
@@ -4131,7 +4148,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4294,7 +4311,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4705,7 +4722,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4787,7 +4804,7 @@
    ]
   },
   "restrictions": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -4800,6 +4817,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EndlessAtlas.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
+    },
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 39,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     },
     {
      "card": "Shrine of the Forsaken Gods",
@@ -4818,17 +4841,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ReflectingPool.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ReflectingPoolScenarioTest.kt"
-    },
-    {
-     "card": "Raphael, the Muscle",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RaphaelTheMuscle.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RaphaelTheMuscleScenarioTest.kt"
     }
    ]
   },
   "timing": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5341,7 +5358,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5893,7 +5910,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -5926,10 +5943,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GenestealerLocusScenarioTest.kt"
     },
     {
-     "card": "Eldrazi Monument",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziMonument.kt",
-     "lines": 40,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziMonumentScenarioTest.kt"
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 39,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
   },
