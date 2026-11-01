@@ -305,7 +305,7 @@
     {
      "card": "Arch of Orazca",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
-     "lines": 39,
+     "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
@@ -2746,7 +2746,7 @@
     {
      "card": "Arch of Orazca",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
-     "lines": 39,
+     "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
@@ -4819,16 +4819,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
     },
     {
-     "card": "Arch of Orazca",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
-     "lines": 39,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
-    },
-    {
      "card": "Shrine of the Forsaken Gods",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShrineOfTheForsakenGods.kt",
      "lines": 39,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt"
+    },
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     },
     {
      "card": "Sceptre of Eternal Glory",
@@ -5945,7 +5945,7 @@
     {
      "card": "Arch of Orazca",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
-     "lines": 39,
+     "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
