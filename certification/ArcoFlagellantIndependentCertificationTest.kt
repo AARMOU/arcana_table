@@ -137,28 +137,24 @@ class ArcoFlagellantIndependentCertificationTest {
 
     @Test
     fun endurantPaysThreeLifeAndIndestructibleLastsThroughEndOfTurn() {
-        val d = customScenario(ArcoFlagellant, "Grizzly Bears")
+        val d = customScenario(ArcoFlagellant, "Murder")
         val p = d.player1
         val opponent = d.player2
         val arco = d.putCreatureOnBattlefield(p, "Arco-Flagellant")
-        val attacker = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
-        d.removeSummoningSickness(attacker)
-        d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
+        val murder = d.putCardInHand(opponent, "Murder")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        d.giveMana(opponent, Color.BLACK, 2)
+        d.giveColorlessMana(opponent, 1)
 
-        assertNull(d.declareAttackers(opponent, listOf(attacker), p).error)
-        d.passPriorityUntil(Step.DECLARE_BLOCKERS)
-        assertNull(d.declareBlockers(p, mapOf(arco to listOf(attacker))).error)
-        assertNull(d.passPriority(opponent).error)
+        assertNull(d.castSpell(opponent, murder, listOf(arco)).error)
         assertNull(d.activate(p, arco).error)
         assertEquals(17, d.getLifeTotal(p))
         assertFalse(d.projected.hasKeyword(arco, Keyword.INDESTRUCTIBLE))
         d.resolveAll()
 
         assertTrue(d.projected.hasKeyword(arco, Keyword.INDESTRUCTIBLE))
-        d.passPriorityUntil(Step.POSTCOMBAT_MAIN, activePlayer = opponent)
-
         assertTrue(d.permanentsNamed(p, "Arco-Flagellant").contains(arco))
-        assertTrue(d.permanentsNamed(p, "Grizzly Bears").isEmpty())
+        assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Murder"))
 
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
         assertFalse(d.projected.hasKeyword(arco, Keyword.INDESTRUCTIBLE))
