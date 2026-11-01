@@ -108,15 +108,18 @@ jobs:
           python3 - <<'PY'
           from xml.etree import ElementTree as E
           from pathlib import Path
-          t=f=0; bad=[]
-          for p in [*Path("android/custom-cards/build/test-results/test").glob("TEST-*.xml"),
-                    *Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml")]:
-            r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
-            for tc in r.iter("testcase"):
-              if tc.find("failure") is not None or tc.find("error") is not None:
-                f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
-          print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
-          assert t>500 and f==0
+          ok=True
+          for label,d,floor in (("cards","android/custom-cards/build/test-results/test",500),
+                                ("app","android/app/build/test-results/testDebugUnitTest",300)):
+            t=f=0; bad=[]
+            for p in Path(d).glob("TEST-*.xml"):
+              r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+              for tc in r.iter("testcase"):
+                if tc.find("failure") is not None or tc.find("error") is not None:
+                  f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+            print(label,{"tests":t,"failed":f}); print("\n".join(bad[:200]))
+            ok = ok and t>floor and f==0
+          assert ok, "a suite failed or did not run"
           PY
       - name: Show the override list and engine diff summary
         if: always()
@@ -126,8 +129,9 @@ jobs:
       - name: Gate - engine suites green
         if: always()
         run: |
-          echo "engine tests: ${{ steps.enginetests.outcome }}, summary: ${{ steps.enginesummary.outcome }}"
+          echo "engine: ${{ steps.enginetests.outcome }}/${{ steps.enginesummary.outcome }} custom: ${{ steps.custom.outcome }} app: ${{ steps.app.outcome }}"
           test "${{ steps.enginetests.outcome }}" = success && test "${{ steps.enginesummary.outcome }}" = success
+          test "${{ steps.custom.outcome }}" = success && test "${{ steps.app.outcome }}" = success
       - uses: actions/upload-artifact@v4
         if: always()
         with:
