@@ -96,6 +96,32 @@ function publicDemand(comments = []) {
 const verifiedGaps = g => !!(g && g.dispatch && g.dispatch.claimsVerified === true && g.dispatch.dispatchable === true);
 const stringList = v => Array.isArray(v) ? v.filter(n => typeof n === 'string') : [];
 
+function classificationCounts(...runs) {
+  const cards = new Map();
+  const counts = { supportedCopilotUnclaimed: 0, needsReview: 0, engineBlocked: 0,
+    implementedAndTested: 0, claimed: 0, unclassified: 0 };
+  for (const g of runs.filter(Boolean)) {
+    if (!verifiedGaps(g) || !Array.isArray(g.cards) || !g.dispatch.claimed ||
+        typeof g.dispatch.claimed !== 'object' || Array.isArray(g.dispatch.claimed)) return null;
+    const claimed = new Map(Object.entries(g.dispatch.claimed).map(([name, by]) => [F.normName(name), by]));
+    for (const c of g.cards) {
+      if (!c || typeof c.name !== 'string' || !F.normName(c.name)) return null;
+      const key = F.normName(c.name);
+      const claimedBy = claimed.get(key);
+      const category = c.readiness === 'IMPLEMENTED_AND_TESTED' ? 'implementedAndTested' :
+        claimedBy ? 'claimed' :
+        c.readiness === 'ENGINE_BLOCKED' || c.route === 'claude' || c.reviewHint === 'possible-engine-gap' ? 'engineBlocked' :
+        c.readiness === 'NEEDS_REVIEW' ? 'needsReview' :
+        c.readiness === 'SUPPORTED' && c.route === 'copilot' ? 'supportedCopilotUnclaimed' : 'unclassified';
+      const previous = cards.get(key);
+      cards.set(key, previous === undefined || previous === category ? category :
+        previous === 'claimed' || category === 'claimed' ? 'claimed' : 'unclassified');
+    }
+  }
+  for (const category of cards.values()) counts[category]++;
+  return { distinctNames: cards.size, counts };
+}
+
 // Per-card Cardkit verdicts from one or more verified `gaps` runs: normName -> compact verdict.
 function verdictMap(...runs) {
   const out = new Map();
@@ -143,6 +169,7 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
   const titles = units.map(i => F.normName(i.title));
   const isQueued = n => queued.has(F.normName(n)) || titles.some(t => t.includes(F.normName(n)));
   const requestedVerified = verifiedGaps(requestedGaps);
+  const classifications = classificationCounts(gaps, requestedVerified ? requestedGaps : null);
   // Copilot-ready = free SUPPORTED/copilot in either verified run (precons + owner requests).
   const copilot = [...new Set([...stringList(gaps.dispatch.copilot),
     ...(requestedVerified ? stringList(requestedGaps.dispatch.copilot) : [])])];
@@ -220,7 +247,8 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
   const publicRequests = demand.slice(0, 30).map(d => ({ name: d.name, votes: d.votes,
     status: isReady(d.name) ? 'copilot-ready' : isQueued(d.name) ? 'queued' : 'not-copilot-ready' }));
   return { ok: true, reason: null, names, requested, blockedRequests, workRequests, resolvedRequests, notReady, publicRequests,
-    ownerDemand, requestedClassified: requestedVerified, alreadyQueued, eligibleNames: available, available: copilot.length };
+    ownerDemand, requestedClassified: requestedVerified, alreadyQueued, eligibleNames: available, available: copilot.length,
+    classificationCounts: classifications };
 }
 
 function newIssueUrl(title, body) {
@@ -241,6 +269,7 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
   });
   return { checkedAt: now.toISOString(), runId: runId ? String(runId) : null, base: base || null, baseSha: baseSha || null,
     ok: !!result?.ok, reason: result?.reason || null, available: result?.available ?? null,
+    classificationCounts: result?.classificationCounts || null,
     alreadyQueued: result?.alreadyQueued || [], blockedRequests: result?.blockedRequests || [], suggestions,
     workRequests: result?.workRequests || [], resolvedRequests: result?.resolvedRequests || [],
     notReady: result?.notReady || [], requestedClassified: !!result?.requestedClassified,
@@ -258,8 +287,16 @@ function queueSummary(p) {
   if (!p.ok) return [`Queue feeder: no suggestions — ${p.reason}`];
   const ready = p.suggestions.filter(s => s.ready);
   const work = p.cardWork || {};
+  const classifications = p.classificationCounts;
+  const classificationSummary = classifications
+    ? `Cardkit classifications (${classifications.distinctNames} distinct names in verified feeder inputs; not an index-gap or rules-playability count): ` +
+      `SUPPORTED/copilot/unclaimed ${classifications.counts.supportedCopilotUnclaimed}, NEEDS_REVIEW ${classifications.counts.needsReview}, ` +
+      `ENGINE_BLOCKED ${classifications.counts.engineBlocked}, IMPLEMENTED_AND_TESTED ${classifications.counts.implementedAndTested}, ` +
+      `claimed ${classifications.counts.claimed}, unclassified ${classifications.counts.unclassified}. Source ${p.baseSha || 'unknown'}; checked ${p.checkedAt || 'unknown'}.`
+    : `Cardkit classification breakdown unavailable (incomplete card or claim evidence). Source ${p.baseSha || 'unknown'}; checked ${p.checkedAt || 'unknown'}.`;
   return [`Queue feeder: ${ready.length} Copilot-ready card(s) suggested of ${p.available} SUPPORTED and unclaimed on ${String(p.baseSha || '').slice(0, 7)}` +
     (p.alreadyQueued.length ? `; already queued: ${p.alreadyQueued.join(', ')}` : '') + '.',
+  classificationSummary,
   ...ready.map(s => `${s.name}${s.requestedIssue ? ' (owner selected #' + s.requestedIssue + ')' : ''}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
   ...(p.blockedRequests?.length ? ['Owner-selected cards not Cardkit Copilot-ready (NO assignment): ' +
     p.blockedRequests.map(r => r.name + ' (#' + r.issue + ', ' + (r.outcome || 'unclassified') + ')').join(', ').slice(0, 900)] : []),
@@ -482,6 +519,6 @@ function needsSiteRefresh(previous, payload) {
     previous && /^[a-f0-9]{40}$/.test(String(previous.baseSha || '')) && previous.baseSha !== payload.baseSha);
 }
 
-module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
+module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, classificationCounts, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK };
