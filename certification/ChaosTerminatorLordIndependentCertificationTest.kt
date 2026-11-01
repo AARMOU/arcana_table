@@ -38,6 +38,8 @@ class ChaosTerminatorLordIndependentCertificationTest {
         val opponentCreature = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
 
         assertFalse(d.projected.hasKeyword(ally, Keyword.DOUBLE_STRIKE))
+        d.passPriorityUntil(Step.BEGIN_COMBAT)
+        d.resolveAll(Choices(targets = listOf(ally)))
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
 
         assertTrue(d.projected.hasKeyword(ally, Keyword.DOUBLE_STRIKE))
