@@ -1,0 +1,9 @@
+{
+  "key": "and-they-shall-know-no-fear",
+  "name": "And They Shall Know No Fear",
+  "issue": 781,
+  "source": "certification/AndTheyShallKnowNoFearIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AndTheyShallKnowNoFearIndependentCertificationTest",
+  "tests": 14,
+  "target": "build"
+}
