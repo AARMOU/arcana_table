@@ -469,6 +469,32 @@
       "baseSha": "853ce781efa03bbeff90d2f8a799b6d1c98a1069",
       "oracleHash": "11bcaf4f9413e1ae76bc0df32df97ff574a6e817d02567ed48d7cf2c6e087606",
       "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Abaddon the Despoiler": {
+      "summary": "The line is covered by a cast-triggered Effects.Cascade (Wildsear, Quandrix), with a hand-zone spell predicate; a dynamic mana-value filter is implemented (Rocco), and DynamicAmounts.lifeLostThisTurn(Player.EachOpponent) sums opponents' life loss (Bloodsoaked Insight). During-your-turn is a triggerRestriction.",
+      "verifiedBy": "Copilot; source inspection of Argentum c1c04ca3265c61df913af6db65460ad4ce409614 on 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/WildsearScouringMaw.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/sos/cards/QuandrixTheProof.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh3/cards/BloodsoakedInsight.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/snc/cards/RoccoCabarettiCaterer.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Mark of Chaos Ascendant — During your turn, spells you cast from your hand with mana value X or less have cascade, where X is the total amount of life your opponents have lost this turn.",
+          "primitives": [
+            "Triggers.you.casts",
+            "SpellCastPredicate.CastFromZone(Zone.HAND)",
+            "Conditions.IsYourTurn",
+            "GameObjectFilter.manaValueAtMostDynamic",
+            "DynamicAmounts.lifeLostThisTurn(Player.EachOpponent)",
+            "Effects.Cascade"
+          ]
+        }
+      ],
+      "baseSha": "bc20a025ba8857f1a5dab41ca8c84d138cde047b",
+      "oracleHash": "63177c9660b62d94fb0d886ebbd66c99d6ef6f3545ca62d4ee8fde589252b02b",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
