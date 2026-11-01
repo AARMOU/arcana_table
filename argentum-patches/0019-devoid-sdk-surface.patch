@@ -1,0 +1,24 @@
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 02cde100d..348f7a27b 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1416,6 +1416,7 @@ Families:
+ - `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability's SOURCE must be colorless.
+ - `ManaRestriction.CostsContainingXOnly` — "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana cost contains {X}, and by activating an ability whose mana cost contains {X} — both are costs, so unlike Sp…
+ - `ManaRestriction.CreatureSpellsOnly` — "Spend this mana only to cast creature spells."
++- `ManaRestriction.DevoidSpellsOnly` — Restricted mana for spells carrying the Devoid keyword (not all colorless spells).
+ - `ManaRestriction.DisturbCostOnly` — "Spend this mana only to pay a disturb cost." Satisfied only by casting a spell for its disturb alternative cost (CR 702.146a — cast transformed from the graveyard).
+ - `ManaRestriction.EquipAbilityActivationOnly` — "Spend this mana only to activate equip abilities." Satisfied only by paying the cost of an **equip** ability (CR 702.6a — "Cost: Attach this permanent to target creature you control.
+ - `ManaRestriction.FaceDownSpellsOnly` — "Spend this mana only to cast face-down spells." Satisfied by casting a card face down for its morph (CR 702.37a) or disguise (CR 702.168a) cost — a spell with no name and no characteristics but "2…
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index bf0eb74bc..1d90b5c8d 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1729,6 +1729,7 @@ ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaC
+ ManaRestriction.CannotPayGenericCosts — ManaRestriction — Jegantha, the Wellspring — ManaRestriction.CannotCastSpellsFromHand, ManaRestriction.CannotCastSpellsOtherThan — every other restriction answers "may this payment spend the mana" through isSatisfiedBy; this one admits every payment and refuses a symbol (generic {N}/{X}, CR 107.4b), which no payment-context axis can express, and the negative pair are shipped data shapes about the spell being cast
+ ManaRestriction.ClassLevelUpOnly — ManaRestriction — Sorcerer Class — ManaRestriction.EquipAbilityActivationOnly, ManaRestriction.AbilityActivationOnly — a Class level-up is one activated ability among the others its source's levels grant, so neither the any-ability atom nor a source type/subtype test can separate it; EquipAbilityActivationOnly is the same narrowing for a different spend context, and both are shipped data objects on the wire
+ ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ManaRestriction — Eldrazi Temple — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.SubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly rejects every ability activation; SubtypeSpellsOrAbilitiesOnly permits colored Eldrazi abilities, so neither can constrain both subtype and colorlessness of a source while also admitting spells
++ManaRestriction.DevoidSpellsOnly — ManaRestriction — Corrupted Crossroads — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly also admits colorless non-devoid spells such as artifacts, and ColorlessSubtypeSpellsOrAbilitiesOnly keys on a subtype and admits abilities; devoid is a keyword on the spell, so neither can express it
+ ManaRestriction.ForetellOnly — ManaRestriction — Karfell Harbinger — ManaRestriction.UnlockDoorOnly, ManaRestriction.TurnPermanentsFaceUpOnly — each whitelists one special action's payment and is a shipped data object on the wire, so none can take another action as an axis; foretelling is its own special action (CR 702.143b), and casting the foretold card later is a spell cast that SpellsWithKeywordOnly covers
+ ManaRestriction.OfChosenType — ManaRestriction — The Ringhart Crest (Kolvori, God of Kinship) — ManaRestriction.SubtypeSpellsOrAbilitiesOnly, ManaRestriction.SubtypeSpellsOnly — both carry a fixed subtype baked into the pool entry; "the chosen type" is unknown until the producing source is known, and a sentinel subtype string would collide with a printed one, so this is the unbound template the engine binds to SubtypeSpellsOrAbilitiesOnly as the mana is made (it subsumes the deleted AddAnyColorManaSpendOnChosenTypeEffect)
+ ManaRestriction.SpellsWithKeywordOnly — ManaRestriction — Niko Defies Destiny — ManaRestriction.KickedSpellsOnly, ManaRestriction.SubtypeSpellsOnly — KickedSpellsOnly asks whether the kicker cost was paid, not whether the card has a keyword; SubtypeSpellsOnly reads type-line subtypes, and a keyword is not a subtype

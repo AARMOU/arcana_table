@@ -1,0 +1,216 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+index 6e41eb9f1..0acc0e501 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+@@ -810,10 +810,13 @@ class ManaSolver private constructor(
+             }.forEach(::tapIntoBonusPool)
+         }
+ 
+-        val paymentSymbols = if (!substitutes) cost.symbols else cost.symbols.sortedBy { symbol ->
++        val hasColorlessHybrid = cost.symbols.any { it is ManaSymbol.ColorlessHybrid }
++        val paymentSymbols = if (!substitutes && !hasColorlessHybrid) cost.symbols else cost.symbols.sortedBy { symbol ->
+             when (symbol) {
++                is ManaSymbol.Colorless -> 1
+                 is ManaSymbol.Colored -> payableColors(listOf(symbol.color)).size
+                 is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color)).size
++                is ManaSymbol.ColorlessHybrid -> payableColors(listOf(symbol.color)).size + 1
+                 is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2)).size
+                 else -> 6
+             }
+@@ -829,12 +832,14 @@ class ManaSolver private constructor(
+                 is ManaSymbol.Colored -> payableColors(listOf(symbol.color))
+                 is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color))
+                 is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2))
++                is ManaSymbol.ColorlessHybrid -> payableColors(listOf(symbol.color))
+                 else -> emptyList()
+             }
+         }.toSet()
+-        val needsColorless = paymentSymbols.any { it is ManaSymbol.Colorless } ||
++        val needsColorless = paymentSymbols.any { it is ManaSymbol.Colorless || it is ManaSymbol.ColorlessHybrid } ||
+             (strictColors.isNotEmpty() && (colorlessAsAnyColor || spendingColors.values.any { null in it }))
+-        val matchingSources = if (!substitutes) emptyList() else remainingSources.filter { source ->
++        val useSourceMatching = substitutes || hasColorlessHybrid
++        val matchingSources = if (!useSourceMatching) emptyList() else remainingSources.filter { source ->
+             val relevant = source.availableColorsFor(spellContext).any { it in strictColors } ||
+                 (needsColorless && source.producesColorless)
+             (relevant || (strictColors.isNotEmpty() && snowStandIn(source) != null)) && source.bonusManaPerTap == 0 && source.bonusManaColorlessPerTap == 0 &&
+@@ -843,13 +848,13 @@ class ManaSolver private constructor(
+                 source.producesColors.all { source.amountFor(it) == 1 } &&
+                 (!source.producesColorless || source.amountFor(null) == 1)
+         }
+-        val useSourceMatching = substitutes
+         if (useSourceMatching) {
+             val choices = paymentSymbols.map { symbol ->
+                 val required = when (symbol) {
+                     is ManaSymbol.Colored -> listOf(symbol.color)
+                     is ManaSymbol.Phyrexian -> listOf(symbol.color)
+                     is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> listOf(symbol.color1, symbol.color2)
++                    is ManaSymbol.ColorlessHybrid -> listOf(symbol.color)
+                     else -> emptyList()
+                 }
+                 val allowed = payableColors(required)
+@@ -858,7 +863,7 @@ class ManaSolver private constructor(
+                         if (source.producesColorless) listOf(PlannedPip(source, null)) else emptyList()
+                     } else source.availableColorsFor(spellContext).filter { it in allowed }
+                         .map { PlannedPip(source, it) } +
+-                        (if (colorlessPays(required) && source.producesColorless)
++                        (if ((colorlessPays(required) || symbol is ManaSymbol.ColorlessHybrid) && source.producesColorless)
+                             listOf(PlannedPip(source, null)) else emptyList()) +
+                         (snowStandIn(source)?.takeIf { required.isNotEmpty() && it.color !in allowed }
+                             ?.let { listOf(PlannedPip(source, it.color)) } ?: emptyList())
+@@ -885,7 +890,8 @@ class ManaSolver private constructor(
+             val strict = paymentSymbols.indices.filter { index ->
+                 when (paymentSymbols[index]) {
+                     is ManaSymbol.Colored, is ManaSymbol.Phyrexian,
+-                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian, is ManaSymbol.Colorless -> true
++                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian, is ManaSymbol.Colorless,
++                    is ManaSymbol.ColorlessHybrid -> true
+                     else -> false
+                 }
+             }
+@@ -1007,6 +1013,33 @@ class ManaSolver private constructor(
+                     manaProduced[source.entityId] = ManaProduction(colorless = source.amountFor(null))
+                     useSource(source, null)
+                 }
++                is ManaSymbol.ColorlessHybrid -> {
++                    // Actual {C} or the printed color, never an arbitrary generic mana.
++                    // The matching pass above reserves scarcer strict pips first for ordinary lands;
++                    // this fallback handles multi-mana and aura-enhanced sources.
++                    val allowedColors = payableColors(listOf(symbol.color))
++                    if (allowedColors.any { spendBonusMana(it) } || spendColorlessBonusMana()) continue
++                    val candidates = mutableListOf<Pair<ManaSource, Color?>>()
++                    for (color in allowedColors) {
++                        findBestSourceForColor(remainingSources, color, handRequirements, availableSourcesByColor, spellContext)
++                            ?.let { candidates.add(it to color) }
++                    }
++                    remainingSources.filter { it.producesColorless }.forEach { candidates.add(it to null) }
++                    val choice = candidates.minWithOrNull(compareBy<Pair<ManaSource, Color?>>(
++                        { (source, color) -> calculateTapPriority(source, handRequirements, availableSourcesByColor) +
++                            painPenalty(source, if (color == null) source.colorlessPainCost else source.colorPainCost[color] ?: 0) },
++                        { (_, color) -> when (color) { symbol.color -> 0; null -> 1; else -> 2 } },
++                    ))
++                    if (choice == null) {
++                        if (allowedColors.any { payColoredPipFromAuraBonus(it) }) continue
++                        return null
++                    }
++                    val (source, color) = choice
++                    manaProduced[source.entityId] = if (color == null)
++                        ManaProduction(colorless = source.amountFor(null))
++                    else ManaProduction(color = color, amount = source.amountFor(color))
++                    useSource(source, color)
++                }
+                 is ManaSymbol.MonocolorHybrid -> {
+                     // Handle in pass 1a below, after all strict colored pips have claimed sources.
+                 }
+@@ -3771,6 +3804,8 @@ class ManaSolver private constructor(
+                 }
+                 is ManaSymbol.MonocolorHybrid ->
+                     colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
++                is ManaSymbol.ColorlessHybrid ->
++                    colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
+                 else -> {}
+             }
+         }
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+new file mode 100644
+index 000000000..90f3c36ce
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+@@ -0,0 +1,97 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.Outcome
++import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.mechanics.mana.ManaSolver
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.*
++import com.wingedsheep.sdk.model.Deck
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/** Proves hybrid land auto-tapping without requiring Ulalek's unregistered stack ability. */
++class ColorlessHybridManaSolverTest : FunSpec({
++    val hybridWatcher = card("Hybrid Test Watcher") {
++        manaCost = "{C/W}{W}"
++        typeLine = "Creature — Eldrazi"
++        power = 2
++        toughness = 2
++    }
++    val fivePipWatcher = card("Five Hybrid Test Watcher") {
++        manaCost = "{C/W}{C/U}{C/B}{C/R}{C/G}"
++        typeLine = "Creature — Eldrazi"
++        power = 5
++        toughness = 5
++    }
++    val testColorlessLand = card("Hybrid Test Wastes") {
++        typeLine = "Land"
++        activatedAbility {
++            cost = Costs.Tap
++            effect = Effects.AddColorlessMana(1)
++            manaAbility = true
++        }
++    }
++
++    fun driver(): GameTestDriver {
++        val d = GameTestDriver()
++        d.registerCards(TestCards.all + listOf(hybridWatcher, fivePipWatcher, testColorlessLand))
++        d.initMirrorMatch(deck = Deck.of("Mountain" to 40))
++        d.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return d
++    }
++
++    fun solver(d: GameTestDriver) = ManaSolver(
++        d.cardRegistry, predicateEvaluator = PredicateEvaluator(cardRegistry = null)
++    )
++
++    test("strict white and hybrid are payable with one Plains and one true colorless land") {
++        val d = driver()
++        val player = d.activePlayer!!
++        val plains = d.putPermanentOnBattlefield(player, "Plains")
++        val wastes = d.putPermanentOnBattlefield(player, "Hybrid Test Wastes")
++        val cost = ManaCost.parse("{C/W}{W}")
++        solver(d).canPay(d.state, player, cost) shouldBe true
++        val creature = d.putCardInHand(player, "Hybrid Test Watcher")
++        val result = d.castSpell(player, creature)
++        result.outcome shouldBe Outcome.Done
++        d.bothPass()
++        d.findPermanent(player, "Hybrid Test Watcher") shouldBe creature
++        d.isTapped(plains) shouldBe true
++        d.isTapped(wastes) shouldBe true
++    }
++
++    test("strict white and hybrid can both be paid with white sources") {
++        val d = driver()
++        val player = d.activePlayer!!
++        repeat(2) { d.putPermanentOnBattlefield(player, "Plains") }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{W}")) shouldBe true
++    }
++
++    test("hybrid cannot be paid with unrelated color, even if one generic mana is present") {
++        val d = driver()
++        val player = d.activePlayer!!
++        d.putPermanentOnBattlefield(player, "Mountain")
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}")) shouldBe false
++    }
++
++    test("Ulalek's five printed pips are payable with one source for each true color") {
++        val d = driver()
++        val player = d.activePlayer!!
++        listOf("Plains", "Island", "Swamp", "Mountain", "Forest").forEach {
++            d.putPermanentOnBattlefield(player, it)
++        }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe true
++    }
++
++    test("Ulalek's five printed pips are payable with five colorless sources, not four") {
++        val d = driver()
++        val player = d.activePlayer!!
++        repeat(4) { d.putPermanentOnBattlefield(player, "Hybrid Test Wastes") }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe false
++        d.putPermanentOnBattlefield(player, "Hybrid Test Wastes")
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe true
++    }
++})

@@ -1,0 +1,166 @@
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 334102ee9..1522ce471 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1443,6 +1443,7 @@ Families:
+ 
+ - `ManaSymbol.Colored(color: Color)`
+ - `ManaSymbol.Colorless`
++- `ManaSymbol.ColorlessHybrid(color: Color)` — A hybrid mana symbol payable with one actual colorless mana or one mana of color.
+ - `ManaSymbol.Generic(amount: Int)`
+ - `ManaSymbol.Hybrid(color1: Color, color2: Color)` — Hybrid mana symbol - can be paid with either of two colors.
+ - `ManaSymbol.HybridPhyrexian(color1: Color, color2: Color)` — Hybrid Phyrexian mana symbol — can be paid with one mana of either color or 2 life (CR 107.4f).
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
+index ff50d4d9e..197c63295 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
+@@ -290,7 +290,11 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
+                 (costSymbol.color == reductionSymbol.color1 || costSymbol.color == reductionSymbol.color2)
+             is ManaSymbol.Phyrexian -> costSymbol is ManaSymbol.Colored && costSymbol.color == reductionSymbol.color
+             is ManaSymbol.MonocolorHybrid -> costSymbol is ManaSymbol.Colored && costSymbol.color == reductionSymbol.color
+-            is ManaSymbol.Colored -> costSymbol is ManaSymbol.Phyrexian && costSymbol.color == reductionSymbol.color
++            is ManaSymbol.Colored -> (costSymbol is ManaSymbol.Phyrexian && costSymbol.color == reductionSymbol.color) ||
++                (costSymbol is ManaSymbol.ColorlessHybrid && costSymbol.color == reductionSymbol.color)
++            is ManaSymbol.Colorless -> costSymbol is ManaSymbol.ColorlessHybrid
++            is ManaSymbol.ColorlessHybrid -> (costSymbol is ManaSymbol.Colored && costSymbol.color == reductionSymbol.color) ||
++                costSymbol is ManaSymbol.Colorless
+             else -> false
+         }
+ 
+@@ -400,7 +404,7 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
+             // Each of these is a single-mana requirement once colors are relaxed: a
+             // monocolored hybrid's colored side ({B} in {2/B}) is 1 mana of any type.
+             is ManaSymbol.Colored, is ManaSymbol.Hybrid, is ManaSymbol.Phyrexian,
+-            is ManaSymbol.HybridPhyrexian, is ManaSymbol.MonocolorHybrid -> true
++            is ManaSymbol.HybridPhyrexian, is ManaSymbol.MonocolorHybrid, is ManaSymbol.ColorlessHybrid -> true
+             is ManaSymbol.Colorless -> !keepColorless
+             // {S} still demands snow mana — "any type" relaxes the type, not the source.
+             is ManaSymbol.Generic, is ManaSymbol.X, ManaSymbol.Snow -> false
+@@ -480,6 +484,10 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
+                             throw IllegalArgumentException("Unknown hybrid Phyrexian mana symbol: {$content}")
+                         }
+                     }
++                    // Colorless/colored hybrid: {C/W}, {C/U}, {C/B}, {C/R}, {C/G}.
++                    // This is one mana of either type, never one generic mana.
++                    content.length == 3 && content.startsWith("C/") && content[2] in "WUBRG" ->
++                        ManaSymbol.ColorlessHybrid(Color.fromSymbol(content[2])!!)
+                     // Hybrid mana: {W/U}, {G/U}, etc.
+                     content.contains("/") && !content.contains("P") -> {
+                         val parts = content.split("/")
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt
+index 5fc2bc338..5bb920e25 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt
+@@ -28,6 +28,7 @@ sealed interface ManaSymbol {
+             is Phyrexian -> setOf(color)
+             is HybridPhyrexian -> setOf(color1, color2)
+             is MonocolorHybrid -> setOf(color)
++            is ColorlessHybrid -> setOf(color)
+             is Generic, Colorless, X, Snow -> emptySet()
+         }
+ 
+@@ -79,6 +80,17 @@ sealed interface ManaSymbol {
+         override fun toString(): String = "{X}"
+     }
+ 
++    /**
++     * A hybrid mana symbol payable with one actual colorless mana or one mana of [color].
++     * It is a colored mana symbol of [color], but colorless is not a color; mana value is one.
++     * Not generic mana and not a two-colored hybrid. (CR 107.4e)
++     */
++    @Serializable
++    data class ColorlessHybrid(val color: Color) : ManaSymbol {
++        override val cmc: Int = 1
++        override fun toString(): String = "{C/${color.symbol}}"
++    }
++
+     /**
+      * A symbol payable with one mana of either of two colors — [Hybrid] `{G/U}` and, when paid with
+      * mana rather than life, [HybridPhyrexian] `{G/U/P}`. Mana-payment code matches
+diff --git a/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/core/ColorlessHybridManaSdkTest.kt b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/core/ColorlessHybridManaSdkTest.kt
+new file mode 100644
+index 000000000..6a8cc5093
+--- /dev/null
++++ b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/core/ColorlessHybridManaSdkTest.kt
+@@ -0,0 +1,69 @@
++package com.wingedsheep.sdk.core
++
++import io.kotest.assertions.throwables.shouldThrow
++import io.kotest.core.spec.style.StringSpec
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.collections.shouldContainExactly
++import kotlinx.serialization.json.Json
++
++/** SDK-only validation; rules-engine mana allocation and Android runtime are separate gates. */
++class ColorlessHybridManaSdkTest : StringSpec({
++    val colors = listOf(Color.WHITE, Color.BLUE, Color.BLACK, Color.RED, Color.GREEN)
++
++    "all five real colorless-hybrid symbols parse as typed single-mana hybrid costs" {
++        for (color in colors) {
++            val cost = ManaCost.parse("{C/${color.symbol}}")
++            cost.symbols shouldContainExactly listOf(ManaSymbol.ColorlessHybrid(color))
++            cost.cmc shouldBe 1
++            cost.colorlessAmount shouldBe 0
++            cost.colors shouldBe setOf(color)
++        }
++    }
++
++    "Ulalek has the printed five hybrid pips, one colored devotion pip per color and mana value five" {
++        val printed = "{C/W}{C/U}{C/B}{C/R}{C/G}"
++        val cost = ManaCost.parse(printed)
++        cost.cmc shouldBe 5
++        cost.symbols.size shouldBe 5
++        cost.colors shouldBe colors.toSet()
++        cost.coloredSymbolCount(colors.toSet()) shouldBe 5
++        colors.forEach { cost.coloredSymbolCount(setOf(it)) shouldBe 1 }
++        cost.toString() shouldBe printed
++    }
++
++    "colorless hybrid does not collapse into colorless or generic and retains its identity" {
++        ManaCost.parse("{C/W}") shouldBe ManaCost.of(ManaSymbol.ColorlessHybrid(Color.WHITE))
++        ManaCost.parse("{C/W}") shouldBe ManaCost.parse("{C/W}")
++        (ManaCost.parse("{C/W}") == ManaCost.parse("{C}")) shouldBe false
++        (ManaCost.parse("{C/W}") == ManaCost.parse("{1}")) shouldBe false
++        (ManaCost.parse("{C/W}") == ManaCost.parse("{W}")) shouldBe false
++    }
++
++    "colorless hybrid survives the SDK persistence wire encoding" {
++        val cost = ManaCost.parse("{2}{C/W}{C/U}{C}{W}")
++        val json = Json.encodeToString(ManaCost.serializer(), cost)
++        Json.decodeFromString(ManaCost.serializer(), json) shouldBe cost
++    }
++
++    "paying or reducing a hybrid pip can select either actual colorless or its specific color" {
++        val hybrid = ManaCost.parse("{C/W}")
++        hybrid.subtract(ManaCost.parse("{W}")) shouldBe ManaCost.ZERO
++        hybrid.subtract(ManaCost.parse("{C}")) shouldBe ManaCost.ZERO
++        ManaCost.parse("{W}").subtract(hybrid) shouldBe ManaCost.ZERO
++        ManaCost.parse("{C}").subtract(hybrid) shouldBe ManaCost.ZERO
++        ManaCost.parse("{U}").subtract(hybrid) shouldBe ManaCost.parse("{U}")
++    }
++
++    "mana of any type relaxation removes the hybrid requirement without rewriting printed cost" {
++        val hybrid = ManaCost.parse("{C/W}")
++        hybrid.relaxColors() shouldBe ManaCost.parse("{1}")
++        hybrid.relaxColoredRequirements() shouldBe ManaCost.parse("{1}")
++        hybrid.toString() shouldBe "{C/W}"
++    }
++
++    "invalid colorless hybrids and phyrexian hybrids do not parse as legal pips" {
++        for (malformed in listOf("{C/P}", "{C/C}", "{C/Z}", "{C/W/P}")) {
++            shouldThrow<IllegalArgumentException> { ManaCost.parse(malformed) }
++        }
++    }
++})
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 1d502c879..d535ae55e 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1134,6 +1134,7 @@ ManaSpellRider.MakesSpellUncounterable — ManaSpellRider
+ ManaSpellRider.ScryOnSharedTypeWithCommander — ManaSpellRider
+ ManaSymbol.Colored — ManaSymbol
+ ManaSymbol.Colorless — ManaSymbol
++ManaSymbol.ColorlessHybrid — ManaSymbol
+ ManaSymbol.Generic — ManaSymbol
+ ManaSymbol.Hybrid — ManaSymbol
+ ManaSymbol.HybridPhyrexian — ManaSymbol

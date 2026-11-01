@@ -1,0 +1,32 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+index 661be4c91..dd68d1a1d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1650,6 +1650,17 @@ class TriggerMatcher(
+                             entity?.has<com.wingedsheep.engine.state.components.identity.TokenComponent>() == true
+                         }
+                     }
++                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasExactlyColors -> {
++                        // For a departure, read the departing permanent's layer-5 colors,
++                        // not its printed colors in the destination zone (CR 603.10/608.2h).
++                        // No LKI means no match; do not silently accept a wrong trigger.
++                        when {
++                            event.isBattlefieldDeparture -> event.lastKnown?.colors?.size == predicate.count
++                            event.toZone == Zone.BATTLEFIELD -> projected.getColors(event.entityId).size == predicate.count
++                            isFaceDown -> predicate.count == 0
++                            else -> cardComponent?.colors?.size == predicate.count
++                        }
++                    }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.Or ->
+                         predicate.predicates.any { matchesLkiPredicate(it) }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.And ->
+@@ -1934,6 +1945,9 @@ class TriggerMatcher(
+                 !isFaceDown && predicate.color.name in colors()
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotColor ->
+                 isFaceDown || predicate.color.name !in colors()
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasExactlyColors ->
++                // Face-down objects are colorless; otherwise layer-5 colors, else printed colors.
++                (if (isFaceDown) 0 else colors().size) == predicate.count
+             // Static whole-card layout characteristic, so it is read off the card component and is
+             // unaffected by face-down status or by which face is currently up.
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsDoubleFaced ->
