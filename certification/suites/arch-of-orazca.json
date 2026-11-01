@@ -1,0 +1,8 @@
+{
+  "key": "arch-of-orazca",
+  "name": "Arch of Orazca",
+  "issue": 720,
+  "source": "certification/ArchOfOrazcaIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ArchOfOrazcaIndependentCertificationTest",
+  "tests": 5
+}
