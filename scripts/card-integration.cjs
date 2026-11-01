@@ -178,9 +178,12 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     if (!suite) continue;
     const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
     if (receipt?.status === 'integrated') continue;
-    // A card already registered on the destination always blocks ("already registered"), so a run can only
-    // re-post the same blocked receipt. Skip it until the destination changes its registry.
-    if (await registeredOn({github,owner,repo,ref:baseSha,symbol:paths(suite).symbol,cache:registryCache})) continue;
+    // A card already registered on the destination always blocks ("already registered"). After that blocked
+    // receipt is visible on this exact source commit, re-running only repeats it, so skip until the registry
+    // changes or the PR gets a new commit. The receipt stays as the visible disposition (same code or not);
+    // nothing is suppressed before it exists.
+    if (receipt?.status === 'blocked' && /already registered/i.test(String(receipt.reason || '')) &&
+        await registeredOn({github,owner,repo,ref:baseSha,symbol:paths(suite).symbol,cache:registryCache})) continue;
     // Blocked by the target's engine (e.g. #662 `encore`, #690 registry cards): re-run only when that engine changes,
     // not on every card-only target commit. Non-engine blocks keep re-running when the target moves.
     if (!retry && await require('./destination-preflight.cjs').engineUnchangedSince({github,owner,repo,receipt,baseSha})) continue;
@@ -263,15 +266,16 @@ const CONTROL_PATHS = ['integration/','certification/','scripts/card-integration
   '.github/workflows/arcana-approved-card-integration.yml'];
 // Unrelated owner merges may advance main during long destination tests. Accept only a
 // fast-forward whose complete changed-file list avoids every control path; else fail closed.
-// Other cards' certification suites (and the idle-burst window) land on main all day; they never change this
-// card's plan, policy or trusted code. Only additions/edits of those exact data files are exempt, never this
-// card's own suite, deletions or renames; everything else under certification/ stays a control path.
-const SUITE_DATA = [/^certification\/[A-Z][A-Za-z0-9]+IndependentCertificationTest\.kt$/,
-  /^certification\/suites\/[a-z0-9-]+\.json$/, /^certification\/idle-burst\.json$/];
+// Copilot suite merges ADD another card's certification suite (certification/<Card>IndependentCertificationTest.kt
+// plus certification/suites/<key>.json) to main all day. A newly added suite for another card cannot change the
+// gates this plan already ran. Only those additions are exempt: never edits, deletions or renames, never this
+// card's own suite, never any other certification/ file, and nothing at all when the plan's suite is unknown.
+const SUITE_ADDITION = [/^certification\/[A-Z][A-Za-z0-9]+IndependentCertificationTest\.kt$/,
+  /^certification\/suites\/[a-z0-9-]+\.json$/];
 function otherSuiteData(f, suite) {
-  if (!['added','modified'].includes(f.status) || f.previous_filename) return false;
-  if (!SUITE_DATA.some(r => r.test(f.filename))) return false;
-  return !suite || (f.filename !== suite.source && f.filename !== `certification/suites/${suite.key}.json`);
+  if (!suite?.source || !suite?.key || f.status !== 'added' || f.previous_filename) return false;
+  if (!SUITE_ADDITION.some(r => r.test(f.filename))) return false;
+  return f.filename !== suite.source && f.filename !== `certification/suites/${suite.key}.json`;
 }
 async function controlUnchanged({github,owner,repo,controlSha,suite}) {
   const live = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
