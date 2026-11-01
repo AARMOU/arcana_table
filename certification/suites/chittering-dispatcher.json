@@ -1,0 +1,9 @@
+{
+  "key": "chittering-dispatcher",
+  "name": "Chittering Dispatcher",
+  "issue": 824,
+  "source": "certification/ChitteringDispatcherIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ChitteringDispatcherIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
