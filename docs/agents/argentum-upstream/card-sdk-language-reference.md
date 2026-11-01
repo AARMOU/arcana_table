@@ -186,7 +186,8 @@ multi-paragraph entry down the same way when you touch it.
 - `warp: String?` — Warp alt-cost; exiles at end of turn.
 - `dash: String?` — Dash alt-cost (CR 702.109); gains haste and returns to owner's hand at the
   beginning of the next end step.
-- `evoke: String?` — Evoke alt-cost; sacrifices on ETB.
+- `evoke: String?` — Evoke alt-cost; sacrifices on ETB. An evoke cost with a non-mana part goes
+  through `keywordAbility(KeywordAbility.Evoke(cost, additionalCost))` instead (see below).
 - `selfAlternativeCost: SelfAlternativeCost?` — generic alternative-cost slot.
 - `castTimeCreatureTypeChoice: CastTimeCreatureTypeSource?` — forces a creature-type choice at cast time. No card uses it
   today: "up to N target creature cards of the creature type of your choice" (Aphetto Dredging) is spelled as
@@ -221,12 +222,21 @@ multi-paragraph entry down the same way when you touch it.
 - `replacementEffect { ... }` — "instead/if … would" replacement.
 - `keywords(...)` / `keywordAbility(...)` / `keywordAbilities(...)` — add keyword abilities.
 - `spell { ... }` — define the spell payload for instants/sorceries and Adventure / Omen faces.
-- `mayBeginGameOnBattlefield()` — the "If this card is in your opening hand, you may begin the game with it on
-  the battlefield" ability (CR 103.6a). Reusable across the Leyline enchantment cycles and non-"Leyline of X"
-  cards alike (e.g. Leyline Axe). Sets `CardScript.mayStartOnBattlefield = true`. After all mulligans and
-  bottoming resolve, the engine walks each player in turn order from the active player and presents a yes/no
-  decision per such card in their opening hand; a "yes" routes the card to the battlefield through the standard
-  zone-change pipeline before the first turn begins, a "no" leaves it in hand.
+- `mayBeginGameOnBattlefield(onlyIf = null, counters = emptyMap(), then = null)` — the "If this card is in your
+  opening hand, you may begin the game with it on the battlefield" ability (CR 103.6a). Reusable across the Leyline
+  enchantment cycles and non-"Leyline of X" cards alike (e.g. Leyline Axe). Sets `CardScript.beginOnBattlefield`
+  (a `BeginOnBattlefield`). After all mulligans and bottoming resolve, the engine walks each player in turn order
+  from the active player and presents a yes/no decision per such card in their opening hand; a "yes" routes the
+  card to the battlefield through the standard zone-change pipeline before the first turn begins, a "no" leaves it
+  in hand. The three axes cover the printed variations:
+  - `onlyIf` — offered only while this `Condition` holds, read once as the walk begins with the card's owner as
+    controller. The starting player is the active player while the game starts (CR 101.4e), so "and you're
+    not the starting player" is `Conditions.IsNotYourTurn`.
+  - `counters` — counters it begins the game with, applied as part of its entry ("with a luck counter on it").
+  - `then` — the "if you do" rider, run once it is on the battlefield (source = the card, controller = its
+    owner), after any as-enters choice the card makes; a question it asks pauses the walk, which resumes after.
+  **Gemstone Caverns**: `mayBeginGameOnBattlefield(onlyIf = Conditions.IsNotYourTurn, counters =
+  mapOf(CounterType.LUCK to 1), then = Patterns.Hand.exileFromHand(1, EffectTarget.Controller))`.
 - `revealFromOpeningHand(effect)` — "You may reveal this card from your opening hand. If you do, …" (CR 103.6b).
   Sets `CardScript.openingHandReveal`. Offered in the same post-mulligan walk as `mayBeginGameOnBattlefield()`
   (starting player first, then each other player in turn order; one yes/no per card). A "yes" emits a
@@ -346,9 +356,12 @@ carries the other side for the hover preview's flip toggle.
     every battlefield static-ability scan reads (continuous-effect projection, clickable granted abilities, the mana
     auto-payer, no-maximum-hand-size). So a static printed on a Room face (e.g. Greenhouse's "Lands you control have
     '{T}: Add one mana of any color.'") works exactly like the same static on a normal permanent, but only once its
-    door is unlocked. The baked continuous-effect component is refreshed when a door unlocks (via `RoomDoorUnlocker`),
-    the same way a transform re-bakes it. (Replacement effects on a Room face are not yet door-gated — no current card
-    needs one.)
+    door is unlocked. **Runtime replacement effects** declared on a face with `replacementEffect(...)` (damage, life,
+    draw, counter modifiers — Torture Pit's `ModifyDamageAmount`) are door-gated the same way, via
+    `RoomFaceStatics.unlockedFaceReplacementEffects`. Both baked components (continuous effects and replacement
+    effects) are re-baked whenever a door unlocks or locks (`RoomDoorUnlocker` / `RoomDoorLocker`), so locking a door
+    turns its statics and replacements off again. Self entry-time replacements (`EntersTapped`, …)
+    on a face are not read — a Room enters with only the cast door unlocked, and no printed door has one.
 - `ADVENTURE` — primary face is a permanent (usually a creature; **may also be a land** — FIN Towns), `cardFaces[0]`
   is an instant/sorcery Adventure (CR 715). Resolving the Adventure exiles the card and grants permission to play
   the primary face from exile — *cast* the creature, or *play* the land for a **land // spell** Adventure
@@ -460,26 +473,59 @@ plus the frame fields:
 metadata (set code, collector number, art, artist, Scryfall id, and the back-face art for genuine DFCs) and leaves the
 card's oracle identity untouched.
 
-**Legendary-slot boosters** — `LegendarySlotBooster(commons, uncommons, legendaryRareChance, mythicChance)` opens
-exactly one legendary creature per pack. With `legendaryRareChance` it is a rare or mythic in the rare slot beside
-`uncommons` nonlegendary uncommons; otherwise it is an uncommon taking one uncommon slot, beside a nonlegendary
-rare/mythic. The other slots never hold a legendary creature. An empty tier (host bans) falls back to the other;
-no legendary creatures at all gives a `StandardBooster`. Dominaria United uses `legendaryRareChance = 0.25`.
-`GuaranteedLegendaryBooster` (Dominaria) is the older shape: one legendary picked uniformly across rarities,
-replacing the slot of its rarity.
+**Booster collation matches paper.** Each complete set's `boosterStrategy` follows its paper booster — the slot
+layout and odds from WotC's "Collecting …" articles and print-sheet checklists, as kept in taw/magic-search-engine
+`data/boosters` — minus what the engine doesn't model: foils, The List, Special Guests, cards from bonus sheets that
+aren't in the engine, and the basic-land slot of a set whose land slot holds only basics (basics are supplied at deck
+building). The strategies compose:
 
-**Double-faced-slot boosters** — `DoubleFacedSlotBooster(commons, uncommons, doubleFacedUncommonChance, mythicChance)`
-opens one double-faced common or uncommon per pack in its own slot (an uncommon with `doubleFacedUncommonChance`,
-default 1/3 — an estimate from per-card sheet frequency; WotC doesn't publish the split), beside `commons` commons, `uncommons` uncommons and a rare/mythic. Ordinary common/uncommon slots
-never hold a double-faced card; double-faced rares and mythics stay in the rare slot. An empty tier (host bans) falls
-back to the other; no double-faced commons or uncommons at all turns the slot into one more common. Kamigawa: Neon
-Dynasty uses `DoubleFacedSlotBooster(commons = 9, uncommons = 3)`.
+**Dedicated-slot boosters** — `DedicatedSlotBooster(base, slots)` adds slots that each draw from their own print
+sheet to a `StandardBooster` or `PlayBooster` base. A `DedicatedSlot(sheet, rarityWeights, rareChance, sharedRarities,
+mythicChance)` names its cards with a `SheetSelector` — `DoubleFaced`, `Battle`, `LegendaryCreature`,
+`HasSubtype(subtype)`, `Named(names)`, `Except(matching, except)` — and opens a rarity rolled from `rarityWeights`. Its sheet is the
+selected cards at those rarities (plus rare and mythic when `rareChance > 0`), and they leave the base's pool unless
+their rarity is in `sharedRarities`. With `rareChance` the slot holds the pack's one rare or mythic instead, and the
+base trades its rare slot for an uncommon (`RarityCountBooster.withRareSlotAsUncommon`); the slots' chances are rolled
+together, so a pack never opens two. A dry sheet (host bans) opens the rolled rarity from the ordinary sheets. In use:
 
-**Play Booster wildcard odds** — `PlayBooster(commons, uncommons, wildcards, raresOrMythics, mythicChance, wildcardWeights)`
-rolls each wildcard slot's rarity from `wildcardWeights` (relative odds per `Rarity`, default 50% C / 30% U / 17.5% R /
-2.5% M); a rolled rarity the pool lacks falls through common → uncommon → rare → mythic. March of the Machine: The
-Aftermath's 5-card Epilogue Booster is `PlayBooster(commons = 0, uncommons = 2, raresOrMythics = 1, wildcards = 2,
-wildcardWeights = …)` with each wildcard a rare or mythic about 1 time in 6.
+- Innistrad: Midnight Hunt / Crimson Vow — base `StandardBooster(9, 2)`, a double-faced common slot and a double-faced
+  uncommon slot with `rareChance = 1.0 / 6`.
+- Kamigawa: Neon Dynasty / The Lost Caverns of Ixalan — base `StandardBooster(9, 3)`, one double-faced common-or-uncommon
+  slot (double-faced rares stay in the rare slot because the slot opens no rares).
+- March of the Machine — base `StandardBooster(8, 2)`, an `Except(DoubleFaced, Battle)` common-or-uncommon slot
+  (`rareChance = 15/140`) and a `Battle` uncommon slot (`rareChance = 27/140`).
+- Dominaria / Dominaria United — base `StandardBooster(10, 2)`, a `LegendaryCreature` uncommon slot, `rareChance = 0.25`.
+- Modern Horizons 3 — a `Named` new-to-Modern reprint slot (75% U / 22.5% R / 2.5% M) on a 6-common Play Booster.
+- Innistrad Remastered — a double-faced common slot on a 5-common Play Booster.
+- Teenage Mutant Ninja Turtles — a `Named` legendary-Turtle slot with `sharedRarities = setOf(RARE, MYTHIC)`, so the
+  rare Turtles also stay on the rare sheet.
+- Strixhaven: School of Mages — base `StandardBooster(10, 3)` (its Mystical Archive slot opens a common) and a
+  `HasSubtype(Subtype.LESSON)` slot weighted 1233 C / 90 R / 9 M; uncommon Lessons stay in the uncommon slots.
+
+**Print-sheet boosters** — `PrintSheetBooster(sheets)` collates straight from paper print sheets for the sets that
+predate rarity slots: each `PrintSheet(slots, cardCounts)` opens `slots` names with probability proportional to how
+many times each was printed on the sheet (art variants summed). Arabian Nights, Antiquities, The Dark and Fallen
+Empires open 8-card packs (6 from the common sheet, 2 from the uncommon sheet — Scryfall's "rare" there is a scarcer
+uncommon-sheet card); Legends opens 11 / 3 / 1 from its three sheets with the C2/U2 doubling.
+
+**Play Booster wildcard odds** — `PlayBooster(commons, uncommons, raresOrMythics, mythicChance, wildcardSlots)` rolls
+each wildcard from its own rarity mix in `wildcardSlots` (relative odds per `Rarity`). The default pair is the
+non-foil wildcard `PlayBooster.DEFAULT_WILDCARD` (17% C / 63% U / 20% R-M) and the foil wildcard
+`DEFAULT_FOIL_WILDCARD` (58% C / 32% U / 10% R-M); sets pass their published figures with
+`PlayBooster.wildcard(common, uncommon, rareOrMythic)` (split 7:1 rare:mythic) or
+`PlayBooster.wildcard(common, uncommon, rare, mythic)`. A rolled rarity the pool lacks falls through by weight, then
+common → uncommon → rare → mythic. March of the Machine: The Aftermath's 5-card Epilogue Booster is
+`PlayBooster(commons = 0, uncommons = 2, raresOrMythics = 1, wildcardSlots = List(2) { … })` with each wildcard a rare
+or mythic about 1 time in 6; Innistrad Remastered adds a third slot for its retro-frame card.
+
+**Land-slot boosters** — `LandSlotBooster(base, nonbasicLandNames, basicLands, nonbasicChance)` reserves named
+nonbasic lands for a dedicated final slot. The wrapper removes those names from every base slot (including the
+wildcards) and adds one land: an available nonbasic with `nonbasicChance` (the set's published odds), otherwise one
+of the supplied basic arts; either group falls back to the other when empty. Basic arts are supplied explicitly
+(`basicLands.filter { it.metadata.inBooster }`) because the generator strips basics from the ordinary pool. Host bans
+remove nonbasics; basics remain available as they do in deck building. Used by every set whose land slot carries
+common duals or gain lands — e.g. Foundations (gain lands, 50%), Tarkir: Dragonstorm (gain lands, 100/115), The Lost
+Caverns of Ixalan (common Caves, 70%), Reality Fracture (6/11).
 
 **Echoed-pair boosters** — override `MtgSet.boosterStrategy` with
 `EchoedPairsPlayBooster(echoedPairs = listOf("First half" to "Second half", ...))`.
@@ -487,12 +533,7 @@ Both halves must be in the pool to open as a pair; the third echoed card exclude
 Missing echoed slots use remaining echoed cards, then unused regular uncommons, commons, rares, and
 mythics in that order. This preserves those slots when host bans or incomplete pools exhaust uncommons,
 without duplicating names. Other regular slots exclude echoed names; the wildcard includes them.
-Compose with `LandSlotBooster(base, nonbasicLandNames, basicLands, basicWeight, nonbasicWeight)` to reserve
-named lands for a dedicated final slot. The wrapper removes those names from every base slot (including
-the wildcard) and adds one weighted land from the available nonbasics and supplied basic arts. Basic
-arts are supplied explicitly because the generator strips basics from the ordinary pool. Host bans
-remove nonbasics; basics remain available as they do in deck building. FRA uses ten duals at weight 3
-and 25 basic arts at weight 1, giving a 6/11 dual chance and 14 cards per pack.
+Compose with `LandSlotBooster` to reserve its ten duals for the land slot (14 cards per pack).
 
 **Showcase / borderless in boosters** — a set advertises a per-card variant rate via `MtgSet.boosterVariantChance`
 (default `0.0`). When non-zero, `BoosterGenerator` rolls each generated card independently and, on a hit, re-skins it
@@ -558,11 +599,13 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
 - `Costs.PayLife(amount)` — pay N life. `CostAtom.PayLife.amount` is a `DynamicAmount` (an `Int`
   overload wraps it in `Fixed`), so `Costs.PayLife(amount: DynamicAmount)` prices a life cost from
   game state as it is paid — War Room's "Pay life equal to the number of colors in your commanders'
-  color identity" is `Costs.PayLife(DynamicAmounts.commanderColorIdentityCount())`. The atom admits
-  only a nonnegative `Fixed` or a `CommanderColorIdentityCount()` for `Player.You` (amounts priced
-  from the payer's state alone, no X or targets); every engine site prices it through `CostAtomAmounts.life` with the payer, so the
+  color identity" is `Costs.PayLife(DynamicAmounts.commanderColorIdentityCount())`, and Hand of
+  Vecna's "Equip—Pay 1 life for each card in your hand" is
+  `Costs.PayLife(DynamicAmounts.cardsInYourHand())` on an `isEquipAbility` activated
+  ability. The atom admits only a nonnegative `Fixed`, a `CommanderColorIdentityCount()` or a
+  `Count(...)` for `Player.You` (amounts priced from the payer's state alone, no X or targets); every engine site prices it through `CostAtomAmounts.life` with the payer, so the
   legal-action enumerator, the activation validator and the payment charge the same number. Renders
-  "pay 2 life" / "pay life equal to <amount>". A commander-identity count for a player with **no**
+  "pay 2 life" / "pay 1 life for each card in your hand" / "pay life equal to <amount>". A commander-identity count for a player with **no**
   commander is unpayable (CR 903.4f; War Room ruling), while a colorless commander prices it at 0. A dynamic
   life cost can't be `repeated` (escalate) and isn't planned over by the scoped mana planner.
 - `Costs.PayXLife` — pay X life, where X is the value chosen for the ability's `{X}` mana cost
@@ -652,9 +695,12 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
   validates a client-supplied `costPayment.discardedCards` (exactly X distinct matching hand cards)
   and is a real discard, so discard triggers fire. **Gix, Yawgmoth Praetor**: `Costs.Composite(
   Costs.Mana("{4}{B}{B}{B}"), Costs.DiscardX())` → exile the top X cards of target opponent's library.
-- `Costs.ExilePermanentsFixed(count = 1, filter = Any, excludeSelf = false)` — **fixed-count** "exile N permanents you
+- `Costs.ExilePermanentsFixed(count = 1, filter = Any, excludeSelf = false, distinctNames = false)` — **fixed-count** "exile N permanents you
   control matching `filter`" activated-ability cost (City of Shadows: "{T}, Exile a creature you
-  control:"). The counted sibling of the variable-count `Costs.ExilePermanents` below — reach for
+  control:"). `distinctNames = true` (the `Costs.Sacrifice` twin) requires the N objects to have different
+  names: "exile … artifacts you control named Eye of Vecna and Hand of Vecna" (The Book of Vile Darkness)
+  is `count = 2` over `named("Eye of Vecna") or named("Hand of Vecna")` with different names — exactly one
+  of each. Payable only with N distinctly named candidates; a selection that repeats a name is rejected. The counted sibling of the variable-count `Costs.ExilePermanents` below — reach for
   this whenever the card names a specific number and nothing downstream reads an X. Pass a
   controller-scoped filter (`.youControl()`): the battlefield zone map is keyed by **owner**, so the
   filter is what enforces "you control". `excludeSelf = true` is "exile **another** …" (Curie,
@@ -700,6 +746,10 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
     the X-bounded target something to choose, and payment rejects more than `maxCount`. A spell's
     additional cost enforces the cap at validation; the spell-side picker doesn't show it yet, since
     no printed spell has a capped variable cost.
+  - **`exactly`** — the whole count fixed to the announced X (`DynamicAmount.XValue`, the only value
+    accepted; `null` = the free count above). A spell-cost axis: "sacrifice X creatures"
+    (`Costs.additional.SacrificeX`, Eliminate the Competition), where X is announced with the spell
+    because nothing in the mana cost carries it. Leaves `minCount`/`maxCount`/`minMeasure` open.
 
   This atom is also a **spell additional cost**, not only an activated-ability cost: teamwork
   (CR 702.194a) rides it through `AdditionalCost.Atom`, paying from
@@ -742,6 +792,14 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
   trigger cannot tell the two apart. Activated-ability-only: a spell on the stack is attached to
   nothing, so every other cost context reports it unpayable rather than half-paying it. Sunforger is
   `Costs.Composite(Costs.Mana("{R}{W}"), Costs.Unattach)`.
+- `Costs.UnattachGrantingPermanent` (ability cost) — "**Unattach [this Equipment]**" inside an ability the
+  Equipment *grants* (KHM — Toralf's Hammer: equipped creature has "{1}{R}, {T}, Unattach Toralf's Hammer: …").
+  `CostAtom.Unattach(ofGrantingPermanent = true)`: the same cost as `Costs.Unattach`, but it detaches the
+  permanent whose static granted the ability (resolved at activation, like `Costs.TapGrantingPermanent`) rather
+  than the creature that has it — `{T}` taps the creature, this unattaches the Equipment. Per CR 201.5a only that
+  specific granter is unattached; a second Equipment on the same creature stays put. Same affordability gate:
+  the granter must be attached to something. Pair with `EffectTarget.GrantingSource` for "it deals …" / "return
+  [it] to its owner's hand" — the granter is captured on the stack, so those still resolve after the unattach.
 - `Costs.CollectEvidence(n)` (ability cost) / `Costs.additional.CollectEvidence(n)` (mandatory
   additional cost) / `card { collectEvidence(n) }` (the optional **linked** cast cost) — Collect
   evidence N (CR 701.59a): "exile any number of cards from your graveyard with total mana value N or
@@ -892,12 +950,16 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
 - `Costs.PutCounterOnSelf(counterType, count = 1)` — "Put a [kind] counter on this permanent" as
   part of the activation cost (Mazemind Tome: "{T}, Put a page counter on this artifact: Scry 1").
   The *accruing* mirror of `Costs.RemoveCounterFromSelf`, and the only cost that adds something
-  rather than spending it: it is **always payable**, which is exactly what lets Mazemind Tome reach
-  the fourth page counter that exiles it. Paid at activation (so the counter lands before the
-  ability resolves, and stays even if the ability is countered), and routed through the normal
-  counter-placement chokepoint — the "can't have counters put on it" gate and the placement
-  replacements (Hardened Scales, Doubling Season) all apply. Activated-ability scoped: there is no
-  additional-cost or `PayCost` form, since a spell on the stack has no permanent to accrue them on.
+  rather than spending it: it is payable whenever the permanent **can** have counters put on it, which
+  is exactly what lets Mazemind Tome reach the fourth page counter that exiles it. A permanent that
+  can't have counters put on it (Solemnity, `CANT_RECEIVE_COUNTERS`) can't pay it at all — the event
+  can't happen (CR 614.17b), so the ability isn't offered (Devoted Druid's untap); a replacement that
+  only shrinks the placement to zero (Vizier of Remedies) leaves it payable. Paid at activation (so
+  the counter lands before the ability resolves, and stays even if the ability is countered), and
+  routed through the normal counter-placement chokepoint, so placement replacements apply (Hardened
+  Scales — not Doubling Season, whose "if an effect would put" excludes a cost). Activated-ability
+  scoped: there is no additional-cost or `PayCost` form, since a spell on the stack has no permanent
+  to accrue them on.
 - `Costs.TapGrantingPermanent` — tap the permanent whose static ability *granted* this activated
   ability, the third member of the granter-cost family alongside `Costs.ExileGrantingPermanent` and
   `Costs.SacrificeGrantingPermanent`. Use for an Equipment/Aura whose granted ability names the
@@ -915,6 +977,15 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
   still resolves. Pair with `DynamicAmounts.countersRemovedAsCost()` for "the number … removed this
   way" — the counters are gone by resolution.
 - `Costs.Composite(c1, c2, ...)` — multiple costs paid together.
+  **Several sacrifice atoms in one composite** ("Sacrifice a Swamp and a Forest" — Jarad, Golgari
+  Lich Lord: `Costs.Composite(Costs.Sacrifice(Land.withSubtype(SWAMP)), Costs.Sacrifice(Land.withSubtype(FOREST)))`)
+  are paid by one **disjoint assignment** — each atom gets its own permanents, so a Swamp Forest dual
+  pays one atom, never both. The ability is offered (battlefield and `activateFromZone` alike) only
+  when such an assignment exists; the legal action carries no sacrifice picker, and the engine asks
+  in cost order, one permanent per `SelectCardsDecision` (an atom of count 2+ is asked slot by slot),
+  offering only permanents that leave the rest of the cost payable and auto-picking forced ones. A pre-filled `costPayment.sacrificedPermanents` is read
+  as ordered per-atom segments (first atom's `count`, then the next's). Works for any number of atoms
+  (`SacrificeCostAssignment`); a single sacrifice atom behaves exactly as before.
 - `Costs.PayPlayerCounters(counterType, amount = 1)` — pay counters from the **activating player**,
   never from the source permanent. `amount` accepts a nonnegative integer, `DynamicAmount.XValue`,
   or `DynamicAmount.ContextProperty(TARGETS_TOTAL_MANA_VALUE)` (priced from announced targets).
@@ -961,6 +1032,8 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
   `CastSpellEnumerator` (so the action isn't offered) and `CastSpellHandler.validate` (so an
   authorization can't outlive the enumeration that offered it). Omit for an unconditional
   alternative (Zahid, Djinn of the Lamp).
+  A rider on whether that cost was paid ("If the {1}{B} cost was paid, …") reads
+  `Conditions.SelfAlternativeCostWasPaid`.
   Optional `manaSources: GameObjectFilter` is "spend only mana produced by <sources> to cast it
   this way" (Security Rhox: `manaSources = GameObjectFilter.Artifact.withSubtype("Treasure")`).
   The alternative's payment only activates mana abilities of matching permanents, and floating
@@ -970,7 +1043,15 @@ counts a hybrid Phyrexian pip paid with life like any other Phyrexian pip.
   preview), validation, auto/explicit/pool payment and the mana window all run inside the same
   restricted view (`ManaSourceRestrictedPayment`); mana it can't touch stays in the pool. Keep the
   filter to type-line predicates. Omit (null) for mana from any source.
-- `evoke` — pay evoke cost; creature is sacrificed at ETB.
+- `evoke` — pay evoke cost; creature is sacrificed at ETB. `KeywordAbility.Evoke(cost,
+  additionalCost = null)` carries an optional non-mana part, paid alongside the mana only when evoke
+  is the alternative cost chosen (`CastAdditionalCosts.owedAdditionalCosts`), like the bundled costs
+  of warp, blitz and bestow. "Evoke—Exile a green card from your hand" (**Endurance**) is
+  `Evoke(ManaCost.ZERO, Costs.additional.ExileCards(1, Any.withColor(GREEN), CostZone.HAND))`: the
+  enumerator offers evoke only when that part is payable, carries its picker as the action's
+  `additionalCostInfo`, and labels it by the cost ("Evoke Endurance (exile a green card from your
+  hand)") rather than "{0}"; `ClientCard.evoke` is `{ cost, additionalCostDescription }`. The
+  card is on the stack while costs are paid, so it can't exile itself.
 - `keywordAbility(KeywordAbility.bestow(cost, additionalCost = null))` — cast as an Aura for the
   bestow price, or normally as a creature. See the parameterized keyword entry below.
 - `keywordAbility(KeywordAbility.mutate(cost))` — cast for the mutate cost onto a non-Human creature
@@ -1031,6 +1112,12 @@ cast action advertises the first selection cost as `additionalCostInfo` and the 
   `keywordAbility(KeywordAbility.flashback("{3}{U}{R}", Costs.additional.ExileVariableCards(minCount = 0)))`; cast
   from hand, X comes from the mana cost. Like every exile-from-zone spell cost, the card being cast is never in
   its own pool (CR 601.2a). Don't combine it with a paid `{X}` on the same cast — both write the one X.
+  Both are `AdditionalCost.VariableCards` with a `CardCostAction` axis (`EXILE` here, `DISCARD` below).
+- `Costs.additional.DiscardVariableCards(minCount = 0, filter = Any)` — "as an additional cost to cast this
+  spell, discard X cards" (Channeled Force). The caster picks how many cards to discard from hand (zero
+  included); the number discarded **is the spell's X**, read with `DynamicAmount.XValue`. It's a real discard
+  through the shared discard path, so discard triggers and madness see it. Client picker: `DiscardCard` with
+  `discardCount` as the minimum and `discardMaxCount` as the maximum.
 - `Costs.additional.ExileOtherCardsWithCardTypes(minTypes, filter = Any)` — "exile any number of other
   cards from your graveyard with N or more card types among them" (Nethergoyf's escape cost). A
   `CostAtom.ExileFromGraveyardForTotal` under the union measure `CardMeasure.DistinctCardTypes`; see
@@ -1054,6 +1141,17 @@ cast action advertises the first selection cost as `additionalCostInfo` and the 
   sacrificed permanent is snapshotted, so "for each Spirit sacrificed this way" is
   `DynamicAmounts.permanentsSacrificedThisWay()`. For "… this spell costs {2} less for each" use
   `SacrificeAnyNumberForCostReduction` instead.
+- `Costs.additional.SacrificeX(filter = GameObjectFilter.Creature)` — "as an additional cost to cast
+  this spell, sacrifice X creatures" (Eliminate the Competition). The same atom with
+  `exactly = DynamicAmount.XValue`: there is no `{X}` in the mana cost, the cost *defines* X, so the
+  caster announces X with the spell (CR 601.2b) — before targets, so "Destroy X target creatures" is
+  `targets(TargetFilter.Creature, exactly = DynamicAmounts.xValue())` — and the payment (601.2h) must
+  sacrifice exactly X, which may be 0. The spell reads it as `DynamicAmounts.xValue()`. The cast offer
+  carries `hasXCost` with `maxAffordableX` = the creatures that could be sacrificed (and the usual
+  exact-target cap), and the `SacrificeVariable` picker sets `sacrificeCountIsX`: the client asks X,
+  then requires exactly X picks (skipping the picker at X = 0). Not `SacrificePermanents` — "you may
+  sacrifice any number" announces nothing, so its count can't size targets. `exactly` is the whole
+  count: it leaves `minCount`/`maxCount`/`minMeasure` open and accepts only the announced X.
 - `Costs.additional.SacrificeAnyNumberForCostReduction(filter, reductionPerUnit)`,
   `TapAnyNumberForCostReduction(filter, reductionPerUnit)`,
   `ExileAnyNumberFromHandForCostReduction(filter, reductionPerUnit)` — "as an additional cost to cast
@@ -1066,7 +1164,8 @@ cast action advertises the first selection cost as `additionalCostInfo` and the 
   announced X is generic in that total, so on an `{X}{W}` March the discount keeps paying into the X),
   and the effect never reads it; X stays the announced X. Choosing none is always legal. Tapping is a
   cost, not `{T}`, so summoning-sick creatures may pay; exiling from hand never offers the spell itself
-  (CR 601.2a). The enumerator publishes a zero-floor picker — `costType` `SacrificeForCostReduction`
+  (CR 601.2a). Also valid as a modal-DFC back face's own `additionalCost` (Extus, Oriq Overlord // Awaken
+  the Blood Avatar) — the back-face offer counts the discount when judging affordability. The enumerator publishes a zero-floor picker — `costType` `SacrificeForCostReduction`
   (`sacrificedPermanents`), `TapForCostReduction` (`tappedPermanents`) or `ExileFromHand`
   (`exiledCards`, `exileMinCount = 0`). Its castability check and X ceiling assume every candidate is
   used, netting a candidate that is itself a mana source (a mana dork) at N − 1.
@@ -1096,6 +1195,16 @@ cast action advertises the first selection cost as `additionalCostInfo` and the 
   mana cost is waived — `GrantMayCastFromLinkedExile(withoutPayingManaCost = true, additionalCost =
   Costs.additional.PayLifeEqualToManaValueOfSpell)` — so the only cost paid is the life. The amount is
   read from the cast card's mana value, checked at cast time (CR 119.4 — must have at least that much life).
+- `Costs.additional.OthersGainLife(amount, eachOtherPlayer = false)` — "you may have **an opponent**
+  gain N life" (Invigorate) / "… have **each other player** gain N life" (Reverent Silence): other
+  players gain life as the non-mana half of a `selfAlternativeCost` (`manaCost = {0}`, usually with a
+  `Conditions.YouControl(<basic land type>)` gate). The caster names the opponent while casting: with
+  one eligible opponent the cast is offered as is, with several the enumerator offers one cast per
+  opponent, pre-filling `AdditionalCostPayment.lifeGainRecipient`. A player who *can't* gain life
+  (Erebos, Gríma) can't be named, nor can "each other player" be paid while any of them can't; one
+  whose gain is only *replaced* (Sulfuric Vortex, `PreventLifeGain(replacesOnly = true)`) still can,
+  and the gain is then replaced like any other (Invigorate ruling, 2020-08-07). The gain goes through
+  the shared life-gain primitive, so gain modifiers and "whenever a player gains life" triggers see it.
 - `Costs.additional.OrPay(cost, alternativeManaCost)` — **cost-vs-mana**: "as an additional cost
   to cast this spell, \<pay this cost\> **or** pay {mana}". One `AdditionalCost.OrPay` covers the
   whole "do X or pay {N}" family, parameterized by the `AdditionalCost` on the non-mana leg; the
@@ -1328,7 +1437,7 @@ self-exclusive one is never offered the source in the first place.
 
 - `Costs.pay.PutCountersOnPermanent(counterType, count = 1, filter = Permanent)` — put counters on a
   permanent **the payer controls**; the selected-permanent sibling of `PutCountersOnSelf`. Unlike that
-  one — always payable, because it needs no selection — this is **unpayable when the payer controls no
+  one — payable without a selection — this is **unpayable when the payer controls no
   matching permanent**, which is the whole point of the punisher clause it models: Tourach's Chant (FEM)
   deals 3 damage to a player "unless the player puts a -1/-1 counter on a creature they control", and a
   player with an empty board simply takes the damage. The payer picks which of their permanents takes it.
@@ -1440,6 +1549,7 @@ serialized shape; the facade for each is:
 | `MarkExileControllerGraveyardOnDeathEffect` | `Effects.MarkExileControllerGraveyardOnDeath` |
 | `MarkExileOnDeathEffect` | `Effects.MarkExileOnDeath` |
 | `MarkMustAttackEffect` | `Effects.MarkMustAttackThisTurn`, `Effects.MarkMustAttackNextCombat` |
+| `MustAttackGroupEffect` | `Effects.MustAttackGroup` |
 | `MarkSpellExileWithCountersEffect` | `Effects.MarkSpellExileWithCounters` |
 | `ModalEffect` | `Effects.Modal` |
 | `ModifyStatsEffect` | `Effects.ModifyStats` |
@@ -1472,10 +1582,11 @@ serialized shape; the facade for each is:
 | `SetLifeTotalEffect` | `Effects.SetLifeTotal` |
 | `ShuffleLibraryEffect` | `Effects.ShuffleLibrary` |
 | `SkipCombatPhasesEffect` | `Effects.SkipCombatPhases` |
-| `SkipUntapEffect` | `Effects.SkipUntap` |
+| `SkipUntapEffect` | `Effects.SkipUntap(target, permanents = Creature or Land)` |
 | `SkipStepOrPhaseEffect` | `Effects.SkipNextStepOrPhase(part, target)` / `Effects.SkipStepOrPhaseThisTurn(part, target)` |
 | `TakeExtraTurnEffect` | `Effects.TakeExtraTurn` |
 | `TapUntapEffect` | `Effects.Tap(target)` / `Effects.Untap(target)` |
+| `EnterTappedEffect` | `Effects.EnterTapped()` |
 | `TauntEffect` | `Effects.Taunt` |
 | `TransformEffect` | `Effects.Transform` |
 | `FlipEffect` | `Effects.Flip` |
@@ -1503,7 +1614,12 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
 
 - `DealDamage(amount, target, damageSource = null, cantBePrevented = false, excessDamageVariable = null, damageDealtVariable = null)`
   — deal fixed/dynamic damage; `damageSource` names the object dealing it when that isn't the
-  resolving source, `cantBePrevented` is "this damage can't be prevented". `excessDamageVariable`
+  resolving source, `cantBePrevented` is "this damage can't be prevented". A non-targeted
+  `damageSource` (`TriggeringEntity`, `Self`, `IterationEntity`) that has left the battlefield still
+  deals the damage by last-known information (CR 608.2h), with its last-known lifelink, deathtouch
+  and wither (read off the card's battlefield-exit snapshot; a token deleted by CR 704.5d keeps no
+  snapshot, so its keywords are not seen) — Wrathful Red Dragon's Dragon killed by the damage it's reflecting; a *targeted*
+  source that became illegal still skips the damage (CR 608.2b). `excessDamageVariable`
   stores the excess damage (CR 120.4a) dealt to the single permanent target — above lethal for a
   creature (marked damage and deathtouch aware), above loyalty for a planeswalker, above defense for a
   battle — read off the actual `DamageDealtEvent` (so prevention is accounted for; 0 when no excess).
@@ -1519,7 +1635,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   then `run(Effects.GainLife(dealt.amount))` (Creeping Bloodsucker, Syphon Soul) — never a fixed
   `GainLife(n)`, which ignores prevention and the opponent count.
 - `DamageCantBePreventedThisTurn(target)` — the per-recipient form of the turn-wide shutoff (Whippoorwill).
-- `RedirectNextDamage(protectedTargets, redirectTo, amount?, scope, creaturesOnly, optional, fromSource?)`,
+- `RedirectNextDamage(protectedTargets, redirectTo, amount?, scope, protectedFilter?, optional, fromSource?, duration = EndOfTurn)`,
   `RedirectCombatDamageToController(target = Self)`, `ReflectCombatDamage(target = Controller)`,
   `RemoveDamageShield(target)` — the redirect / reflect / shield-removal effects.
 - `DealDamageExcessToController(amount, target, damageSource?)` — deal damage to a creature; any amount beyond
@@ -1555,7 +1671,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   If either fighter is no longer a creature on the battlefield when the fight happens, neither deals
   damage (CR 701.14b) and the excess variable is 0 — this covers a `Self` fighter ("it fights"), which
   no target re-check removes.
-- `Effects.DividedDamage(total, minTargets, maxTargets, dynamicTotal?)` — "N damage divided as you
+- `Effects.DividedDamage(total, minTargets, maxTargets, dynamicTotal?, among?)` — "N damage divided as you
   choose among target ..." The targets come from the ability's target requirement; pair with
   `TargetObject(filter = TargetFilter.Creature, count = count, minCount = minCount)` (Forked Lightning, Skirk Volcanist) or, for "any number of target",
   a `TargetObject(unlimited = true, dynamicMaxCount = ..., filter = ...)`. Set `dynamicTotal` (a
@@ -1567,6 +1683,17 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   Effects.SacrificeOwn(filter = GameObjectFilter.Artifact), then = Effects.DividedDamage(total = 4,
   minTargets = 0, maxTargets = 4))` with `AnyTarget(count = 4, minCount = 0, optional = true)`; the
   announced split is dealt only if the gate opens.
+
+  **One target word of several** (Magma Opus: "deals 4 damage divided as you choose among any number
+  of targets. Tap two target permanents. …"): pass the handles of the divided requirement as `among`
+  — `val damaged = targets(AnyTarget(count = 4, minCount = 0)); val (a, b) = targets(TargetFilter.Permanent,
+  count = 2); effect = Effects.DividedDamage(total = 4, minTargets = 0, maxTargets = 4, among = damaged)
+  then Effects.Tap(a) then Effects.Tap(b) then …`. The division is then announced as the spell is cast
+  even though it sits inside a sequence, among that requirement's targets only: the legal action names
+  the group (`distributionTargetGroup`, an index into the spell's requirements), the client divides
+  among that group's picks, and the validator checks the split against that slice of the targets.
+  The same object may be chosen for both target words. Without `among`, a divided step inside a
+  sequence divides among every target at resolution, as before.
 
   **A total fixed "as you activate this ability"** (Lukka, Bound to Ruin's −4: "X damage divided …,
   where X is the greatest power among creatures you control as you activate this ability") is a
@@ -1587,6 +1714,17 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   and target cap resolved — picking the offer *is* announcing X (CR 107.3a). The validator re-checks
   the sacrificed permanent against the announced X (an unannounced X is 0) and the division against
   the X-derived total.
+
+  **A total that reads a mana-paid `{X}`** (Shatterskull Smashing: "X damage divided as you choose
+  among up to two target creatures and/or planeswalkers. If X is 6 or more, … twice X damage divided
+  … instead") is a `dynamicTotal` over `DynamicAmounts.xValue()` — here one amount,
+  `DynamicAmounts.conditional(Conditions.CompareAmounts(xValue(), GTE, 6), xValue() * 2, xValue())`,
+  since the ruling divides twice X rather than doubling each share. X is announced before targets
+  and the division (CR 601.2b, 601.2d), so the cast offer carries `totalDamageByX` — the total for
+  every X from `minX` to `maxAffordableX` — and the client divides the entry for the X it chose,
+  capping the divided targets at what that total covers (X = 1 can't be split between two). The
+  validator checks the split against the announced X. A total that doesn't move with X (Meteor
+  Swarm's 8) gets no table.
 
   **Always cap the target count at the total.** Each chosen target must be assigned at least 1 damage
   (CR 601.2d), so a requirement that lets the player pick more targets than there is damage leaves them
@@ -1629,7 +1767,11 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   Narrow the pattern for a card that names one end of the damage instance: **Excruciator**'s "damage that
   would be dealt by this creature can't be prevented" is
   `DamageCantBePrevented(EventPattern.DamageEvent(source = GameObjectFilter.Any.sourceItself()))`, which leaves every other
-  source's damage preventable. `DamageUtils.isDamagePreventionDisabled(state, recipientId, sourceId)`
+  source's damage preventable. `damageType` scopes it too: **Questing Beast**'s "combat damage that would be
+  dealt by creatures you control can't be prevented" is
+  `DamageEvent(source = GameObjectFilter.Creature.youControl(), damageType = DamageType.Combat)`, and Frenzied
+  Baloth's "combat damage can't be prevented" is `DamageEvent(damageType = DamageType.Combat)` — a creature's
+  noncombat ping stays preventable under either. `DamageUtils.isDamagePreventionDisabled(state, recipientId, sourceId, isCombatDamage)`
   matches the pattern against the concrete damage instance through the same `damageSourceMatches` /
   `damageRecipientMatches` pair every other damage replacement uses, so a filter supported by one is
   supported by all. Callers that don't know both ends of the instance get the *unscoped* answer only —
@@ -1854,24 +1996,49 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   card is still in that zone ("exile it **from their graveyard**" does nothing once the card has moved
   on — by then it's a new object, CR 400.7); `addCounterType` puts one counter of that type on the card
   once it lands ("exile it **with a stash counter on it**" — Tinybones, Bauble Burglar), and is skipped
-  along with the move when the `fromZone` gate closes. Both are pass-throughs to `MoveToZoneEffect`
-  (also reachable via `Effects.Move`), where `addCounterType` is the single-target counterpart of
-  `MoveCollectionEffect.addCounterType`. `Effects.Move` also takes `addCounterIf: GameObjectFilter?`, which places
-  that counter only when the card landed in the destination and matches the filter in *projected*
-  state there — "if a creature enters this way, it enters with an additional +1/+1 counter on it"
-  (**Recommission**: `Move(t, BATTLEFIELD, fromZone = GRAVEYARD, addCounterType = PLUS_ONE_PLUS_ONE,
-  addCounterIf = GameObjectFilter.Creature)`; a noncreature artifact made a creature on arrival by
-  March of the Machines still gets it).
+  along with the move when the `fromZone` gate closes. Both build `MoveToZoneEffect.entryCounters:
+  List<EntryCounter(counterType, onlyIf: GameObjectFilter?, count: DynamicAmount = Fixed(1))>` (also reachable via `Effects.Move`),
+  the single-target counterpart of `MoveCollectionEffect.addCounterType`. `Effects.Move` also takes
+  `addCounterIf: GameObjectFilter?` (the one counter's `onlyIf`), which places that counter only when
+  the card landed in the destination and matches the filter in *projected* state there — "if a
+  creature enters this way, it enters with an additional +1/+1 counter on it" (**Recommission**:
+  `Move(t, BATTLEFIELD, fromZone = GRAVEYARD, addCounterType = PLUS_ONE_PLUS_ONE, addCounterIf =
+  GameObjectFilter.Creature)`; a noncreature artifact made a creature on arrival by March of the
+  Machines still gets it). For several counters, each with its own condition, pass `entryCounters`
+  directly — "an additional +1/+1 counter on it if it's a creature and an additional loyalty counter
+  on it if it's a planeswalker" (**Semester's End**: `entryCounters = listOf(EntryCounter(PLUS_ONE_PLUS_ONE,
+  Creature), EntryCounter(LOYALTY, Planeswalker))`; a creature planeswalker gets both). On the
+  battlefield all of them, plus a planeswalker's printed loyalty, enter as one entry event, so counter
+  replacements (Doubling Season) apply once per counter kind. An entry's `count` is evaluated once,
+  *before* the card moves, so it can read the card where it was — "return Cosima to the battlefield
+  with X +1/+1 counters on it, where X is the number of voyage counters on it" (**Cosima, God of the
+  Voyage**: `EntryCounter(PLUS_ONE_PLUS_ONE, count = voyage.amount)` after
+  `storeNumber(countersOnSelf(VOYAGE))`; the exiled card's counters are gone once it leaves exile). A
+  count of zero or less places none.
+- `EntersWithCharacteristics(addedCardTypes, addedSubtypes, addedColors, power?, toughness?)` — characteristics
+  a card an effect puts onto the battlefield has **as it enters**, carried as `entersWith` on `MoveToZoneEffect`
+  (also `Effects.PutOntoBattlefieldFromGraveyard(…, entersWith = …)`) and `MoveCollectionEffect` (pipeline
+  `move` / `moveTracked`). Everything *adds* — "in addition to their other types" — and `power`/`toughness`
+  (set together) set base P/T in layer 7b; types/subtypes go in layer 4, colors in layer 5. Unlike moving and then
+  `BecomeCreature`, the permanent is already a creature when it arrives, as the rulings demand ("they don't enter as
+  noncreature permanents and then become creatures"): "[creatures] enter tapped" replacements, creature-gated entry
+  counters and "whenever a creature enters" triggers all see it. The change is a permanent floating effect on that
+  object, gone when it leaves (CR 400.7); a later effect that sets P/T wins by timestamp, counters apply on top.
+  Ignored face down and for non-battlefield destinations; an Aura entering through the attach prompt doesn't take it.
+  `EntersWithCharacteristics.creature(power, toughness, vararg subtypes)` builds the common shape. **Dance of the
+  Manse** (`If(X ≥ 6, move(targets, entersWith = creature(4, 4)), otherwise = move(targets))`), **Relive the Past**
+  (`move(gather(ChosenTargets), BATTLEFIELD, entersWith = creature(5, 5, "Elemental"))`).
 - `ExileAndGrantOwnerPlayPermission(target, until?)` — exile + owner may play it (Garth-style).
 - `ExileOpponentsGraveyards()` — exile every card in each opponent's graveyard.
 - `MoveUntilSourceLeaves(target, destination)` — move an object to a non-battlefield, non-stack zone and return it to its previous zone immediately when the source's battlefield visit ends. The return does not use the stack and survives loss of the source's abilities. An exile also populates the ordinary linked-exile pile for client display and linked abilities. Returning permanents enter under their owner's control; tokens and objects that have since left the destination do not return. If the source has already left (including leaving and returning), the initial move does nothing. Ossification uses `Effects.MoveUntilSourceLeaves(victim, Zone.EXILE)` with no leaves trigger.
+- `MoveUntilLeaves(target, destination, anchor)` — the same duration bounded by **another** permanent instead of the source (`MoveUntilSourceLeavesEffect.anchor`, default `Self`): the object returns the moment `anchor`'s battlefield visit ends, whatever happens to the source. If the anchor is no longer on the battlefield as the effect resolves, nothing moves. No linked-exile pile is written (the anchor's own linked abilities must not see the card). Calix, Destiny's Hand's −3: `Effects.MoveUntilLeaves(victim, Zone.EXILE, anchor = enchantmentYouControl)` — "exile target creature or enchantment you don't control until target enchantment you control leaves the battlefield".
 - `ExileUntilLeaves(target)` — linked exile; the exiled card returns when the source leaves the battlefield (pair with `ReturnLinkedExile*` on the source's `LeavesBattlefield` trigger). The target is normally a **battlefield** permanent (O-Ring: Liminal Hold, Driftgloom Coyote), but a **graveyard card** is also legal — the executor moves the target to exile from whichever of those two zones it is in, so a cross-zone union `target(...)` ("creature on the battlefield **or** creature card from a graveyard") works directly (Savior of Ollenbock). Other zones are ignored.
 - `ExileWithAurasNotingCounters(target = ContextTarget(0))` / `ReturnNotedExileTappedWithAuras()` — the state-preserving "blink that remembers counters and Auras" pair (Tawnos's Coffin). The exile half exiles the target creature **and all Auras attached to it** (all linked to the source via `LinkedExileComponent`) and records the creature's identity + its `kind→count` counter snapshot on the source via `NotedExileComponent` (captures the Auras *before* exiling the creature, so the unattached-Aura SBA can't pre-empt them). The return half (a no-op when nothing is noted, so it's safe to fire from **both** a `LeavesBattlefield` and a `BecomesUntapped` trigger — whichever fires first returns the cards) returns the noted creature **tapped under its owner's control** with the noted counters restored, then returns the linked Auras attached to it; Auras that can't legally re-attach go to their owners' graveyards via the CR 704.5m unattached-Aura SBA (the "If you don't …" fallback). `NotedExileComponent` is preserved across the source's own zone change (like `LinkedExileComponent`) so the leaves-the-battlefield return still reads it, and stripped on battlefield re-entry (Rule 400.7).
 - `ExileLinkedToSource(target)` — exile a target **permanently** and record it in the source's linked-exile pile (`LinkedExileComponent`). Unlike `MoveUntilSourceLeaves` there's no automatic return — the link just lets later abilities reference the exiled card (Territory Forge's "this permanent has all activated abilities of the exiled card").
 - `RecordSourceObjects(from, key)` — append distinct current battlefield object identities from a pipeline collection to a named history owned by the ability's original source visit. `from` accepts a string or `CollectionSlot`. Records survive the source leaving, blinking, or ceasing to exist, so delayed abilities retain the old history. A new visit starts a separate history. Repeated writes of the same object are idempotent.
 - `CardSource.SourceLinkedBattlefield(key)` — gather the still-current, non-phased battlefield objects in that source visit's history. Targets that leave and return are new objects and no longer match. Use `FilterCollection` afterwards for projected characteristic filtering, or gather another history and use `CollectionFilter.ExcludeOtherCollection` / pipeline `exclude` for set difference. Records store public identities, never hidden cards or characteristic snapshots; there is no player decision or separate UI.
 - `RecordChosenLinkedExile(from)` — stamp the source's `ChosenLinkedExileComponent` with the first card in the pipeline collection `from` (its "last chosen card"). Pair after a `SelectFromCollection` over `CardSource.FromLinkedExile()` so a `HasAbilitiesOfChosenLinkedExiledCard` static ability grants the source that card's activated and triggered abilities (Koh, the Face Stealer's "Pay 1 life: Choose a creature card exiled with Koh").
-- `LinkCollectionToPermanent(from, permanent)` — file the still-exiled cards in the pipeline collection `from` under **another permanent's** linked-exile pile (its `LinkedExileComponent`) — nothing moves. Every other linker files under the resolving ability's own source; this one is for a pile that belongs to, e.g., the token the ability just created, so that token's `Triggers.self.leaves()` ability returns them through `CardSource.FromLinkedExile`. Mechtitan Core: `gather(CardSource.ExiledAsCost)` then `LinkCollectionToPermanent(exiled, EffectTarget.PipelineTarget(CREATED_TOKENS))` after `CreateToken`. No-op when `permanent` isn't on the battlefield.
+- `LinkCollectionToPermanent(from, permanent)` — file the still-exiled cards in the pipeline collection `from` under **another permanent's** linked-exile pile (its `LinkedExileComponent`) — nothing moves. Every other linker files under the resolving ability's own source; this one is for a pile that belongs to, e.g., the token the ability just created, so that token's `Triggers.self.leaves()` ability returns them through `CardSource.FromLinkedExile`. Mechtitan Core: `gather(CardSource.ExiledAsCost)` then `LinkCollectionToPermanent(exiled, EffectTarget.PipelineTarget(CREATED_TOKENS))` after `CreateToken`. No-op when `permanent` isn't on the battlefield. The same link serves a token **copy** that names the card it was made from — Hofri Ghostforge's "exile it. If you do, create a token that's a copy of that creature … and it has 'When this token leaves the battlefield, return the exiled card to its owner's graveyard'" is Kinzu's `IfYouDo(exile TriggeringEntity, CreateTokenCopyOfTarget(TriggeringEntity, exceptions = CopyExceptions(addedTriggeredAbilities = [self.leaves() → move(FromLinkedExile, GRAVEYARD)])))` followed by `ForEachInCollection(CreatedTokens, LinkCollectionToPermanent(exiled, IterationEntity))`, so every token a doubler makes is linked, and a later copy of the token gets the ability with an empty pile.
 - `ExileGroupAndLink(filter, storeAs?)` — exile all matching permanents into source's linked exile pile.
 - `ExileFromTopRepeating(count, repeatCondition)` — keep exiling top cards while a condition holds.
 - `ExileLibraryUntilManaValue(manaValue)` — exile from library until mana value ≤ N.
@@ -1902,6 +2069,13 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   so a dynamic cap like `CreatureInYourGraveyard.manaValueAtMostDynamic(<count>)` is read again then —
   Unforgiving One's "mana value X or less, where X is the number of modified creatures you control"
   doesn't resolve once X has dropped below the card's mana value.
+  A triggered ability's target filter can also read its own event's numbers: trigger targeting carries
+  the trigger context, so `DynamicAmounts.triggerDamageAmount()` (and the other trigger-context
+  properties) is the event's value when the target is chosen, not 0 — **Venerable Warsinger**:
+  `Triggers.self.dealsCombatDamage(Recipient.AnyPlayer)` + `target(TargetFilter(Creature.ownedByYou()
+  .manaValueAtMostDynamic(DynamicAmounts.triggerDamageAmount()), zone = GRAVEYARD))` →
+  `PutOntoBattlefieldFromGraveyard`, `optional = true` ("mana value X or less, where X is the amount of
+  damage this creature dealt to that player").
 - `ReturnToHandFromGraveyard(target)` — the *guarded* bounce, `PutOntoBattlefieldFromGraveyard`'s
   sibling one destination over: `MoveToZone(…, Zone.HAND, fromZone = GRAVEYARD)`, so the move is
   skipped if the card has left the graveyard by resolution. Use this for the **self**-return, and only
@@ -1957,20 +2131,25 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   attach step when the card is still in the graveyard: `PutOntoBattlefieldAsNonAura(listOf(TriggeredAbility.create(
   Triggers.player(Player.ChosenPlayer).beginningOf(UPKEEP), Effects.DealDamage(1, PlayerRef(Player.TriggeringPlayer)))),
   chosenPlayer = EffectTarget.ControllerOfTriggeringEntity)`.
-- `ReturnSelfToBattlefieldAttached(target, transformed = false)` — return source attached to target
-  (Aura recursion). [target] may resolve to a **player** as well as a permanent, and the two cases
-  differ in who controls the returned Aura: a *permanent* host hands control to that permanent's
-  controller (the Dragon-aura cycle's "attached to that creature"), a *player* host leaves it under
-  the **ability's** controller — the only reading "under your control attached to target opponent"
-  allows. `transformed = true` returns it back face up (CR 712.8); the face swap happens while the
+- `ReturnSelfToBattlefieldAttached(target, transformed = false, controllerOverride = null)` — return
+  source attached to target (Aura recursion). [target] may resolve to a **player** as well as a
+  permanent, and the two cases differ in who controls the returned Aura: a *permanent* host hands
+  control to that permanent's controller (the Dragon-aura cycle's "attached to that creature"), a
+  *player* host leaves it under the **ability's** controller — the only reading "under your control
+  attached to target opponent" allows. `controllerOverride` names the controller outright when the
+  text says "under your control" and the host is a permanent: Vengeful Strangler's "return it to the
+  battlefield transformed under your control attached to target creature or planeswalker an opponent
+  controls" is `ReturnSelfToBattlefieldAttached(ContextTarget(0), transformed = true,
+  controllerOverride = EffectTarget.Controller)`. `transformed = true` returns it back face up (CR 712.8); the face swap happens while the
   card is still in its old zone, so the entry registers the back face's statics and replacements.
   A single-faced card told to enter transformed doesn't move at all (standing ruling), so it is a
   quiet no-op. Radiant Grace: `ReturnSelfToBattlefieldAttached(target = cursed, transformed = true)`.
 - `PutOntoBattlefieldAsAura(enchant, grantedStaticAbilities = [], grantedAbilities = [], target = Self,
-  fromZone = GRAVEYARD)` — "return it to the battlefield. It's an Aura enchantment with enchant *X* and
+  fromZone = GRAVEYARD, losesOtherAbilities = true)` — "return it to the battlefield. It's an Aura enchantment with enchant *X* and
   \"…\", and it loses all other abilities." The card enters under the effect controller's control already
   that Aura: layer 4 makes it Enchantment — Aura (supertypes, name and colors stay), layer 6 strips its
-  printed abilities, and it has exactly `enchant` (with "you" = the Aura's controller) plus the granted
+  printed abilities (`losesOtherAbilities = false` keeps them when the text doesn't say "loses all other
+  abilities" — Old-Growth Troll keeps trample and its dies trigger), and it has exactly `enchant` (with "you" = the Aura's controller) plus the granted
   static/activated abilities for as long as it stays on the battlefield. It is never a creature there, so
   "a creature entered" observers miss it. Its controller chooses the host as it enters among the permanents
   `enchant` admits (CR 303.4f — not targeted; protection from the Aura's new characteristics excludes a
@@ -2036,7 +2215,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   the old effect. No additional card-authoring flag is needed. It can't be transformed (CR 712.4c) and never
   matches `transformed()` (CR 701.27g). The upkeep / end-step / beginning-of-combat meld triggers keep their
   intervening "if" as the trigger condition; the ownership half is checked by the effect as it resolves.
-- `ReturnSelfFromGraveyardTransformed(tapped = false)` — "Return this card from your graveyard to the
+- `ReturnSelfFromGraveyardTransformed(tapped = false, underYourControl = false)` — "Return this card from your graveyard to the
   battlefield transformed" (Garland, Knight of Cornelia). Returns the *source card* from the graveyard
   to the battlefield with its back face up; pair with `activateFromZone = Zone.GRAVEYARD` on the owning
   activated ability, **or wire it to `Triggers.self.dies()`** for the "when this dies, return it transformed"
@@ -2048,8 +2227,10 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   transformed"). Because the graveyard→battlefield move preserves the entity id, "...with N counters
   on it" (Ojer Pakpatiq's three time counters) composes as `Composite(ReturnSelfFromGraveyardTransformed(
   tapped = true), AddCounters(counter, n, EffectTarget.Self))` — the following `Self` still resolves to
-  the returned permanent. Raw type `ReturnSelfFromZoneTransformedEffect(fromZone, tapped)` generalizes
-  to other source zones.
+  the returned permanent. `underYourControl = true` is "...return this card to the battlefield transformed
+  **under your control**" (Journey to Eternity): the back face enters under the ability's controller rather
+  than the card's owner (the same `controllerOverride` axis as `PutOntoBattlefieldFromGraveyard`). Raw type
+  `ReturnSelfFromZoneTransformedEffect(fromZone, tapped, controllerOverride)` generalizes to other source zones.
 - `ReturnCreaturesPutInGraveyardThisTurn(player)` — Patriarch's Bidding shape.
 - `ReturnSameNamedFromGraveyard(target = ContextTarget(0))` — return the target graveyard card and
   **every other card with the same name** in the controller's graveyard to the battlefield **tapped**
@@ -2065,7 +2246,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   Revealing emits a `CardsRevealedEvent` and stops; declining (or empty selection) runs
   `otherwise`. Compose with `Effects.Tap`/`Effects.Sacrifice`/etc. via `otherwise` to
   express "if you don't, X" riders — e.g. SOI shadow lands wrap this in
-  `OnEnterRun(...)` with `otherwise = Effects.Tap(EffectTarget.Self)` for the
+  `OnEnterRun(...)` with `otherwise = Effects.EnterTapped()` for the
   "this land enters tapped" branch.
 - `Effects.Behold(filter, ifBeheld?, otherwise?)` — resolution-time **behold** (`BeholdEffect`): "you may
   behold a `filter`. If you do, `ifBeheld`. If you don't, `otherwise`." The behold itself is optional — the controller may
@@ -2136,14 +2317,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `ReturnLinkedExileToHand()` — return all from linked exile to hand.
 - `ReturnLinkedExileToZoneExiledFrom()` — return each linked-exiled card to **the zone it was exiled from** (CR 610.3 "this second one-shot effect returns the object to its previous zone"), under its owner's control when that zone is the battlefield (CR 610.3c). For an exile-until clause whose exile half can reach more than one zone: **Cloak and Dagger, Entwined** exiles either a nonland card from an opponent's *hand* or the chosen creature from the *battlefield*, and one leaves-the-battlefield trigger puts each back where it belongs. Built on `CardDestination.ToZoneExiledFrom` (below); prefer the fixed-destination siblings when the card names one zone explicitly. Recorded origins are honoured as-is (battlefield, hand, graveyard, library, command zone, sideboard), with two special cases: a card recorded as exiled from the **stack**, or with no recorded origin at all, falls back to the battlefield, and a card exiled **from exile** (CR 406.7) stays put.
 - `ReturnOneFromLinkedExile()` — return one chosen card.
-- `GrantMayPlayFromExile(from, expiry?, withAnyManaType?, asThoughFlash?, condition?, landEntersTapped?, onPlayRider?, ownerControls?, recipient?, insteadOfGraveyard?, fixedAlternativeManaCost?, fixedAlternativeCostIsManaValue?, waterbend?, nonLandOnly?, castFaceIndex?, castColorRestriction?, castColorCount?, maxPlays?, colorlessAsAnyColor?, withAnyManaColor?)` — controller may play matching cards from exile. `nonLandOnly=true` restricts the permission to *casting* — a land among the granted cards can never be played through it, modeling "you may **cast** that card" wording (**Ragavan, Nimble Pilferer**: "exile the top card of that player's library… you may cast that card") as distinct from "you may **play** those cards" (Light Up the Stage): "cast" never covers a land's play-as-a-special-action (CR 305.1), so the granting effect still exiles the card regardless of type, but the resulting `MayPlayPermission.nonLandOnly` is read by `CastFromZoneEnumerator` (both the exile and graveyard land-play branches) and independently by `PlayLandHandler`'s authoritative `validate`/`execute`, so a client can't bypass the restriction by hand-constructing the action. `castFaceIndex` restricts the permission to the card's **alternative face** at that index (`cardFaces[castFaceIndex]`) instead of its primary characteristics — the face's mana cost, type line, timing, cast restrictions, target requirements, and spell script all apply, and the emitted `CastSpell` carries the same `faceIndex`. Models "you may cast it from your graveyard **as an Adventure**" (**Mosswood Dreadknight**, CR 715.3): index 0 is the Adventure face, so only Dread Whispers becomes castable and the creature half stays locked in the graveyard. Resolving the Adventure then exiles the card and grants the ordinary cast-the-creature-from-exile permission (CR 715.3d), so the two halves chain with no card-specific wiring. Reuses the same enumerator face-swap as a Secrets of Strixhaven prepare-spell copy; `CastSpellHandler` rejects any `faceIndex` (including the unrestricted `null`) that no active permission authorizes. `asThoughFlash=true` lets the granted cards be cast at **instant speed** — "as though they had flash" (CR 702.8) — even when they are sorceries/creatures; the timing rider rides on the `MayPlayPermission` and is honored by both `CastFromZoneEnumerator` (offered actions) and `CastSpellHandler` (authoritative timing check), and waives no cost. Combine with `condition = IsYourTurn` + `withAnyManaType = true` + `expiry = MayPlayExpiry.Permanent` for "During your turn, you may cast cards exiled with this … as though they had flash. Mana of any type can be spent to cast those spells." (**Azula, Cunning Usurper**, whose ETB exiles the two chosen cards *with* it via `MoveCollection(linkToSource = true)`, then grants over `CardSource.FromLinkedExile`). `fixedAlternativeManaCost` (a `ManaCost`, e.g. `{2}`) makes each granted card castable for that *fixed* cost **instead of** its printed mana cost while exiled — it *replaces* the cost, unlike `GrantPlayWithCostIncrease` which adds on top. Stamps `PlayWithFixedAlternativeManaCostComponent(controllerId, fixedCost, waterbend)`, honored by `CastFromZoneEnumerator` + `CastSpellHandler` and stripped on leaving exile by `StackResolver`. `fixedAlternativeCostIsManaValue = true` computes that fixed cost **per card** as `{its mana value}` generic at grant time (a 6-drop → `{6}`, mutually exclusive with a literal `fixedAlternativeManaCost`), and `waterbend = true` marks it a **waterbend** cost (CR 701.67): its whole generic may be paid by tapping untapped artifacts/creatures (each `{1}`) in addition to mana — `CastSpellHandler` reduces the fixed cost by the tapped `AlternativePaymentChoice.tapForGenericPermanents` (cap = the fixed cost's generic) in both validation and payment, and `CastFromZoneEnumerator` surfaces `hasTapForGeneric`/`tapForGenericPermanents` + folds the tap help into affordability. Reached through the `Effects.WaterbendCastFromExile(from, condition?)` facade — backs **Hama, the Bloodbender** ("you may cast the exiled card during your turn by waterbending {X} … where X is its mana value"), whose grant is gated by `AllConditions(IsYourTurn, YouControlSource)` so the exiled card is castable only on your turn and only while you control the granting source (once it leaves the battlefield `YouControlSource` fails and the grant ends). Backs the **Airbend** keyword (`Effects.Airbend`); pair with `ownerControls = true` for "its owner may cast it for {2}". `insteadOfGraveyard = AfterResolveDestination.EXILE` stamps `AfterResolveDestinationComponent` on each granted card so a spell cast from the permission is exiled instead of going to a graveyard (on resolution, when countered, or when it fizzles) — the "If that spell would be put into a graveyard, exile it instead" rider on borrow-a-spell-you-don't-own cards (Nita, Forum Conciliator); `BOTTOM_OF_LIBRARY` is the "put it on the bottom of its owner's library instead" spelling. The same cast-this-way rider, under the same parameter name, as `GrantFreeCastTargetFromExile` and `CastFromCollectionWithoutPayingCost`. `withAnyManaType=true` relaxes the colored pips so mana of any type can pay them (Laughing Jasper Flint, Cruelclaw's Heist); the grant works whether the card stays in exile *or* in a graveyard (Tinybones, the Pickpocket grants over a card the trigger gathered straight from a graveyard via `CardSource.ChosenTargets`), and the relaxation is applied both in the legal-action enumerator and in the cast handler's payment. `withAnyManaColor=true` is "you may spend mana **as though it were mana of any color** to cast those spells" (CR 609.4b — **Stolen Strategy**, **Curse of Hospitality**): every colored, hybrid, Phyrexian and monocolored-hybrid pip is relaxed to generic (`ManaCost.relaxColoredRequirements()`), but a `{C}` pip still needs colorless mana — colorless is a mana *type*, not a color, which is exactly where it differs from `withAnyManaType` (CR 118.14). It rides on `MayPlayPermission.withAnyManaColor` and is applied by `CastCostPayer.relaxForCastPermission` (payment, validation and the payment window) and by the from-zone cast enumerator. `colorlessAsAnyColor=true` is the narrower "you may spend **colorless** mana as though it were mana of any color to cast that spell" (CR 609.4b — **Abstruse Appropriation**, whose pipeline is `gather(ChosenTargets) → exile → GrantMayPlayFromExile(expiry = Permanent, nonLandOnly = true, colorlessAsAnyColor = true)`): the cost is *not* rewritten — every colored, hybrid, Phyrexian and monocolored-hybrid pip additionally accepts colorless mana, `{C}` still needs colorless, and the mana spent is still recorded as colorless. It rides on `MayPlayPermission.colorlessAsAnyColor` into `SpellPaymentContext.colorlessAsAnyColor`, which the floating-pool matcher (`ManaPool`) and the auto-tap solver honour (native colors first, colorless as the fallback); set in `CastCostPayer.spellPaymentContext` and the from-zone cast enumerator, so only the granted spell gets it. `landEntersTapped=true` forces a played land tapped regardless of its own ETB script (Lightstall Inquisitor); PlayLandHandler reads the flag off the active `MayPlayPermission` at play time and stamps `TappedComponent` before the card's intrinsic `EntersTapped` branch runs. `onPlayRider` is a "When you play a card this way, …" payoff: the engine registers a linked event-based delayed triggered ability alongside the permission, and casting/playing a granted card emits a `CardPlayedFromPermissionEvent` (link-id-scoped, like `DamagePreventedEvent`) that fires the rider on the stack as a triggered ability of the granting source. Expires with the grant (end of turn). Used by Fires of Mount Doom ("…When you play a card this way, Fires of Mount Doom deals 2 damage to each player."). `ownerControls=true` grants the permission to each exiled card's *owner* instead of the effect controller — the collection is grouped by owner into one permission per owner, and any turn-keyed `expiry` (e.g. `MayPlayExpiry.UntilEndOfNextTurn`) is measured against each owner's own turns. Use for "for each of those cards, its owner may play it until the end of their next turn" wording where the exiled cards may belong to different players (Suspend Aggression: exile a target nonland permanent + your top library card, each owner may replay the one they own). Mirrors `MakePlottedEffect.ownerControls`; prefer it (composed in a gather → exile → grant pipeline) over the monolithic `ExileAndGrantOwnerPlayPermission` when the expiry is turn-bounded or more than one card is exiled. `recipient` (an `EffectTarget`, default `Controller`) names the player who gets the permission when it isn't the effect's controller — resolved against the resolving context, so a trigger can hand the grant to a player named by the trigger rather than by the source. **Gonti, Night Minister** ("Whenever a creature deals combat damage to one of your opponents, **its controller** … may play that card") uses `recipient = EffectTarget.ControllerOfTriggeringEntity`: in a pod the damaging creature's controller may be an opponent of Gonti's controller, a player the ability has no other handle on. Turn-keyed `expiry` windows still follow the *activating* player (the grant's duration is a property of the effect, not of who may use it); for per-card owner routing use `ownerControls`, which takes precedence. `castColorCount = 3` is the same cast-time check on the spell's **number** of colors — "You may cast spells with exactly three colors from among them this turn" (**Meeting of the Five**, paired with `nonLandOnly = true`, since the count gates casts, not land plays); both riders go through `MayPlayPermission.authorizesSpellColors`. `castColorRestriction = Color.RED` restricts the permission to **red spells** — checked against the *face actually being cast*, not the card sitting in exile, in both `CastFromZoneEnumerator` and `CastSpellHandler`. This is the "You may cast red spells from among them this turn" wording (**Chandra, Dressed to Kill** −7), and it is deliberately *not* the same as "if it's red, you may cast it" (her +1), which tests the exiled **card's** characteristics and is expressed upstream as `FilterCollection(GameObjectFilter.Any.withColor(RED))` before the grant. Her rulings pin the difference: a modal double-faced card that is red in exile may have *either* face cast through the +1, but its blue back face is not castable through the −7. `maxPlays = n` caps the plays the grant authorises across the whole collection (null, the default, is unlimited): each card cast (or land played) through it spends one, and the last play revokes the permission for every other card in it. `maxPlays = 1` is "you may cast **an** instant or sorcery spell from among those exiled cards" (**Chandra, Hope's Beacon** +1: `gather(TopOfLibrary(5)) → move(→ exile) → filter(InstantOrSorcery) → GrantMayPlayFromExile(expiry = UntilEndOfNextTurn, nonLandOnly = true, maxPlays = 1)`); `maxPlays = 2` is "you may play **up to two** of those cards" (**March of Reckless Joy**: `gather(TopOfLibrary(X)) → move(→ exile) → GrantMayPlayFromExile(expiry = UntilEndOfNextTurn, maxPlays = 2)`), as opposed to the default, where a multi-card grant keeps authorising the rest after each cast (Light Up the Stage). The cap rides on `MayPlayPermission.playsRemaining` and is spent as the spell is *cast* (`SpellCaster`) or the land is played (`PlayLandHandler`) through `spendCappedMayPlayFor`, so a spell countered back into exile can't be recast through it, while a card that leaves exile any other way spends nothing. A card also covered by an ordinary *unconditional* grant is attributed to that one and spares the capped grant (the player picks which permission they use). With `ownerControls`, each owner's grant is capped separately. Contrast `CastUpToNFromCollectionWithoutPayingCost(from, n)`, which is the same "up to n of them" limit but only *during resolution*.
+- `GrantMayPlayFromExile(from, expiry?, withAnyManaType?, asThoughFlash?, condition?, entersTapped?, onPlayRider?, ownerControls?, recipient?, insteadOfGraveyard?, fixedAlternativeManaCost?, fixedAlternativeCostIsManaValue?, waterbend?, nonLandOnly?, castFaceIndex?, castColorRestriction?, castColorCount?, maxPlays?, spendAsAnyColor?, withAnyManaColor?)` — controller may play matching cards from exile (or from a graveyard, or from their own sideboard — "you may play a card you own from outside the game this turn", **Wish**: grant over `gather(FromZone(SIDEBOARD, You))` with `maxPlays = 1`). **A grant names objects, not cards:** when a granted card moves to another zone it becomes a new object (CR 400.7) and drops out of every grant (`GameState.addToZone`), so a card that leaves and comes back — returned to hand and discarded, exiled and returned, or cast and countered — is not playable through the old grant; only the move onto the stack keeps it, so the cast can still read and spend the permission that authorised it. That is what makes "until end of turn, each legendary card in your graveyard gains 'You may play this card from your graveyard'" a plain grant over `gather(FromZone(GRAVEYARD, You, Any.legendary()))` (**Kethis, the Hidden Hand**): the set is fixed as the ability resolves, and a card played and returned to the graveyard no longer has it. `nonLandOnly=true` restricts the permission to *casting* — a land among the granted cards can never be played through it, modeling "you may **cast** that card" wording (**Ragavan, Nimble Pilferer**: "exile the top card of that player's library… you may cast that card") as distinct from "you may **play** those cards" (Light Up the Stage): "cast" never covers a land's play-as-a-special-action (CR 305.1), so the granting effect still exiles the card regardless of type, but the resulting `MayPlayPermission.nonLandOnly` is read by `CastFromZoneEnumerator` (both the exile and graveyard land-play branches) and independently by `PlayLandHandler`'s authoritative `validate`/`execute`, so a client can't bypass the restriction by hand-constructing the action. `castFaceIndex` restricts the permission to the card's **alternative face** at that index (`cardFaces[castFaceIndex]`) instead of its primary characteristics — the face's mana cost, type line, timing, cast restrictions, target requirements, and spell script all apply, and the emitted `CastSpell` carries the same `faceIndex`. Models "you may cast it from your graveyard **as an Adventure**" (**Mosswood Dreadknight**, CR 715.3): index 0 is the Adventure face, so only Dread Whispers becomes castable and the creature half stays locked in the graveyard. Resolving the Adventure then exiles the card and grants the ordinary cast-the-creature-from-exile permission (CR 715.3d), so the two halves chain with no card-specific wiring. Reuses the same enumerator face-swap as a Secrets of Strixhaven prepare-spell copy; `CastSpellHandler` rejects any `faceIndex` (including the unrestricted `null`) that no active permission authorizes. **Without** `castFaceIndex` a grant covers every face the card can be cast as — "you may cast that card" lets an Adventurer card be cast as its Adventure (CR 715.3) and a modal double-faced card as either face (CR 712.11b), a permanent back cast transformed for its own mana cost (`AlternativeCostType.MODAL_BACK_FACE`, as from hand) — each offered as its own cast with that face's timing, cost and targets, and `castColorRestriction` judged per face. Only the Adventure's own exile (CR 715.3d) is creature-only (`MayPlayPermission.primaryFaceOnly`); read through `MayPlayPermission.authorizesFace` / `authorizesModalBack`. A fixed alternative cost applies to whichever face is cast, except a granted foretell cost (**Dream Devourer**: "its mana cost reduced by {2}"), which `PlayWithFixedAlternativeManaCostComponent.faceCosts` prices per face — a foretold Kolvori, God of Kinship is cast as Kolvori for {G}{G} or as The Ringhart Crest for {G}. `asThoughFlash=true` lets the granted cards be cast at **instant speed** — "as though they had flash" (CR 702.8) — even when they are sorceries/creatures; the timing rider rides on the `MayPlayPermission` and is honored by both `CastFromZoneEnumerator` (offered actions) and `CastSpellHandler` (authoritative timing check), and waives no cost. Combine with `condition = IsYourTurn` + `withAnyManaType = true` + `expiry = MayPlayExpiry.Permanent` for "During your turn, you may cast cards exiled with this … as though they had flash. Mana of any type can be spent to cast those spells." (**Azula, Cunning Usurper**, whose ETB exiles the two chosen cards *with* it via `MoveCollection(linkToSource = true)`, then grants over `CardSource.FromLinkedExile`). `fixedAlternativeManaCost` (a `ManaCost`, e.g. `{2}`) makes each granted card castable for that *fixed* cost **instead of** its printed mana cost while exiled — it *replaces* the cost, unlike `GrantPlayWithCostIncrease` which adds on top. Stamps `PlayWithFixedAlternativeManaCostComponent(controllerId, fixedCost, waterbend)`, honored by `CastFromZoneEnumerator` + `CastSpellHandler` and stripped on leaving exile by `StackResolver`. `fixedAlternativeCostIsManaValue = true` computes that fixed cost **per card** as `{its mana value}` generic at grant time (a 6-drop → `{6}`, mutually exclusive with a literal `fixedAlternativeManaCost`), and `waterbend = true` marks it a **waterbend** cost (CR 701.67): its whole generic may be paid by tapping untapped artifacts/creatures (each `{1}`) in addition to mana — `CastSpellHandler` reduces the fixed cost by the tapped `AlternativePaymentChoice.tapForGenericPermanents` (cap = the fixed cost's generic) in both validation and payment, and `CastFromZoneEnumerator` surfaces `hasTapForGeneric`/`tapForGenericPermanents` + folds the tap help into affordability. Reached through the `Effects.WaterbendCastFromExile(from, condition?)` facade — backs **Hama, the Bloodbender** ("you may cast the exiled card during your turn by waterbending {X} … where X is its mana value"), whose grant is gated by `AllConditions(IsYourTurn, YouControlSource)` so the exiled card is castable only on your turn and only while you control the granting source (once it leaves the battlefield `YouControlSource` fails and the grant ends). Backs the **Airbend** keyword (`Effects.Airbend`); pair with `ownerControls = true` for "its owner may cast it for {2}". `insteadOfGraveyard = AfterResolveDestination.EXILE` stamps `AfterResolveDestinationComponent` on each granted card so a spell cast from the permission is exiled instead of going to a graveyard (on resolution, when countered, or when it fizzles) — the "If that spell would be put into a graveyard, exile it instead" rider on borrow-a-spell-you-don't-own cards (Nita, Forum Conciliator); `BOTTOM_OF_LIBRARY` is the "put it on the bottom of its owner's library instead" spelling. The same cast-this-way rider, under the same parameter name, as `GrantFreeCastTargetFromExile` and `CastFromCollectionWithoutPayingCost`. `withAnyManaType=true` relaxes the colored pips so mana of any type can pay them (Laughing Jasper Flint, Cruelclaw's Heist); the grant works whether the card stays in exile *or* in a graveyard (Tinybones, the Pickpocket grants over a card the trigger gathered straight from a graveyard via `CardSource.ChosenTargets`), and the relaxation is applied both in the legal-action enumerator and in the cast handler's payment. `withAnyManaColor=true` is "you may spend mana **as though it were mana of any color** to cast those spells" (CR 609.4b — **Stolen Strategy**, **Curse of Hospitality**): every colored, hybrid, Phyrexian and monocolored-hybrid pip is relaxed to generic (`ManaCost.relaxColoredRequirements()`), but a `{C}` pip still needs colorless mana — colorless is a mana *type*, not a color, which is exactly where it differs from `withAnyManaType` (CR 118.14). It rides on `MayPlayPermission.withAnyManaColor` and is applied by `CastCostPayer.relaxForCastPermission` (payment, validation and the payment window) and by the from-zone cast enumerator. `spendAsAnyColor = ManaSpentAsAnyColor.COLORLESS` is the narrower "you may spend **colorless** mana as though it were mana of any color to cast that spell" (CR 609.4b — **Abstruse Appropriation**, whose pipeline is `gather(ChosenTargets) → exile → GrantMayPlayFromExile(expiry = Permanent, nonLandOnly = true, spendAsAnyColor = COLORLESS)`); `ManaSpentAsAnyColor.SNOW` is "you may spend **mana from snow sources** as though it were mana of any color" (CR 107.4h — any mana a snow source produced, colored or colorless). Either way the cost is *not* rewritten — every colored, hybrid, Phyrexian and monocolored-hybrid pip additionally accepts that mana, `{C}` still needs colorless, and the mana spent keeps its real type. It rides on `MayPlayPermission.spendAsAnyColor` into `SpellPaymentContext.spendAsAnyColor`, which the floating-pool matcher (`ManaPool`; snow takes the unit-exact `allocateFloating` path, since only the unit view knows which floating mana is snow) and the auto-tap solver honour (native colors first, the stand-in as the fallback); set in `CastCostPayer.spellPaymentContext` and the from-zone cast enumerator, so only the granted spell gets it. `entersTapped` (a `GameObjectFilter`) makes a card played through the grant enter the battlefield tapped when it matches, regardless of its own ETB script: `GameObjectFilter.Land` for "each land played this way enters tapped" (**Lightstall Inquisitor**), `GameObjectFilter.Any` for "you may play target snow permanent card from your graveyard this turn. If you do, it enters tapped" (**Kaldring, the Rimestaff**: `target(graveyard snow permanent card) → gather(ChosenTargets) → GrantMayPlayFromExile(entersTapped = Any)`). It covers both a land played (`PlayLandHandler`) and a permanent spell cast (frozen on the spell at cast as `CastThisWayEntryRiderComponent.entersTapped`, applied as it resolves); the filter is matched against the permanent as it enters, so a modal DFC is judged by the face played, and an applicable "enters untapped" replacement still wins. The rider belongs to the permission the play goes through, so it binds only when every active may-play permission that could authorize this play (this face, these colours) carries it and no rider-free route could play the card instead — a plain grant, Crucible / Muldrotha / Mayhem, a linked-exile grant, or the card's own graveyard route (flashback, escape, disturb, its own `MayCastSelfFromZones`, …) — read by `mayPlayEntersTappedRiders`. `onPlayRider` is a "When you play a card this way, …" payoff: the engine registers a linked event-based delayed triggered ability alongside the permission, and casting/playing a granted card emits a `CardPlayedFromPermissionEvent` (link-id-scoped, like `DamagePreventedEvent`) that fires the rider on the stack as a triggered ability of the granting source. Expires with the grant (end of turn). Used by Fires of Mount Doom ("…When you play a card this way, Fires of Mount Doom deals 2 damage to each player."). `ownerControls=true` grants the permission to each exiled card's *owner* instead of the effect controller — the collection is grouped by owner into one permission per owner, and any turn-keyed `expiry` (e.g. `MayPlayExpiry.UntilEndOfNextTurn`) is measured against each owner's own turns. Use for "for each of those cards, its owner may play it until the end of their next turn" wording where the exiled cards may belong to different players (Suspend Aggression: exile a target nonland permanent + your top library card, each owner may replay the one they own). Mirrors `MakePlottedEffect.ownerControls`; prefer it (composed in a gather → exile → grant pipeline) over the monolithic `ExileAndGrantOwnerPlayPermission` when the expiry is turn-bounded or more than one card is exiled. `recipient` (an `EffectTarget`, default `Controller`) names the player who gets the permission when it isn't the effect's controller — resolved against the resolving context, so a trigger can hand the grant to a player named by the trigger rather than by the source. **Gonti, Night Minister** ("Whenever a creature deals combat damage to one of your opponents, **its controller** … may play that card") uses `recipient = EffectTarget.ControllerOfTriggeringEntity`: in a pod the damaging creature's controller may be an opponent of Gonti's controller, a player the ability has no other handle on. Turn-keyed `expiry` windows still follow the *activating* player (the grant's duration is a property of the effect, not of who may use it); for per-card owner routing use `ownerControls`, which takes precedence. `castColorCount = 3` is the same cast-time check on the spell's **number** of colors — "You may cast spells with exactly three colors from among them this turn" (**Meeting of the Five**, paired with `nonLandOnly = true`, since the count gates casts, not land plays); both riders go through `MayPlayPermission.authorizesSpellColors`. `castColorRestriction = Color.RED` restricts the permission to **red spells** — checked against the *face actually being cast*, not the card sitting in exile, in both `CastFromZoneEnumerator` and `CastSpellHandler`. This is the "You may cast red spells from among them this turn" wording (**Chandra, Dressed to Kill** −7), and it is deliberately *not* the same as "if it's red, you may cast it" (her +1), which tests the exiled **card's** characteristics and is expressed upstream as `FilterCollection(GameObjectFilter.Any.withColor(RED))` before the grant. Her rulings pin the difference: a modal double-faced card that is red in exile may have *either* face cast through the +1, but its blue back face is not castable through the −7. `maxPlays = n` caps the plays the grant authorises across the whole collection (null, the default, is unlimited): each card cast (or land played) through it spends one, and the last play revokes the permission for every other card in it. `maxPlays = 1` is "you may cast **an** instant or sorcery spell from among those exiled cards" (**Chandra, Hope's Beacon** +1: `gather(TopOfLibrary(5)) → move(→ exile) → filter(InstantOrSorcery) → GrantMayPlayFromExile(expiry = UntilEndOfNextTurn, nonLandOnly = true, maxPlays = 1)`); `maxPlays = 2` is "you may play **up to two** of those cards" (**March of Reckless Joy**: `gather(TopOfLibrary(X)) → move(→ exile) → GrantMayPlayFromExile(expiry = UntilEndOfNextTurn, maxPlays = 2)`), as opposed to the default, where a multi-card grant keeps authorising the rest after each cast (Light Up the Stage). A play goes through **one** permission: when several capped grants cover the card, only one is spent (the one covering the fewest cards, then the oldest), so repeated grants over the same pile stack — **Idol of Endurance**'s `{1}{W}, {T}` is `filter(gather(FromLinkedExile()), Creature) → GrantMayPlayFromExile(maxPlays = 1, nonLandOnly = true) → GrantPlayWithoutPayingCost`, and two activations are two free casts. The cap rides on `MayPlayPermission.playsRemaining` and is spent as the spell is *cast* (`SpellCaster`) or the land is played (`PlayLandHandler`) through `spendCappedMayPlayFor`, so a spell countered back into exile can't be recast through it, while a card that leaves exile any other way spends nothing. A card also covered by an ordinary *unconditional* grant is attributed to that one and spares the capped grant (the player picks which permission they use). With `ownerControls`, each owner's grant is capped separately. Contrast `CastUpToNFromCollectionWithoutPayingCost(from, n)`, which is the same "up to n of them" limit but only *during resolution*.
 - `GrantPlayWithoutPayingCost(from, expiry?)` — the cards in the collection may be played without paying their mana costs (pair with `GrantMayPlayFromExile` for exiled cards). Lasts this turn by default; pass the paired grant's `MayPlayExpiry` when the free play outlasts the turn — **Ignite the Future** ("Until the end of your next turn, you may play those cards … without paying their mana costs") passes `MayPlayExpiry.UntilEndOfNextTurn` to both. A turn-keyed expiry is stored on `PlayWithoutPayingCostComponent.expiresAfterTurn` and cleared by the same floor + active-player check as the permission; `Permanent` and the source-keyed expiries leave the waiver in place and let the permission's revocation end the play.
 - `GrantPlayWithAdditionalCost(from, additionalCost)` — require a runtime additional cost when casting
   cards in the named collection. Compose with `GrantMayPlayFromExile` and
   `GrantPlayWithoutPayingCost` for "pay [cost] rather than pay its mana cost" permissions. The cost
   remains additive with the spell's printed mandatory additional costs; `PayLifeEqualToManaValueOfSpell`
   computes and displays the life payment per exiled card.
-- `GrantPlayWithCostIncrease(from, amount)` — stamp `PlayWithCostIncreaseComponent(controllerId, amount)` on every card in the collection, so the next cast pays `{amount}` extra generic. Pair with `GrantMayPlayFromExile` for "each spell cast this way costs {N} more" clauses (Lightstall Inquisitor); for target-based "exile this permanent, owner may play it, opponents tax" effects use `Effects.ExileAndGrantOwnerPlayPermission` instead.
+- `GrantPlayWithCostIncrease(from, amount, unlessTargets?)` — stamp `PlayWithCostIncreaseComponent(controllerId, amount)` on every card in the collection, so the next cast pays `{amount}` extra generic. Pair with `GrantMayPlayFromExile` for "each spell cast this way costs {N} more" clauses (Lightstall Inquisitor). When the controller already holds a may-play permission from the same source over the card (the grant it's paired with), the tax is tied to that permission — "cast **this way**": it lapses with the permission and isn't owed by a cast that announces the card's own graveyard route (flashback, harmonize, mayhem, escape, disturb). `unlessTargets` (a `GameObjectFilter`) waives the tax when any chosen target of the spell matches — "if that spell doesn't target a creature you control, it costs {8} more to cast this way" (**Mavinda, Students' Advocate**: `gather(ChosenTargets) → GrantMayPlayFromExile(expiry = EndOfTurn, insteadOfGraveyard = EXILE) → GrantPlayWithCostIncrease(amount = 8, unlessTargets = Creature.youControl())`, over a card left in your graveyard). The negated, grant-side counterpart of `CostModification.IncreaseGenericIfAnyTargetMatches`: `CastCostTotaller` prices it against the permanents actually targeted, a spell with no targets always pays it, and the legal-action offer prices the cheapest cast (waived when one of the spell's legal targets — any mode's, for a modal spell — matches, via `CostCalculator.anyLegalTargetMatches`); for target-based "exile this permanent, owner may play it, opponents tax" effects use `Effects.ExileAndGrantOwnerPlayPermission` instead.
 - `GrantFreeCastTargetFromExile(target, insteadOfGraveyard?)` — the controller may cast one specific card (in exile, or left in a graveyard) without paying its mana cost **for the rest of the turn** — a lingering `MayPlayPermission`, not a cast during resolution, so ordinary timing rules still apply to it. `insteadOfGraveyard` is the cast-this-way destination rider (`AfterResolveDestination.EXILE` for "exile it instead" — Daring Waverider, Sins of the Past; `BOTTOM_OF_LIBRARY` for "put it on the bottom of its owner's library instead"). **Quintorius, Loremaster** pairs it with a linked exile: its end-step trigger exiles with `ExileLinkedToSource`, and its activated ability targets `TargetFilter(GameObjectFilter.Any.exiledWithSource(), zone = Zone.EXILE)` then grants with `insteadOfGraveyard = BOTTOM_OF_LIBRARY`.
 - `MakePlotted(from, ownerControls = false)` — make every card in the named collection *plotted* (CR 718). The cards must already be in exile (chain after a `MoveCollection` to `Zone.EXILE`). Each card gets the plotted designation (`PlottedComponent`) + a permanent free-cast-as-a-sorcery-on-a-later-turn permission (`PlayWithoutPayingCostComponent` + `MayPlayPermission` gated by `SourcePlottedOnPriorTurn`) — the Plot keyword's state without a plot cost. Emits a `CardPlottedEvent` per card so "when this card becomes plotted" triggers fire. No-ops on an empty collection (so an optional "you may exile … it becomes plotted" fork is safe). With `ownerControls = true` the free-cast permission goes to each card's **owner** rather than the effect's controller (CR 718.2 — for "exile target spell, it becomes plotted" the spell's owner casts it later, not the plotter); default is controller-controls (you plot a card you own, like Make Your Own Luck).
 
@@ -2154,7 +2335,12 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `ModifyStats(power, toughness, target?, duration?)` — `±P/±T` for `duration` (default: until end of
   turn). Pass `Duration.WhileSourceTapped("…")` for the Antiquities "tap-locked" buffs (Ashnod's Battle
   Gear `+2/-2`, Tawnos's Weaponry `+1/+1`): the bonus persists for as long as the source artifact remains
-  tapped and the one-way latch drops it when it untaps.
+  tapped and the one-way latch drops it when it untaps. From an activated ability the duration counts
+  from activation (CR 611.2b): the stack object records the source's untap clock
+  (`UntapCountComponent`), so a source that untaps before the ability resolves — even if it is tapped
+  again by then — leaves the effect inert. The clock is stamped on floating effects (every
+  `Effects.ModifyStats` / `GrantKeyword` / `GainControl` / `BecomeCreature` with a source-tapped duration,
+  including `WhileSourceTappedAndAffectedPowerAtMostSource` and `WhileYouControlSourceAndSourceTapped`).
 - `SetBasePower(target, power: DynamicAmount, duration, reevaluateContinuously = false)` — set base power
   to a dynamic value (Layer 7b), leaving toughness unchanged.
 - `SetBaseToughness(target, toughness: DynamicAmount, duration, reevaluateContinuously = false)` —
@@ -2213,8 +2399,8 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `GrantKeyword(keyword, target, duration, condition = null)` — grant a keyword for a duration. The target may be a battlefield permanent **or a permanent spell still on the stack**: a permanent spell keeps its entity id as it resolves, so a keyword granted to `EffectTarget.TriggeringEntity` inside a "when you next cast a creature spell this turn" delayed trigger carries onto the creature the moment it enters (Summon: Brynhildr's Gestalt Mode = "it gains haste until end of turn"). On a non-permanent spell the floating effect simply never has a permanent to apply to.
   **`condition`** makes the granted keyword *conditionally live* rather than gating whether the grant happens: the grant always happens and still expires with `duration`, but the condition rides along as the floating effect's `sourceCondition` and is re-asked on every projection — the durational sibling of a printed `ConditionalStaticAbility`'s "as long as …" clause. This is how a **quoted conditional ability handed out by an animate effect** is modelled: Restless Spire's "{U}{R}: … becomes a 2/1 blue and red Elemental creature with *'During your turn, this creature has first strike.'*" is `Effects.Composite(Effects.BecomeCreature(...), Effects.GrantKeyword(Keyword.FIRST_STRIKE, EffectTarget.Self, Duration.EndOfTurn, Conditions.IsYourTurn))`. "You" resolves to the **source's projected controller**, and Layer 2 has already run when a later layer's modification is applied, so the clause correctly goes dark if another player gains control of the permanent mid-turn — and comes back if control returns. Do **not** reach for a `Duration.While…` here: those latch off permanently once their gate first fails (CR 611.2b), which is right for a "for as long as" duration and wrong for a conditional clause inside a granted ability. Also distinct from wrapping the grant in a `Effects.If`, which tests the condition **once** at resolution and then grants unconditionally.
 - `GrantActivatedAbilityEffect(ability, target, duration)` — one-shot grant of an `ActivatedAbility` to a **target permanent** for a duration (default `Duration.EndOfTurn`). The runtime sibling of the static `GrantActivatedAbility`: records a `GrantedActivatedAbility` keyed to the entity in `GameState.grantedActivatedAbilities`, which both ability enumerators (`ActivatedAbilityEnumerator`, and `ManaAbilityEnumerator` when the granted ability has `isManaAbility = true`) and the activation path (`ActivateAbilityHandler`) read alongside printed abilities; the grant expires in the cleanup step. **Target-general** — works on any battlefield permanent, not just creatures (the *type* of a legal target is constrained by the ability's `TargetRequirement`, so a `TargetObject(filter = TargetFilter.Land)` yields "target land gains …"). Glorious Sunrise's mode 2 = grant a land `ActivatedAbility(cost = AbilityCost.Tap, effect = AddMana(GREEN, 3), isManaAbility = true, timing = TimingRule.ManaAbility)` — a temporary "{T}: Add {G}{G}{G}". A granted **mana** ability must set `isManaAbility = true` or the mana enumerator won't surface it, and `timing = TimingRule.ManaAbility` beside it: the `activatedAbility { manaAbility = true }` builder derives the timing for you, but a raw `ActivatedAbility(...)` inside a grant has no builder to do it (Cryptolith Rite, Joiner Adept and Citanul Hierophants each shipped without either flag until Argentum Assay's differential reported them; Abundant Growth, Nature's Embrace, New Horizons, Huatli, Enduring Vitality and Great Divide Guide followed. `CardLinter`'s `UnflaggedManaAbility` rule — gated corpus-wide by `CardLintTest` — now fails the build on an activated ability that adds mana without the flag, so there is no third batch; its mirror `MisflaggedManaAbility` fails on the opposite mistake, an ability flagged as a mana ability that CR 605.1a disqualifies). (The always-on land-grant sibling is the static `ConditionalStaticAbility(GrantActivatedAbility(...), EnchantedPermanentMatches(Land))` — Nature's Embrace.) **`Duration.UntilSourceCastFromExile`** ("until this card is cast from exile") is an event-bounded duration this grant honours: the executor records the source card's current *exile object* (`ObjectRef`) on the `GrantedActivatedAbility`, and `SpellCaster` removes every such grant whose recorded object is the one being cast from exile, as it moves to the stack. A source that leaves exile any other way becomes a new object (CR 400.7) that no later cast matches, so the grant then lasts indefinitely — as it does when the source was not in exile when the ability resolved. **Emrakul, the Exigent Doom**'s hand ability = `Costs.Composite(Costs.Mana("{3}"), Costs.ExileSelf)` with `activateFromZone = Zone.HAND`, then `Effects.GrantActivatedAbility({T}: AddColorlessMana(2), land, Duration.UntilSourceCastFromExile)` + `Effects.Pipeline { gather(FromZone(EXILE, You, Any.sourceItself())) → GrantMayPlayFromExile(expiry = MayPlayExpiry.Permanent) }`. Only the activated-ability grant store reads this duration today; other grant/effect stores would treat it as permanent. **Auto-pay sees granted mana abilities.** `ManaSolver.findAvailableManaSources` folds a permanent's runtime-granted mana abilities (duration-gated through `GrantDurationGate`) into its mana source alongside printed and statically granted ones, and the affordability extras (tap+sacrifice, explicit-activation) count them too, so a spell payable only through a granted ability is highlighted castable and auto-paid. A source whose abilities yield different amounts of different kinds keeps them apart — `ManaSource.colorAmounts` / `colorlessAmount`, read through `ManaSource.amountFor(kind)` — because one tap activates one ability: a Forest with Emrakul's granted "{T}: Add {C}{C}" is {G} **or** {C}{C}, never {G}{G}. The solver pays generic with the higher-yield kind and avoids spending such a source on a colored pip another source can cover.
-- `GrantStaticAbility(ability, target, duration)` — grant a printed-shape `StaticAbility` (e.g. `CantBeBlockedByMoreThan(1)`) to a card or player for a duration. The runtime sibling of a printed static ability: unlike keyword grants (which flow through projected keywords) it is recorded as a `GrantedStaticAbility` keyed to the entity in `GameState.grantedStaticAbilities` and read **at the point of use** — combat blocker validation (`BlockPhaseManager`, CR 509.1b) consults granted `CantBeBlockedByMoreThan` alongside the creature's printed static abilities; the grant expires in the cleanup step (EndOfTurn). Compose inside `ForEachInGroup` with `EffectTarget.IterationEntity` for "each creature you control gains ..." (Full Steam Ahead = `ModifyStats(2,2)` + `GrantKeyword(TRAMPLE)` + `GrantStaticAbility(CantBeBlockedByMoreThan(1))`). `CantBeBlockedByMoreThan` (combat), `MayCastFromGraveyard` (graveyard-cast enumerator + `CastZoneResolver`, e.g. Forgotten Cellar's "cast spells from your graveyard this turn"), `PreventActivatedAbilities` (activation legality: `CastPermissionUtils.isActivationPrevented`, consulted by the ability handler and both ability enumerators), `GrantActivatedAbility` (ability legality: `CastPermissionUtils.getStaticGrantedAbilitiesWithGranter` + the `ActivateAbilityHandler` twin, read by both ability enumerators and the activation handler), `AssignDamageEqualToToughness` (combat damage assignment: `CombatDamageUtils`, read against *final* projected P/T), `AssignCombatDamageAsUnblocked` (the blocked-attacker pre-check in `CombatDamageManager`), and `LegendRuleDoesNotApplyTo` (the legend-rule SBA, `LegendRuleCheck`, for a grant held by the player or one of their permanents — Hall of Echoes), and `CantAttackYou` (attack declaration, `CantAttackYouDefenderRule` — "you" is the grant's controller; Promise of Loyalty) are wired into read sites today. **A grant to a battlefield permanent also projects**: whatever part of the ability lowers to a continuous effect when printed (`CantBlock`, `CantAttack`, `MustAttack`, `MustBlock`, `GrantKeyword`, `ModifyStats`, `CantBeBlocked`, …) is lowered by `StateProjector` exactly as the printed form would be — sourced from the holder, filters resolved relative to it, timestamped at the later of the holder's and the grant's, and suppressed by the same lose-all-abilities rules — so `GrantStaticAbility(CantBlock(), target)` really stops the creature blocking. Grants to players or graveyard cards don't project. **Resolution-time players are frozen into the grant.** A grant is read long after its resolution context is gone, so `GrantStaticAbilityExecutor` rewrites any `ControlledByReferencedPlayer` over a context-bound reference (`PipelineTarget`, `ContextTarget`, `BoundVariable`) inside a granted `CantBeBlockedBy`'s `blockerFilter` into `ControlledByReferencedPlayer(SpecificEntity(playerId))` — the *player* is fixed when the effect resolves while the set of their creatures stays live. The Black Gate = `selectTarget(TargetPlayer(restriction = Conditions.candidateHasMostLife()), nonTargeting = true)` + `GrantStaticAbility(CantBeBlockedBy(GameObjectFilter.Creature.withControllerPredicate(ControlledByReferencedPlayer(player.asTarget))), creature)`. State-relative references (`PlayerRef(DefendingPlayer)`, …) stay symbolic; another granted static kind that carries a player-scoped filter needs its own arm in that bake. Granting a `StaticAbility` kind that neither lowers nor has a read site compiles and stores but needs its own point-of-use read to take effect. Granting `AssignDamageEqualToToughness` is how an **until-end-of-turn rules modification** is expressed: because the read site re-asks per creature per damage step, using the final projected power and toughness, the affected set stays dynamic the way CR 611.2c requires of an effect that changes no characteristic — The Kingpin of Crime's "until end of turn, creatures you control with toughness greater than their power assign combat damage equal to their toughness" is `GrantStaticAbility(AssignDamageEqualToToughness(GroupFilter.AllCreaturesYouControl, onlyWhenToughnessGreaterThanPower = true), EffectTarget.Self, Duration.EndOfTurn)`, i.e. Bedrock Tortoise's printed static ability for a turn. Do **not** model that sentence as `ForEachInGroup` + `GrantKeyword(AbilityFlag.ASSIGNS_COMBAT_DAMAGE_AS_TOUGHNESS)`: that snapshots the group at resolution (right for an ability grant, wrong for a rules modification), and a floating group-flag variant would resolve its filter in layer 6, before layer 7 has applied, so it could not see a toughness pumped afterwards either. Granting a `GrantActivatedAbility` makes the holder confer the inner activated ability to its filtered group exactly like a printed one — this is how "This permanent gains 'Creatures you control have "&lt;activated ability&gt;"'" is modelled (Roar of the Fifth People, the Saga back of Huatli, Poet of Unity: `GrantStaticAbility(GrantActivatedAbility(ActivatedAbility({T}: AddManaOfChoice(ManaColorSet.Specific(R,G,W))), GroupFilter(Creature.youControl())), EffectTarget.Self, Duration.Permanent)`). A granted `PreventActivatedAbilities` behaves exactly like the printed form anchored to the grant's holder: its filter is evaluated with the holder as source, so the self-scoped `PreventActivatedAbilities(GameObjectFilter.Permanent.sourceItself())` locks the *holder's own* activated abilities — mana abilities included unless `nonManaAbilitiesOnly = true`. Pair it with `Duration.WhileAffectedTapped` ("for as long as it remains tapped", keyed to the granted-to permanent) for the Braided Net shape — "Tap another target nonland permanent. Its activated abilities can't be activated for as long as it remains tapped." = `Effects.Tap(target)` + `Effects.GrantStaticAbility(PreventActivatedAbilities(GameObjectFilter.Permanent.sourceItself()), target, Duration.WhileAffectedTapped)`. Like every "for as long as …" duration it is one-way (CR 611.2b): the read site gates per-frame, and `EndedDurationExpiryCheck` physically removes the grant the moment the permanent untaps (or leaves the battlefield), so a later re-tap does not re-lock it.
-- `GrantReplacementEffect(replacement, target, duration)` — grant a printed-shape `ReplacementEffect` (e.g. `RedirectZoneChange`) to a permanent for a duration. The runtime sibling of a printed replacement effect, modelled exactly like `GrantStaticAbility`: recorded as a `GrantedReplacementEffect` (carrying the granting `controllerId`) in `GameState.grantedReplacementEffects` and read **at the point of use** — the zone-change redirect path (`ZoneMovementUtils.checkZoneChangeRedirect`) consults granted `RedirectZoneChange` alongside permanents' printed replacement effects; the grant expires in the cleanup step (EndOfTurn). Used for durational "this turn" riders such as Forgotten Cellar's "if a card would be put into your graveyard from anywhere this turn, exile it instead" (`GrantReplacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter(controllerPredicate = ControllerPredicate.OwnedByYou), to = Zone.GRAVEYARD)))`). The zone-change and token read sites support: `RedirectZoneChange` (the zone-change redirect path above) and the **token-creation** replacements `MultiplyTokenCreation` / `ModifyTokenCount` / `CreateAdditionalToken`, which `TokenCreationReplacementHelper` reads through `ActiveReplacements.all(state)` — the enumerator that walks battlefield permanents' printed `ReplacementEffectSourceComponent` *and* `GameState.grantedReplacementEffects` together. That is how Kaya, Geist Hunter's −2 (`GrantReplacementEffect(MultiplyTokenCreation(factor = 2, appliesTo = EventPattern.TokenCreationEvent(controller = Player.You)))`) doubles tokens for the turn: it stacks multiplicatively with a printed doubler and keeps working after Kaya leaves the battlefield, because the grant lives on `GameState` rather than on her. `OptionalEffectDiscardDestination` is also read by the effect-discard path (§15), including duration-scoped grants. The **enters-with** replacements `EntersWithCounters` / `EntersWithDynamicCounters` / `EntersWithKeywords` are read by the global entry path (`EntersWithReplacements.applyGlobal`), which sweeps grants alongside printed sources, so a resolving spell can grant "creatures you control enter with …" for a duration. Pair any of these with `Duration.NextUse(description)` for a **one-shot** rider — "the next time one or more enchantment creatures you control enter this turn, each enters with two additional +1/+1 counters on it" (Storyweave: `GrantReplacementEffect(EntersWithCounters(count = 2, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Creature.youControl() and GameObjectFilter.Enchantment, to = Zone.BATTLEFIELD)), EffectTarget.Self, Duration.NextUse("one or more enchantment creatures you control enter"))`). The first entry it modifies spends it: every matching object entering in that same event (one effect instruction, or one resolving permanent spell / land play) still gets it, a later event doesn't; an entry it doesn't match leaves it waiting, and unused it lapses in the cleanup step. Only the enters-with path spends a `NextUse` grant today — on any other granted replacement kind it is never spent and simply lasts the turn, so wire its read site to spend it before relying on it. Granting an otherwise unwired `ReplacementEffect` kind compiles and stores but needs its own point-of-use read to take effect — add it to the read site, not a second grant store. A **resolving instant/sorcery** may also grant a *floating, controller-scoped global* replacement — `EffectTarget.Self` then resolves to the spell on the stack (not a battlefield permanent), and the grant is anchored to the caster (`context.controllerId`) so it persists after the spell leaves; the redirect read path uses only the grant's `controllerId` + the replacement's filter. Used by Malicious Eclipse's "if a creature an opponent controls would die this turn, exile it instead" (`GrantReplacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Creature.opponentControls(), from = Zone.BATTLEFIELD, to = Zone.GRAVEYARD)), EffectTarget.Self, Duration.EndOfTurn)`). Note: `MayCastFromGraveyard` granted via `GrantStaticAbility` is now also read at the graveyard-cast enumerator/`CastZoneResolver`, so "you may cast spells from your graveyard this turn" is `GrantStaticAbility(MayCastFromGraveyard(filter), EffectTarget.Self, Duration.EndOfTurn)`.
+- `GrantStaticAbility(ability, target, duration)` — grant a printed-shape `StaticAbility` (e.g. `CantBeBlockedByMoreThan(1)`) to a card or player for a duration. The runtime sibling of a printed static ability: unlike keyword grants (which flow through projected keywords) it is recorded as a `GrantedStaticAbility` keyed to the entity in `GameState.grantedStaticAbilities` and read **at the point of use** — combat blocker validation (`BlockPhaseManager`, CR 509.1b) consults granted `CantBeBlockedByMoreThan` alongside the creature's printed static abilities; the grant expires in the cleanup step (EndOfTurn). Compose inside `ForEachInGroup` with `EffectTarget.IterationEntity` for "each creature you control gains ..." (Full Steam Ahead = `ModifyStats(2,2)` + `GrantKeyword(TRAMPLE)` + `GrantStaticAbility(CantBeBlockedByMoreThan(1))`). `CantBeBlockedByMoreThan` (combat), `MayCastFromGraveyard` (graveyard-cast enumerator + `CastZoneResolver`, e.g. Forgotten Cellar's "cast spells from your graveyard this turn"), `PreventActivatedAbilities` (activation legality: `CastPermissionUtils.isActivationPrevented`, consulted by the ability handler and both ability enumerators), `GrantActivatedAbility` (ability legality: `CastPermissionUtils.getStaticGrantedAbilitiesWithGranter` + the `ActivateAbilityHandler` twin, read by both ability enumerators and the activation handler), `AssignDamageEqualToToughness` (combat damage assignment: `CombatDamageUtils`, read against *final* projected P/T), `AssignCombatDamageAsUnblocked` (the blocked-attacker pre-check in `CombatDamageManager`), and `LegendRuleDoesNotApplyTo` (the legend-rule SBA, `LegendRuleCheck`, for a grant held by the player or one of their permanents — Hall of Echoes), and `CantAttackYou` (attack declaration, `CantAttackYouDefenderRule` — "you" is the grant's controller; Promise of Loyalty), `AttackTax` (attack pricing, `CombatTaxes.attackTax` — held by a player it taxes attacks on that player, held by a permanent it taxes for the permanent's controller; Summon: Yojimbo), and `GrantWard` (the ward trigger, `TriggerAbilityResolver` for a `Filters.Self` grant and `BattlefieldStaticsIndex` for a battlefield-scope one, gated on the projected WARD keyword so a later "loses all abilities" ends it — Hall of Storm Giants: `BecomeCreature(7/7 blue Giant, EndOfTurn) then GrantStaticAbility(GrantWard(WardCost.Mana("{3}"), Filters.Self), EffectTarget.Self, Duration.EndOfTurn)`) are wired into read sites today. **A grant to a battlefield permanent also projects**: whatever part of the ability lowers to a continuous effect when printed (`CantBlock`, `CantAttack`, `MustAttack`, `MustBlock`, `GrantKeyword`, `ModifyStats`, `CantBeBlocked`, …) is lowered by `StateProjector` exactly as the printed form would be — sourced from the holder, filters resolved relative to it, timestamped at the later of the holder's and the grant's, and suppressed by the same lose-all-abilities rules — so `GrantStaticAbility(CantBlock(), target)` really stops the creature blocking. Grants to players or graveyard cards don't project. **Resolution-time players are frozen into the grant.** A grant is read long after its resolution context is gone, so `GrantStaticAbilityExecutor` rewrites any `ControlledByReferencedPlayer` over a context-bound reference (`PipelineTarget`, `ContextTarget`, `BoundVariable`) inside a granted `CantBeBlockedBy`'s `blockerFilter` into `ControlledByReferencedPlayer(SpecificEntity(playerId))` — the *player* is fixed when the effect resolves while the set of their creatures stays live. The Black Gate = `selectTarget(TargetPlayer(restriction = Conditions.candidateHasMostLife()), nonTargeting = true)` + `GrantStaticAbility(CantBeBlockedBy(GameObjectFilter.Creature.withControllerPredicate(ControlledByReferencedPlayer(player.asTarget))), creature)`. State-relative references (`PlayerRef(DefendingPlayer)`, …) stay symbolic; another granted static kind that carries a player-scoped filter needs its own arm in that bake. Granting a `StaticAbility` kind that neither lowers nor has a read site compiles and stores but needs its own point-of-use read to take effect. Granting `AssignDamageEqualToToughness` is how an **until-end-of-turn rules modification** is expressed: because the read site re-asks per creature per damage step, using the final projected power and toughness, the affected set stays dynamic the way CR 611.2c requires of an effect that changes no characteristic — The Kingpin of Crime's "until end of turn, creatures you control with toughness greater than their power assign combat damage equal to their toughness" is `GrantStaticAbility(AssignDamageEqualToToughness(GroupFilter.AllCreaturesYouControl, onlyWhenToughnessGreaterThanPower = true), EffectTarget.Self, Duration.EndOfTurn)`, i.e. Bedrock Tortoise's printed static ability for a turn. Do **not** model that sentence as `ForEachInGroup` + `GrantKeyword(AbilityFlag.ASSIGNS_COMBAT_DAMAGE_AS_TOUGHNESS)`: that snapshots the group at resolution (right for an ability grant, wrong for a rules modification), and a floating group-flag variant would resolve its filter in layer 6, before layer 7 has applied, so it could not see a toughness pumped afterwards either. Granting a `GrantActivatedAbility` makes the holder confer the inner activated ability to its filtered group exactly like a printed one — this is how "This permanent gains 'Creatures you control have "&lt;activated ability&gt;"'" is modelled (Roar of the Fifth People, the Saga back of Huatli, Poet of Unity: `GrantStaticAbility(GrantActivatedAbility(ActivatedAbility({T}: AddManaOfChoice(ManaColorSet.Specific(R,G,W))), GroupFilter(Creature.youControl())), EffectTarget.Self, Duration.Permanent)`). A granted `PreventActivatedAbilities` behaves exactly like the printed form anchored to the grant's holder: its filter is evaluated with the holder as source, so the self-scoped `PreventActivatedAbilities(GameObjectFilter.Permanent.sourceItself())` locks the *holder's own* activated abilities — mana abilities included unless `nonManaAbilitiesOnly = true`. Pair it with `Duration.WhileAffectedTapped` ("for as long as it remains tapped", keyed to the granted-to permanent) for the Braided Net shape — "Tap another target nonland permanent. Its activated abilities can't be activated for as long as it remains tapped." = `Effects.Tap(target)` + `Effects.GrantStaticAbility(PreventActivatedAbilities(GameObjectFilter.Permanent.sourceItself()), target, Duration.WhileAffectedTapped)`. Like every "for as long as …" duration it is one-way (CR 611.2b): the read site gates per-frame, and `EndedDurationExpiryCheck` physically removes the grant the moment the permanent untaps (or leaves the battlefield), so a later re-tap does not re-lock it.
+- `GrantReplacementEffect(replacement, target, duration)` — grant a printed-shape `ReplacementEffect` (e.g. `RedirectZoneChange`) to a permanent for a duration. The runtime sibling of a printed replacement effect, modelled exactly like `GrantStaticAbility`: recorded as a `GrantedReplacementEffect` (carrying the granting `controllerId`) in `GameState.grantedReplacementEffects` and read **at the point of use** — the zone-change redirect path (`ZoneMovementUtils.checkZoneChangeRedirect`) consults granted `RedirectZoneChange` alongside permanents' printed replacement effects; the grant expires in the cleanup step (EndOfTurn), or — with `Duration.UntilYourNextTurn` — after the untap step of the granting controller's next turn (`CleanupPhaseManager.expireUntilYourNextTurnEffects`; Arlinn, the Pack's Hope's +1: `GrantReplacementEffect(EntersWithCounters(…), EffectTarget.Self, Duration.UntilYourNextTurn)`). Used for durational "this turn" riders such as Forgotten Cellar's "if a card would be put into your graveyard from anywhere this turn, exile it instead" (`GrantReplacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter(controllerPredicate = ControllerPredicate.OwnedByYou), to = Zone.GRAVEYARD)))`). The zone-change and token read sites support: `RedirectZoneChange` (the zone-change redirect path above) and the **token-creation** replacements `MultiplyTokenCreation` / `ModifyTokenCount` / `CreateAdditionalToken`, which `TokenCreationReplacementHelper` reads through `ActiveReplacements.all(state)` — the enumerator that walks battlefield permanents' printed `ReplacementEffectSourceComponent` *and* `GameState.grantedReplacementEffects` together. That is how Kaya, Geist Hunter's −2 (`GrantReplacementEffect(MultiplyTokenCreation(factor = 2, appliesTo = EventPattern.TokenCreationEvent(controller = Player.You)))`) doubles tokens for the turn: it stacks multiplicatively with a printed doubler and keeps working after Kaya leaves the battlefield, because the grant lives on `GameState` rather than on her. `OptionalEffectDiscardDestination` is also read by the effect-discard path (§15), including duration-scoped grants. The global **enter tapped / untapped** replacements `PermanentsEnterTapped` / `EntersUntapped` are read by the single entry kernel every path asks (`EnterTappedReplacements` / `EnterUntappedReplacements`, via `ActiveReplacements.all(state)`: land plays, resolving permanent spells, put-onto-the-battlefield moves and created tokens), so Nahiri's Lithoforming's "Lands you control enter tapped this turn" is `GrantReplacementEffect(PermanentsEnterTapped(appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Land.youControl(), to = Zone.BATTLEFIELD)), EffectTarget.Self, Duration.EndOfTurn)` — "you" is the caster; an applicable "enters untapped" still wins. The **enters-with** replacements `EntersWithCounters` / `EntersWithDynamicCounters` / `EntersWithKeywords` are read by the global entry path (`EntersWithReplacements.applyGlobal`), which sweeps grants alongside printed sources, so a resolving spell can grant "creatures you control enter with …" for a duration. Pair any of these with `Duration.NextUse(description)` for a **one-shot** rider — "the next time one or more enchantment creatures you control enter this turn, each enters with two additional +1/+1 counters on it" (Storyweave: `GrantReplacementEffect(EntersWithCounters(count = 2, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Creature.youControl() and GameObjectFilter.Enchantment, to = Zone.BATTLEFIELD)), EffectTarget.Self, Duration.NextUse("one or more enchantment creatures you control enter"))`). The first entry it modifies spends it: every matching object entering in that same event (one effect instruction, or one resolving permanent spell / land play) still gets it, a later event doesn't; an entry it doesn't match leaves it waiting, and unused it lapses in the cleanup step. Only the enters-with path and the granted `EntersAsCopy(copyOf = …)` entry copy (§ `EntersAsCopy`) spend a `NextUse` grant today — on any other granted replacement kind it is never spent and simply lasts the turn, so wire its read site to spend it before relying on it. Granting an otherwise unwired `ReplacementEffect` kind compiles and stores but needs its own point-of-use read to take effect — add it to the read site, not a second grant store. A **resolving instant/sorcery** may also grant a *floating, controller-scoped global* replacement — `EffectTarget.Self` then resolves to the spell on the stack (not a battlefield permanent), and the grant is anchored to the caster (`context.controllerId`) so it persists after the spell leaves; the redirect read path uses only the grant's `controllerId` + the replacement's filter (only a `selfOnly` grant reads its anchor). Used by Malicious Eclipse's "if a creature an opponent controls would die this turn, exile it instead" (`GrantReplacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Creature.opponentControls(), from = Zone.BATTLEFIELD, to = Zone.GRAVEYARD)), EffectTarget.Self, Duration.EndOfTurn)`). **A `selfOnly = true` granted `RedirectZoneChange` is an ability the target itself gained** — the redirect path applies it only when the moving object *is* the grant's holder, and `GameState.withoutObjectGrants` drops it when the holder becomes a new object (re-entering the battlefield or being cast, CR 400.7), so a creature blinked back the same turn no longer has it. Elemental Expressionist's "until end of turn, it gains 'If this creature would leave the battlefield, exile it instead of putting it anywhere else'" is `GrantReplacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(from = Zone.BATTLEFIELD), selfOnly = true), t, Duration.EndOfTurn)`. Without `selfOnly` the same grant would be a floating rider over every matching object — the Forgotten Cellar shape. Unlike `GrantExileOnLeave` (a durationless component, the unearth / reanimation shape) this grant has a duration and ends with the object. Note: `MayCastFromGraveyard` granted via `GrantStaticAbility` is now also read at the graveyard-cast enumerator/`CastZoneResolver`, so "you may cast spells from your graveyard this turn" is `GrantStaticAbility(MayCastFromGraveyard(filter), EffectTarget.Self, Duration.EndOfTurn)`. With `Duration.NextUse(description)` that grant is **one permission, not a standing one** — "you may cast *a* creature spell from your graveyard this turn" (Chainer, Nightmare Adept: `GrantStaticAbility(MayCastFromGraveyard(Creature), EffectTarget.Controller, Duration.NextUse("you cast a creature spell from your graveyard"))`): the graveyard cast that uses it removes that grant (`CastZoneResolver.graveyardCastAllowanceToSpend` — only the permission the cast went through pays, so a free cast through it never burns, say, Kotis, Sibsig Champion's once-per-turn allowance and its exile cost), two such grants are two casts, and an unused one lapses in the cleanup step. A one-shot grant never authorizes a `playsLands` land play.
 - `GrantHarmonize(target, cost?, duration)` — grant **Harmonize** (CR 702.180) to a target instant/sorcery card in a graveyard. `cost` defaults to `null` = "equal to the card's mana cost" (Songcrafter Mage); pass a `ManaCost` for a fixed harmonize cost. Records a runtime `GrantedKeywordAbility` keyed to the card entity; the cast-from-graveyard enumerator, the cast handler, the alternative-payment handler (tap-for-power reduction), and the stack resolver (exile on resolution) all read printed-or-granted harmonize through the shared `HarmonizeGrants` resolver, so a granted harmonize behaves identically to a printed one. The grant expires in the cleanup step (EndOfTurn) and surfaces a "Granted Ability" badge on the card.
 - `GrantFlashback(target, cost?, duration)` — grant **Flashback** (CR 702.34) to a target instant/sorcery card in a graveyard. The runtime sibling of printed `KeywordAbility.Flashback`, modelled exactly like `GrantHarmonize`. `cost` defaults to `null` = "equal to the card's mana cost" (Archmage's Newt); pass a `ManaCost` for a fixed flashback cost (e.g. `{0}` on a saddled-Mount branch). Records a runtime `GrantedKeywordAbility` keyed to the card entity; the cast-from-graveyard enumerator, the cast handler / `CastZoneResolver`, and the stack resolver (exile on resolution) read printed-**or**-granted flashback through the shared `FlashbackGrants.effectiveFlashback` resolver, so a granted flashback is castable and exiled exactly like a printed one. The grant survives the graveyard → stack move and expires in the cleanup step (EndOfTurn). Pair with `Effects.If(Conditions.SourceIsSaddled, GrantFlashback(t, {0}), otherwise = GrantFlashback(t))` for the saddled-or-not cost swap.
 - `GrantEscape(target, cost?, additionalCost?, duration)` — grant **Escape** (CR 702.138) to a target card in a graveyard. The single-card runtime sibling of printed `KeywordAbility.Escape` and of the whole-graveyard static `GraveyardCardsHaveEscape`. `cost` defaults to `null` = "equal to its mana cost" (a card with no mana cost has an unpayable escape cost; a printed {0} remains payable); `additionalCost` is the non-mana half, e.g. `Costs.additional.ExileOtherCards(2)` for Desdemona, Freedom's Edge: `Effects.GrantEscape(card, additionalCost = Costs.additional.ExileOtherCards(2))`. Records a runtime `GrantedKeywordAbility` keyed to the card entity; the enumerator, `CastZoneResolver`, cost totaller and additional-cost collector read printed-**or**-granted escape through `EscapeCasts.effectiveEscape` (each distinct escape cost is offered separately). Escape itself does not change the resolution destination, and a permanent cast this way escaped (`Conditions.Escaped`). The grant expires in the cleanup step (EndOfTurn) and is dropped when the card changes zones (CR 400.7), so it cannot escape again from a later graveyard life. The target filter carries any type restriction ("creature card … that's an artifact or that has mana value 3 or less").
@@ -2235,6 +2421,17 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   Both are facades lowering onto the player-aware `GrantEvasionKeywordEffect(keyword, target, duration)`:
   for player targets it attaches the matching player protection component; for permanents it grants the
   keyword via a Layer-6 floating effect (like `GrantKeyword`).
+- `GrantHexproofFrom(from, target = Controller, duration = EndOfTurn)` — temporary "hexproof from
+  [quality]" (CR 702.11d) on a player or permanent: the `from: ProtectionScope?` axis of
+  `GrantEvasionKeywordEffect` (null = full hexproof; only with `HEXPROOF`; any scope
+  `GrantHexproofFromToGroup.isSupported` accepts). A permanent gains the same projected `HEXPROOF_FROM_*`
+  keywords a printed hexproof-from carries. A player gets a `PlayerHexproofFromComponent` grant (each grant
+  expires on its own duration) that `PlayerProtectionRules.blocksTargeting` reads against the spell's or
+  ability's source, opponents only — so the player's own spells still target them, a non-matching source
+  still can, and a spell whose player target gains it in response fizzles. Shows as a "Hexproof from …"
+  player badge. **Veil of Summer** — "You and permanents you control gain hexproof from blue and from black
+  until end of turn" — is `GrantHexproofFrom(ProtectionScope.Colors(setOf(BLUE, BLACK)))` then
+  `ForEachInGroup(Filters.Group.permanentsYouControl, GrantHexproofFrom(scope, EffectTarget.IterationEntity))`.
 - `GrantExileOnLeave(target)` — "if it would leave, exile instead".
 - `BecomeBlocking(blocker, attacker)` — establish a block immediately during resolution. Both operands
   are independent symbolic entity references; a noncreature, departed object, nonattacker, attacking
@@ -2245,6 +2442,17 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   status transition. Combat and turn histories are recorded just as for declared blocks.
   Optional non-targeting choice composes from `Pipeline` + `gather` + `chooseUpTo(1)`; False Orders
   removes its target from combat first, then offers attackers defended by that target's controller.
+  `entering = true` is the "put onto the battlefield blocking" form (CR 509.4): run it right after the
+  effect that created the blocker. That creature is blocking but never "blocked" — none of its own or
+  observers' blocks / blocks-a-creature / blocks-or-becomes-blocked triggers fire (CR 509.3a-b) and it
+  gets no blocked-this-combat/turn history — while the attacker's becomes-blocked (if it was unblocked)
+  and becomes-blocked-by triggers do (CR 509.3c-d). An attacker that is gone or not attacking the
+  creature's controller's side leaves it entering unblocking (CR 509.4a). Brimaz, King of Oreskos's
+  "create a … token … that's blocking that creature" = `CreateToken(…) then
+  ForEachInCollection(CollectionSlot.CreatedTokens, BecomeBlocking(IterationEntity, TriggeringEntity, entering = true))`
+  under `Triggers.self.blocks(attackerFilter = Creature)`. Unlike `CreateToken(attacking = true)`, entering
+  blocking is a follow-up effect rather than a token rider so it composes over any created permanent
+  (plain tokens, token copies, substitutes) through `CreatedTokens` — don't add a `CreateToken(blocking = …)`.
 - `attackingDefenderOf(reference)` — filter attacking creatures by the defending side of a player or
   permanent reference. Includes attacks on that player's planeswalkers and protected battles, and shared
   turn teams; reads projected controllers and resolves current object identity. The attack retains its
@@ -2273,7 +2481,13 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `DynamicAmounts.countersOnSelf(null)`). Every kind a card names must be one of `CounterType.KNOWN` —
   `CounterTypeVocabularyTest` walks the corpus for it — so a new kind is a constant in `CounterType`
   (plus the client's mirror in `web-client/src/types/enums.ts`), never a string on a card.
-- `AddCounters(type, count, target)` — add N counters of `type`.
+- `AddCounters(type, count, target)` — add N counters of `type`. **On a permanent spell on the stack**
+  (`EffectTarget.TriggeringEntity` of a cast trigger or `ManaSpellRider.TriggersWhenSpent`) it reads
+  "that creature enters with N additional counters on it" (Runadi, Behemoth Caller; Boreal Outrider;
+  Jade Orb of Dragonkind): the counters are owed to the spell (`SpellOnStackComponent.additionalEntryCounters`)
+  and given to the permanent as it enters, so counter-placement replacements (Hardened Scales) apply then
+  (CR 122.6). A countered spell carries none into its next zone, and a copy of the spell owes none
+  (CR 707.2). `AddDynamicCounters` behaves the same.
 - `Adapt(amount, target = Self)` (`AdaptEffect`) — adapt N (CR 701.46a): if the permanent has no +1/+1
   counters as this resolves, put N +1/+1 counters on it. Always spell adapt this way, never as an `If` over
   `AddCounters` — `AdaptAsThoughNoCounters` shields can only see a real adapt. Placement goes through the
@@ -2308,7 +2522,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `-1/-1` annihilate each other as a state-based action (CR 122.3); the asymmetric counters never cancel.
 - `DoubleCounters(type?, target?)` — one-shot doubling of the `type` counters (default `+1/+1`) already on the
   target: reads the current count and places that many more (so the total doubles). Distinct from the
-  `DoubleCounterPlacement` replacement (which doubles *future* placements); the added counters still trigger
+  `ScaleCounterPlacement` replacement (which doubles *future* placements); the added counters still trigger
   placement replacements like Hardened Scales. No-op with zero counters. Sage of the Fang.
 - `DoubleAllCounters(target?)` — the every-kind twin of `DoubleCounters`: "double the number of each kind of
   counter on target permanent" (`DoubleCountersEffect` with `counterType = null`). Every kind currently on the
@@ -2446,7 +2660,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   Add a new one as a `CounterType` constant (listed in `CounterType.KNOWN`) plus the client's passive-counter
   wiring (`PASSIVE_COUNTER_TYPES`, `passiveCounterBadgeStyle`, `counterManaClass`, `CounterTypeDisplayNames`);
   keep it out of `StateProjector.KEYWORD_COUNTER_MAP` since it grants no keyword. Recent examples:
-  `CounterType.LANDMARK` (Treasure Map — three flip it into Treasure Cove), `CounterType.DREAD` (Grasping Shadows —
+  `CounterType.LANDMARK` (Treasure Map — three flip it into Treasure Cove), `CounterType.FUSE` (Pumpkin Bombs — damage equal to its fuse counters, which stay on as it changes hands), `CounterType.FORESHADOW` (Ominous Seas — one per card drawn; remove eight for an 8/8 Kraken), `CounterType.LUCK` (Gemstone Caverns — begins the game with one and taps for any color while it has it), `CounterType.DREAD` (Grasping Shadows —
   three flip it into Shadows' Lair), `CounterType.BORE` (Brass's Tunnel-Grinder — three flip it into Tecutlan),
   `CounterType.REVIVAL` (Nine-Lives Familiar — a "lives left" counter: it enters with eight if you cast it and its
   dies trigger reads the last-known count to come back with one fewer),
@@ -2483,7 +2697,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   card to or from a library; an unlock counter is none of those, so the counter lands at a moment nobody
   can respond to).
 - `DistributeCountersFromSelf(type?, count?)` — split source's counters among creatures you control.
-- `DistributeCountersAmongTargets(total, type?, minPerTarget?)` — divvy N counters among chosen
+- `DistributeCountersAmongTargets(total, type?, minPerTarget?, upTo?)` — divvy N counters among chosen
   targets. `total` is a `DynamicAmount` (an `Int` overload wraps it in `Fixed`), evaluated when the
   division is announced (or at resolution when it isn't), so the pool can be the spell's X or a
   cast-time capture. For "distribute X counters among **any number** of
@@ -2512,6 +2726,15 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `DistributeDecision`. "Any number of target creatures" with a fixed pool is a
   `count = N, minCount = 0` range — Jugan, the Rising Star: `targets(TargetFilter.Creature, count = 5,
   minCount = 0)`, where choosing no targets is the "may" declined.
+  `upTo = true` is "distribute **up to** N counters" (Lathiel, the Bounteous Dawn): the pool is a
+  cap, not an exact total. The triggered-ability announcement becomes a partial division
+  (`DistributeDecision.allowPartial`) — made even for a single target, since how many it gets is
+  still a choice — totalling at most N with each target getting at least `minPerTarget`. Only
+  triggered abilities print it, so a spell or activated ability with an up-to pool is not offered
+  a cast/activation-time division and divides at resolution, partially. Lathiel:
+  `TargetObject(optional = true, filter = TargetFilter.OtherCreature, dynamicMaxCount =
+  DynamicAmounts.lifeGainedThisTurn(Player.You))` with
+  `DistributeCountersAmongTargets(DynamicAmounts.lifeGainedThisTurn(Player.You), upTo = true)`.
 - `DistributeCountersAmongFiltered(total, type?, filter, minPerTarget?)` — distribute N **new** counters among permanents matching `filter`, chosen at resolution (not the spell's targets); `minPerTarget = 0` models "among any number of". `total` is an `Int` or a `DynamicAmount` evaluated once at resolution — Feast of the Victorious Dead's "distribute that many +1/+1 counters" passes `DynamicAmounts.creaturesDiedThisTurn(Player.Each)`. Unlike `DistributeCountersFromSelf` nothing is removed from a source. Crashing Wave: `DistributeCountersAmongFiltered(3, CounterType.STUN, Filters.Creature.tapped().opponentControls())` — "distribute three stun counters among any number of tapped creatures your opponents control."
 - `Proliferate(target?)` — give one more counter of each kind already there. With no argument it is
   proliferate proper (CR 701.34): the controller chooses any number of permanents and/or players with
@@ -2521,7 +2744,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   announced with the spell/ability, respects hexproof/shroud, and the ability is countered if that
   target is illegal on resolution (CR 608.2b). Pair it with `Targets.PermanentOrPlayer`. Both forms
   place counters identically: replacement effects honored, placement attributed to the controller,
-  and a recipient that "can't have counters put on it" (Blossombind) skipped.
+  and a recipient that "can't have counters put on it" (Blossombind) skipped. Pass `storeAs` to
+  publish **the permanents that had a counter put on them this way** to a pipeline collection —
+  `runStoringCollection { Effects.Proliferate(storeAs = it) }` — for a follow-up that acts on them.
+  Only permanents a counter actually landed on are stored (a chosen recipient whose placement was
+  prevented or replaced to zero isn't; players never are); under "proliferate twice instead" it is
+  the union of every proliferate in the run. Ripples of Potential: `Pipeline { val countered =
+  runStoringCollection { Proliferate(storeAs = it) }; val chosen = chooseAnyNumber(countered, filter
+  = Permanent.youControl()); run(ForEachInCollection(chosen, PhaseOut(IterationEntity))) }`.
 - `AddCountersOfChosenKind(target?, count = 1)` — "choose a counter on target permanent. Put an additional
   counter of that kind on that permanent" (Ichormoon Gauntlet). The one-kind sibling of the targeted
   `Proliferate(target)`: at resolution the controller picks one kind among those on the recipient
@@ -2530,7 +2760,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   apply. Works on a player target (poison) as well as a permanent. Pass
   `kindFrom = CounterKindSource.ITERATION` to place the kind an enclosing
   `ForEachCounterKindAmong` / `ForEachCounterKindOn` loop is visiting instead — no choice is asked, and outside such a loop
-  it places nothing (Exotic Pets).
+  it places nothing (Exotic Pets). `atRandom = true` draws the kind uniformly through the game RNG instead of
+  asking ("choose a kind of counter on it at random").
+- `AddCounterOfAbsentKind(kinds, target = Self, count = 1, atRandom = false)` — "choose a kind of counter [at
+  random] that this creature doesn't have on it from among flying, first strike, …, and +1/+1. Put a counter of
+  that kind on it" (Crystalline Giant): `AddCountersOfChosenKindEffect(kindFrom = LISTED_ABSENT, kinds)`. The
+  candidates are the printed `kinds` the recipient has no counter of, read at resolution (a counter gained in
+  response is excluded); none left is a no-op, one is placed without a prompt, otherwise the controller picks
+  (`ChooseOptionDecision`) or, with `atRandom`, the engine draws one.
 - `RemoveCountersOfIteratedKind(target?, count = 1)` — remove `count` counters of the kind an enclosing
   counter-kind loop (`ForEachCounterKindOn` / `ForEachCounterKindAmong`) is visiting; the removing
   counterpart of `AddCountersOfChosenKind(kindFrom = ITERATION)`, a no-op outside such a loop. Removal
@@ -2561,6 +2798,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   resolution. Compose as `ChooseColorThen(then = ChangeColorToChosen(target))` for "target ...
   becomes the color of your choice" (Blind Seer). Under `ChooseColorsThen` it takes the whole chosen
   set (`EffectContext.chosenColors`) — "the color **or colors** of your choice" (Quickchange).
+- `ChangeCreatureTypeText(target, excludedTypes?, replacementType?)` — Layer-3 indefinite text change
+  over **creature types**: "replacing all instances of one creature type with another" on a spell or
+  permanent, recorded as a `TextReplacement` that rewrites its subtypes and every creature-type word in
+  its rules text. `excludedTypes` forbids replacement types ("The new creature type can't be Wall" —
+  Artificial Evolution). `replacementType` fixes the new type, so the player picks only the type it
+  replaces — "replacing all instances of one creature type with Vampire" (New Blood); the fixed type is
+  left out of the FROM list and arrives pre-selected as the sole TO option of the same
+  `ChooseReplacementDecision`. The two parameters can't be combined.
 - `ChangeWordInText(categories, target, duration)` — Layer-3 text change: the player picks one **color word**
   or **basic land type** and a different replacement of the same category, recorded as a
   `TextReplacement` on the target. `categories` is a required nonempty set of `TextWordCategory`
@@ -2591,7 +2836,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   pools. Plain `END_OF_TURN` mana, despite the name, is lost as each step and phase ends (CR 500.5).
   See [ManaExpiry](#manaexpiry). `riders` is a `Set<ManaSpellRider>`
   applied to whatever spell this mana ends up paying for (Pyromancer's Goggles tags its {R} with
-  `CopySpellWhenSpent`); as with `AddManaOfChoice`, riders without a `restriction` are stored under
+  `TriggersWhenSpent` carrying a copy effect); as with `AddManaOfChoice`, riders without a `restriction` are stored under
   `ManaRestriction.AnySpend` so the rider survives in the pool while the mana stays spendable on
   anything. See [ManaSpellRider](#manaspellrider).
 - `AddColorlessMana(amount, restriction?, riders?, expiry?)` — add colorless; `riders` and `expiry`
@@ -2642,9 +2887,9 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   cards' colors"). Pair with a `MoveToZoneEffect(linkToSource = true)` that records the exiled pile.
 - `AddManaOfColorLandsCouldProduce(scope)` — sugar for `AddManaOfChoice(ManaColorSet.LandsCouldProduce(scope))`. Fellwar Stone / Exotic Orchard shape. Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
 - `AddManaOfColorInCommanderColorIdentity()` — sugar for `AddManaOfChoice(ManaColorSet.CommanderIdentity)`. Arcane Signet / Command Tower shape.
-- `AddAnyColorManaSpendOnChosenType(typeName)` — mana that can only pay for a specific card type (kept separate because it derives a runtime [ManaRestriction] from the source's chosen subtype).
+- `AddAnyColorManaSpendOnChosenType(amount?, creatureOnly?, riders?)` — sugar for `AddManaOfChoice(ManaColorSet.AnyColor, restriction = ManaRestriction.OfChosenType(creatureOnly), riders)`: any-color mana spendable only on spells (and, unless `creatureOnly`, abilities) of the source's chosen creature type. Secluded Courtyard, Eclipsed Realms (default); Cavern of Souls (`creatureOnly = true, riders = setOf(MakesSpellUncounterable())`).
 - `AddDynamicMana(amount, allowedColors, restriction?)` — split X across a fixed color set, distinct from `AddManaOfChoice` because it distributes the full X total across multiple colors rather than producing X copies of one chosen color.
-- `AddManaInAnyCombination(amount, allowedColors?, restriction?)` — "Add N mana in any combination of colors" (Wizard's Rockets, Thornvault Forager, Interdimensional Web Watch). Sugar for `AddDynamicMana`; `allowedColors` defaults to all five. The controller colors **each** pip independently at resolution (3+ colors → pip-by-pip color choice; 2 colors → one "how much of the first" prompt; ≤0 → no mana, no prompt), so the result can mix colors — distinct from `AddAnyColorMana`, where all N share one color. For "any combination of **its** colors" (a looked-at card), repeat `AddManaOfChoice(ManaColorSet.ColorsOf(…))` N times.
+- `AddManaInAnyCombination(amount, allowedColors?, restriction?, expiry?)` — "Add N mana in any combination of colors" (Wizard's Rockets, Thornvault Forager, Interdimensional Web Watch). Sugar for `AddDynamicMana`; `allowedColors` defaults to all five. `expiry` (`AddDynamicManaEffect.expiry`) is the `ManaExpiry` as on `AddMana` — Klauth, Unrivaled Ancient's "add X mana in any combination of colors … Until end of turn, you don't lose this mana as steps and phases end" is `AddManaInAnyCombination(totalAttackingPower, restriction = ManaRestriction.SpellsOnly, expiry = ManaExpiry.KEPT_UNTIL_END_OF_TURN)`; every pip, whichever split path colors it, carries the expiry. The controller colors **each** pip independently at resolution (3+ colors → pip-by-pip color choice; 2 colors → one "how much of the first" prompt; ≤0 → no mana, no prompt), so the result can mix colors — distinct from `AddAnyColorMana`, where all N share one color. For "any combination of **its** colors" (a looked-at card), repeat `AddManaOfChoice(ManaColorSet.ColorsOf(…))` N times.
 - Several fixed kinds on one tap ("{T}: Add {R}{G}", Timeless Lotus's "{T}: Add {W}{U}{B}{R}{G}") — chain
   `AddMana(color)` / `AddColorlessMana` leaves with `then`. Auto-pay models every leaf: the first feeds the
   source's colors, each extra fixed color is credited separately, so a lone Lotus pays a `{W}{U}{B}{R}{G}` spell.
@@ -2705,7 +2950,13 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   counters, abilities, tapped state and cleanup riders. Event-scoped additions (Peregrin Took's
   Food) and attached-copy replacement choices apply once to the whole batch, including across
   a paused decision. Use this for “create [token] and [token]”; `then` creates separate events.
-- `CreateToken(p, t, colors?, creatureTypes, keywords?, count?, controller?, imageUri?, name?, legendary?, tapped?, artifactToken?, enchantmentToken?, staticAbilities?, exileAtStep?, sacrificeAtStep?, attacking?, attackDefender?, attackedPlayer?)` — make N creature tokens.
+- `CreateToken(p, t, colors?, creatureTypes, keywords?, count?, controller?, imageUri?, name?, legendary?, tapped?, artifactToken?, enchantmentToken?, staticAbilities?, exileAtStep?, sacrificeAtStep?, attacking?, attackDefender?, attackedPlayer?, triggeredAbilitiesOf?)` — make N creature tokens.
+  `triggeredAbilitiesOf: List<CollectionSlot>` creates the token "with all triggered abilities of the exiled
+  cards" (The Book of Vile Darkness: `listOf(gather(CardSource.Entity(Self)), gather(CardSource.ExiledAsCost))`).
+  Every triggered ability declared by the definitions of the cards in those collections (keyword-derived
+  triggers such as prowess aren't read) is read once, as the token is
+  created, into its copiable values — so a gained "when this enters" triggers on the token's own entry (the
+  Book's ruling) and a copy of the token keeps them. Face-down cards lend nothing.
   `exileAtStep: Step?` arms the exile counterpart of the delayed trigger described below. Both the fixed
   and dynamic-count overloads expose both delayed zone-change options.
   `attacking = true` (usually with `tapped = true`) puts the tokens onto the battlefield attacking, and
@@ -2803,7 +3054,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `CreateTokenCopyOfSelf(count?, overridePower?, overrideToughness?, removeLegendary?)` — token copies
   of the source. `removeLegendary = true` applies the "except it's not legendary" copy clause (Ran and
   Shaw), mirroring `CreateTokenCopyOfEquippedCreature`.
-- `CreateTokenCopyOfTarget(target, count?, overridePower?, overrideToughness?, tapped?, attacking?, triggeredAbilities?, addedKeywords?, addedSupertypes?, removedSupertypes?, overrideColors?, addedColors?, overrideSubtypes?, addedSubtypes?, overrideCardTypes?, activatedAbilities?, addedStaticAbilities?, sacrificeAtStep?, sacrificeOnlyOnControllersTurn?, addCardTypes?, exileAtStep?, exileUnlessSourceIsRingBearer?, controller?, noManaCost?, attachedTo?, attackedPlayer?, attackDefender?, basePower?, baseToughness?)` —
+- `CreateTokenCopyOfTarget(target, count?, overridePower?, overrideToughness?, tapped?, attacking?, triggeredAbilities?, addedKeywords?, addedSupertypes?, removedSupertypes?, overrideColors?, addedColors?, overrideSubtypes?, addedSubtypes?, overrideCardTypes?, activatedAbilities?, addedStaticAbilities?, sacrificeAtStep?, sacrificeOnlyOnControllersTurn?, addCardTypes?, exileAtStep?, exileUnlessSourceIsRingBearer?, controller?, noManaCost?, attachedTo?, attackedPlayer?, attackDefender?, basePower?, baseToughness?, initialCounters?)` —
   token copy of another permanent (or a card in any zone — the executor copies the target's `CardComponent`,
   so a graveyard/exile card works; pass `EffectTarget.PipelineTarget("name")` to copy a card a prior pipeline
   step exiled/stored, as Nexus of Becoming and Mardu Siegebreaker do).
@@ -2896,6 +3147,17 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   single artifact or creature you control, … a copy of that artifact or creature" — Vesuvan Duplimancy) copies a
   target that left before the ability resolved as it last existed on the battlefield: its departure snapshot, or,
   for a token that has ceased to exist, the copiable values frozen when the ability triggered.
+  **A departed object, copied by a delayed trigger.** `CreateDelayedTrigger(step = END,
+  CreateTokenCopyOfTarget(Self | TriggeringEntity, …))` from a dies trigger ("when this creature dies, … create a
+  token that's a copy of it at the beginning of the next end step" — Ochre Jelly) freezes the dying object's
+  departure snapshot into the delayed trigger when it is scheduled, so even a *token* that has ceased to exist
+  by the end step is still copied as it last existed.
+  **Entry counters.** `initialCounters = mapOf(CounterType.PLUS_ONE_PLUS_ONE to amount)` — "the token enters with
+  N +1/+1 counters on it". The dynamic sibling of `CreateToken`'s `initialCounters`: evaluated once per batch,
+  the counters arrive as part of the token's entry (CR 122.6 — Hardened Scales applies, ETB triggers see them),
+  unlike a following `AddCountersToCollection(CREATED_TOKENS, …)`. Inside a delayed trigger the amount is
+  snapshotted when the trigger is scheduled, so a last-known count survives: Ochre Jelly's split is
+  `initialCounters = mapOf(PLUS_ONE_PLUS_ONE to DynamicAmounts.lastKnownSourceCounters(PLUS_ONE_PLUS_ONE) / 2)`.
   **A sacrificed permanent.** `CreateTokenCopyOfTarget(EffectTarget.SacrificedAsCost(0))` copies the permanent
   the cost or an earlier `SacrificeOwn` step sacrificed from the copiable values its sacrifice snapshot froze
   (`EntitySnapshot.copiableCard`, CR 608.2h) — so a sacrificed *token* is still copied, and an Aura that was
@@ -2942,7 +3204,10 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   (the latter evaluated at resolution, e.g. `CreateTreasure(DynamicAmounts.sourcePower(), tapped = true)`
   for Goldvein Hydra's "create a number of tapped Treasure tokens equal to its power"). `controller`
   (Int overload) redirects the tokens, e.g. `EffectTarget.TargetController` for "its controller creates
-  two Treasure tokens" (An Offer You Can't Refuse). `imageUri` overrides the token art (see the
+  two Treasure tokens" (An Offer You Can't Refuse). A `controller` that resolves to no player —
+  `TargetController` after an "up to one target" chose none — creates no token (this holds for every
+  token-making effect, `CreateToken` and `Investigate` included); it never falls back to you (Cavalier
+  of Dawn). `imageUri` overrides the token art (see the
   set-specific-art note below).
 - `CreateFood(count?, controller?)` — Food tokens. `count` accepts an `Int` or a `DynamicAmount` (the latter evaluated at resolution, e.g. `CreateFood(DynamicAmount.Divide(DynamicAmount.CastX, DynamicAmount.Fixed(2), roundUp = true))` for The Goose Mother's "create half X Food tokens, rounded up").
 - `CreateEldraziSpawn(count?, controller?, imageUri?)` — 0/1 colorless Eldrazi Spawn creature tokens
@@ -2959,6 +3224,10 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   Mite (Crawling Chorus, Basilica Shepherd, Mirrex, …). `count` accepts an `Int` or a `DynamicAmount`
   (White Sun's Twilight's X). A predefined token gets its definition's printed keyword components the way
   a card does, so the Mite's toxic 1 is real toxic, not a label.
+- `CreateGold(count?, controller?)` — Gold artifact tokens with "Sacrifice this token: Add one mana of any
+  color." (`PredefinedTokens.Gold`) — no tap in the cost, so a Gold that just entered can be sacrificed
+  at once. Inside `ForEachPlayer` the visited player creates them ("each opponent attacking that player
+  does the same" — Curse of Opulence).
 - `CreatePowerstone(count?, tapped?, controller?)` — colorless Powerstone artifact tokens with "{T}: Add {C}. This
   mana can't be spent to cast a nonartifact spell." (`PredefinedTokens.Powerstone`) — The Brothers' War's ramp token
   (Stern Lesson, Fallaji Excavation, Powerstone Engineer, …). Pass `tapped = true` for the usual "create a tapped
@@ -3090,17 +3359,19 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   Aetherdrift's "3/2 colorless Vehicle artifact token with crew 1" (Mu Yanling, Wind Rider). A *noncreature*
   artifact carrying printed P/T and the ordinary `crew 1` keyword, defined on the predefined `Vehicle`
   `CardDefinition`, so it can't attack or block until something crews it and it crews through the normal path.
-- `CreatePermanentEmblem(groupFilter?, powerBonus?, toughnessBonus?, grantedKeywords?, grantedActivatedAbilities?, ownedStaticAbilities?, ownedActivatedAbilities?, emblemDescription)` — permanent planeswalker emblem whose dynamically evaluated group receives the listed stats, keywords, and activated abilities. Unlike a one-shot group grant, the emblem also affects matching permanents that enter later. The activated-ability form powers Arlinn Kord's emblem. A granted **mana** ability (`manaAbility = true`) works too — Liliana of the Dark Realms' "Swamps you control have '{T}: Add {B}{B}{B}{B}.'": the mana-ability enumerator offers it on each matching permanent and `ManaStaticsIndex` adds the emblem as a mana-ability grantor, so the auto-payer counts it like a battlefield `GrantActivatedAbility` static.
+- `CreatePermanentEmblem(groupFilter?, powerBonus?, toughnessBonus?, grantedKeywords?, grantedActivatedAbilities?, ownedStaticAbilities?, ownedActivatedAbilities?, ownedReplacementEffects?, emblemDescription)` — permanent planeswalker emblem whose dynamically evaluated group receives the listed stats, keywords, and activated abilities. Unlike a one-shot group grant, the emblem also affects matching permanents that enter later. The activated-ability form powers Arlinn Kord's emblem. A granted **mana** ability (`manaAbility = true`) works too — Liliana of the Dark Realms' "Swamps you control have '{T}: Add {B}{B}{B}{B}.'": the mana-ability enumerator offers it on each matching permanent and `ManaStaticsIndex` adds the emblem as a mana-ability grantor, so the auto-payer counts it like a battlefield `GrantActivatedAbility` static.
   - `ownedStaticAbilities` carries wording the emblem has **itself** rather than grants to a group — "You may cast spells from your hand without paying their mana costs" (Tamiyo, Field Researcher's −7) is `MayCastWithoutPayingManaCost(controllerOnly = true)`, the same static Omniscience prints. Such an emblem leaves `groupFilter` and the group modifications at their defaults. The emblem entity lives outside every zone, so a scan that only walks the battlefield won't see it; the free-cast scan (`CostCalculator.hasFreeCastPermission`) consults emblem statics explicitly. `firstSpellOfTurnOnly` / `oncePerTurn` gates are rejected there rather than approximated, since both key off marking a *battlefield* source used.
   - The graveyard permissions read emblems too: `MayPlayLandsFromGraveyard` and `MayCastFromGraveyard` in `ownedStaticAbilities` are honoured by the land-play and graveyard-cast scans (legal actions and handlers alike) exactly as if a permanent the emblem's controller controls printed them — Wrenn and Realmbreaker's −7 is `listOf(MayPlayLandsFromGraveyard, MayCastFromGraveyard(GameObjectFilter.NonlandPermanent))` ("permanent spells" never includes a land). The emblem entity is the grant's source, so `oncePerTurn` on an emblem-held `MayCastFromGraveyard` works. The engine helper is `GameState.emblemStaticAbilitiesOf(playerId)`.
+  - A `GrantDynamicStats(group, power, toughness)` in `ownedStaticAbilities` is a "<group> get +X/+X for each …" the emblem has — Ellywick Tumblestrum's −7 is `groupFilter = <creatures you control>, grantedKeywords = [TRAMPLE, HASTE], ownedStaticAbilities = listOf(GrantDynamicStats(<creatures you control>, dungeonsCompleted(distinctNames = true) * 2, …))`. Unlike the fixed `powerBonus`/`toughnessBonus`, the amount is re-read every projection (layer 7c) with the emblem as its source, so "you" is the emblem's controller and the bonus follows the count as it changes after the emblem exists.
   - `ownedActivatedAbilities` are abilities the emblem **itself** has, as opposed to `grantedActivatedAbilities`, which it hands to each permanent in `groupFilter`. Karn, Living Legacy's −7 — "Tap an untapped artifact you control: This emblem deals 1 damage to any target." — is `ownedActivatedAbilities = listOf(grantedActivatedAbility { cost = Costs.TapPermanents(1, GameObjectFilter.Artifact); … Effects.DealDamage(1, anyTarget) })`. The emblem's controller activates it at instant speed from the command zone (CR 114.4), the emblem is the ability's source (so "this emblem deals damage" names it), and since an emblem is not a permanent (CR 114.5) nothing that stops a *permanent's* abilities reaches it — only a player-wide prohibition does. The engine gives such an emblem a characteristic-less `CardComponent` (CR 114.3) so the activation pipeline treats it like any source; the client activates it from the emblem's badge.
   - A battlefield-scope `GrantWard` in `ownedStaticAbilities` is a ward grant from the emblem — "Knights you control get +1/+0 and have ward {1}" (Teferi Akosa of Zhalfir's −2) is `groupFilter = <Knights you control>, powerBonus = 1, ownedStaticAbilities = listOf(GrantWard(WardCost.Mana("{1}"), <Knights you control>))`. The ward trigger reads it exactly as a grant printed on a permanent the emblem's controller controls (`BattlefieldStaticsIndex` collects it alongside the battlefield walk), and the emblem projects the WARD keyword onto the group itself — don't also list `WARD` in `grantedKeywords`.
+  - `ownedReplacementEffects` are replacement effects the emblem **itself** has, read beside the battlefield by the life-total replacements — the damage→life-loss scans (`LifeLossFloor`, `ModifyLifeLoss`) and the read sites that go through `ActiveReplacements` (`ReplaceLifeReductionToZero`, token-creation replacements, `LoyaltyDamageFloor`). Other replacement families (`ReplacementEffectProcessor`'s draw/zone-change domain, damage prevention/amplification, enters-tapped, life payment) still walk only the battlefield, so an emblem holding one of those would do nothing until its scan learns emblems; the emblem's controller is "you". Serra the Benevolent's −6 — "If you control a creature, damage that would reduce your life total to less than 1 reduces it to 1 instead." — is `ownedReplacementEffects = listOf(LifeLossFloor(1, restrictions = listOf(Conditions.YouControl(GameObjectFilter.Creature)), appliesTo = LifeLossEvent(Player.You)))`, Worship's replacement held by an emblem.
 
 ### Ability granting
 
-- `GrantTriggeredAbilityEffect(ability, target, duration = Duration.EndOfTurn)` — grant a triggered ability to a battlefield permanent for a duration; `Duration.Permanent` for "gains … " with no end (Carnage, Crimson Chaos). **Target-general — not creature-only.** Nothing in the rules restricts "gains '<triggered ability>'" to creatures, and the printed wording routinely names a noncreature permanent: Down in the Valley's chapter II is "*This Saga* gains 'Landfall — Whenever a land you control enters, create a 1/1 green Elf creature token'", authored as `GrantTriggeredAbilityEffect(ability, EffectTarget.Self, Duration.Permanent)`. Whether a noncreature is a *legal* pick is the `TargetRequirement`'s job; the executor only requires the target to be a permanent on the battlefield **or a permanent spell on the stack** (the same holds for `GrantStateTriggeredAbilityEffect` and `GrantActivatedAbilityEffect`). A grant to a permanent spell follows it onto the battlefield (CR 400.7a) because the spell keeps its entity id as it resolves: **Thief of Existence** — "When you cast this spell, exile up to one target … If you do, Thief of Existence gains 'When this creature leaves the battlefield, target opponent draws a card'" — is `Effects.Exile(t) then Effects.If(Conditions.TargetMatchesFilter(GameObjectFilter.Any.currentlyIn(Zone.EXILE), t), GrantTriggeredAbility(…, EffectTarget.Self, Duration.Permanent))` on a `Triggers.self.isCast()` trigger. A stack object that leaves any other way (countered, bounced, exiled) drops the grant in `GameState.removeFromStack`, and casting a card drops any grant left on it, so a countered-then-recast spell starts clean. Recorded in `GameState.grantedTriggeredAbilities` and merged into the entity's abilities by `TriggerAbilityResolver`, so a granted trigger is detected exactly like a printed one and dies with the permanent. **The conditional "for as long as …" durations work here too**, in the same two halves every such duration gets: `TriggerAbilityResolver` gates the grant per read (so it goes dark the instant the condition fails, even mid-resolution) and `EndedDurationExpiryCheck` physically removes it, one-way per CR 611.2b, so the condition becoming true again does not bring the ability back. Both halves ask the same `GrantDurationGate`. Makeshift Mannequin is the shape: `PutOntoBattlefieldFromGraveyard(target)` + `AddCountersEffect(CounterType.MANNEQUIN, 1, target)` + `GrantTriggeredAbilityEffect(sacrificeOnBecomingTarget, target, Duration.WhileAffectedHasCounter(CounterType.MANNEQUIN))` — remove the counter (Hex Parasite, Vampire Hexmage) and the drawback really is gone. Wiring that sentence as `Duration.Permanent` reads identically on the card and is wrong in exactly that case.
+- `GrantTriggeredAbilityEffect(ability, target, duration = Duration.EndOfTurn)` — grant a triggered ability to a battlefield permanent for a duration; `Duration.Permanent` for "gains … " with no end (Carnage, Crimson Chaos). **Target-general — not creature-only.** Nothing in the rules restricts "gains '<triggered ability>'" to creatures, and the printed wording routinely names a noncreature permanent: Down in the Valley's chapter II is "*This Saga* gains 'Landfall — Whenever a land you control enters, create a 1/1 green Elf creature token'", authored as `GrantTriggeredAbilityEffect(ability, EffectTarget.Self, Duration.Permanent)`. Whether a noncreature is a *legal* pick is the `TargetRequirement`'s job; the executor only requires the target to be a permanent on the battlefield **or a permanent spell on the stack** (the same holds for `GrantStateTriggeredAbilityEffect` and `GrantActivatedAbilityEffect`). A grant to a permanent spell follows it onto the battlefield (CR 400.7a) because the spell keeps its entity id as it resolves: **Thief of Existence** — "When you cast this spell, exile up to one target … If you do, Thief of Existence gains 'When this creature leaves the battlefield, target opponent draws a card'" — is `Effects.Exile(t) then Effects.If(Conditions.TargetMatchesFilter(GameObjectFilter.Any.currentlyIn(Zone.EXILE), t), GrantTriggeredAbility(…, EffectTarget.Self, Duration.Permanent))` on a `Triggers.self.isCast()` trigger. A stack object that leaves any other way (countered, bounced, exiled) drops the grant in `GameState.removeFromStack`, and casting a card drops any grant left on it, so a countered-then-recast spell starts clean. Recorded in `GameState.grantedTriggeredAbilities` and merged into the entity's abilities by `TriggerAbilityResolver`, so a granted trigger is detected exactly like a printed one and dies with the permanent. **The conditional "for as long as …" durations work here too**, in the same two halves every such duration gets: `TriggerAbilityResolver` gates the grant per read (so it goes dark the instant the condition fails, even mid-resolution) and `EndedDurationExpiryCheck` physically removes it, one-way per CR 611.2b, so the condition becoming true again does not bring the ability back. Both halves ask the same `GrantDurationGate`. Makeshift Mannequin is the shape: `PutOntoBattlefieldFromGraveyard(target)` + `AddCountersEffect(CounterType.MANNEQUIN, 1, target)` + `GrantTriggeredAbilityEffect(sacrificeOnBecomingTarget, target, Duration.WhileAffectedHasCounter(CounterType.MANNEQUIN))` — remove the counter (Hex Parasite, Vampire Hexmage) and the drawback really is gone. Wiring that sentence as `Duration.Permanent` reads identically on the card and is wrong in exactly that case. **A card in exile may gain a triggered ability too** — "It gains 'At the beginning of your upkeep, if this card is exiled, …'" (**Uvilda, Dean of Perfection**: `chooseUpTo` an instant or sorcery from hand → `exile` → `ForEachInCollection(AddCounters(REFINE, 3, IterationEntity) + GrantTriggeredAbility(…, IterationEntity, Duration.Permanent))`). Only triggered grants may land there (activated and state-triggered grants stay permanent-only), and the granted ability functions only if it declares `triggerZone = Zone.EXILE`: the step pass already scans exile, and the per-event pass scans an exiled card for its *granted* abilities only (printed exile shapes — suspend, madness, paradigm — keep their dedicated paths), so a `losesCounters(…, lastRemoved = true)` grant fires however the last counter left. The grant ends when the card leaves exile (CR 400.7) — `ZoneTransitionService` drops it, and `SpellCaster` does when the card is cast.
 - `GrantStateTriggeredAbilityEffect(ability, target, duration = Duration.Permanent)` — grant a **state**-triggered ability (CR 603.8) to a battlefield permanent. The sibling of `GrantTriggeredAbilityEffect` for the abilities the `StateTriggerPoller` owns rather than the `TriggerIndex`: use it when the printed rider fires because a condition *becomes true*, with no event to match. **Olivia, Crimson Bride**: the reanimated creature gains `"When you don't control a legendary Vampire, exile this creature."` — nothing *happens* when the last legendary Vampire leaves, so a `GrantTriggeredAbilityEffect` has no event to hang off. Recorded in `GameState.grantedStateTriggeredAbilities`, folded into the per-permanent ability list by `StateTriggerPoller` beside the printed ones, suppressed per `(source object, AbilityId)` while its original trigger is outstanding, exactly like a printed state trigger, dropped on battlefield re-entry (CR 400.7) and expired by `CleanupPhaseManager` for `Duration.EndOfTurn`. The default duration is `Permanent`, not `EndOfTurn` — a granted state trigger is a durable rider, where a granted event trigger is usually a one-turn pump. Like `GrantTriggeredAbilityEffect` it is **target-general, not creature-only**; legality is the `TargetRequirement`'s job.
-- `CreateGlobalTriggeredAbility(ability, duration = Duration.Permanent, descriptionOverride? = null)` — engine-wide triggered ability with no source permanent. `duration` is a plain parameter, so the one method covers every lifetime: `Duration.EndOfTurn` (False Cure, Death Frenzy), `Duration.UntilYourNextTurn` (Season of the Bold), `Duration.EndOfCombat`, `Duration.Permanent` (Dimensional Breach, planeswalker emblems), etc. `descriptionOverride` sets emblem display text. This is the right shape for a *floating* "until end of turn, whenever …" payoff that must outlive its own source — Mistway Spy's turned-face-up "whenever a creature you control deals combat damage to a player, investigate" keeps triggering even if the Spy is killed in response, which a `GrantTriggeredAbilityEffect` on the Spy would not. Because a global ability is attached to no permanent it lives outside every battlefield trigger index, so each specialized detector has to walk `GameState.globalGrantedTriggeredAbilities` itself; the ANY-bound `DealsDamageEvent` observers do (`DamageTriggerDetector.detectDamageObserverTriggers`), and a new detector that doesn't will silently never fire for a global ability.
+- `CreateGlobalTriggeredAbility(ability, duration = Duration.Permanent, descriptionOverride? = null, emblem = false)` — engine-wide triggered ability with no source permanent. **`emblem = true`** is "you get an emblem with '…'" (CR 114): the executor mints a zone-less emblem entity (controlled by the player who gets it, colorless, no types — CR 114.3) and makes *it* the ability's source, so "this emblem deals 5 damage" is damage from a colorless source and each emblem is its own badge (Chandra, Torch of Defiance; Koth, Fire of Resistance). Wrap it in `Effects.ForEachPlayer(Player.EachOpponent, …)` for "each opponent gets an emblem" — the iteration rebinds the controller, so each opponent owns one whose "your upkeep" and "you" mean them (Chandra, Awakened Inferno). Without the flag the creating card stays the source (Dimensional Breach, False Cure). `duration` is a plain parameter, so the one method covers every lifetime: `Duration.EndOfTurn` (False Cure, Death Frenzy), `Duration.UntilYourNextTurn` (Season of the Bold), `Duration.EndOfCombat`, `Duration.Permanent` (Dimensional Breach, planeswalker emblems), etc. `descriptionOverride` sets emblem display text. This is the right shape for a *floating* "until end of turn, whenever …" payoff that must outlive its own source — Mistway Spy's turned-face-up "whenever a creature you control deals combat damage to a player, investigate" keeps triggering even if the Spy is killed in response, which a `GrantTriggeredAbilityEffect` on the Spy would not. Because a global ability is attached to no permanent it lives outside every battlefield trigger index, so each specialized detector has to walk `GameState.globalGrantedTriggeredAbilities` itself; the ANY-bound `DealsDamageEvent` observers do (`DamageTriggerDetector.detectDamageObserverTriggers`), as do the combat-damage batch triggers (`OneOrMoreDealCombatDamageToPlayerEvent` and its defensive/opponent-keyed siblings — Lolth, Spider Queen's −8 emblem "whenever an opponent is dealt combat damage by one or more creatures you control"), and a new detector that doesn't will silently never fire for a global ability.
 - `GrantSpellKeywordEffect` — grant a keyword to a spell on the stack.
 - `GrantSpellsCantBeCountered(target, filter, duration)` — target's matching spells become uncounterable (Domri shape).
 - `GrantFlashToSpells(target, spellFilter, duration)` — target may cast matching spells as though they had flash (CR 702.8a) for `duration` (default `EndOfTurn`; `UntilYourNextTurn` lapses after the granting player's next untap step — **Teferi, Time Raveler**'s +1; `Permanent` never lapses). Each grant keeps its own lifetime, so stacked grants of different durations expire independently. Resolution-time one-shot that records the grant on the player and survives the source spell leaving the stack. Used by **Borne Upon a Wind** ("You may cast spells this turn as though they had flash."); narrower filters like `GameObjectFilter.Sorcery` cover "you may cast sorcery spells as though they had flash" variants. Sibling of the permanent-static [`GrantFlashToSpellType`](#9-static-abilities) — use the static for "as long as this is on the battlefield" wording (the two Gandalfs); use this Effect for a turn-scoped or duration-bounded grant.
@@ -3159,6 +3430,16 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   the condition fails — so a pump that wears off, a re-tap, or a re-acquired source never
   re-grabs the creature.
 - `ExchangeControlEffect(target1, target2)` — swap control of two permanents.
+- `ExchangeTextBoxesEffect(first, second)` (facade `Effects.ExchangeTextBoxes(first, second)`) — exchange the
+  text boxes of two permanents (CR 612.5, 701.12h): each one's rules text — abilities, keywords, oracle text —
+  becomes the other's previous rules text; names, mana costs, colors, types and power/toughness stay put.
+  Indefinite: the side that leaves the battlefield is a new object with its own text (CR 400.7), the other keeps
+  what it got. Not a copiable value (CR 707.2) — a copy of an exchanged permanent copies its own text, and a copy
+  effect applied later keeps the exchanged text on top. Nothing happens unless both resolve to different
+  face-up permanents on the battlefield (face-down sides aren't supported yet — offer only `faceUp()` creatures).
+  Deadpool, Trading Card's "As Deadpool enters, you may exchange his text box and another creature's" is the
+  `then` of an `EntersWithChoice(CREATURE_ON_BATTLEFIELD, …)`: `ExchangeTextBoxes(EffectTarget.Self,
+  EffectTarget.ChosenCreature)`.
 - `ChangeOwnershipEffect(card = ContextTarget(0), newOwner = Controller)` (facade `Effects.ChangeOwnership(card, newOwner)`) —
   `newOwner` becomes the **owner** of `card` (CR 407.3), the one thing only the ante cards do: Darkpact's "You
   own target card in the ante", Bronze Tablet's "that player owns this card and you own the other exiled card"
@@ -3327,11 +3608,26 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `AttackPhaseManager`, the mandatory-attacker pre-selection, and the `Goaded` badge — goes through
   it. Unlike the designation it has no "until your next turn" expiry; it ends with the ability. A
   face-down or ability-stripped holder goads nothing.
+- `Effects.MustAttackGroup(filter, defender = MustAttackDefender.Any, duration = Duration.EndOfTurn)`
+  (`MustAttackGroupEffect`) — "[filter] attack each combat if able" for `duration`, the durational group
+  form of the printed `MustAttack` static. One floating effect over a dynamic group, so creatures that
+  arrive later are bound too (CR 611.2c), unlike `MarkMustAttackEffect`, which marks only the objects it
+  names. `defender` takes `Any`, `APlayer` or `PlayerOtherThanYou` ("you" = the effect's controller,
+  fixed at resolution); `EnchantedCreatureController` is rejected. Kardur, Doomscourge:
+  `Effects.MustAttackGroup(GroupFilter.AllCreaturesOpponentsControl, MustAttackDefender.PlayerOtherThanYou, Duration.UntilYourNextTurn)`.
+  Badged "Must Attack" on each creature it binds.
 - `Effects.MarkMustAttackThisTurn(target = ContextTarget(0))` (`MarkMustAttackEffect`, window
   `MustAttackWindow.ThisTurn`) — require one creature to attack this turn if able. The transient marker is
   enforced by `AttackPhaseManager` and removed during cleanup. It composes with the token pipeline for “that
   token attacks this combat if able”: create the token, then target
   `PipelineTarget(CREATED_TOKENS, 0)` with this facade.
+- `Effects.MarkMustAttackThisTurn(target, defender)` (`MarkMustAttackEffect.defender`, `ThisTurn` window only) —
+  "it attacks **that player** this turn if able" (encore's token copies, CR 702.141a). `defender` is resolved
+  to a player when the effect resolves and stored on the creature as `MustAttackPlayerThisTurnComponent`, which
+  `DirectedAttackRequirements` reads beside the Public Enemy static: the creature is bound only while it could
+  attack that player at no cost (CR 508.1d), and only an attack on that player — not their planeswalker or
+  battle, nor another player — obeys it. If it can't attack that player it is under no requirement at all.
+  Removed during cleanup or when the creature leaves the battlefield; its "Must Attack" badge names the player.
 - `Effects.MarkMustAttackNextCombat(target)` (`MarkMustAttackEffect`, window
   `MustAttackWindow.ControllersNextCombat`) — "that creature attacks during its controller's next combat
   phase if able" (Sizzling Soloist). The mark waits across turns for that player's next combat phase, binds
@@ -3352,12 +3648,19 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   attacked instead (Tolsimir, Midnight's Light: "blocks **that Wolf** this combat if able"). A requirement, not a guarantee (CR 509.1c): a tapped creature, one
   that can't block, or one whose every block would be illegal is excused, and its controller is
   never forced to pay a cost associated with blocking. Used by Culvert Ambusher (MKM).
+- `Effects.MustBlockGroup(filter, duration = Duration.EndOfTurn)` (`MustBlockGroupEffect`) —
+  "[filter] block this turn if able", the group sibling of `MarkMustBlockThisTurn` and the durational
+  form of the static `MustBlock`. One `Layer.ABILITY` floating `SetMustBlock` over a dynamic group, so
+  it binds creatures that arrive or change hands later (CR 611.2c) and outlives its source. "You" in
+  the filter is the effect's controller, fixed at resolution. Brutal Hordechief:
+  `MustBlockGroup(GroupFilter.AllCreaturesOpponentsControl) then ChooseBlockersThisTurn(Player.EachOpponent)`.
 - `Effects.ForceBlock(blocker, attacker)` also accepts two spell targets (Hunt Down, LRW).
   The blocker is checked using projected creature types, including animated lands and artifacts.
   The end-of-turn requirement is removed when either permanent leaves the battlefield; returning
   that card does not restore the old requirement.
 - `OptionalSkipTurnWith(effect, appliesTo = EventPattern.TurnBeginEvent(Player.You), restrictions = …)` — optional turn-start replacement. The affected player chooses before a turn begins, independently of the untap step. Accepting skips this occurrence, preserves other pending turn skips, and performs the composed `effect` as the first action in the next turn that actually occurs (CR 614.10b), before that turn's untap actions. Multiple applicable sources appear in the existing option chooser with card previews; declining begins the turn or consumes a pending mandatory skip. Printed sources use projected controllers and respect lost abilities, face-down status and phasing; grants use captured grant controllers and existing end-of-turn expiry. Restrictions and follow-up `You` name the replacement's controller; `TriggeringPlayer` names the player whose turn was skipped. Follow-ups capture object identity and can pause for ordinary effect decisions. `TurnBeginEvent` is an interception pattern for replacements, not a trigger. Time Vault composes this with `SourceIsTapped` and `Untap(Self)` plus the existing extra-turn effect. Synthetic scheduling bypasses used to insert extra turns are consumed before offering turn replacements and do not consume real pending skips. Existing skip-based extra-turn scheduling retains its differently owned extra-turn ordering and turn-identity limitations; this primitive does not create extra turns.
 - `Effects.SkipNextTurn(target = Controller, count = Fixed(1))` (`SkipNextTurnEffect`) — target skips their next `count` turns. `count` is a `DynamicAmount`, so it can read a pipeline value (e.g. a coin-flip tally via `DynamicAmount.VariableReference`). Skips accumulate on a `SkipNextTurnComponent(turns)`, decremented one turn per the player's turn-start; a resolved count of 0 is a no-op. Used by Lethal Vapors (one turn) and **Ral Zarek, Guest Lecturer** (skip N turns where N = heads).
+- `Effects.SkipUntap(target, permanents = Creature or Land)` (`SkipUntapEffect`) — "[permanents] target player controls don't untap during their next untap step." `permanents` is a `GameObjectFilter` naming the kind of permanent only (the player comes from `target`): the default for **Exhaustion**, `GameObjectFilter.Land` for **Mana Vapors**, `Creature` for **Blinding Beam** / **Pollen Lullaby**, `Artifact or Creature` for **Icebreaker Kraken**. It adds the filter to the player's `SkipUntapComponent`, read at that player's next untap step against the projected permanents they control *then* — something they gained control of after it resolved stays tapped too (Icebreaker Kraken ruling) — and consumed by that step. Several such effects stack: each filter holds its own permanents. A skipped untap step (`SkipNextStepOrPhase(UNTAP_STEP)`) leaves the marker waiting. It taps nothing.
 - `Effects.FlipCoins(count, storeHeadsAs = "heads")` (`FlipCoinsEffect`) — flip `count` coins and store the number of heads under `storeHeadsAs` in the pipeline (`storedNumbers`) so a later sub-effect in the same composite can scale off it via `DynamicAmount.VariableReference`. The general "flip N coins, count heads" primitive (CR 705); unlike `FlipCoinEffect` (branch on win/lose) and `FlipTwoCoinsEffect` (branch on combined outcome) it only tallies. Each flip emits a `CoinFlipEvent`. **Ral Zarek, Guest Lecturer**'s ultimate composes `FlipCoins(5, "heads")` then `SkipNextTurn(target, count = VariableReference("heads"))`.
 - `Effects.FlipCoinsUntilLoss(storeWinsAs = "wins")` (`FlipCoinsUntilLossEffect`) — `FlipCoins`'s open-ended sibling: flip one coin at a time until the flipper *loses* a flip or answers "stop flipping", then store how many flips they won under `storeWinsAs`. The run length is discovered rather than given, and the order within an iteration is flip → check → ask, so the stop question only ever follows a *won* flip ("after each flip, you choose whether to continue flipping"). Losing the first flip stores 0, and since an unread pipeline number reads as 0, a card gating payoffs on "if you win one or more flips" needs no separate "this has no effect" branch — that sentence *is* the absence of every payoff. Deliberately **not** a `RepeatWhile` over `FlipCoinEffect`: a repeat condition is asked unconditionally after each body (so it can't stop *because* a flip was lost) and the repeat loop restarts each iteration from the pristine pre-loop context (so a running tally couldn't survive the prompt). The tally rides `FlipCoinsUntilLossContinuation` instead and is published once, when the run ends. Unlike `FlipCoins`, where the whole batch is one flip event, each coin here is its own flip — so a "the first time you flip one or more coins each turn" replacement (Edgar, King of Figaro) covers only the first coin. Bounded by `GameLimits.MAX_COIN_FLIPS_PER_EFFECT` as a backstop against a forced-win static plus an always-continue automated answer. **Fiery Gambit** composes `FlipCoinsUntilLoss("fieryGambitWins")` with three cumulative `Gate.WhenCondition(Compare(VariableReference("fieryGambitWins"), GTE, Fixed(n)))` tiers.
 - `flipOntoBattlefield(filter)` (pipeline step, `FlipOntoBattlefieldEffect(storeTouchedAs, filter)`) — the dexterity flip
@@ -3413,7 +3716,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   per-card `maxPileMemberships`, and `useTargetingUI`; the client selects piles on the battlefield.
   Used by **Camouflage**. New vocabulary; Assay grammar support is separate.
 
-- `Effects.ChooseAttackersAndBlockersThisTurn()` (`ControlCombatDeclarationsThisTurnEffect`) — "You choose which creatures attack this turn. You choose which creatures block this turn and how those creatures block." (**Master Warcraft**). Moves only the attack and block *declarations*, for every player and every combat this turn, to the controller — never priority, other decisions, or hidden zones (it deliberately does **not** go through `actorFor`, which carries hand visibility). Marks the controller with a turn-stamped `CombatDeclarationControlComponent` (latest wins); `CombatDeclarationControl.declarerFor` / `inputActorFor` route the owed `DeclareAttackers` / `DeclareBlockers` legal action to the new declarer, and the game server refuses that declaration from anyone else. The declaration is still the owing player's action and is validated as theirs. Gap: when the defender controls a planeswalker or battle, the caster also picks each attacker's target (the ruling gives that choice to the active player).
+- `Effects.ChooseAttackersAndBlockersThisTurn()` / `Effects.ChooseBlockersThisTurn(players = Player.Each)` (`ControlCombatDeclarationsThisTurnEffect(declarations: Set<CombatDeclaration> = {ATTACKERS, BLOCKERS}, declaringPlayers: Player = Player.Each)`) — "You choose which creatures attack this turn. You choose which creatures block this turn and how those creatures block." (**Master Warcraft**), or only the block declarations owed by `players` (**Brutal Hordechief**: `ChooseBlockersThisTurn(Player.EachOpponent)` — "you choose how those creatures block", leaving your own blocks and an opponent's attacks on their turn alone). `declaringPlayers` takes `Each`, `EachOpponent`, `EachOtherPlayer` or `You` and is resolved to players at resolution; each resolution adds a turn-stamped `CombatDeclarationGrant` to the controller's `CombatDeclarationControlComponent`, and for each owed declaration the latest grant covering it wins (Hordechief ruling), so a narrower grant never erases a wider one. Moves only the covered *declarations*, in every combat this turn, to the controller — never priority, other decisions, or hidden zones (it deliberately does **not** go through `actorFor`, which carries hand visibility). `CombatDeclarationControl.declarerFor` / `inputActorFor` route the owed `DeclareAttackers` / `DeclareBlockers` legal action to the new declarer, and the game server refuses that declaration from anyone else. The declaration is still the owing player's action and is validated as theirs. Gap: when the defender controls a planeswalker or battle, the caster also picks each attacker's target (the ruling gives that choice to the active player).
 - `GrantCantBeBlockedByChosenColorEffect(target, duration)` — unblockable except by chosen color.
 - `Effects.GrantCantBeBlockedExceptBy(target, blockerFilter, duration = EndOfTurn)` (`GrantCantBeBlockedExceptByEffect`) —
   the floating, one-shot grant of "can't be blocked except by creatures matching `blockerFilter`". The dynamic
@@ -3426,9 +3729,19 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   except by N or more creatures," a generalization of menace (the N = 2 case). May be left unblocked;
   the restriction only applies once at least one creature blocks it. Enforced at block declaration in
   `BlockPhaseManager.validateMinBlockersRequirements`, mirroring the menace check. Used by Troll of
-  Khazad-dûm (`CantBeBlockedByFewerThan(3)`).
-- `CantCastSpellsEffect(target, duration = EndOfTurn, spellFilter = Any)` — target can't cast matching
-  spells from any zone. Facade: `Effects.CantCastSpells(target, duration, spellFilter)`.
+  Khazad-dûm (`CantBeBlockedByFewerThan(3)`). Like `CantBeBlockedByMoreThan`, a **group** filter
+  projects the minimum from the host onto every attacker matching it on *projected* state (the host
+  covers itself unless `excludeSelf`; a face-down attacker is still covered by a face-up host) —
+  Sonorous Howlbonder's "each creature you control with menace can't be blocked except by three or
+  more creatures" = `CantBeBlockedByFewerThan(3, GroupFilter(GameObjectFilter.Creature.youControl()
+  .withKeyword(Keyword.MENACE)))`. A copy granted via `Effects.GrantStaticAbility` is read too; the
+  strictest minimum wins.
+- `CantCastSpellsEffect(target, duration = EndOfTurn, spellFilter = Any, moreAllowed = 0)` — target can't cast matching
+  spells from any zone. Facade: `Effects.CantCastSpells(target, duration, spellFilter, moreAllowed)`.
+  `moreAllowed = N` lets each target cast N more spells first, counted from resolution (spells cast earlier
+  this turn, the restricting spell included, don't use it up) — **Irencrag Feat**: `AddMana(Color.RED, 7) then
+  CantCastSpells(EffectTarget.Controller, moreAllowed = 1)` ("You can cast only one more spell this turn").
+  The allowance counts against the per-turn cast count, so it requires `spellFilter = Any` and `EndOfTurn`.
   `PlayerRef(Player.Each)` + `GameObjectFilter.Noncreature` models **Calamity's Wake**.
   The filter checks the spell's announced characteristics (including alternative faces, bestow and
   face-down casting), not a fixed list of cards at resolution. Independent bans accumulate and
@@ -3439,6 +3752,9 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   A dynamic mana-value bound (`manaValueEqualsDynamic` / `ManaValueAtMostDynamic`) is locked in as a literal when
   the effect resolves (CR 608.2h) — **Living Breakthrough**: `Triggers.you.casts()` →
   `CantCastSpells(PlayerRef(EachOpponent), UntilYourNextTurn, Any.manaValueEqualsDynamic(DynamicAmounts.triggeringManaValue()))`.
+  A chosen card name (`Any.namedFromVariable(slot)`, i.e. `NameEqualsChosen`) is frozen the same way into a
+  literal `NameEquals` — **Academic Probation**: `chooseCardName(pool = CardNamePool.NONLAND)` →
+  `CantCastSpells(PlayerRef(EachOpponent), UntilYourNextTurn, Any.namedFromVariable(name))`.
   A mana-value ban reads the X chosen for an `{X}` spell (CR 202.3e): the offer stays up unless the ban holds at
   every X, and validation rejects a banned X.
   Use characteristic filters independent of the casting process, such as type, subtype, color or mana value.
@@ -3447,11 +3763,19 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `CantSearchLibrariesEffect(target, duration = EndOfTurn)` — target player(s) can't search libraries. Facade:
   `Effects.CantSearchLibraries(target, duration)`; `EffectTarget.PlayerRef(Player.Each)` for "Players can't search
   libraries this turn" (Shadow of Doubt). Stamps `CantSearchLibrariesComponent` (cleared at end-of-turn cleanup). Enforced
-  at the search itself: a `GatherCardsEffect(search = true)` whose effect controller (the searcher) carries it finds no
-  library cards, and the `EmitLibrarySearchedEventEffect` tail emits nothing. The rest of the instruction still runs, so a
+  at the search itself: a `GatherCardsEffect(search = true)` whose `searcher` (the effect controller by default) carries it
+  finds no library cards, and the `EmitLibrarySearchedEventEffect` tail emits nothing. The rest of the instruction still runs, so a
   "search …, then shuffle" still shuffles; looking at / revealing the top of a library is not a search and is untouched.
   An optional search ("you may search … then shuffle" — a `Effects.May` whose action leads with a search gather) can't be
-  chosen at all, so it is skipped without a prompt and without the shuffle.
+  chosen at all, so it is skipped without a prompt and without the shuffle. Static twin: `PlayersCantSearchLibraries`.
+- `BlockerCountLimitThisCombatEffect(target, maxBlockers)` — target player(s) can't block with more
+  than `maxBlockers` creatures this combat. Facade: `Effects.BlockerCountLimitThisCombat(maxBlockers,
+  target = PlayerRef(Player.EachOpponent))` — Mirri, Weatherlight Duelist's attack trigger. Stamps
+  `BlockerCountLimitThisCombatComponent` on each player (stacked stamps keep the smallest cap), so
+  it outlives its source; `BlockPhaseManager` rejects a declaration in which that player blocks with
+  more distinct creatures (a creature blocking several attackers counts once), and
+  `CombatManager.endCombat` clears it. The player sees a "Block Limit" badge while it lasts. The
+  global, source-bound static is `BlockerCountLimit`.
 - `CantPlayCardsFromHandEffect(target = Controller, duration = UntilYourNextTurn)` — target can't play cards (cast
   spells **or** play lands) from their **hand** zone for the duration. Hand-scoped: cards in exile/graveyard with a
   may-play permission stay playable. Facade: `Effects.CantPlayCardsFromHand(target, duration)`. Pairs with an impulse
@@ -3485,7 +3809,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `CantActivateLoyaltyAbilitiesEffect(target, duration)` — target can't activate planeswalkers' loyalty abilities.
   Facade: `Effects.CantActivateLoyaltyAbilities(target, duration)`. Sibling of `CantCastSpells`; compose the two for
   cards that forbid both (e.g. Revel in Silence).
-- `GrantLoyaltyActivationPermissionEffect(target, planeswalkerFilter, instantSpeed, times, duration)` — the
+- `GrantLoyaltyActivationPermissionEffect(target, planeswalkerFilter, instantSpeed, times, duration, additionalActivations)` — the
   permissive mirror: target may activate loyalty abilities of planeswalkers matching `planeswalkerFilter` more freely
   for `duration` (default `EndOfTurn`). Each axis relaxes one half of CR 606.3; the grant must relax at least one.
   A resolution-time one-shot that records the grant on the player (`LoyaltyActivationPermissionsComponent`, removed
@@ -3500,6 +3824,12 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
     "you may activate the loyalty abilities of planeswalkers you control twice this turn rather than only once".
     Lifts only the count half; sorcery timing still applies. Like the static `LoyaltyActivationPermission`, allowances
     take the largest, never a sum. **Urza Assembles the Titans** III: `Effects.ExtraLoyaltyActivations()`.
+  - `Effects.AdditionalLoyaltyActivations(count = 1, planeswalkerFilter = Planeswalker.youControl(), duration, target)` —
+    `additionalActivations = count`: "for each planeswalker you control, you may activate one of its loyalty abilities
+    once this turn as though none of its loyalty abilities have been activated this turn". Unlike `times`, these
+    **add**: summed across grants and on top of the largest maximum (Oath of Teferi, a per-permanent
+    `AllowLoyaltyActivationsThisTurn`), so two resolutions mean three activations. Covers planeswalkers that come under
+    your control later in the turn. **The Chain Veil**: `Effects.AdditionalLoyaltyActivations()`.
 - `LoyaltyActivationPermission(filter = GameObjectFilter.Planeswalker.youControl(), instantSpeed = false, times = 1)` —
   the static counterpart of `GrantLoyaltyActivationPermissionEffect`: a permission for matching permanents that lasts
   only while its source's ability applies. It must relax at least one half of CR 606.3.
@@ -3598,8 +3928,8 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 
 - `CounterEffect(target, condition?, destination?)` — counter a spell/ability; optionally send elsewhere. `CounterDestination.Exile(grantFreeCast?)`: `grantFreeCast` lets the counter's *controller* recast the exiled card for free (Kheru Spellsnatcher). (For "exile it; its owner may recast it" wording that is **not** a counter — e.g. airbending a spell — use `ExileTargetSpell(fixedAlternativeManaCost = …)` below, which bypasses can't-be-countered.) `CounterDestination.Hand` (facade `Effects.CounterSpellToHand()`) is Remand's "put it into its owner's hand instead of into that player's graveyard" — still a real counter, so an uncounterable spell is untouched and "whenever a spell is countered" triggers still fire; `ReturnSpellToOwnersHand` is the non-counter sibling. `CounterDestination.Library(positions)` (facade `Effects.CounterSpellToLibrary(vararg positions)`) counters into the owner's library: one `LibraryChoicePosition` is a fixed spot (Memory Lapse `Top`, Spell Crumple `Bottom`), several are the *counter's controller's* choice (Hinder `Top, Bottom`) — asked only when the spell would really land there (not if it can't be countered or a counter replacement exiles it); `PutOnTopOrBottomOfLibrary` on a spell is the non-counter sibling (Swat Away).
   - `target = CounterTarget.Spell` / `Ability` / `SpellOrAbility` — `SpellOrAbility` dispatches at resolution by inspecting whether the stack entity has a `SpellOnStackComponent`. Used by Teferi's Response.
-  - `condition = CounterCondition.UnlessPaysMana(cost, onPaid?)` / `UnlessPaysDynamic(amount, onPaid?)` — "unless its controller pays …" with an optional `onPaid: Effect` rider that fires **only** when the spell's controller pays (Divert Disaster's "If they do, you create a Lander token"). The rider executes with the counter's controller as `controllerId`, so "you" in the rider resolves to the caster of the counter. The rider does not fire when the spell is countered. Facade: `Effects.CounterUnlessPays(cost, onPaid, target, targetSource)` / `Effects.CounterUnlessDynamicPays(amount, exileOnCounter, onPaid, targetSource)`. Pass `targetSource = CounterTargetSource.TriggeringEntity` from a cast trigger to tax the spell that fired it rather than a chosen target — Nether Void's "Whenever a player casts a spell, counter it unless that player pays {3}", In the Eye of Chaos's "…unless that player pays {X}, where X is its mana value" (`DynamicAmount.EntityProperty(EffectTarget.TriggeringEntity, EntityNumericProperty.ManaValue)`, which counts the spell's announced X); the payer is the spell's controller either way. With `target = CounterTarget.SpellOrAbility` (Mirrorshell Crab's "counter target spell or ability unless its controller pays {3}", paired with `TargetFilter.SpellOrAbilityOnStack`) the payer is the stack object's controller — the caster of a spell, or the controller of an activated/triggered ability — and an unpaid ability is countered (removed from the stack).
-- `CounterAllOnStackEffect(filter?, destination?)` — counter everything matching.
+  - `condition = CounterCondition.UnlessPaysMana(cost, onPaid?)` / `UnlessPaysDynamic(amount, onPaid?)` — "unless its controller pays …" with an optional `onPaid: Effect` rider that fires **only** when the spell's controller pays (Divert Disaster's "If they do, you create a Lander token"). The rider executes with the counter's controller as `controllerId`, so "you" in the rider resolves to the caster of the counter. The rider does not fire when the spell is countered. Facade: `Effects.CounterUnlessPays(cost, onPaid, target, targetSource)` / `Effects.CounterUnlessDynamicPays(amount, exileOnCounter, onPaid, targetSource)`. Pass `targetSource = CounterTargetSource.TriggeringEntity` from a cast trigger to tax the spell that fired it rather than a chosen target — Nether Void's "Whenever a player casts a spell, counter it unless that player pays {3}", In the Eye of Chaos's "…unless that player pays {X}, where X is its mana value" (`DynamicAmount.EntityProperty(EffectTarget.TriggeringEntity, EntityNumericProperty.ManaValue)`, which counts the spell's announced X); the payer is the spell's controller either way. With `target = CounterTarget.SpellOrAbility` (Mirrorshell Crab's "counter target spell or ability unless its controller pays {3}", paired with `TargetFilter.SpellOrAbilityOnStack`) the payer is the stack object's controller — the caster of a spell, or the controller of an activated/triggered ability — and an unpaid ability is countered (removed from the stack). With `targetSource = CounterTargetSource.EachOnStack(controller = Player.EachOpponent)` the counter is **untargeted and stack-wide** — every object of the `target` kind on the stack whose controller is in `controller` (narrowed by `filter`; the resolving object itself never counts): Whirlwind Denial's "For each spell and ability your opponents control, counter it unless its controller pays {4}" is `Effects.CounterUnlessPays("{4}", target = CounterTarget.SpellOrAbility, targetSource = CounterTargetSource.EachOnStack())`. With an unless-pays condition each controller in APNAP order is asked object by object (top of the stack first; an object they can no longer afford is unpaid without a prompt), and nothing is countered until everyone has decided — then every unpaid object is countered together. It is the unless-pays shape only — an unconditional "counter all spells and abilities your opponents control" is `CounterAllOnStackEffect`. `onPaid` riders and a top-or-bottom `CounterDestination.Library` choice are rejected with this source.
+- `CounterAllOnStackEffect(spells = true, abilities = true, opponentsOnly = true, storeCountAs = null)` — counter every spell and/or ability on the stack (opponents' only by default), unconditionally; `storeCountAs` records how many were countered.
 - `ExileTargetSpellEffect(makePlotted = false, fixedAlternativeManaCost = null, linkToSource = false, spell = CounterTargetSource.Chosen)` (facade `Effects.ExileTargetSpell(makePlotted, fixedAlternativeManaCost, linkToSource)`; `Effects.ExileTriggeringSpell(linkToSource)` sets `spell = CounterTargetSource.TriggeringEntity` to exile the spell that fired a cast trigger without targeting it — Eye of the Storm's "whenever a player casts an instant or sorcery card, exile it") — exile target spell (CR 718 "exile target spell"). **Not a counter:** it removes the spell from the stack and exiles the card even if the spell *can't be countered* (so it works where `CounterEffect(destination = Exile())` no-ops), and it fires no "whenever a spell is countered" trigger — but the spell still fails to resolve because it left the stack. With `makePlotted = true` the exiled card becomes *plotted* for its **owner** (gains `PlottedComponent` + a permanent free-cast-on-a-later-turn `MayPlayPermission` gated by `SourcePlottedOnPriorTurn`, granted to the owner per CR 718.2), emitting a `CardPlottedEvent`. With `fixedAlternativeManaCost = {2}` the exiled card's **owner** instead gets a permanent `MayPlayPermission` + `PlayWithFixedAlternativeManaCostComponent`, letting them recast it for that fixed cost rather than its printed cost — the spell-on-stack form of the **Airbend** keyword (Aang, Swift Savior). `makePlotted` and `fixedAlternativeManaCost` are mutually exclusive. With `linkToSource = true` the exiled card is appended to the effect *source's* `LinkedExileComponent` — the stack-side counterpart of `ExileLinkedToSource` / `MoveCollection(linkToSource = true)`. It grants nothing on its own; it is only a handle so a later ability of the same source can say "the exiled card", and it survives the source's own zone change so a leaves-the-battlefield trigger still finds it. **Spell Queller** pairs it with a `LeavesBattlefield` trigger of `ForEachPlayer(Player.OwnersOfLinkedExile, gather(FromLinkedExile()) → Effects.May(CastFromCollectionWithoutPayingCost(...)))` — note that Spell Queller's payoff is a cast *during resolution* (its ruling: "The player can't wait to cast it later in the turn"), not a lingering `GrantMayPlayFromExile` permission. Pair with `TargetObject(filter = TargetFilter.SpellOnStack)`. Used by **Aven Interrupter** ("…exile target spell. It becomes plotted."), **Spell Queller**, and the airbend stack branch.
 - `MarkSpellExileWithCountersEffect(target = TriggeringEntity, counterType, count = 1)` (facade `Effects.MarkSpellExileWithCounters(target, counterType, count)`) — mark a spell on the stack so that, **as it resolves**, it is exiled with `count` counters of `counterType` on it instead of being put into its owner's graveyard. Lets the spell resolve fully, then re-routes only its post-resolution destination via `ExileAfterResolveComponent(onlyIfResolved = true)` — so if the spell is countered or fizzles it goes to the graveyard normally. Used by **Goliath Daydreamer** ("exile that card with a dream counter on it instead of putting it into your graveyard as it resolves").
 - `MarkSpellPlotOnResolveEffect(target = TriggeringEntity)` (facade `Effects.MarkSpellPlotOnResolve(target)`) — the plot sibling of `MarkSpellExileWithCounters`: as the spell resolves it is exiled instead of going to the graveyard and **becomes plotted** for its owner (`PlottedComponent` + permanent free-cast-on-a-later-turn `MayPlayPermission` gated by `SourcePlottedOnPriorTurn`, emitting `CardPlottedEvent`). Also `onlyIfResolved` — a countered/fizzled spell is not exiled and doesn't become plotted. Distinct from `ExileTargetSpell(makePlotted = true)`, which removes a *targeted* spell from the stack now (it never resolves); this one only changes a self-cast spell's destination after it resolves. Used by **Lilah, Undefeated Slickshot** ("Whenever you cast a multicolored instant or sorcery spell from your hand, exile that spell instead of putting it into your graveyard as it resolves. If you do, it becomes plotted.").
@@ -3607,7 +3937,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `OpenLifeBid(onWin, participant = Player.AnOpponent)` — open life-bidding auction between you and `participant` (resolved against the effect context). You open at a bid of 1; the two bidders alternate topping the high bid (yes/no to top, then a number for the amount, capped at the bidder's life) until one passes. The high bidder loses that much life; `onWin` runs **only if you win**, with the original targets in context. If `participant` resolves to you (or to nobody), you're the sole bidder and win at the opening bid. For Mages' Contest, bid against the targeted spell's controller and counter it: `Effects.OpenLifeBid(Effects.CounterSpell(), Player.ControllerOf("target spell"))` — pair with a `TargetSpell` requirement.
 - `DestroySourceOfTargetedAbilityEffect` — when the targeted stack object is a permanent's activated/triggered ability, destroy that source permanent. Compose *before* the counter step so the ability component is still readable (Teferi's Response).
 - `RemoveAbilitiesFromSourceOfTargetedAbilityEffect(duration = EndOfTurn, sourceCardTypes = emptySet())` (facade `Effects.RemoveAbilitiesFromSourceOfTargetedAbility(duration, sourceCardTypes)`) — the ability-strip sibling of `DestroySourceOfTargetedAbilityEffect`. When the targeted stack object is a permanent's activated/triggered ability whose source is still on the battlefield **and** (when `sourceCardTypes` is non-empty) has one of those projected card types, that source permanent gains a Layer-6 `RemoveAllAbilities` floating effect for `duration`. The floating effect is keyed to *this effect's* source, so `Duration.WhileSourceOnBattlefield` ends when that permanent (e.g. Tishana) leaves. No-op for a spell target, an already-gone source, or a type mismatch. Compose *before* the counter step so the ability's source component is still readable. Used by **Tishana's Tidebinder** ("If an ability of an artifact, creature, or planeswalker is countered this way, that permanent loses all abilities for as long as this creature remains on the battlefield") — pair with `CounterAbility()`, `Duration.WhileSourceOnBattlefield`, and `sourceCardTypes = {ARTIFACT, CREATURE, PLANESWALKER}`, targeting via an optional (`optional = true`) `TargetObject(filter = TargetFilter.ActivatedOrTriggeredAbilityOnStack)` slot for "up to one".
-- `CopyTargetSpellEffect(target, keywordsForCopy, removeLegendary, addedTokenKeywords, sacrificeTokenAtStep, sacrificeTokenOnlyOnControllersTurn, copies = DynamicAmount.Fixed(1), exceptions = CopyExceptions.None, tokenStartingLoyalty = null)` (facade `Effects.CopyTargetSpell(...)`) — copy a spell on the stack. `keywordsForCopy` grants keywords to the copy **while it remains a spell** (wither/lifelink). When the copied spell is a **permanent spell** it becomes a token as it resolves (CR 707.10f); the *token-side* riders bake onto that token for its life on the battlefield: `addedTokenKeywords` (e.g. `HASTE`) are unioned into the token's base keywords, and `sacrificeTokenAtStep: Step?` registers a delayed "sacrifice this token" trigger at the next matching step (`sacrificeTokenOnlyOnControllersTurn` gates it to "your next" step), and `tokenStartingLoyalty: DynamicAmount?` replaces a planeswalker token's printed starting loyalty, read against the copied spell's X (casualty X's "has starting loyalty X"). The spell-copy mirror of `CreateTokenCopyOfTargetEffect.addedKeywords` / `sacrificeAtStep`. Used by **Choreographed Sparks** ("Copy target creature spell you control. The copy gains haste and 'At the beginning of the end step, sacrifice this token.'"). Pair with `TargetObject(filter = TargetFilter.CreatureSpellOnStack.youControl())`. `copies` (a `DynamicAmount`, default 1) makes *N independent copies*, each retargeted separately (CR 707.10c) — **Thousand-Year Storm** ("copy it for each other instant and sorcery spell you've cast before it this turn") pairs `Effects.CopyTargetSpell(TriggeringEntity, copies = DynamicAmounts.spellsCastThisTurn(filter = InstantOrSorcery, beforeTriggeringSpell = true))` with `Triggers.you.casts(InstantOrSorcery)`. A count of zero or less makes no copies at all; a spell with no targets, or one with no legal replacement target, gets its copies without a prompt (inheriting the original's targets). Bestowed copies apply the same exceptions to the saved creature identity, so P/T and type exceptions survive entry, target loss, and later detachment. "Copy that spell" (`target = EffectTarget.TriggeringEntity`) still makes its copy when the spell left the stack without resolving before the effect resolved — countered, bounced, exiled: the copy is read from the spell as it last existed on the stack (CR 608.2h; the engine keeps it in `GameState.departedSpells` until the turn ends) — **Jin-Gitaxias, Progress Tyrant**.
+- `CopyTargetSpellEffect(target, keywordsForCopy, removeLegendary, addedTokenKeywords, sacrificeTokenAtStep, sacrificeTokenOnlyOnControllersTurn, copies = DynamicAmount.Fixed(1), exceptions = CopyExceptions.None, tokenStartingLoyalty = null, mayChooseNewTargets = true)` (facade `Effects.CopyTargetSpell(...)`) — copy a spell on the stack. `keywordsForCopy` grants keywords to the copy **while it remains a spell** (wither/lifelink). When the copied spell is a **permanent spell** it becomes a token as it resolves (CR 707.10f); the *token-side* riders bake onto that token for its life on the battlefield: `addedTokenKeywords` (e.g. `HASTE`) are unioned into the token's base keywords, and `sacrificeTokenAtStep: Step?` registers a delayed "sacrifice this token" trigger at the next matching step (`sacrificeTokenOnlyOnControllersTurn` gates it to "your next" step), and `tokenStartingLoyalty: DynamicAmount?` replaces a planeswalker token's printed starting loyalty, read against the copied spell's X (casualty X's "has starting loyalty X"). The spell-copy mirror of `CreateTokenCopyOfTargetEffect.addedKeywords` / `sacrificeAtStep`. Used by **Choreographed Sparks** ("Copy target creature spell you control. The copy gains haste and 'At the beginning of the end step, sacrifice this token.'"). Pair with `TargetObject(filter = TargetFilter.CreatureSpellOnStack.youControl())`. `copies` (a `DynamicAmount`, default 1) makes *N independent copies*, each retargeted separately (CR 707.10c) — **Thousand-Year Storm** ("copy it for each other instant and sorcery spell you've cast before it this turn") pairs `Effects.CopyTargetSpell(TriggeringEntity, copies = DynamicAmounts.spellsCastThisTurn(filter = InstantOrSorcery, beforeTriggeringSpell = true))` with `Triggers.you.casts(InstantOrSorcery)`. A count of zero or less makes no copies at all; a spell with no targets, or one with no legal replacement target, gets its copies without a prompt (inheriting the original's targets). Bestowed copies apply the same exceptions to the saved creature identity, so P/T and type exceptions survive entry, target loss, and later detachment. "Copy that spell" (`target = EffectTarget.TriggeringEntity`) still makes its copy when the spell left the stack without resolving before the effect resolved — countered, bounced, exiled: the copy is read from the spell as it last existed on the stack (CR 608.2h; the engine keeps it in `GameState.departedSpells` until the turn ends) — **Jin-Gitaxias, Progress Tyrant**. `mayChooseNewTargets = false` is the bare "copy that spell" with no "you may choose new targets" clause: every copy keeps the original's targets and chosen modes (CR 707.10) and no retarget decision is offered — **Reflections of Littjara** (`Triggers.you.casts(GameObjectFilter.Any.withChosenSubtype())` + `Effects.CopyTargetSpell(TriggeringEntity, mayChooseNewTargets = false)`), which matters for a Kindred instant or sorcery of the chosen type or an Aura spell. Other bare "copy that spell" cards pass it too (Double Down, Taigam, Volo, Brass Knuckles, Double Major, Mentor's Guidance, Plumb the Forbidden, Sage of the Skies, Social Snub, Tawnos, Jackal, The Clone Saga).
   `exceptions` composes the shared `CopyExceptions` vocabulary into spell-copy creation. For “except that the copy is red”, use `CopyExceptions(overrideColors = setOf(Color.RED))`: this replaces color without changing the mana cost, omits copied devoid, and is inherited by a later copy of the copy. Exceptions are baked into the new `CardComponent` before stack-placement events, and survive no-target, inherited-target, modal, multi-copy and serialized retargeting paths. Numeric keywords travel with the copy into permanent resolution. `retainResolvingTriggeredAbility` freezes the resolving trigger before pausing; a newly created spell has no pre-copy colors, so `retainColors` retains the empty set. Target enumeration uses a transient prospective copy with these characteristics and the copy controller; the source spell and copying effect are not used as substitutes. The preview never enters the stack and is not persisted. Existing granted-spell keywords and token-lifetime riders remain separate. Color-word text replacements reach both color additions and overrides. Empty exceptions are omitted from serialized effects/continuations, preserving ordinary-copy snapshots.
   Spell-copy retargeting uses one optional decision slot per announced target, including each chosen
   mode and each repeated copy. Empty slot answers **keep the original target**, including an illegal
@@ -3626,18 +3956,20 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   usually `ContextTarget(0)`; `EffectTarget.TargetingSource` copies the ability that just targeted
   something (Mirror-Shield Hoplite). The copy keeps the original's source and flags (a copy of a backup
   ability is a backup ability).
+- `GrantKeywordToSpellEffect(keyword, target = TriggeringEntity, duration = Duration.Permanent)` (facade `Effects.GrantKeywordToSpell(keyword, target, duration)`) — "that spell gains [keyword]". Stamps the keyword onto the stack object (`SpellGrantedKeywordsComponent`), which the damage and split-second read sites consult while it is a spell — **Spinerock Tyrant**'s wither, **Judith, Carnage Connoisseur**'s deathtouch and lifelink. On a permanent spell the grant also carries through to the permanent the spell becomes (CR 400.7a), for `duration` from the moment it enters: **Tyvar Kell**'s emblem "Whenever you cast an Elf spell, it gains haste until end of turn" is `Effects.GrantKeywordToSpell(Keyword.HASTE, EffectTarget.TriggeringEntity, Duration.EndOfTurn)` under `Triggers.you.casts(GameObjectFilter.Any.withSubtype("Elf"))`; "it gains flying" with no end is the default `Duration.Permanent`. The keyword is frozen onto `SpellOnStackComponent.entryKeywordGrants` (the same channel `ManaSpellRider.GrantsKeywordWhenSpent` uses) rather than floated at the spell's entity id, so a countered spell carries nothing into its next zone (CR 400.7). An instant or sorcery has no permanent, so its grant just ends with the spell.
 - `CopyTargetSpellOrAbilityEffect(target, copies = DynamicAmount.Fixed(1))` (facade `Effects.CopyTargetSpellOrAbility(target, copies)`) — copy whichever kind of stack object the single target resolved to, dispatching at resolution by inspecting the stack entity's component: an instant/sorcery **spell** copies via the spell-copy path, a **triggered ability** via `CopyTargetTriggeredAbilityEffect`'s logic, an **activated ability** by cloning its `ActivatedAbilityOnStackComponent`. You may choose new targets for the copy (CR 707.10c). Pair with `TargetObject(filter = TargetFilter.InstantSorcerySpellOrAbilityOnStack)` (one requirement admitting all four kinds). Generalizes the two single-kind copy effects into the "copy target instant/sorcery spell, activated ability, or triggered ability" clause — **Return the Favor**. `copies` (a `DynamicAmount`, default 1) makes *N independent copies* of an **ability** — pass `DynamicAmount.XValue` for "copy target activated or triggered ability you control X times" (**Gogo, Master of Mimicry**); the executor pauses per copy that has targets so each is retargeted independently, and a no-target ability is copied all the same. `copies` > 1 is honored on both branches — the spell branch forwards it to `CopyTargetSpellEffect.copies`. An ability instance tagged "can't be copied" (`ActivatedAbility.cantBeCopied`, see §9/§11) yields no copies (CR 707.10e).
 - `CopyNextSpellCastEffect(copies = 1, spellFilter = InstantOrSorcery)` (facade `Effects.CopyNextSpellCast(copies, spellFilter)`) — when its controller next casts a spell matching `spellFilter` this turn, create `copies` copies of it. `spellFilter` is a `GameObjectFilter` matched against the spell as it's cast, so the default "instant or sorcery" (Howl of the Horde) can be widened — e.g. `GameObjectFilter.Creature` for "copy the next creature spell." The filter is evaluated with the rider's **own source** in the predicate context, so it may be source-relative — Loki Laufeyson's "with mana value less than or equal to Loki's power" is `InstantOrSorcery.manaValueAtMostDynamic(DynamicAmounts.sourcePower())`, resolved as the spell is cast (which is when the delayed trigger's condition is checked), not when the rider was created. Consumed after one matching cast. Non-matching casts leave the entry waiting. A source-relative filter keeps working after the source **leaves the battlefield** (CR 608.2h / 113.7a — the rider exists independently of its source): `ZoneTransitionService` stamps the departing permanent's `EntitySnapshot` onto the pending entry, and `PredicateEvaluator.evaluateDynamicCap` threads it into the reconstructed `EffectContext` so `DynamicAmountEvaluator`'s existing last-known-information branch resolves the cap. The stamp happens at **departure**, not at rider creation, so a source that grew after arming the rider caps on the larger value — Loki armed at 2/1, powered up to 4/3, then killed still copies a mana-value-4 spell.
 - `CopyEachSpellCastEffect(copies = 1, spellFilter = InstantOrSorcery)` (facade `Effects.CopyEachSpellCast(copies, spellFilter)`) — the persistent sibling: copies **every** spell matching `spellFilter` the controller casts for the rest of the turn (The Mirari Conjecture Ch. III). Same `spellFilter` parameterization as above.
 - `MakeNextSpellUncounterableEffect(spellFilter = Any)` (facade `Effects.MakeNextSpellUncounterable(spellFilter)`) — one-shot rider: the controller's **next** spell matching `spellFilter` cast this turn can't be countered, then the entry is consumed. Stamps `CantBeCounteredComponent` on that spell as it's cast (so it stays uncounterable for as long as it's on the stack); non-matching casts leave the entry waiting, and an unused entry clears at the start of the controller's next turn. Same pending-rider shape as `CopyNextSpellCastEffect`, including the source-relative filter contract (the entry's own `sourceId` goes into the predicate context at cast time). Contrast with the duration-based `GrantSpellsCantBeCountered` (Domri), which protects **every** matching spell cast for a whole duration rather than just the next one. Used by **Mistrise Village** ("{U}, {T}: The next spell you cast this turn can't be countered.").
-- `GrantNextSpellAffinityEffect(spellFilter = Noncreature, forType = ARTIFACT)` (facade `Effects.GrantNextSpellAffinity(spellFilter, forType)`) — one-shot rider mirroring `MakeNextSpellUncounterable`, but the controller's **next** matching spell this turn gains **affinity for `forType`**: the cost calculator reduces it by the caster's count of that card type *at cast time* (dynamic), then `CastSpellHandler` consumes the entry. The *consumption* site evaluates `spellFilter` with the entry's own `sourceId` in context like the other two riders, but the *cost-reduction* site (`CostCalculator`) passes no `sourceEntityId` at all, so it answers `false` for dynamic **and** source-relative card predicates — so keep this rider's filter source-independent until that gap is closed. (This is a call-site difference, not a `CostCalculator` limitation: `GrantNextSpellFreeCastEffect` below passes its entry's `sourceId` into the same helper and source-relative predicates do work there.) Used by **Don & Raph, Hard Science** ("the next noncreature spell you cast this turn has affinity for artifacts").
+- `GrantNextSpellAffinityEffect(spellFilter = Noncreature, forType = ARTIFACT)` (facade `Effects.GrantNextSpellAffinity(spellFilter, forType)`) — one-shot rider mirroring `MakeNextSpellUncounterable`, but the controller's **next** matching spell this turn gains **affinity for `forType`**: the cost calculator reduces it by the caster's count of that card type *at cast time* (dynamic), then `CastSpellHandler` consumes the entry. The *consumption* site evaluates `spellFilter` with the entry's own `sourceId` in context like the other two riders, but the *cost-reduction* site (`CostCalculator`) passes no `sourceEntityId` at all, so it answers `false` for dynamic **and** source-relative card predicates — so keep this rider's filter source-independent until that gap is closed. (This is a call-site difference, not a `CostCalculator` limitation: `GrantFreeCastThisTurnEffect` below passes its entry's `sourceId` into the same helper and source-relative predicates do work there.) Used by **Don & Raph, Hard Science** ("the next noncreature spell you cast this turn has affinity for artifacts").
 - `GrantNextSpellKeywordEffect(keyword, spellFilter = Any)` (facade `Effects.GrantNextSpellKeyword(keyword, spellFilter)`) — one-shot rider in the same family: the controller's **next** spell matching `spellFilter` cast this turn **has `keyword`**, then the entry is consumed. `keyword` is a cost-payment keyword — `IMPROVISE`, `CONVOKE` or `DELVE`; anything else throws at construction. Stored on `GameState.pendingNextSpellKeywords`; `GrantedKeywordResolver` reports it alongside printed keywords and `GrantKeywordToOwnSpells` grants, so the enumerators, the validator and the payment all see it — improvise and convoke on hand casts and cast-from-zone casts (flashback, exile, graveyard, command zone), delve on hand casts only (the cast-from-zone enumerator doesn't read delve yet) — a granted keyword on a spell that already prints it is redundant (CR 702.126c for improvise). Improvise taps also pay an announced {X} (X is generic mana in the total cost), printed or granted. **Consumed by the cast, not by the payment**: a matching spell paid entirely with mana still spends the rider. Non-matching casts leave it waiting; an unused entry clears at the turn boundary (`TurnManager.startTurn`). The resolver matches `spellFilter` against the printed `CardDefinition` and only understands type/colour/subtype predicates; any other predicate (mana value, name, source-relative) never grants the keyword yet still spends the rider, so keep `spellFilter` to those. The client shows a "<Keyword>" player badge while it waits. Used by **Archway of Innovation** ("{U}, {T}: The next spell you cast this turn has improvise.", `Effects.GrantNextSpellKeyword(Keyword.IMPROVISE)`).
 - `GrantOneSpellAnyManaTypeEffect(spellFilter = Any)` (facade `Effects.SpendAnyManaTypeForOneSpell(spellFilter)`) — one-shot rider in the same turn-scoped family, but **not** a "next spell" one: "**For one spell this turn**, you may spend mana as though it were mana of any type to pay that spell's mana cost. (Additional costs are still paid normally.)" (CR 118.14 / 609.4b). The printed text lets the player pick the spell, so the rider is spent only by the first matching cast whose mana payment **needs** it: `CastCostPayer.relaxForCastPermission` relaxes the cost only when it can't be paid as printed with the payment the caster chose (auto-pay, pool or explicit sources), and `CastCostPayer.pay` removes the entry right there. A matching spell paid with the right types leaves it waiting; an unused entry clears at the turn boundary (`TurnManager.startTurn`). Only the colored, hybrid, Phyrexian and colorless pips of the cast face's own mana cost turn generic — pips an additional cost adds (kicker, a mode's cost) keep their type. Stored on `GameState.pendingAnyManaTypeSpells`; the cast enumerators read it through `CastPermissionUtils.canSpendAnyManaTypeForSpell`, so a spell only the rider makes affordable is offered. The client shows an "Any Mana Type" player badge while it waits. Prefer the static `SpendAnyManaTypeForSpells` for a permanent blanket grant. Used by **North Star** ("{4}, {T}: For one spell this turn, …", `Effects.SpendAnyManaTypeForOneSpell()`).
-- `GrantNextSpellFreeCastEffect(spellFilter = Any)` (facade `Effects.GrantNextSpellFreeCast(spellFilter)`) — one-shot rider in the same family: the controller's **next** spell matching `spellFilter` cast this turn **can be cast without paying its mana cost**, then the entry is consumed. Stored on `GameState.pendingFreeCastSpells`; `CostCalculator.hasFreeCastPermission` reads it (ahead of the battlefield scan) so the cast surfaces the ordinary `CastSpell.useWithoutPayingManaCost` action variant, and `CastSpellHandler` removes the entry on the matching cast. Per CR 118.9 this is an alternative cost — mandatory additional costs still apply, X is 0 (CR 107.3b, enforced by the enumerator: the `CastWithoutPayingManaCost` action variant carries no X and is not flagged `hasXCost`), and only one alternative cost may apply to a cast (CR 118.9a). **Consumed by the cast, not by the discount**: "the next … spell you cast this turn" names a spell, so a matching spell cast for full price is that spell and spends the rider. Non-matching casts leave the entry waiting, and an unused entry clears at the turn boundary (`TurnManager.startTurn`). Prefer this over the battlefield static `MayCastWithoutPayingManaCost` (§ static abilities) whenever the permission has already *resolved*: the rider lives on the state, so it survives its source leaving the battlefield, applies to a cast from any zone, and carries no first-spell / once-per-turn / active-player gate. A rider-funded free cast deliberately does **not** burn a `MayCastWithoutPayingManaCost(oncePerTurn = true)` source's use. Both the permission site and the consumption site evaluate `spellFilter` with the entry's own `sourceId` in context, so source-relative predicates work on both — but the permission site is `CostCalculator`, which still answers `false` for *dynamic* card predicates (mana-value/power comparisons against another entity). The two sites also read different *characteristic* sources: `CostCalculator` matches the printed `CardDefinition`, while the consumption site matches the spell entity through `PredicateEvaluator` (projected values, falling back to base). They agree today because objects on the stack have no projection entry; see the `hasFreeCastRider` KDoc for what would diverge if that changed. Used by **World War Hulk** chapter I ("The next red or green creature spell you cast this turn can be cast without paying its mana cost.", `GameObjectFilter().withAnyColor(RED, GREEN) and GameObjectFilter.Creature`).
-- `ModifySpellCostsEffect(spellFilter, amount, duration = Duration.EndOfTurn, player = Player.You, increase = false, nextSpellOnly = false)` (facades `Effects.ReduceSpellCosts(spellFilter, amount, duration)`, `Effects.IncreaseSpellCosts(amount, player, spellFilter = Any, duration)` and `Effects.ReduceNextSpellCost(amount, spellFilter = Any)`) — by default the **repeating** counterpart of `GrantNextSpellAffinityEffect` (the one-shot `nextSpellOnly` form is below): "spells you cast this turn that match `spellFilter` cost {X} less to cast." With `increase = true` it is the tax mirror ("cost {X} more"); `player` is resolved once, at resolution, to the players whose spells are affected (one state entry each) — **Academy Loremaster**'s "if they do, spells they cast this turn cost {2} more" is `Effects.IncreaseSpellCosts(DynamicAmounts.fixed(2), player = Player.TriggeringPlayer)` inside the draw-step player's `May`. `UntilYourNextTurn` is accepted only for `Player.You`. Unfiltered entries also apply to face-down spells. `amount` (a `DynamicAmount`) is evaluated **once, when this effect resolves**, and the resolved number is stored on `GameState.spellCostModifiers`; every matching spell the controller casts until `duration` ends is discounted by it, and (unless `nextSpellOnly`) nothing is consumed by a cast. Only generic mana is reduced (CR 601.2f). `duration` is `Duration.EndOfTurn` (cleared at the turn boundary by `TurnManager.startTurn`) or `Duration.UntilYourNextTurn` ("until your next turn, instant and sorcery spells you cast cost {1} less" — it keeps discounting instants cast on opponents' turns and is removed after the controller's next untap step by `CleanupPhaseManager.expireUntilYourNextTurnEffects`); any other duration throws at construction. Because it lives on the state rather than on the source, the discount survives the source leaving the battlefield. Resolving `amount` up front is what the Scion cycle's rulings require ("the value of X is determined only once, at the time the ability resolves") — reach for a static `ModifySpellCost` instead when the reduction should track board state continuously. Used by **Will, Scion of Peace** (`DynamicAmounts.lifeGainedThisTurn()`, white and/or blue spells), **Rowan, Scion of War** (`DynamicAmounts.lifeLostThisTurn()`, black and/or red) and **Ral, Leyline Prodigy**'s +1 (`Fixed(1)`, instant/sorcery, `UntilYourNextTurn`). **`nextSpellOnly = true`** (facade `Effects.ReduceNextSpellCost`) is the one-shot form, "the next spell you cast this turn [that matches] costs {X} less": the same state entry, but `CastTriggers.consumeNextSpellRiders` removes every matching one-shot entry when the controller casts a matching spell — consumed by the cast, not by the discount, so a spell with no generic mana to reduce still spends it, several stacked entries all go to that one spell, and a non-matching cast leaves a filtered entry waiting. `EndOfTurn` only (anything else throws). Used by **Peerless Samurai** ("whenever a Samurai or Warrior you control attacks alone, the next spell you cast this turn costs {1} less").
+- `GrantFreeCastThisTurnEffect(spellFilter = Any, nextSpellOnly = true, fromZones = null)` (facades `Effects.GrantNextSpellFreeCast(spellFilter)` for the one-shot form, `Effects.GrantFreeCastThisTurn(spellFilter, fromZones)` for the whole-turn form) — by default a one-shot rider in the same family: the controller's **next** spell matching `spellFilter` cast this turn **can be cast without paying its mana cost**, then the entry is consumed. Stored on `GameState.pendingFreeCastSpells`; `CostCalculator.hasFreeCastPermission` reads it (ahead of the battlefield scan) so the cast surfaces the ordinary `CastSpell.useWithoutPayingManaCost` action variant, and `CastSpellHandler` removes the entry on the matching cast. Per CR 118.9 this is an alternative cost — mandatory additional costs still apply, X is 0 (CR 107.3b, enforced by the enumerator: the `CastWithoutPayingManaCost` action variant carries no X and is not flagged `hasXCost`), and only one alternative cost may apply to a cast (CR 118.9a). **Consumed by the cast, not by the discount**: "the next … spell you cast this turn" names a spell, so a matching spell cast for full price is that spell and spends the rider. Non-matching casts leave the entry waiting, and an unused entry clears at the turn boundary (`TurnManager.startTurn`). Prefer this over the battlefield static `MayCastWithoutPayingManaCost` (§ static abilities) whenever the permission has already *resolved*: the rider lives on the state, so it survives its source leaving the battlefield, applies to a cast from any zone (unless `fromZones` scopes it), and carries no first-spell / once-per-turn / active-player gate. A rider-funded free cast deliberately does **not** burn a `MayCastWithoutPayingManaCost(oncePerTurn = true)` source's use. Both the permission site and the consumption site evaluate `spellFilter` with the entry's own `sourceId` in context, so source-relative predicates work on both — but the permission site is `CostCalculator`, which still answers `false` for *dynamic* card predicates (mana-value/power comparisons against another entity). The two sites also read different *characteristic* sources: `CostCalculator` matches the printed `CardDefinition`, while the consumption site matches the spell entity through `PredicateEvaluator` (projected values, falling back to base). They agree today because objects on the stack have no projection entry; see the `hasFreeCastRider` KDoc for what would diverge if that changed. Used by **World War Hulk** chapter I ("The next red or green creature spell you cast this turn can be cast without paying its mana cost.", `GameObjectFilter().withAnyColor(RED, GREEN) and GameObjectFilter.Creature`).
+  **`nextSpellOnly = false`** (facade `Effects.GrantFreeCastThisTurn`) is the whole-turn form, "until end of turn, you may cast spells [from your hand] without paying their mana costs": the same state entry, offered the same `useWithoutPayingManaCost` variant, but **never consumed** — every matching cast this turn may take it, and the entry clears at the turn boundary. It changes no timing (a sorcery still waits for an empty stack in a main phase). **`fromZones`** scopes either form to casts from those zones (`null` = any zone), read like `MayCastWithoutPayingManaCost.fromZones`: the permission site checks the cast's source zone, and a one-shot rider is spent only by a matching cast from one of its zones. Used by **Chandra, Flame's Catalyst**'s −8 ("Discard your hand, then draw seven cards. Until end of turn, you may cast spells from your hand without paying their mana costs." → `Effects.GrantFreeCastThisTurn(fromZones = setOf(Zone.HAND))`). The player sees an active-effect badge for each whole-turn grant ("This turn you may cast spells from your hand without paying their mana costs").
+- `ModifySpellCostsEffect(spellFilter, amount, duration = Duration.EndOfTurn, player = Player.You, increase = false, nextSpellOnly = false)` (facades `Effects.ReduceSpellCosts(spellFilter, amount, duration)`, `Effects.IncreaseSpellCosts(amount, player, spellFilter = Any, duration)` and `Effects.ReduceNextSpellCost(amount, spellFilter = Any)`) — by default the **repeating** counterpart of `GrantNextSpellAffinityEffect` (the one-shot `nextSpellOnly` form is below): "spells you cast this turn that match `spellFilter` cost {X} less to cast." With `increase = true` it is the tax mirror ("cost {X} more"); `player` is resolved once, at resolution, to the players whose spells are affected (one state entry each) — **Academy Loremaster**'s "if they do, spells they cast this turn cost {2} more" is `Effects.IncreaseSpellCosts(DynamicAmounts.fixed(2), player = Player.TriggeringPlayer)` inside the draw-step player's `May`. `UntilYourNextTurn` always means the *effect controller's* next turn, whoever `player` names — **Elspeth Conquers Death** II is `Effects.IncreaseSpellCosts(Fixed(2), player = Player.EachOpponent, spellFilter = GameObjectFilter.Noncreature, duration = Duration.UntilYourNextTurn)`: the tax sits on each opponent, survives their own untap steps, and is removed after the Saga controller's next untap step (the entry records the installing player as `expiresWithPlayerId`). Unfiltered entries also apply to face-down spells. `amount` (a `DynamicAmount`) is evaluated **once, when this effect resolves**, and the resolved number is stored on `GameState.spellCostModifiers`; every matching spell the controller casts until `duration` ends is discounted by it, and (unless `nextSpellOnly`) nothing is consumed by a cast. Only generic mana is reduced (CR 601.2f). `duration` is `Duration.EndOfTurn` (cleared at the turn boundary by `TurnManager.startTurn`) or `Duration.UntilYourNextTurn` ("until your next turn, instant and sorcery spells you cast cost {1} less" — it keeps discounting instants cast on opponents' turns and is removed after the controller's next untap step by `CleanupPhaseManager.expireUntilYourNextTurnEffects`); any other duration throws at construction. Because it lives on the state rather than on the source, the discount survives the source leaving the battlefield. Resolving `amount` up front is what the Scion cycle's rulings require ("the value of X is determined only once, at the time the ability resolves") — reach for a static `ModifySpellCost` instead when the reduction should track board state continuously. Used by **Will, Scion of Peace** (`DynamicAmounts.lifeGainedThisTurn()`, white and/or blue spells), **Rowan, Scion of War** (`DynamicAmounts.lifeLostThisTurn()`, black and/or red) and **Ral, Leyline Prodigy**'s +1 (`Fixed(1)`, instant/sorcery, `UntilYourNextTurn`). **`nextSpellOnly = true`** (facade `Effects.ReduceNextSpellCost`) is the one-shot form, "the next spell you cast this turn [that matches] costs {X} less": the same state entry, but `CastTriggers.consumeNextSpellRiders` removes every matching one-shot entry when the controller casts a matching spell — consumed by the cast, not by the discount, so a spell with no generic mana to reduce still spends it, several stacked entries all go to that one spell, and a non-matching cast leaves a filtered entry waiting. `EndOfTurn` only (anything else throws). Used by **Peerless Samurai** ("whenever a Samurai or Warrior you control attacks alone, the next spell you cast this turn costs {1} less").
 - `CopyCardIntoCollectionEffect(source, storeAs)` *(SDK-internal step; cards use `Effects.Pipeline { copyCard }` — §5.5.)* (facade `Effects.CopyCardIntoCollection(source, storeAs)`) — copy a **card in a zone** (not a spell on the stack), publishing the copy's entity id to pipeline collection `storeAs`. Per Rule 707.12 the copy is created in the card's current zone under the effect's controller and tagged as a stack-style copy, so once cast it becomes a token if it's a permanent spell and ceases to exist if it's an instant/sorcery (Rule 707.10). Pair with `CastFromCollectionWithoutPayingCostEffect(from)` (facade `Effects.CastFromCollectionWithoutPayingCost(from)`, wrap in `Effects.May` for "you may cast") to express "copy a card, then cast the copy" — e.g. **Shiko, Paragon of the Way**: `Composite(MoveToZoneEffect(target, Zone.EXILE), Effects.CopyCardIntoCollection(target, "copy"), Effects.May(Effects.CastFromCollectionWithoutPayingCost("copy")))`. A copy that is never cast is swept up by the Rule 707.10a state-based action (`PhantomCardCopiesCheck`), so no explicit cleanup step is needed. For the "you may cast it" wording that **doesn't** say "without paying its mana cost", use `Effects.CastFromCollection(from, storeCastTo?)` (`CastFromCollectionWithoutPayingCostEffect(from, payManaCost = true, storeCastTo)`): the controller pays the spell's normal cost (an {X} spell prompts for X) instead of casting for free. Pass `storeCastTo` to publish the cast card's id to that pipeline collection on a successful cast, then gate a follow-up with `Effects.IfYouDo(this, then, SuccessCriterion.CollectionNonEmpty(storeCastTo))` — e.g. **Kaervek, the Punisher**: `Composite(Move(target, EXILE), CopyCardIntoCollection(target, "copy"), Effects.May(Effects.IfYouDo(CastFromCollection("copy", storeCastTo = "cast"), LoseLife(2, Controller), SuccessCriterion.CollectionNonEmpty("cast"))))` — declining (or being unable to pay) leaves the collection empty, so no life is lost. (`storeCastTo` is reliably published for synchronous casts and target-selection casts; an {X}-cost spell cast with no targets is the one sub-case where the publish doesn't survive the X pause.) **Free-casting still pays the copied spell's non-mana additional costs** (CR 601.2f / 118.9 waive only the mana cost) — when the copy carries a printed sacrifice / discard / exile / tap additional cost, the engine resolves it during the synthesized cast: a forced single option is auto-paid, and a real choice pauses for an on-battlefield (sacrifice/tap) or overlay (discard/exile) selection; if the cost can't be paid the cast doesn't happen (e.g. Roving Actuator copying **Embrace Oblivion**'s "sacrifice an artifact or creature" still makes you sacrifice).
 - `CopyCollectionIntoCollectionEffect(from, storeAs)` *(SDK-internal step; cards use `Effects.Pipeline { copyCards }` — §5.5.)* (facade `Effects.CopyCollectionIntoCollection(from, storeAs)`) — the collection-wide sibling of `CopyCardIntoCollectionEffect`: copy **every** card in pipeline collection `from`, publishing all the copies' entity ids (in `from` order) to `storeAs`. For "copy them" over a set of cards rather than one (`CopyCardIntoCollection` overwrites its collection, so it can't accumulate across a `ForEach`). Each copy is created in its original's current zone (Rule 707.12) and tagged as a stack-style copy, so gather/exile the originals first, then copy. Pair with `Effects.CastAnyNumberFromCollection(storeAs)` for "copy them. You may cast any number of the copies" — e.g. **The Tale of Tamiyo** IV: `Composite(ForEachTargetEffect(Move(ContextTarget(0), EXILE)), GatherCards(ChosenTargets, "exiled"), CopyCollectionIntoCollection("exiled", "copies"), CastAnyNumberFromCollection("copies"))`. Copies never cast are swept by the Rule 707.10a state-based action.
-- `CastFromCollectionWithoutPayingCostEffect(from, payManaCost = false, storeCastTo = null, castTransformed = false, insteadOfGraveyard = null, caster = Chooser.Controller, alternativeCost = null, additionalManaCost = null, castUsing = null)` — `additionalManaCost` (with `payManaCost = true`; facade `Effects.CastFromCollection(from, …, additionalManaCost = "{R}{R}")`) is "you may cast that card **by paying {R}{R} in addition to its other costs**" — an additional cost (CR 601.2f) stamped on the card for that one cast as a `PlayWithCostIncreaseComponent` (the same runtime increase as Soul Partition's tax, now any `ManaCost`, colored included), added on top of the mana cost and every other increase; a caster who can't pay the total casts nothing and the stamp is removed. **Ogre Battlecaster**: `target(InstantOrSorceryInYourGraveyard)`, `gather(CardSource.ChosenTargets)`, then `Effects.May(Effects.IfYouDo(Effects.CastFromCollection(card, insteadOfGraveyard = EXILE, storeCastTo = "cast", additionalManaCost = "{R}{R}"), then = Effects.ReflexiveTrigger(Effects.Nothing, optional = false, reflexiveEffect = ModifyStats(manaValueOf("cast"), 0, Self)), CollectionNonEmpty("cast")))` — "when you cast that spell" is a reflexive trigger gated on the cast actually happening.  `alternativeCost` (an `AdditionalCost`, facade `Effects.CastFromCollectionByPaying(from, cost, storeCastTo?)`) is "you may cast that card **by paying [cost] rather than paying its mana cost**", still during this effect's resolution (timing ignored, nothing left castable afterwards). The mana cost is waived (so {X} is 0) and `cost` is stamped as a `PlayWithAdditionalCostComponent` for that one cast, so `CastSpellHandler` validates and charges it with the spell's own additional costs (kicker etc. still apply — it is an alternative cost, CR 118.9); a client can't skip it. The executor offers nothing when the caster can't afford it (CR 601.2h), and a cast that never initiates removes the stamp. **Amped Raptor**: `Effects.If(Conditions.CompareAmounts(DynamicAmounts.energyCount(), GTE, DynamicAmounts.manaValueOf(nonland)), Effects.May(Effects.CastFromCollectionByPaying(nonland, Costs.additional.PayPlayerCounters(CounterType.ENERGY, DynamicAmounts.sourceManaValue()))))` — the `If` only keeps the "you may" from being asked when the energy isn't there. Mutually exclusive with `payManaCost`. `castTransformed = true` casts the card **transformed**, back face up (CR 712.8c), the way disturb casts a card from the graveyard: the back face supplies the spell's card types (hence its timing), its targets and `auraTarget`, its name in the prompt, and the permanent it becomes. It is carried to the cast as `MayPlayPermission.castTransformed`, so the whole ordinary cast pipeline honors it — distinct from `MayPlayPermission.castFaceIndex`, which picks an alternative *face* of a multi-face card (an Adventure, a split half) rather than turning a transforming double-faced card over. A card with **no back face** is not cast at all and stays where it is (the CR 310.12b ruling: a token or non-transforming card that became a copy of a Siege "remains in exile"). Backs `Sieges.defeatAbility` — "exile it, then you may cast it transformed without paying its mana cost". `castFaceDown = true` (facade `Effects.CastFaceDownFromCollection(from, turnsFaceUpInstead?, storeCastTo?)`) casts the card **face down as a 2/2 creature spell without paying its mana cost** (CR 708.4) — the card needs no morph or disguise; the effect's `MayPlayPermission.castFaceDown` is what authorizes it, and nothing (not even the face-down {3}) is paid. It is a real cast: it can be responded to and countered, and it takes no targets. Once on the battlefield it can be turned face up only by its own morph/disguise, if it has one. `turnsFaceUpInstead = true` (needs `castFaceDown`) gives the permanent the spell becomes Illusionary Mask's rider — `TurnsFaceUpInsteadComponent`: until it is turned face up, if it would assign or deal damage, be dealt damage, or become tapped, it is turned face up instead and then does so; the rider outlives its source. Face-down casts can't combine with `payManaCost`, `castTransformed`, `alternativeCost` or `additionalManaCost`. `castUsing` (a `Keyword`, with `payManaCost = true`) casts the card **using one of its own keyword costs** — the cast announces that alternative cost (CR 118.9), so it is priced exactly as a cast with it would be (the keyword cost as the base, increases and reductions applied, {X} chosen), and the stack records how it was cast. Only `Keyword.MIRACLE` is castable this way today (`Miracle.castAbility`, the miracle trigger); any other keyword casts nothing. Exclusive with `alternativeCost`, `additionalManaCost`, `castTransformed` and `castFaceDown`. **Illusionary Mask**: `gather(hand, Creature.manaCostPayableWithManaSpent()) → chooseUpTo(1) → Effects.May(Effects.CastFaceDownFromCollection(chosen, turnsFaceUpInstead = true))`.
+- `CastFromCollectionWithoutPayingCostEffect(from, payManaCost = false, storeCastTo = null, castTransformed = false, insteadOfGraveyard = null, caster = Chooser.Controller, alternativeCost = null, additionalManaCost = null, castUsing = null, alternativeManaCost = null, costReduction = 0, withAnyManaType = false)` — `costReduction` (with `payManaCost` or `alternativeManaCost`; facade `Effects.CastFromCollection(from, costReduction = 4)`) is "you may cast it. **It costs {4} less to cast this way**" (**Uvilda, Dean of Perfection**) — a cost reduction (CR 601.2f) stamped on the card for that one cast as a `PlayWithCostReductionComponent` tied to the cast's one-shot permission, taken off by `CastCostTotaller` *after* the base and every increase, generic mana only (a colored pip is never reduced; {X} is still chosen, and the mana value is unchanged). Removed when the cast is made or never initiates. `additionalManaCost` (with `payManaCost = true`; facade `Effects.CastFromCollection(from, …, additionalManaCost = "{R}{R}")`) is "you may cast that card **by paying {R}{R} in addition to its other costs**" — an additional cost (CR 601.2f) stamped on the card for that one cast as a `PlayWithCostIncreaseComponent` (the same runtime increase as Soul Partition's tax, now any `ManaCost`, colored included), added on top of the mana cost and every other increase; a caster who can't pay the total casts nothing and the stamp is removed. **Ogre Battlecaster**: `target(InstantOrSorceryInYourGraveyard)`, `gather(CardSource.ChosenTargets)`, then `Effects.May(Effects.IfYouDo(Effects.CastFromCollection(card, insteadOfGraveyard = EXILE, storeCastTo = "cast", additionalManaCost = "{R}{R}"), then = Effects.ReflexiveTrigger(Effects.Nothing, optional = false, reflexiveEffect = ModifyStats(manaValueOf("cast"), 0, Self)), CollectionNonEmpty("cast")))` — "when you cast that spell" is a reflexive trigger gated on the cast actually happening.  `alternativeCost` (an `AdditionalCost`, facade `Effects.CastFromCollectionByPaying(from, cost, storeCastTo?)`) is "you may cast that card **by paying [cost] rather than paying its mana cost**", still during this effect's resolution (timing ignored, nothing left castable afterwards). The mana cost is waived (so {X} is 0) and `cost` is stamped as a `PlayWithAdditionalCostComponent` for that one cast, so `CastSpellHandler` validates and charges it with the spell's own additional costs (kicker etc. still apply — it is an alternative cost, CR 118.9); a client can't skip it. The executor offers nothing when the caster can't afford it (CR 601.2h), and a cast that never initiates removes the stamp. **Amped Raptor**: `Effects.If(Conditions.CompareAmounts(DynamicAmounts.energyCount(), GTE, DynamicAmounts.manaValueOf(nonland)), Effects.May(Effects.CastFromCollectionByPaying(nonland, Costs.additional.PayPlayerCounters(CounterType.ENERGY, DynamicAmounts.sourceManaValue()))))` — the `If` only keeps the "you may" from being asked when the energy isn't there. Mutually exclusive with `payManaCost`. `alternativeManaCost` (a `ManaCost`, facade `Effects.CastFromCollectionByPaying(from, manaCost: String, storeCastTo?)`) is the **mana** spelling of the same "by paying [cost] rather than paying its mana cost": a fixed alternative mana cost (CR 118.9) castable from **whatever zone the card is in** — library, exile, graveyard, hand. It is stamped as a `PlayWithFixedAlternativeManaCostComponent` for that one cast (the stamp madness and airbend use), so `CastCostTotaller` swaps it in for the printed cost: colored pips are gone, {X} is 0 (CR 107.3b), cost increases and reductions apply on top (CR 601.2f), additional costs such as kicker may still be paid; a caster who can't pay casts nothing (CR 601.2h) and a cast that never initiates removes the stamp. **Jadzi, Oracle of Arcavios**: `gather(TopOfLibrary(1), revealed = true) → move(→ battlefield, filter = Land) → filter(Nonland) → chooseSpell → Effects.CastFromCollectionByPaying(spell, "{1}")` — `chooseSpell` is the "you may" and offers each nonland face of a modal DFC; a declined card stays on top. Exclusive with `payManaCost`, `alternativeCost`, `castUsing` and `castFaceDown`. `castTransformed = true` casts the card **transformed**, back face up (CR 712.8c), the way disturb casts a card from the graveyard: the back face supplies the spell's card types (hence its timing), its targets and `auraTarget`, its name in the prompt, and the permanent it becomes. It is carried to the cast as `MayPlayPermission.castTransformed`, so the whole ordinary cast pipeline honors it — distinct from `MayPlayPermission.castFaceIndex`, which picks an alternative *face* of a multi-face card (an Adventure, a split half) rather than turning a transforming double-faced card over. A card with **no back face** is not cast at all and stays where it is (the CR 310.12b ruling: a token or non-transforming card that became a copy of a Siege "remains in exile"). Backs `Sieges.defeatAbility` — "exile it, then you may cast it transformed without paying its mana cost". `castFaceDown = true` (facade `Effects.CastFaceDownFromCollection(from, turnsFaceUpInstead?, storeCastTo?)`) casts the card **face down as a 2/2 creature spell without paying its mana cost** (CR 708.4) — the card needs no morph or disguise; the effect's `MayPlayPermission.castFaceDown` is what authorizes it, and nothing (not even the face-down {3}) is paid. It is a real cast: it can be responded to and countered, and it takes no targets. Once on the battlefield it can be turned face up only by its own morph/disguise, if it has one. `turnsFaceUpInstead = true` (needs `castFaceDown`) gives the permanent the spell becomes Illusionary Mask's rider — `TurnsFaceUpInsteadComponent`: until it is turned face up, if it would assign or deal damage, be dealt damage, or become tapped, it is turned face up instead and then does so; the rider outlives its source. Face-down casts can't combine with `payManaCost`, `castTransformed`, `alternativeCost` or `additionalManaCost`. `castUsing` (a `Keyword`, with `payManaCost = true`) casts the card **using one of its own keyword costs** — the cast announces that alternative cost (CR 118.9), so it is priced exactly as a cast with it would be (the keyword cost as the base, increases and reductions applied, {X} chosen), and the stack records how it was cast. Only `Keyword.MIRACLE` is castable this way today (`Miracle.castAbility`, the miracle trigger); any other keyword casts nothing. Exclusive with `alternativeCost`, `additionalManaCost`, `castTransformed` and `castFaceDown`. **Illusionary Mask**: `gather(hand, Creature.manaCostPayableWithManaSpent()) → chooseUpTo(1) → Effects.May(Effects.CastFaceDownFromCollection(chosen, turnsFaceUpInstead = true))`. `withAnyManaType = true` (needs `payManaCost` or `alternativeManaCost`; facade `Effects.CastFromCollection(from, withAnyManaType = true)`) is "you may cast [it], **and mana of any type can be spent to cast that spell**" (CR 118.14, 609.4b): every colored and colorless pip of that one cast accepts mana of any type. The rider rides the one-shot cast grant's `MayPlayPermission.withAnyManaType`, so `CastCostPayer` relaxes exactly that cast and nothing outlives it; the card must be cast from exile or a graveyard (the zones a per-card grant reaches). **Summon: Esper Valigarmanda** (chapters II–IV): `AddMana(RED, countersOnSelf(LORE)) → gather(FromLinkedExile()) → filter(InstantOrSorcery) → chooseUpTo(1) → CastFromCollection(picked, withAnyManaType = true)` — the just-added {R} pays a blue or colorless cost.
 
   `insteadOfGraveyard` is the **cast-this-way destination rider**: an `AfterResolveDestination`
   naming where the spell goes when it would leave the stack for its owner's graveyard — `EXILE`
@@ -3663,7 +3995,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   has a caster but no `ControllerComponent`). Pair it with the same `Chooser` on the upstream
   `SelectFromCollection`, or the opponent would be handed the picker too. The default
   `Chooser.Controller` is every non-iterated card.
-- `CastAnyNumberFromCollectionWithoutPayingCostEffect(from, payManaCost = false, maxCasts = null, maxTotalManaValue = null, playLands = false, insteadOfGraveyard = null)` (facades `Effects.CastAnyNumberFromCollectionWithoutPayingCost(from)` for free / `Effects.PlayAnyNumberFromCollectionWithoutPayingCost(from)` for the free form with `playLands = true` / `Effects.CastAnyNumberFromCollection(from)` for paid / `Effects.CastUpToNFromCollectionWithoutPayingCost(from, maxCasts, maxTotalManaValue?, insteadOfGraveyard?)` for the capped free form / `Effects.CastWithTotalManaValueFromCollectionWithoutPayingCost(from, maxTotalManaValue)` for the total-mana-value form) — the multi-cast sibling of `CastFromCollectionWithoutPayingCostEffect`. **During this effect's resolution**, the controller is offered the cards in pipeline collection `from` (filtered to those still in their owner's exile, hand or graveyard) one at a time and may cast each until they decline; each cast's targets / X / modes flow through the normal cast machinery. With the default `payManaCost = false` each is cast for free; set `payManaCost = true` (facade `Effects.CastAnyNumberFromCollection`) for the "you may cast any number of [them]" wording **without** "without paying their mana costs" — each chosen card is then cast paying its normal cost (an {X} card prompts for X). Because the casts go through the synthesized-cast path (like Cascade), card-type **timing restrictions are ignored** and no lingering "you may play it later" permission is granted — cards left uncast just stay where they are (the controller can't wait until later in the turn). Hand it the eligible set: filter the collection upstream (e.g. nonland + `FilterCollection(Any.manaValueAtMostDynamic(...))`). The free form models "you may cast any number of spells with mana value X or less from among them without paying their mana costs" — e.g. **Kotis, the Fangkeeper**: `GatherCards(TopOfLibrary(damage, TriggeringPlayer)) → MoveCollection(→ exile) → FilterCollection(Nonland) → FilterCollection(Any.manaValueAtMostDynamic(damage)) → CastAnyNumberFromCollectionWithoutPayingCostEffect("castable")` (also **Villainous Wealth**, **Etali, Primal Storm**). The paid form models **The Tale of Tamiyo** IV (cast the copies paying their costs). `maxCasts` bounds the loop for the "you may cast **up to N** spells from among them" wording (**Doom Reigns Supreme**: "target opponent exiles the top five cards of their library. You may cast up to two spells from among the exiled cards without paying their mana costs"); it is a ceiling only — the controller may still stop early, and the loop also ends when the collection runs out. The remaining budget rides on the engine's `CastAnyNumberFromCollectionContinuation`, so the resumer re-enters the loop with `maxCasts - 1` and a budget of 0 makes the effect a no-op before another decision is offered; `null` (the default) is the uncapped "any number" form and leaves every existing caller unchanged. The budget is spent on a cast that **initiates**, not on the pick: a chosen card whose required target has no legal choice can't be cast at all (CR 601.2c), so it stays in exile and the count is untouched (it is still dropped from the pool, so the loop can't re-offer it). Use the facade rather than the raw constructor — it rejects a non-positive `maxCasts`, which would otherwise be a silent no-op, and it only offers `maxCasts` alongside the free form. **`maxCasts` is wired for `payManaCost = false` only**: no printed card pairs "up to N" with "paying their mana costs", and the engine's "did the cast initiate" precondition asks only whether a required target had a legal choice, not whether the controller can afford the cost — so a pick abandoned for want of mana would still spend one of the N. Wire the affordability check before authoring that combination. `maxTotalManaValue` is the "any number of spells with **total mana value N or less** from among them" budget (**Uldaros Theorix**: exile up to one target nonland card of each card type from your graveyard, copy them, "cast any number of spells with total mana value 6 or less from among the copies without paying their mana costs" — `Pipeline { exiled = gather(ChosenTargets); exile(exiled); copies = copyCards(exiled); run(CastWithTotalManaValueFromCollectionWithoutPayingCost(copies, 6)) }`). Each iteration offers only the cards whose mana value still fits in the remaining budget (a card that doesn't fit is dropped — the budget only shrinks); a cast that initiates spends its mana value (X is 0 on a free cast, CR 107.3b, so the off-stack mana value is the cast one), carried on the continuation exactly like `maxCasts`. Same free-form-only caveat as `maxCasts`. The two budgets combine — "cast **up to two** instant and/or sorcery spells **with total mana value 6 or less** from your graveyard and/or hand" is both at once — and the cards need not be exiled first: a card is offered from its owner's exile, hand or graveyard, so **Invoke Calamity** gathers straight from those zones: `Pipeline { candidates = gather(FromMultipleZones(listOf(GRAVEYARD, HAND), You, InstantOrSorcery)); run(CastUpToNFromCollectionWithoutPayingCost(candidates, maxCasts = 2, maxTotalManaValue = 6, insteadOfGraveyard = AfterResolveDestination.EXILE)) }` + `selfExile()`. `insteadOfGraveyard` is the cast-this-way rider "if those spells would be put into your graveyard, exile them instead" — the same parameter, with the same meaning (resolved, countered or fizzled), as on `CastFromCollectionWithoutPayingCostEffect`, which each loop iteration forwards it to. `playLands = true` is the "you may **play lands and cast spells** from among them without paying their mana costs" wording (**Gix, Yawgmoth Praetor**: `gather(TopOfLibrary(xValue, TargetOpponent)) → exile → PlayAnyNumberFromCollectionWithoutPayingCost(exiled)`): land cards in the collection are offered too, but only while the controller could play one right now — asked of `PlayLandHandler.validateDuringResolution` against the same temporary permission the play uses, so it is the controller's own turn, a land play is left and no lock applies (CR 305.2/305.3; Gix's ruling). A chosen land is played through `PlayFromCollectionWithoutPayingCostEffect` (a special action that uses up the land play, not a cast), spends nothing from a `maxCasts`/`maxTotalManaValue` budget, and a land that can't be played is never offered and stays in exile.
+- `CastAnyNumberFromCollectionWithoutPayingCostEffect(from, payManaCost = false, maxCasts = null, maxTotalManaValue = null, playLands = false, insteadOfGraveyard = null, storeCastTo = null)` (facades `Effects.CastAnyNumberFromCollectionWithoutPayingCost(from, storeCastTo?)` for free / `Effects.PlayAnyNumberFromCollectionWithoutPayingCost(from)` for the free form with `playLands = true` / `Effects.CastAnyNumberFromCollection(from)` for paid / `Effects.CastUpToNFromCollectionWithoutPayingCost(from, maxCasts, maxTotalManaValue?, insteadOfGraveyard?)` for the capped free form / `Effects.CastWithTotalManaValueFromCollectionWithoutPayingCost(from, maxTotalManaValue)` for the total-mana-value form) — the multi-cast sibling of `CastFromCollectionWithoutPayingCostEffect`. **During this effect's resolution**, the controller is offered the cards in pipeline collection `from` (filtered to those still in their owner's exile, hand or graveyard) one at a time and may cast each until they decline; each cast's targets / X / modes flow through the normal cast machinery. With the default `payManaCost = false` each is cast for free; set `payManaCost = true` (facade `Effects.CastAnyNumberFromCollection`) for the "you may cast any number of [them]" wording **without** "without paying their mana costs" — each chosen card is then cast paying its normal cost (an {X} card prompts for X). Because the casts go through the synthesized-cast path (like Cascade), card-type **timing restrictions are ignored** and no lingering "you may play it later" permission is granted — cards left uncast just stay where they are (the controller can't wait until later in the turn). Hand it the eligible set: filter the collection upstream (e.g. nonland + `FilterCollection(Any.manaValueAtMostDynamic(...))`). The free form models "you may cast any number of spells with mana value X or less from among them without paying their mana costs" — e.g. **Kotis, the Fangkeeper**: `GatherCards(TopOfLibrary(damage, TriggeringPlayer)) → MoveCollection(→ exile) → FilterCollection(Nonland) → FilterCollection(Any.manaValueAtMostDynamic(damage)) → CastAnyNumberFromCollectionWithoutPayingCostEffect("castable")` (also **Villainous Wealth**, **Etali, Primal Storm**). The paid form models **The Tale of Tamiyo** IV (cast the copies paying their costs). `maxCasts` bounds the loop for the "you may cast **up to N** spells from among them" wording (**Doom Reigns Supreme**: "target opponent exiles the top five cards of their library. You may cast up to two spells from among the exiled cards without paying their mana costs"); it is a ceiling only — the controller may still stop early, and the loop also ends when the collection runs out. The remaining budget rides on the engine's `CastAnyNumberFromCollectionContinuation`, so the resumer re-enters the loop with `maxCasts - 1` and a budget of 0 makes the effect a no-op before another decision is offered; `null` (the default) is the uncapped "any number" form and leaves every existing caller unchanged. The budget is spent on a cast that **initiates**, not on the pick: a chosen card whose required target has no legal choice can't be cast at all (CR 601.2c), so it stays in exile and the count is untouched (it is still dropped from the pool, so the loop can't re-offer it). Use the facade rather than the raw constructor — it rejects a non-positive `maxCasts`, which would otherwise be a silent no-op, and it only offers `maxCasts` alongside the free form. **`maxCasts` is wired for `payManaCost = false` only**: no printed card pairs "up to N" with "paying their mana costs", and the engine's "did the cast initiate" precondition asks only whether a required target had a legal choice, not whether the controller can afford the cost — so a pick abandoned for want of mana would still spend one of the N. Wire the affordability check before authoring that combination. `maxTotalManaValue` is the "any number of spells with **total mana value N or less** from among them" budget (**Uldaros Theorix**: exile up to one target nonland card of each card type from your graveyard, copy them, "cast any number of spells with total mana value 6 or less from among the copies without paying their mana costs" — `Pipeline { exiled = gather(ChosenTargets); exile(exiled); copies = copyCards(exiled); run(CastWithTotalManaValueFromCollectionWithoutPayingCost(copies, 6)) }`). Each iteration offers only the cards whose mana value still fits in the remaining budget (a card that doesn't fit is dropped — the budget only shrinks); a cast that initiates spends its mana value (X is 0 on a free cast, CR 107.3b, so the off-stack mana value is the cast one), carried on the continuation exactly like `maxCasts`. Same free-form-only caveat as `maxCasts`. The two budgets combine — "cast **up to two** instant and/or sorcery spells **with total mana value 6 or less** from your graveyard and/or hand" is both at once — and the cards need not be exiled first: a card is offered from its owner's exile, hand or graveyard, so **Invoke Calamity** gathers straight from those zones: `Pipeline { candidates = gather(FromMultipleZones(listOf(GRAVEYARD, HAND), You, InstantOrSorcery)); run(CastUpToNFromCollectionWithoutPayingCost(candidates, maxCasts = 2, maxTotalManaValue = 6, insteadOfGraveyard = AfterResolveDestination.EXILE)) }` + `selfExile()`. `insteadOfGraveyard` is the cast-this-way rider "if those spells would be put into your graveyard, exile them instead" — the same parameter, with the same meaning (resolved, countered or fizzled), as on `CastFromCollectionWithoutPayingCostEffect`, which each loop iteration forwards it to. `playLands = true` is the "you may **play lands and cast spells** from among them without paying their mana costs" wording (**Gix, Yawgmoth Praetor**: `gather(TopOfLibrary(xValue, TargetOpponent)) → exile → PlayAnyNumberFromCollectionWithoutPayingCost(exiled)`): land cards in the collection are offered too, but only while the controller could play one right now — asked of `PlayLandHandler.validateDuringResolution` against the same temporary permission the play uses, so it is the controller's own turn, a land play is left and no lock applies (CR 305.2/305.3; Gix's ruling). A chosen land is played through `PlayFromCollectionWithoutPayingCostEffect` (a special action that uses up the land play, not a cast), spends nothing from a `maxCasts`/`maxTotalManaValue` budget, and a land that can't be played is never offered and stays in exile. `storeCastTo` names a pipeline collection that ends up holding **every card the loop actually cast**, in cast order — the same name and meaning as on `CastFromCollectionWithoutPayingCostEffect`, widened to the whole loop. A pick whose cast never initiates (no legal target, CR 601.2c) and a land played under `playLands` are not recorded; the collection is written (possibly empty) on every exit, so the step after the loop reads "none" rather than a missing slot. Use it through `runStoringCollection`: **Kefka, Dancing Mad** — "exile a card at random from each opponent's graveyard. You may cast any number of spells from among cards exiled this way without paying their mana costs. Then each player who owns a spell you cast this way loses life equal to its mana value" — is `Pipeline { val (picked) = forEachPlayerCollecting(EachOpponent) { listOf(chooseRandom(1, gather(FromZone(GRAVEYARD, You)))) }; exile(picked); val cast = runStoringCollection { CastAnyNumberFromCollectionWithoutPayingCost(filter(picked, Nonland), storeCastTo = it) }; run(ForEachInCollection(cast, LoseLife(manaValueOf(IterationEntity), PlayerRef(Player.OwnerOfIterationEntity)))) }` — one life loss per spell, charged to its owner rather than to you, its caster.
 - `FilterCollectionEffect(from, filter = GameObjectFilter.Any, collectionFilter = null, storeMatching, storeNonMatching = null)` *(SDK-internal step; cards use `Effects.Pipeline { filter/filterSplit/exclude }` — §5.5.)*
   — the choice-free partition step. A card is kept when it matches `filter`, an ordinary
   `GameObjectFilter` evaluated per card with the **resolving** context (a
@@ -3678,6 +4010,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `FilterCollection(from, GameObjectFilter.Any.currentlyIn(zone), storeMatching)` — keep only the cards in pipeline collection `from` that are **currently** in `zone`. Pipeline collections track entity refs, not live location, so a card can leave its zone mid-resolution (e.g. an exiled card cast for free moves to the stack). Use this to act on "the ones still there." Models the "you may cast it … if you don't, put that card into your hand" fallback of the **Tarkir: Dragonstorm "…storm" enchantments** (Breaching Dragonstorm): `GatherUntilMatch(Nonland) → MoveCollection(→ exile) → FilterCollection(Any.manaValueAtMostDynamic(Fixed(8)), "castable") → ConditionalOnCollection("castable", ifNotEmpty = Effects.May(CastFromCollectionWithoutPayingCost("castable"))) → FilterCollection("nonland", Any.currentlyIn(EXILE), "uncast") → MoveCollection("uncast" → hand)` — only the nonland still in exile (not the one just cast) goes to hand; the lands stay exiled. The `ConditionalOnCollection` wrapper suppresses the empty "you may cast" prompt when the nonland's mana value is > 8.
 - `FilterCollection(from, collectionFilter = CollectionFilter.GreatestManaValue, storeMatching)` — keep the cards tied for the greatest mana value (ties all kept, so a downstream "exactly one" step can see them). A face-down permanent in the collection counts as mana value 0 (CR 708.2a, 202.3a). Over a gathered battlefield collection it spells "sacrifices a creature with the greatest mana value among creatures they control": Gather → `GreatestManaValue` → `SelectFromCollection(ChooseExactly(1), chooser = TargetPlayer)` → `MoveCollection(moveType = Sacrifice)` (Break Under Pressure). Reveal-and-compare cards use it the same way (Psychic Battle).
 - `MoveCollectionEffect(from, destination, filter = null, …)` *(SDK-internal step; cards use `Effects.Pipeline { move/moveTracked and the destroy/sacrifice/discard/exile/toHand/… shortcuts }` — §5.5.)* — move a pipeline collection to a zone.
+  `attackDefender: EnteringAttackDefender` (pipeline `move`, `Patterns.Hand.putFromHand`) says what each card put
+  onto the battlefield `ZonePlacement.TappedAndAttacking` attacks. `JOIN_SOURCE` (default) joins a defending player
+  already in this combat — right for "attacking that player" (Kaalia of the Vast). `CONTROLLER_CHOOSES` is CR 508.4
+  as printed for a bare "tapped and attacking" (Minion of the Mighty): before any card moves, the controller picks
+  a defending player, a planeswalker one controls or a battle one protects for each card in collection order — the
+  same chooser as `CreateTokenEffect.attackDefender`; one legal choice is taken silently, and a card with none (or
+  that isn't a creature as it lands) enters unattacking. `RETURNED_ATTACKER` is single-card `MoveToZoneEffect` only;
+  any non-default value needs a `ToZone(…, placement = TappedAndAttacking)` destination.
   `addCounterType` on `Effects.Move` and pipeline `move` gives each battlefield entrant one counter as part of entry, before its zone-change event, honoring counter-placement replacements and “can't receive counters”; the entrant's controller is the placer, `addCounterIf` uses projected arrival characteristics, and redirected or prevented entries receive no counter. Nonbattlefield destinations retain counter annotations on the arriving card. Supplied, printed, and intrinsic entry counters of the same kind form one placement; its modifiers use sources present before the entry event, while prevention reads the entrant's prospective characteristics and excludes other simultaneous entrants' statics.
   **A collection spanning several players is one simultaneous move by each of them.** A graveyard
   destination always routes each card to its owner's graveyard (CR 400.3); a `MoveType.Discard`
@@ -3706,7 +4046,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   (a noncreature host, protection, its own `EquipmentAttachRestriction`, a creature card) **enters
   unattached** (CR 301.5e, Danitha's ruling), and every other card moves normally. When the wording keeps the
   unattachable ones behind instead ("any targets that couldn't be legally attached … stay in your
-  graveyard", Mantle of the Ancients), add `filter = GameObjectFilter.Any.couldAttachTo(host)`. `markEnteredViaSourceAbility = true` stamps each
+  graveyard", Mantle of the Ancients), add `filter = GameObjectFilter.Any.couldAttachTo(host)`. `auraHostFilter = <GameObjectFilter>`
+  (battlefield destination, exclusive with `attachTo`) keeps the per-Aura host choice of CR 303.4f but
+  narrows it to permanents that also match the filter ("you" = the effect's controller): "return any
+  number of Aura cards from your graveyard to the battlefield attached to creatures you control"
+  (Storm Herald: `auraHostFilter = Creature.youControl()`). Each Aura still needs a host its own enchant
+  ability allows; one with no host in the intersection stays where it is (CR 303.4g). Every host is
+  chosen before anything moves, so the batch still enters at once and `storeMovedAs` holds only the cards
+  that actually entered. `markEnteredViaSourceAbility = true` stamps each
   card that lands on the battlefield with `EnteredViaAbilityComponent(this source)` so a later
   `GatherCards(CardSource.EnteredViaThisResolution)` can re-collect them from live battlefield state.
   `lookableInExile = true` is the "**You may look at that card for as long as it remains exiled**"
@@ -3785,9 +4132,11 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   ability sources carry their original identity through noncombat damage. Redirection retains damage
   source, combat status and unpreventability; an absent/invalid recipient leaves the shield unused.
   Jade Monolith and Beacon of Destiny.
-- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope)` — redirection shield (CR 614.9):
-  while active, damage that would be dealt to any of `protectedTargets` this turn is dealt to `redirectTo`
-  instead. Installed as a `Duration.EndOfTurn` floating effect and checked during damage resolution.
+- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, protectedFilter, optional, fromSource, duration)` —
+  redirection shield (CR 614.9): while active, damage that would be dealt to any of `protectedTargets` (or to
+  any permanent matching `protectedFilter`, see below) is dealt to `redirectTo` instead. Installed as a
+  floating effect lasting `duration` (`Duration.EndOfTurn` by default — "this turn") and checked during
+  damage resolution; a `redirectTo` permanent that leaves the battlefield ends it (CR 400.7).
   `amount` caps the redirected damage (`null` = redirect all). **`scope` decides when an unlimited shield is
   used up** (a capacity shield, `amount != null`, is always used up once its capacity hits 0 — CR 615.7):
   - `RedirectScope.NEXT_INSTANCE` (default) — one source's damage instance, then gone.
@@ -3797,7 +4146,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
     attacker hitting the protected player/creature — not just the first. "The next time damage would be dealt
     to X and/or you…" (Glarecaster). The shield survives the per-assignment apply loop (`inBatch=true`) and is
     consumed once afterwards by `CombatDamageManager.consumeBatchRedirectShields`.
-  - `RedirectScope.CONTINUOUS` — never self-consumed; redirects every instance until end of turn.
+  - `RedirectScope.CONTINUOUS` — never self-consumed; redirects every instance until its `duration` ends.
     "All damage that would be dealt to it this turn…" (Karona's Zealot).
   **`fromSource`** keys the shield to the damage of one *object* — resolved at resolution, so the same
   card returning later is a new source the shield doesn't know (CR 400.7). Shimian Night Stalker's "{B},
@@ -3812,10 +4161,14 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   its own `redirectTo`, so an every-recipient shield can't loop.
   Distinct from the static `RedirectDamage` replacement (continuous, source-keyed) listed under Replacement
   effects — this one is a one-shot/duration shield generated by a resolving ability.
-- `Effects.BecomeCreature(target, power, toughness, keywords, creatureTypes, removeTypes, addTypes, colors, imageUri, duration, dynamicPower = null, dynamicToughness = null)`
+- `Effects.BecomeCreature(target, power, toughness, keywords, creatureTypes, removeTypes, addTypes, colors, imageUri, duration, dynamicPower = null, dynamicToughness = null, removeSubtypes = emptySet())`
   (`BecomeCreatureEffect`) — animate / "becomes a creature." Adds CREATURE (Layer 4, keeping the permanent's
   existing types — so "it's still a land"), *sets* creature subtypes to `creatureTypes` (replacing all others),
-  removes `removeTypes`, grants additional card types via `addTypes` (e.g. `setOf("ARTIFACT")` for **Mishra's
+  removes the card types in `removeTypes`, removes just the subtypes in `removeSubtypes` (a Layer 4
+  `RemoveSubtype` per entry, every other subtype kept — **Dancing Sword**'s "becomes a 2/1 Construct
+  artifact creature … it isn't an Equipment" is `creatureTypes = {"Construct"}, removeSubtypes =
+  {"Equipment"}, duration = Duration.Permanent`; the attach check and the CR 704.5p SBA read the
+  projected subtype, so it can't equip and comes off any host), grants additional card types via `addTypes` (e.g. `setOf("ARTIFACT")` for **Mishra's
   Factory** — "becomes a 2/2 Assembly-Worker artifact creature. It's still a land"), *sets* `colors` (Layer 5,
   replacing all others; `null` = keep), grants `keywords` (Layer 6), and sets base P/T (Layer 7b set
   values). **`power`/`toughness` are `DynamicAmount`** (evaluated once at resolution, CR 613.4c, then
@@ -3854,8 +4207,8 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `BecomeSolvedEffect(target = Self)` (facade `Effects.BecomeSolved()`) — target permanent gains the **solved** designation (CR 719.3b), the resolving half of a Case's "To solve" trigger. Stamps the sticky `SolvedComponent` marker and emits `CaseSolvedEvent` / `ClientEvent.CaseSolved`. Unlike saddled the marker survives cleanup — it lasts until the permanent leaves the battlefield, and there is no inverse effect. Not a copiable value, so a copy of a solved Case enters unsolved; re-solving is a silent no-op. Read it with `Conditions.SourceIsSolved` / `.solved()`. Authored through `toSolve(condition)` rather than called directly.
 - `BecomePreparedEffect(target = Self)` (facade `Effects.BecomePrepared()`) — target permanent becomes prepared (Secrets of Strixhaven). The target must be a `CardLayout.PREPARE` permanent on the battlefield; becoming prepared creates a castable copy of its prepare spell in exile (shared `PreparationLogic.makePrepared`, the same path used when a `Keyword.PREPARED` creature enters prepared). A creature already prepared, not on the battlefield, or not a preparation card does nothing. This is the *only* way a card that lacks `Keyword.PREPARED` can become prepared — cards that "enter prepared" carry the keyword on a `PREPARE`-layout card instead, and the two are mutually exclusive (see `Keyword.PREPARED`). Used by Leech Collector ("Whenever you gain life for the first time each turn, this creature becomes prepared"), Joined Researchers (end-step trigger), and Emeritus of Truce (an ETB "Then if …" conditional).
 - `UnprepareEffect(target = Self)` (facade `Effects.Unprepare()`) — target permanent **becomes unprepared** (Secrets of Strixhaven), the inverse of `BecomePrepared`. Strips the target's `PreparedComponent` and removes the cast-from-exile permission for its exile prepare-spell copy; the now-orphaned copy is swept by the `PhantomCardCopiesCheck` state-based action (which removes prepare-spell copies whose source is no longer prepared). No-op if the target isn't prepared. Used by Biblioplex Tomekeeper ("Target creature becomes unprepared").
-- `EachPermanentBecomesCopyOfTargetEffect(target, filter, duration, excludeTarget, affected, sourceFromAnyZone, exceptions, retainActivatingAbility)` — mass copy (Mirrorform, Naga Fleshcrafter renew). Facade `Effects.EachPermanentBecomesCopyOfTarget(...)`. Copies copiable values only (Rule 707) — counters, tapped state, attached auras/equipment and non-copy modifiers stay put. `duration = Duration.Permanent` (default) bakes the copy into base state for good; `Duration.EndOfTurn` makes a temporary copy reverted by the end-of-turn cleanup; `Duration.UntilNextEndStep` reverts one step earlier — on **entry to the next end step** (`RevertCopyAtNextEndStepComponent`, processed by `CleanupPhaseManager.performNextEndStepExpiry`) — so it lines up with a paired "return it at the beginning of the next end step" delayed trigger (Niko, Light of Hope: "Shards you control become copies of it until the next end step"); `Duration.UntilYourNextTurn` reverts after the **untap step of the effect controller's next turn** (`RevertCopyAtYourNextTurnComponent`, processed by `CleanupPhaseManager.expireUntilYourNextTurnEffects` alongside every other "until your next turn" effect) — Absorbing Man, Taskmaster, Mercenary Mimic. `Duration.WhileSourceAttachedToAffected` keys the copy to the effect's **source** (an Equipment/Aura) staying attached to the copied permanent: it's tagged with the same `CopyWhileAttachedComponent(sourceId)` that `BecomeCopyOfLinkedExileEffect` uses, so `AttachedCopyExpiryCheck` reverts it the moment the source detaches, moves or leaves (CR 611.2b); a permanent the source isn't attached to at resolution is left alone — Blade of Shared Souls (`affected = EffectTarget.AttachedToTriggeringPermanent`, target filter `.notAttachedToBySource()` for "another target creature you control"). Temporary copy histories retain preceding identities separately from the printed `CopyOfComponent` exit snapshot; expiry exposes the most recent remaining identity, preserving current flipped status. Note what the long duration buys: a copy replaces the permanent's card component wholesale, so the permanent's *own* "at the beginning of your first main phase" trigger is gone while the copy is up and back in time to fire again once it reverts. A copy source that has left the battlefield and is a last-known reference with a captured snapshot (`EffectTarget.ExiledAsCost()`, `SacrificedAsCost()`, …) is copied from that snapshot's copiable values (CR 608.2h) — "becomes a copy of the exiled creature" (Curie, Emergent Intelligence). `sourceFromAnyZone = true` lets the copy **source** (`target`) live off the battlefield — its copiable characteristics are read wherever it is, e.g. a card in exile (Lazav, Familiar Stranger; Niko reads the just-exiled creature) or a creature card in a graveyard (Likeness Looter, Taskmaster). `excludeTarget = true` keeps the copy **source** out of the affected set, for "each **other** … becomes a copy of that …" wordings where the target keeps its own identity (and any counter just placed on it). `affected` (an `EffectTarget`, e.g. a second `ContextTarget` or `EffectTarget.Self`) switches to the single-permanent "target permanent A becomes a copy of target permanent B" shape (Fleeting Reflection) — only that one resolved permanent becomes a copy of `target`, and `filter`/`excludeTarget` are ignored; if `affected` resolves to nothing (optional target omitted) the effect is a no-op. **Copy exceptions** ("except …") all ride one `exceptions: CopyExceptions` — see below. `retainActivatingAbility = true` is the one rider that stays on the effect (it isn't a characteristic): it re-grants the activated ability that created the copy, durably and idempotently, so the permanent can be re-aimed after later copies. **Likeness Looter** uses `CopyExceptions(addedKeywords = {FLYING})` plus the retained ability; **Mimeoplasm, Revered One** uses `powerOverride = 0`, `toughnessOverride = 0` and the retained ability while preserving its entry counters; **Shuri, Wakandan Inventor** uses `removedSupertypes = {LEGENDARY}`.
-- `CopyExceptions(nameOverride?, addedKeywords?, addedSupertypes?, removedSupertypes?, addedCardTypes?, overrideCardTypes?, addedSubtypes?, overrideSubtypes?, addedColors?, overrideColors?, retainColors?, powerOverride?, toughnessOverride?, retainPowerToughness?, noManaCost?, addedNumericKeywords?, addedTriggeredAbilities?, addedActivatedAbilities?, retainResolvingTriggeredAbility?)` — the **"except …" half of a copy effect** (CR 707.9b), one vocabulary shared across the copy paths that carry characteristic exceptions and applied in exactly one place engine-side (`CopyExceptionApplier`). Everything on it is a *copiable* value (CR 707.2), so a later copy of the copy sees it, and it lasts exactly as long as the copy does. Add/override pairs follow Magic's own templating, which the rules make load-bearing: a stated card type or subtype **replaces** by default (CR 205.1a) — `overrideCardTypes` / `overrideSubtypes` / `overrideColors` — unless the clause says "**in addition to** its other types" / "still a [type]", which retains the prior types (CR 205.1b) — `addedCardTypes` / `addedSubtypes` / `addedColors`. A printed clause is only ever one or the other; when both are set anyway the override wins on every axis alike. Supertypes only add and remove — `removedSupertypes` is the "except it isn't legendary" direction, without which a copy of a legendary permanent is binned by the legend rule (CR 704.5j), and it is applied **after** `addedSupertypes`. `powerOverride`/`toughnessOverride` create base P/T from nothing when the copied object had none (Absorbing Man copying a land is "a legendary 4/4 Human Villain creature in addition to his other types") — but only when the copy (its other exceptions applied) is a creature: a noncreature with no printed P/T gets none (CR 208.3), so Mindlink Mech copying a crewing animated land ("except it's 4/3, it's a Vehicle artifact") is left a 0/0 once its crew effect makes it a creature, per the card's ruling. Carried as an `exceptions` field by **all three** effects that can express one — `EachPermanentBecomesCopyOfTargetEffect`, `CreateTokenCopyOfTargetEffect`, `CreateTokenCopyOfSourceEffect` — and built from its own riders by the `EntersAsCopy` clone path, so all four run identical type-line arithmetic and a new exception added here is immediately expressible on every one of them. The two token effects *additionally* keep their historical flat riders (`addedSupertypes`, `overridePower`, `addCardTypes`, …) because ~20 card definitions and their serialized shape depend on them; `effect.copyExceptions` is `exceptions.over(<the riders projected into a CopyExceptions>)`, so the two combine and neither drops the other (`CopyExceptions.None.over(base) == base`, so a card using only the riders is bit-for-bit unchanged). Those riders are frozen. `CreateTokenCopyOfEquippedCreatureEffect` (Helm of the Host) also lowers its `removeLegendary` exception through the shared applier, including both flip halves. Spell-copy creation also applies this vocabulary through `CopyTargetSpellEffect.exceptions` and `StackPlacement.putSpellCopy`; its retarget continuations carry the same exceptions (CR 707.10). **New copy exceptions belong here, not on a flat rider.** `addedNumericKeywords` (a `List<KeywordAbility.Numeric>`) is "except it … has toxic 1" — kept apart from `addedKeywords` because the N is part of the ability; it stacks with the copied instances (toxic 2 copied + toxic 1 added = toxic 3, CR 702.164b) — Kinzu of the Bleak Coven. Every token-copy executor (target, source, chosen permanent, equipped creature) carries the copied object's numeric-keyword values over via `CopyExceptionApplier.withNumericKeywords`, since printed toxic N / bushido N ride `ToxicComponent` / `NumericKeywordValuesComponent` rather than the copied `CardComponent`; read off the source's components, so a copy of a copy keeps an exception-added value. `retainColors = true` retains the copying object’s pre-copy copiable colors, independently for each affected permanent. Entry copies read the entrant’s stored colors; later copies read the current copy identity, never an older revert snapshot or layer-five modifiers. Token creation has no previous object colors and retains the empty set. It cannot combine with color additions/overrides. Color exceptions omit copied color-defining abilities (currently the SDK’s `DEVOID` keyword); color indicators are already baked into stored colors and are replaced with the retained/override values. Later plain copies inherit those values and the omitted keyword stays omitted. Other color-changing statics remain active. `retainColors` composes over legacy riders as an override on the color axis. `retainPowerToughness = true` is its P/T twin — "except its power and toughness are equal to this creature's power and toughness" (Hulking Metamorph): the copy keeps the copier's own pre-copy base P/T instead of the copied one. Entry copies read the entrant's stored stats, so a prototyped entrant (CR 718.3b) keeps its prototype size and an unprototyped one its printed size; an existing permanent becoming a copy keeps its current copiable P/T. Token copies have no copier and keep the copied P/T. It cannot combine with `powerOverride` / `toughnessOverride`, is itself a copiable value (a Clone of the copy gets the retained size), and reverts with the copy. Existing-permanent copies emit the ID-only `CopiableCharacteristicsChangedEvent`; token and entry copies keep their normal entry events. The marker is serialized/classified, requires no new trigger category or client animation, and existing state projection sends the current colors. `retainResolvingTriggeredAbility = true` appends the exact resolving triggered ability as copiable rules text (CR 707.9a), including its target requirements, optionality and frozen text changes. The engine captures it when the trigger fires and carries it through target/distribution questions, stack copies, serialized effect contexts and resolution-time choices, including modal modes, action choices, budget modes, discover follow-up effects, payment consequences, bidding outcomes and counterspell payment riders. Each copy adds one new instance, even when copying itself; copying another object replaces old instances. It applies to permanent and token copy effects; outside a resolving trigger (including standalone entry replacements) it adds nothing. Existing-permanent retention emits `CopiableTriggeredAbilityAddedEvent`; token copies emit their normal entry events. Public active-effect projection reads the intrinsic text; the marker carries only an entity ID and has no separate client animation. This supplies “and it has this ability” without recursive SDK construction or rediscovering the source’s current text. `addedTriggeredAbilities` appends triggered rules text as copiable values (CR 707.9a), preserving repeated instances. Use `grantedTriggeredAbility { ... }` to author each entry. `addedActivatedAbilities` is the activated sibling — "except it has '{X}: This creature has base power and toughness X/X'" (Gigantoplasm), authored with `grantedActivatedAbility { ... }`. Stored on `CardComponent.copyActivatedAbilities` and read through the engine's `ownActivatedAbilities(card, cardDef, classLevel)` alongside the definition's own, so the enumerator, the activation lookup/validator, Sharkey-style "gains the activated abilities of" and face-down / lost-all-abilities suppression treat it as the permanent's own ability; a Clone of the copy inherits it. Non-mana abilities activated from the battlefield only — `CopyExceptions` rejects a mana ability or another `activateFromZone` at construction, because the mana-ability readers don't consult it. These abilities are intrinsic to the copy: later copies inherit them, ability removal suppresses them, departure snapshots retain dies/leaves triggers (including simultaneous-death observers and attached triggers), freeze text changes, and suppress abilities that were absent at departure; ending the copy removes them. `EntersAsCopy(exceptions = CopyExceptions(...))` carries the same vocabulary through both spell resolution and the land-entry continuation; it layers over the existing flat riders. Declining the entry copy applies no exceptions. Effect-driven entries through `MoveToZone`/`MoveCollection` also offer `EntersAsCopy` choices before movement, including reanimation, blink, library placement, and simultaneous collections. Entering controllers choose in active-player/nonactive-player order against the pre-entry battlefield; simultaneous entrants are not offered as battlefield copy sources. Copy exceptions, entry counters, tapped riders, copied statics, and ETB triggers use the selected identity. Declines and face-down entries apply no copy riders. Copying a double-faced permanent preserves the entrant’s physical face identity; a single-faced copier cannot transform. The serialized continuation retains the whole effect context and resumes collection bookkeeping and subsequent effects.
+- `EachPermanentBecomesCopyOfTargetEffect(target, filter, duration, excludeTarget, affected, sourceFromAnyZone, exceptions, retainActivatingAbility)` — mass copy (Mirrorform, Naga Fleshcrafter renew). Facade `Effects.EachPermanentBecomesCopyOfTarget(...)`. Copies copiable values only (Rule 707) — counters, tapped state, attached auras/equipment and non-copy modifiers stay put. `duration = Duration.Permanent` (default) bakes the copy into base state for good; `Duration.EndOfTurn` makes a temporary copy reverted by the end-of-turn cleanup; `Duration.UntilNextEndStep` reverts one step earlier — on **entry to the next end step** (`RevertCopyAtNextEndStepComponent`, processed by `CleanupPhaseManager.performNextEndStepExpiry`) — so it lines up with a paired "return it at the beginning of the next end step" delayed trigger (Niko, Light of Hope: "Shards you control become copies of it until the next end step"); `Duration.UntilYourNextTurn` reverts after the **untap step of the effect controller's next turn** (`RevertCopyAtYourNextTurnComponent`, processed by `CleanupPhaseManager.expireUntilYourNextTurnEffects` alongside every other "until your next turn" effect) — Absorbing Man, Taskmaster, Mercenary Mimic. `Duration.WhileSourceAttachedToAffected` keys the copy to the effect's **source** (an Equipment/Aura) staying attached to the copied permanent: it's tagged with the same `CopyWhileAttachedComponent(sourceId)` that `BecomeCopyOfLinkedExileEffect` uses, so `AttachedCopyExpiryCheck` reverts it the moment the source detaches, moves or leaves (CR 611.2b); a permanent the source isn't attached to at resolution is left alone — Blade of Shared Souls (`affected = EffectTarget.AttachedToTriggeringPermanent`, target filter `.notAttachedToBySource()` for "another target creature you control"). Temporary copy histories retain preceding identities separately from the printed `CopyOfComponent` exit snapshot; expiry exposes the most recent remaining identity, preserving current flipped status. Note what the long duration buys: a copy replaces the permanent's card component wholesale, so the permanent's *own* "at the beginning of your first main phase" trigger is gone while the copy is up and back in time to fire again once it reverts. A copy source that has left the battlefield and is a last-known reference with a captured snapshot (`EffectTarget.ExiledAsCost()`, `SacrificedAsCost()`, …) is copied from that snapshot's copiable values (CR 608.2h) — "becomes a copy of the exiled creature" (Curie, Emergent Intelligence), and so is a target an earlier instruction of the same resolution moved off the battlefield (Absorb Identity). `sourceFromAnyZone = true` lets the copy **source** (`target`) live off the battlefield — its copiable characteristics are read wherever it is, e.g. a card in exile (Lazav, Familiar Stranger; Niko reads the just-exiled creature) or a creature card in a graveyard (Likeness Looter, Taskmaster). `excludeTarget = true` keeps the copy **source** out of the affected set, for "each **other** … becomes a copy of that …" wordings where the target keeps its own identity (and any counter just placed on it). `affected` (an `EffectTarget`, e.g. a second `ContextTarget` or `EffectTarget.Self`) switches to the single-permanent "target permanent A becomes a copy of target permanent B" shape (Fleeting Reflection) — only that one resolved permanent becomes a copy of `target`, and `filter`/`excludeTarget` are ignored; if `affected` resolves to nothing (optional target omitted) the effect is a no-op. **Copy exceptions** ("except …") all ride one `exceptions: CopyExceptions` — see below. `retainActivatingAbility = true` is the one rider that stays on the effect (it isn't a characteristic): it re-grants the activated ability that created the copy, durably and idempotently, so the permanent can be re-aimed after later copies. **Likeness Looter** uses `CopyExceptions(addedKeywords = {FLYING})` plus the retained ability; **Mimeoplasm, Revered One** uses `powerOverride = 0`, `toughnessOverride = 0` and the retained ability while preserving its entry counters; **Shuri, Wakandan Inventor** uses `removedSupertypes = {LEGENDARY}`.
+- `CopyExceptions(nameOverride?, addedKeywords?, addedSupertypes?, removedSupertypes?, addedCardTypes?, overrideCardTypes?, addedSubtypes?, overrideSubtypes?, addedColors?, overrideColors?, retainColors?, powerOverride?, toughnessOverride?, retainPowerToughness?, noManaCost?, startingLoyalty?, addedNumericKeywords?, addedTriggeredAbilities?, addedActivatedAbilities?, retainResolvingTriggeredAbility?, conditional?)` — the **"except …" half of a copy effect** (CR 707.9b), one vocabulary shared across the copy paths that carry characteristic exceptions and applied in exactly one place engine-side (`CopyExceptionApplier`). Everything on it is a *copiable* value (CR 707.2), so a later copy of the copy sees it, and it lasts exactly as long as the copy does. Add/override pairs follow Magic's own templating, which the rules make load-bearing: a stated card type or subtype **replaces** by default (CR 205.1a) — `overrideCardTypes` / `overrideSubtypes` / `overrideColors` — unless the clause says "**in addition to** its other types" / "still a [type]", which retains the prior types (CR 205.1a) — `addedCardTypes` / `addedSubtypes` / `addedColors`. A printed clause is only ever one or the other; when both are set anyway the override wins on every axis alike. Supertypes only add and remove — `removedSupertypes` is the "except it isn't legendary" direction, without which a copy of a legendary permanent is binned by the legend rule (CR 704.5j), and it is applied **after** `addedSupertypes`. `powerOverride`/`toughnessOverride` create base P/T from nothing when the copied object had none (Absorbing Man copying a land is "a legendary 4/4 Human Villain creature in addition to his other types") — but only when the copy (its other exceptions applied) is a creature: a noncreature with no printed P/T gets none (CR 208.3), so Mindlink Mech copying a crewing animated land ("except it's 4/3, it's a Vehicle artifact") is left a 0/0 once its crew effect makes it a creature, per the card's ruling. Carried as an `exceptions` field by **all three** effects that can express one — `EachPermanentBecomesCopyOfTargetEffect`, `CreateTokenCopyOfTargetEffect`, `CreateTokenCopyOfSourceEffect` — and built from its own riders by the `EntersAsCopy` clone path, so all four run identical type-line arithmetic and a new exception added here is immediately expressible on every one of them. The two token effects *additionally* keep their historical flat riders (`addedSupertypes`, `overridePower`, `addCardTypes`, …) because ~20 card definitions and their serialized shape depend on them; `effect.copyExceptions` is `exceptions.over(<the riders projected into a CopyExceptions>)`, so the two combine and neither drops the other (`CopyExceptions.None.over(base) == base`, so a card using only the riders is bit-for-bit unchanged). Those riders are frozen. `CreateTokenCopyOfEquippedCreatureEffect` (Helm of the Host) also lowers its `removeLegendary` exception through the shared applier, including both flip halves. Spell-copy creation also applies this vocabulary through `CopyTargetSpellEffect.exceptions` and `StackPlacement.putSpellCopy`; its retarget continuations carry the same exceptions (CR 707.10). **New copy exceptions belong here, not on a flat rider.** `startingLoyalty: Int?` is "except … its starting loyalty is N" (Jace, Mirror Mage's kicked token, `Effects.CreateTokenCopyOfSelf(exceptions = CopyExceptions(removedSupertypes = {LEGENDARY}, startingLoyalty = 1))`): stamped on the copy's `CardComponent.startingLoyaltyOverride`, which every battlefield entry reads in place of the printed loyalty when it places a planeswalker's loyalty counters (CR 306.5b). A copiable value, so a copy of the copy starts at N too; an existing permanent that becomes a copy keeps its counters, since starting loyalty is only read on entry. The spell-copy route (casualty X) keeps its own `tokenStartingLoyalty` rider. `addedNumericKeywords` (a `List<KeywordAbility.Numeric>`) is "except it … has toxic 1" — kept apart from `addedKeywords` because the N is part of the ability; it stacks with the copied instances (toxic 2 copied + toxic 1 added = toxic 3, CR 702.164b) — Kinzu of the Bleak Coven. Every token-copy executor (target, source, chosen permanent, equipped creature) carries the copied object's numeric-keyword values over via `CopyExceptionApplier.withNumericKeywords`, since printed toxic N / bushido N ride `ToxicComponent` / `NumericKeywordValuesComponent` rather than the copied `CardComponent`; read off the source's components, so a copy of a copy keeps an exception-added value. `retainColors = true` retains the copying object’s pre-copy copiable colors, independently for each affected permanent. Entry copies read the entrant’s stored colors; later copies read the current copy identity, never an older revert snapshot or layer-five modifiers. Token creation has no previous object colors and retains the empty set. It cannot combine with color additions/overrides. Color exceptions omit copied color-defining abilities (currently the SDK’s `DEVOID` keyword); color indicators are already baked into stored colors and are replaced with the retained/override values. Later plain copies inherit those values and the omitted keyword stays omitted. Other color-changing statics remain active. `retainColors` composes over legacy riders as an override on the color axis. `retainPowerToughness = true` is its P/T twin — "except its power and toughness are equal to this creature's power and toughness" (Hulking Metamorph): the copy keeps the copier's own pre-copy base P/T instead of the copied one. Entry copies read the entrant's stored stats, so a prototyped entrant (CR 718.3b) keeps its prototype size and an unprototyped one its printed size; an existing permanent becoming a copy keeps its current copiable P/T. Token copies have no copier and keep the copied P/T. It cannot combine with `powerOverride` / `toughnessOverride`, is itself a copiable value (a Clone of the copy gets the retained size), and reverts with the copy. Existing-permanent copies emit the ID-only `CopiableCharacteristicsChangedEvent`; token and entry copies keep their normal entry events. The marker is serialized/classified, requires no new trigger category or client animation, and existing state projection sends the current colors. `retainResolvingTriggeredAbility = true` appends the exact resolving triggered ability as copiable rules text (CR 707.9a), including its target requirements, optionality and frozen text changes. The engine captures it when the trigger fires and carries it through target/distribution questions, stack copies, serialized effect contexts and resolution-time choices, including modal modes, action choices, budget modes, discover follow-up effects, payment consequences, bidding outcomes and counterspell payment riders. Each copy adds one new instance, even when copying itself; copying another object replaces old instances. It applies to permanent and token copy effects; outside a resolving trigger (including standalone entry replacements) it adds nothing. Existing-permanent retention emits `CopiableTriggeredAbilityAddedEvent`; token copies emit their normal entry events. Public active-effect projection reads the intrinsic text; the marker carries only an entity ID and has no separate client animation. This supplies “and it has this ability” without recursive SDK construction or rediscovering the source’s current text. `addedTriggeredAbilities` appends triggered rules text as copiable values (CR 707.9a), preserving repeated instances. Use `grantedTriggeredAbility { ... }` to author each entry. `addedActivatedAbilities` is the activated sibling — "except it has '{X}: This creature has base power and toughness X/X'" (Gigantoplasm), authored with `grantedActivatedAbility { ... }`. Stored on `CardComponent.copyActivatedAbilities` and read through the engine's `ownActivatedAbilities(card, cardDef, classLevel)` alongside the definition's own, so the enumerator, the activation lookup/validator, Sharkey-style "gains the activated abilities of" and face-down / lost-all-abilities suppression treat it as the permanent's own ability; a Clone of the copy inherits it. Non-mana abilities activated from the battlefield only — `CopyExceptions` rejects a mana ability or another `activateFromZone` at construction, because the mana-ability readers don't consult it. `conditional: List<CopyExceptions.IfCardType(cardType, exceptions)>` is "and, **if it's a creature**, … has changeling" (Moritte of the Frost): each clause's characteristic exceptions apply only when the copy — its copiable type line with every unconditional exception applied — has `cardType`, tested per flip half and folded into `CopyExceptionApplier.typeLine` too. It asks about the copy, not the copied object, so a land animated by a non-copy effect is copied as a noncreature and the clause is skipped (Moritte's ruling). A clause can't nest another condition, add numeric keywords or retain the resolving trigger. These abilities are intrinsic to the copy: later copies inherit them, ability removal suppresses them, departure snapshots retain dies/leaves triggers (including simultaneous-death observers and attached triggers), freeze text changes, and suppress abilities that were absent at departure; ending the copy removes them. `EntersAsCopy(exceptions = CopyExceptions(...))` carries the same vocabulary through both spell resolution and the land-entry continuation; it layers over the existing flat riders. Declining the entry copy applies no exceptions. Effect-driven entries through `MoveToZone`/`MoveCollection` also offer `EntersAsCopy` choices before movement, including reanimation, blink, library placement, and simultaneous collections. Entering controllers choose in active-player/nonactive-player order against the pre-entry battlefield; simultaneous entrants are not offered as battlefield copy sources. Copy exceptions, entry counters, tapped riders, copied statics, and ETB triggers use the selected identity. Declines and face-down entries apply no copy riders. Copying a double-faced permanent preserves the entrant’s physical face identity; a single-faced copier cannot transform. The serialized continuation retains the whole effect context and resumes collection bookkeeping and subsequent effects.
 - An `EntersAsCopy` choice that produces an Aura asks its entering controller what it will enchant
   before entry, on spell resolution and single/collection effect-driven entry. This is a non-targeted
   choice: hexproof and shroud do not prevent attachment, but the copied enchant restriction and
@@ -3868,6 +4221,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `AnimateLandEffect(target, subtypes, keywords, duration)` — land becomes a creature.
 - `MassAnimateEffect(filter, power, toughness, loseAllAbilities = true, duration = EndOfTurn)` — facade `Effects.MassAnimate(filter, power, toughness, loseAllAbilities, duration)`. One-shot: animate **every** permanent matching `filter` into a creature for `duration`, setting each one's base power and toughness to the `power`/`toughness` **`DynamicAmount`s** — resolved per affected permanent (Layer 7b `SetPowerToughnessDynamic`), so `EntityProperty(AffectedEntity, ManaValue)` gives "each equal to its own mana value" — and, when `loseAllAbilities`, stripping all of its abilities (Layer 6 `RemoveAllAbilities`); Layer 4 `AddType("CREATURE")` makes them creatures. The affected set is captured **once** at resolution against the current battlefield (CR 611.2c) and locked in for the duration. This is the fixed-set, one-shot companion to expressing the same effect *continuously* via the `GrantCardType` + `LoseAllAbilities` + `SetBasePowerToughnessDynamicStatic` group statics on a permanent (which take the same `DynamicAmount` P/T) — use the statics for the while-on-battlefield behavior and this effect for the "this effect continues until end of turn" linger when the generating permanent leaves. Used by **Titania's Song** ("Each noncreature artifact loses all abilities and becomes an artifact creature with power and toughness each equal to its mana value. If this enchantment leaves the battlefield, this effect continues until end of turn.") — a `LeavesBattlefield(SELF)` trigger replays the static set as until-EOT floating effects with `power = toughness = EntityProperty(AffectedEntity, ManaValue)`. The dynamic-P/T floating effect resolves its controller from the effect's captured controller (`ContinuousEffect.controllerId`) when the source has already left the battlefield.
 - `ExploreEffect(target)` — Explore mechanic (reveal top; land → battlefield, else hand + counter).
+- `LearnEffect(body, replacementsApplied = false)` — the Learn keyword action (CR 701.48), wrapping its pipeline. Built by `Patterns.Mechanic.learn()`; never constructed directly by a card. `body` runs unchanged; the wrapper names the action so `ReplaceKeywordAction` over `EventPattern.LearnEvent` can replace it (Retriever Phoenix). `replacementsApplied` is the CR 614.5 guard, set on the re-issue after every offered replacement was declined. Same shape as `ConniveEffect`.
 - `ConniveEffect(subject, body, replacementsApplied = false, count = Fixed(1))` — the connive keyword action (CR 701.50), wrapping the pipeline that carries it out. Built by `Patterns.Hand.connive` / `Effects.Connive(target)`; never constructed directly by a card. `body` is the ordinary draw → discard → conditional +1/+1 counter pipeline and runs unchanged — the wrapper exists to give the action a **name and a subject**, which is what `ModifyKeywordAction` needs to replace it (`EventPattern.ConnivedEvent`) and what lets `ConniveEffectExecutor` append `EmitConnivedEventEffect` as the pipeline's tail so `PermanentConnivedEvent` fires after the discard resolves (CR 701.50f). `replacementsApplied` is the CR 614.5 recursion guard, set only on the post-replacement re-issue. Mirrors `ExploreEffect`, the other replaceable/observable keyword action. `count` is N for connive N (CR 701.50d); the body computes N itself, and the executor evaluates `count` only to honour CR 701.50e — a connive 0 draws and discards nothing, is not replaced, and fires no connive event. **Departed subject (CR 701.50b).** A creature that convoked the resolving spell and has left the battlefield still connives as the object it last was: the executor finds its snapshot in the spell's `convokedLastKnown`, has the snapshot's controller draw and discard, puts no counter anywhere (the loop's binding is dropped, so `IterationEntity` names nothing), matches `ModifyKeywordAction` replacements against the snapshot, and emits `PermanentConnivedEvent(lastKnown = snapshot)`, which `TriggerMatcher` matches with `matchesSnapshot`. Any other unresolvable subject (a targeted permanent that left) still draws and discards, with nothing to match a replacement or trigger against.
 - `AttachEquipmentEffect(equip, target)` — attach an Equipment. Facade `Effects.AttachEquipment(...)`.
   `Effects.AttachTargetEquipmentToCreature(equipmentTarget, creatureTarget)` force-attaches one
@@ -3912,6 +4266,12 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `target` is usually `EffectTarget.TriggeringEntity` ("that Equipment" inside a delayed trigger) or
   `EffectTarget.Self`. Used by Stolen Uniform's "when you lose control of that Equipment … unattach it".
 - `TapUntapEffect(target, isTap)` — tap or untap. Facade: `Effects.Tap` / `Effects.Untap`.
+- `EnterTappedEffect` — "this permanent enters tapped", the rider of an `OnEnterRun` as-enters
+  replacement (reveal lands, snarls, Multiversal Passage's "if you don't, it enters tapped"). Facade:
+  `Effects.EnterTapped()`. An entry modification, not a tap: it marks the entering permanent tapped
+  without a "becomes tapped" event, and an `EntersUntapped` replacement (The Wandering Minstrel,
+  Spelunking) overrides it (CR 616.1). Use it instead of `Effects.Tap(EffectTarget.Self)` for any
+  "enters tapped" clause inside `OnEnterRun`.
 - `Effects.TapEachTarget()` — "tap up to N target creatures": taps every object chosen as a target.
   Composes `ForEachTargetEffect` over `Effects.Tap(ContextTarget(0))`, so the count lives only on the
   spell's `TargetCreature`/`TargetPermanent` (`count`, `unlimited`, or `dynamicMaxCount`) — never
@@ -3924,7 +4284,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   `Effects.Untap(ContextTarget(0))`, with the count owned by the spell's target requirement.
 - `UnlockDoorEffect(target = ContextTarget(0))` — facade `Effects.UnlockDoor(target)`. The resolution-time
   **"unlock a door"** instruction (CR 709.5f): gives a locked half of the targeted Room the "unlocked"
-  designation. Distinct from the *unlock cost* special action (CR 709.5e, `ModifyUnlockCost` below) — the
+  designation. Distinct from the *unlock cost* special action (CR 709.5e, `ModifySpecialActionCost` below) — the
   resolving controller pays nothing. Routes through the same shared `RoomDoorUnlocker` the special action uses,
   so it emits the identical `DoorUnlockedEvent`/`RoomFullyUnlockedEvent` and a face's "When you unlock this
   door" trigger (`Triggers.self.doorUnlocked()`, CR 709.5h) fires either way. Pair with an **up-to-one** target
@@ -3947,9 +4307,9 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   chooses lock or unlock as it resolves, then the chosen door effect runs against the same outer `target`. Pair
   with a single **"target Room you control"** `TargetObject` (no locked/unlocked restriction — either choice can
   always do something on a Room you control).
-- `PhaseOutEffect(target = Self, cantPhaseInWhileYouControlSource = false)` — phase the target permanent out (Rule 702.26); facade `Effects.PhaseOut(target, cantPhaseInWhileYouControlSource)`. With `cantPhaseInWhileYouControlSource = true` it is "It can't phase in for as long as you control this Saga" (The Phasing of Zhalfir): the permanent and its indirectly phased attachments carry a `PhaseInLock` on `PhasedOutComponent`, the untap step skips them, and `EndedDurationExpiryCheck` releases the lock one-way (CR 611.2b) the moment the source leaves the battlefield or changes controller. Release does **not** phase anything in — it phases in at its controller's next untap step, which is what separates it from `PhaseOutUntilLeaves` (Oubliette's immediate phase-in on the source's leaves trigger). While phased out it's treated as though it doesn't exist (excluded from `getBattlefield`, so from projection, triggers, combat, targeting, and SBAs) and phases back in before its controller's next untap step. Indirect phasing (attached Auras/Equipment) is handled automatically. Used as the `suffer` branch of a pay-or-phase trigger (Vaporous Djinn: "phases out unless you pay {U}{U}" = `PayOrSufferEffect(Costs.pay.Mana(...), Effects.PhaseOut())`), or as the reaction of a "becomes the target of a spell, it phases out" trigger (King of the Oathbreakers = `Triggers.a(...).becomesTarget(spellsOnly = true)` + `Effects.PhaseOut(EffectTarget.TriggeringEntity)`). The matching phase-in moment is the `Triggers.a(filter?).phasesIn()` trigger (see Triggers below).
+- `PhaseOutEffect(target = Self, cantPhaseIn: Duration? = null)` — phase the target permanent out (Rule 702.26); facade `Effects.PhaseOut(target, cantPhaseIn)`. `cantPhaseIn` is a window during which it can't phase in — the permanent and its indirectly phased attachments carry a `PhaseInLock` on `PhasedOutComponent` and the untap step skips them. Two windows: `Duration.WhileYouControlSource("this Saga")` is "It can't phase in for as long as you control this Saga" (The Phasing of Zhalfir) — `EndedDurationExpiryCheck` releases the lock one-way (CR 611.2b) the moment the source leaves the battlefield or changes controller; `Duration.EndOfYourNextTurn` is "Until the end of your next turn, they can't phase in" (Teferi, Timeless Voyager, over `ForEachInGroup(GroupFilter(Creature.targetOpponentControls()), PhaseOut(IterationEntity, …))`) — released at the cleanup of the effect controller's next turn (the current turn never counts), or when that player leaves the game. Any other duration is rejected at construction. Release does **not** phase anything in — it phases in at its controller's next untap step, which is what separates it from `PhaseOutUntilLeaves` (Oubliette's immediate phase-in on the source's leaves trigger). While phased out it's treated as though it doesn't exist (excluded from `getBattlefield`, so from projection, triggers, combat, targeting, and SBAs) and phases back in before its controller's next untap step. Indirect phasing (attached Auras/Equipment) is handled automatically. Used as the `suffer` branch of a pay-or-phase trigger (Vaporous Djinn: "phases out unless you pay {U}{U}" = `PayOrSufferEffect(Costs.pay.Mana(...), Effects.PhaseOut())`), or as the reaction of a "becomes the target of a spell, it phases out" trigger (King of the Oathbreakers = `Triggers.a(...).becomesTarget(spellsOnly = true)` + `Effects.PhaseOut(EffectTarget.TriggeringEntity)`). The matching phase-in moment is the `Triggers.a(filter?).phasesIn()` trigger (see Triggers below).
 - `PhaseOutUntilLeavesEffect(target, tapOnPhaseIn)` / `Effects.PhaseOutUntilLeaves(target, tapOnPhaseIn)` — phase the target out **indefinitely, linked to the effect's source** (the phasing analogue of `ExileUntilLeaves`): it skips its untap-step phase-in and stays out until the source leaves the battlefield. Pair with `Effects.PhaseInLinkedToSource()` on the source's `LeavesBattlefield` trigger, which phases everything the source phased out this way back in (tapping those flagged `tapOnPhaseIn`). The link lives on the phased-out permanent (`PhasedOutComponent.phaseInOnSourceLeaves`); indirect phasing carries Auras/Equipment out with the creature. This is Oubliette (ETB phase-out + leaves-trigger phase-in, tapped).
-- `MarkExileOnDeathEffect(target)` — replace next "to graveyard" with "to exile".
+- `MarkExileOnDeathEffect(target, duration = Duration.EndOfTurn)` — "if it would die [this turn], exile it instead": marks the creature so any death (destruction, lethal damage, sacrifice, SBA) goes to exile. `Duration.EndOfTurn` is the "this turn" rider (Carbonize, Fanged Flames); `Duration.Permanent` is a creature that *gains* "If this creature would die, exile it instead" (Can't Stay Away: `Effects.MarkExileOnDeath(returned.asTarget, Duration.Permanent)` after a tracked return) — the mark lasts until the creature leaves the battlefield, when zone-change cleanup drops it with its other floating effects (CR 400.7). Read by `ZoneMovementUtils.checkZoneChangeRedirect` for every battlefield → graveyard move.
 - `Effects.AddCombatPhase` / `Effects.AddMainPhase` — the two **atomic extra-phase** effects
   (CR 500.8: extra phases are added after the specified phase). `AddCombatPhase` queues *one combat
   phase and nothing else* — "After this phase, there is an additional combat phase" (Aurelia, the
@@ -3990,7 +4350,20 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   matched against projected state so animated lands read as the land *creatures* they are. Reused by
   Aang, Destined Savior and Bumi, King of Three Trials' sibling. (A Kotlin property and function can't
   share a name, so the unrestricted atom stays the `Effects.AddCombatPhase` value and the restricted
-  variant is this factory; both build the one `AddCombatPhaseEffect(attackerRestriction: GameObjectFilter?)`.)
+  variant is this factory; both build the one `AddCombatPhaseEffect(attackerRestriction, atBeginningOfThatCombat)`.)
+- `Effects.AddCombatPhaseWithBeginningTrigger(atBeginningOfThatCombat: Effect)` — the atomic extra
+  combat phase (combat only, no trailing main phase) plus an **"At the beginning of that combat,
+  [effect]"** rider — Moraug, Fury of Akoum: "there's an additional combat phase after this phase. At
+  the beginning of that combat, untap all creatures you control" ⇒
+  `AddCombatPhaseWithBeginningTrigger(Effects.ForEachInGroup(GroupFilter(Creature.youControl()), Effects.Untap(EffectTarget.IterationEntity)))`.
+  The rider is a delayed triggered ability (CR 603.7) linked to *that* added phase alone: it is baked
+  when the effect resolves (by the same path as `CreateDelayedTrigger`, so context targets freeze and
+  "you" is the effect's controller) and stored on the `QueuedPhase` (`beginningTrigger`) rather than in
+  `GameState.delayedTriggers`; `TurnManager` installs it as that phase begins, and that phase's
+  beginning of combat step fires and consumes it. So cast precombat the untap happens at the added
+  combat but not the natural one after it; two resolutions give two added combats that each untap at
+  their own start; a skipped added phase drops its rider unfired. `CreateDelayedTrigger(step =
+  BEGIN_COMBAT)` is the wrong tool here — it fires at the *next* beginning of combat of any kind.
 - `Effects.AddAdditionalUpkeepSteps(amount)` (`amount: DynamicAmount` or `Int`) — give the
   controller `amount` additional upkeep steps after the current phase (Obeka, Splitter of Seconds:
   "you get that many additional upkeep steps after this phase"). Per CR 500.10, each added upkeep
@@ -4003,6 +4376,15 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   (after the additional-combat-phase check), each remaining count redirecting into a fresh upkeep
   step in the beginning phase. Read "that many" from the triggering combat damage with
   `DynamicAmount.ContextProperty(ContextPropertyKey.TRIGGER_DAMAGE_AMOUNT)`.
+  `Effects.AddAdditionalUpkeepSteps(amount, afterThisStep = true)` instead inserts the upkeep
+  steps directly after the current upkeep step (Paradox Haze: "that player gets an additional upkeep
+  step after this step"). Per CR 500.9 that is a bare upkeep step in the same beginning phase — no
+  untap or draw step between them, and the turn goes on to its draw step afterwards (or back to the
+  postcombat main phase from an Obeka upkeep). Accumulates an `AdditionalUpkeepStepsAfterStepComponent`
+  count on the active player, drained by `TurnManager.advanceStep` when leaving the upkeep step;
+  upkeep triggers fire again in each. Use it only from an upkeep-step trigger (a count queued
+  elsewhere waits for the next upkeep step of the turn, or is dropped at cleanup). Gate a rider that re-triggers in it on
+  `Conditions.IsFirstUpkeepStepOfTurn`.
 - `Effects.AddAdditionalEndSteps(amount)` (`amount: DynamicAmount` or `Int`, default `1`) — insert
   `amount` additional end step(s) directly after the current end step (Y'shtola Rhul: "there is an
   additional end step after this step"). Per CR 500.9 a step is inserted directly after the
@@ -4318,7 +4700,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   (default) asks everyone; `Player.EachOpponent` asks only the controller's opponents — "any
   opponent may sacrifice a creature… if a player does, tap this and put a +1/+1 counter on it"
   (Desecration Demon). APNAP order is preserved within the scoped subset.
-- `RepeatWhileEffect(body, repeatCondition, collectCollections = emptyMap())` (facade `Effects.RepeatWhile(body, repeatCondition)`; with `collectCollections`, the `repeatCollecting { }` pipeline verb) — do-while loop: run `body` once, then repeat while `repeatCondition` holds. `repeatCondition` is `RepeatCondition.PlayerChooses(decider, prompt)` (a yes/no each iteration) or `RepeatCondition.WhileCondition(condition)` (a game-state `Condition`). A `WhileCondition` is evaluated against the **body's own pipeline outputs from that iteration** (the collections/values it just stored), then the next iteration's body runs from the pristine pre-loop context — so a loop can branch on what it just produced without stale state leaking forward. This holds **whether the body resolves synchronously or pauses for a decision mid-loop**: a body that stops for a player choice (e.g. a `SelectFromCollection` "you may" prompt) has its outputs captured when it resumes and still fed to the condition. Models "do X. Repeat this process [if …]" — e.g. **The Tale of Tamiyo** I–III (synchronous body): `RepeatWhile(body = Composite(Patterns.Library.mill(2), Effects.If(CollectionSharesCardType("milled"), DrawCards(1))), repeatCondition = WhileCondition(CollectionSharesCardType("milled")))` mills two, and while the two milled cards share a card type both draws and repeats. **Cultivator Colossus** (pausing body): `RepeatWhile(body = Composite(Patterns.Hand.putFromHand(Land, count = 1, entersTapped = true), Effects.If(CollectionContainsMatch("putting", Land), DrawCards(1))), repeatCondition = WhileCondition(CollectionContainsMatch("putting", Land)))` — each pass prompts to put up to one land (choosing zero declines), draws only if one was put, and repeats while a land was put this pass. Because every pass starts pristine, nothing a pass stores reaches the effects after the loop — except through `collectCollections` (body collection → aggregate, the loop's twin of `ForEachEffect.collectCollections`): each pass's output is appended to the aggregate, and once the loop stops every aggregate is published to the following effects (empty if no pass wrote to it), whether the last pass paused or not. The repeat condition still reads only the pass just run, never the aggregate. **Struggle for Sanity** ("repeat this process until all cards in that hand have been exiled. That player returns the cards they exiled this way…") collects both players' picks across passes.
+- `RepeatWhileEffect(body, repeatCondition, collectCollections = emptyMap())` (facade `Effects.RepeatWhile(body, repeatCondition)`; with `collectCollections`, the `repeatCollecting { }` pipeline verb) — do-while loop: run `body` once, then repeat while `repeatCondition` holds. `repeatCondition` is `RepeatCondition.PlayerChooses(decider, prompt)` (a yes/no each iteration) or `RepeatCondition.WhileCondition(condition)` (a game-state `Condition`). A `WhileCondition` is evaluated against the **body's own pipeline outputs from that iteration** (the collections/values it just stored), then the next iteration's body runs from the pristine pre-loop context — so a loop can branch on what it just produced without stale state leaking forward. This holds **whether the body resolves synchronously or pauses for a decision mid-loop**: a body that stops for a player choice (e.g. a `SelectFromCollection` "you may" prompt) has its outputs captured when it resumes and still fed to the condition. Models "do X. Repeat this process [if …]" — e.g. **The Tale of Tamiyo** I–III (synchronous body): `RepeatWhile(body = Composite(Patterns.Library.mill(2), Effects.If(CollectionSharesCardType("milled"), DrawCards(1))), repeatCondition = WhileCondition(CollectionSharesCardType("milled")))` mills two, and while the two milled cards share a card type both draws and repeats. **Cultivator Colossus** (pausing body): `RepeatWhile(body = Composite(Patterns.Hand.putFromHand(Land, count = 1, entersTapped = true), Effects.If(CollectionContainsMatch("putting", Land), DrawCards(1))), repeatCondition = WhileCondition(CollectionContainsMatch("putting", Land)))` — each pass prompts to put up to one land (choosing zero declines), draws only if one was put, and repeats while a land was put this pass. Because every pass starts pristine, nothing a pass stores reaches the effects after the loop — except through `collectCollections` (body collection → aggregate, the loop's twin of `ForEachEffect.collectCollections`): each pass's output is appended to the aggregate, and once the loop stops every aggregate is published to the following effects (empty if no pass wrote to it), whether the last pass paused or not. The repeat condition still reads only the pass just run, never the aggregate. **Struggle for Sanity** ("repeat this process until all cards in that hand have been exiled. That player returns the cards they exiled this way…") collects both players' picks across passes. `PlayerChooses(…, onlyIf = condition)` makes the yes/no a **gated offer**: it is asked only after a pass where `onlyIf` holds — read like a `WhileCondition`, against that pass's outputs (numbers included, paused or not) — and a pass where it fails ends the loop without a prompt. **Delina, Wild Mage** ("roll a d20. 1—14 | create a token … 15—20 | Create one of those tokens. You may roll again.") gates the offer on the pass's roll; the `repeatProcess { }` pipeline verb lets the condition name the body's slots.
 
 ### Sequencing & conditional
 
@@ -4483,6 +4865,9 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `ModalEffect.chooseOne { mode(...) }` / `ModalEffect.chooseN(n) { ... }` — modal effect block.
 - `ModalEffect.chooseOneNotYetChosen(*modes)` — "choose one that hasn't been chosen"; source remembers used modes across the game (Gandalf the Grey). Flag: `excludePreviouslyChosenModes` (per-source `ChosenModesEverComponent`, never cleared).
 - `ModalEffect.chooseOneNotYetChosenThisTurn(*modes)` — "choose one that hasn't been chosen **this turn**"; the turn-scoped sibling. The source remembers modes chosen during the current turn (per-source `ChosenModesThisTurnComponent`, cleared each cleanup step) and excludes them from later triggers *this turn*, so across all of a turn's triggers each mode is chosen at most once; the memory resets next turn. Once every mode is chosen this turn, a top-level triggered ability is removed from the stack and a top-level activated ability cannot be activated; a nested resolution-time choice does nothing. Keyed to the source object, so two copies track modes independently. Flag: `excludeModesChosenThisTurn` (mutually exclusive with `excludePreviouslyChosenModes`). Repeatable modal triggered/activated abilities only — not modal spells (Breeches, Eager Pillager).
+- `ModalEffect.chooseOneAtRandom(*modes)` — "choose one **at random**" (Summon: Magus Sisters). Flag: `chooseAtRandom` (exactly one mode; `chooseCount` other than 1 is rejected). The controller makes no choice: as the triggered ability goes onto the stack the engine draws the mode uniformly from the game's seeded RNG, **before** targets, from the modes that could legally be chosen — a mode with no legal target is out of the draw (an "up to one target" mode always qualifies), and with none left the ability is removed from the stack (CR 603.3c). Players then see the drawn mode on the stack and choose only its targets. Read on the triggered-ability announcement path (`TriggerProcessor`), like `mayChooseNone`; every printed card with the wording is a triggered ability.
+- `Effects.Modal(modes, chooseCount, minChooseCount, mayChooseNone = true)` — "you **may** choose two": the controller may pick no mode at all, but once a mode is picked the printed `[minChooseCount, chooseCount]` holds, so `chooseCount = 2` allows exactly zero or two modes — never one, which `minChooseCount = 0` alone would allow. Before the first pick the mode menu carries the decline option (`ModalEffectExecutor.DECLINE_MODE_LABEL`); declining removes the ability from the stack (CR 603.3c). Read where a modal **triggered** ability announces its modes (`TriggerProcessor`) — every printed card with the wording is a trigger (**Shadrix Silverquill**).
+- `Effects.Modal(..., eachModeTargetsDifferent = true)` — "each mode must target a different player": no player or object may be a target of two chosen modes. Matched as modes to distinct targets (`DistinctModeTargets`): a mode is offered only when it, the modes already picked and enough further legal modes to reach the minimum can all get distinct targets; each later mode's legal targets exclude what earlier modes took; and an earlier mode may not take a target a later chosen mode needs (so an "any player" mode is steered off the one opponent an "opponent" mode must have). With one opponent, a Vindictive Lich–shaped "choose one or more" over opponent modes ends after one pick; with no feasible pair, a `mayChooseNone` choose-two is removed without asking. Triggered-ability announcement path only, like `mayChooseNone` (**Shadrix Silverquill**: `chooseCount = 2, mayChooseNone = true, eachModeTargetsDifferent = true`).
 - `ChooseActionEffect(choices, player = Controller)` — `player` picks from a list of labeled effects; infeasible options (per each `EffectChoice.feasibilityCheck`) are filtered out, and if one remains it auto-runs. `player` may be any `EffectTarget`, including the state-relational `EffectTarget.TargetController` — routing the choice to the controller of the ability's chosen permanent (a "[do X to target permanent] unless its controller [accepts an avoidance]" choice). Combustion Man: "destroy target permanent unless its controller has Combustion Man deal damage to them equal to his power" — `player = TargetController`, with choices `DealDamage(sourcePower(), target = TargetController, damageSource = Self)` and `Destroy(<the permanent>)`. `FeasibilityCheck.CanPayMana(cost)` hides an option whose mana the player can't pay right now (floating mana or untapped sources, the `ManaSolver`'s answer), which is how a **choice of payments** is spelled: "you may pay {G}, {W}, or {U}. If you do, put a +1/+1 counter on Isu" (Isu the Abominable) is one `EffectChoice` per colour — `PayMana(symbol) then AddCounters(...)` with `CanPayMana(symbol)`, so a chosen payment always goes through — plus a "Don't pay" `Effects.Nothing`; with no colour payable only "Don't pay" survives and runs unasked.
 - `GrantBushido(amount, target, duration = EndOfTurn)` — "[target] gains bushido N"; a thin recipe over `GrantKeyword("BUSHIDO_<n>")`, the same `<KEYWORD>_<n>` form as `GrantToxic`. The engine derives the bushido trigger from it and `KeywordValue(BUSHIDO)` counts it. Sensei Golden-Tail: `AddCounters(TRAINING, 1, t) then GrantBushido(1, t, Duration.Permanent) then AddCreatureType("Samurai", t)`.
 - `GrantRampage(amount, target, duration = EndOfTurn)` — "[target] gains rampage N"; `GrantKeyword("RAMPAGE_<n>")`, the `GrantBushido` shape. The engine derives the rampage trigger from it (see `Rampage(n)`). Rapid Fire: `GrantKeyword(FIRST_STRIKE, t) then If(Not(EntityMatches(t, Any.withKeyword(RAMPAGE))), GrantRampage(2, t))`.
@@ -4495,13 +4880,17 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   answered in one `ChooseColorDecision` (`maxColors`) with `ColorChosenResponse.colors`. `then` sees the set as
   `EffectContext.chosenColors` (and one of them as `chosenColor`). Quickchange:
   `ChooseColorsThen(ChangeColorToChosen(creature)) then DrawCards(1)`.
-- `Effects.ChooseNumberThen(then, minValue=0, maxValue=16, prompt)` — pick a number in `[minValue, maxValue]`,
+- `Effects.ChooseNumberThen(then, minValue=0, maxValue=16, prompt, random=false)` — pick a number in `[minValue, maxValue]`,
   then run `then` once with the chosen number exposed via the effect context as **X**. Atomic effects and filters
   under `then` read it through `.manaValueEqualsX()`. Compose with `CompositeEffect` for
   multi-step cards (Void: destroy all artifacts/creatures with that mana value, then a target player reveals their
   hand and discards all nonland cards with that mana value).
   The `maxValue` overload accepts a `DynamicAmount`, evaluated once before the chosen
   number replaces X. An empty range skips both the choice and the inner effect.
+  `random = true` is Oracle's "choose 1, 2, or 3 at random": the engine draws uniformly from the same bounds off
+  the game's seeded RNG and runs `then` inline — no prompt, and not a die roll (no die-roll triggers or
+  replacements). Tibalt's Trickery: `ChooseNumberThen(then = ForEachPlayer(…, Pipeline { mill(XValue) … }),
+  minValue = 1, maxValue = 3, random = true)`.
 - `Effects.AddCountersWithLimit(type, amount, totalLimit, target)` — put a computed number
   of counters on a permanent or player without this instruction raising that kind's total
   above `totalLimit`. The limit applies **after** placement replacements (including doubling);
@@ -4558,7 +4947,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
 - `Effects.GrantProtectionFromChosenCardType(target, duration)` — "gains protection from the card type of your choice" (Pippin, Guard of the Citadel). The card-type analogue of `GrantProtectionFromChosenColor`, but **self-contained**: its executor owns the choice — it presents a `ChooseOptionDecision` over the fixed protectable card-type set (Artifact, Creature, Enchantment, Instant, Land, Planeswalker, Sorcery, Battle) and, on response, grants a floating `PROTECTION_FROM_CARDTYPE_<TYPE>` keyword for `duration`. The targeting validator, `StackResolver` spell-targeting, `DamageUtils`, the combat-damage pipeline/manager, and a `ProtectionFromCardTypeRule` block-evasion rule all match the protected keyword against the source's projected card types. (The "can't be enchanted/equipped by that type" clause is reminder text and unenforced at attach time, mirroring color/subtype protection.)
 - `Effects.GrantProtectionFromColorlessOrChosenColor(target, duration = EndOfTurn)` (`GrantProtectionFromColorlessOrChosenColorEffect`) — "gains protection from colorless or from the color of your choice" (Angelic Intervention). Self-contained like `GrantProtectionFromChosenCardType`: colorless is not a color (CR 105.4), so `ChooseColorThen` can't offer it; the executor presents a `ChooseOptionDecision` over Colorless plus the five colors and grants a floating `PROTECTION_FROM_COLORLESS` or `PROTECTION_FROM_<COLOR>` keyword. **Protection from colorless** matches any source with no colors — artifacts, Eldrazi, colorless spells, abilities of colorless sources — and every color-protection read site (targeting and resolution re-check, `DamageUtils`, the combat-damage pipeline/manager, the `ProtectionFromColorRule` block-evasion rule, and the Aura/Equipment attach and SBA checks) asks the engine's shared `ColorProtection` helper, so the colorless case is enforced for all of DEBT. A source whose card is unknown is never treated as colorless.
 - `ChooseCreatureTypeEffect(...)` — pause for creature-type pick.
-- `SelectTargetEffect(requirement, storeAs, nonTargeting = false, prompt = null, excluding = emptyList())` *(SDK-internal step; cards use `Effects.Pipeline { selectTarget }` — §5.5.)* — have a player pick from a valid set mid-resolution. `nonTargeting = true` makes it a plain "choose" that hexproof, shroud and protection don't restrict (Spectral Searchlight's "choose a player"); `TargetFinder` honours `ignoreTargetingRestrictions` for player requirements too. **Since `selectTarget` is only for choices the Oracle text doesn't call "target", nearly every card use wants `nonTargeting = true`** — "you may sacrifice an artifact. When you do, …" (Cornered Crook), "put a counter on a creature you control", "tap another untapped creature you control": without it an artifact with shroud or protection from red can't be sacrificed and the prompt reads "Choose target …". `ReflexiveTriggerEffect`'s "is the action possible" check honours the flag too, so a lone shrouded artifact still makes the "may" askable. `prompt` replaces the derived "Choose <requirement>" the player sees — use it when the choice only makes sense alongside the rest of the card (Crush Underfoot's Giant, chosen on resolution after its target was declared at cast). `excluding` names earlier pipeline slots whose members are dropped from the legal set before the choice is offered or auto-picked — `selectTarget(..., excluding = listOf(first, second))` is "choose a second player … then a third player" where every pick differs (Gluntch, the Bestower); an exclusion that leaves nobody stores an empty slot, so a following `ForEachPlayer(slot.asPlayers, …)` does nothing.
+- `SelectTargetEffect(requirement, storeAs, nonTargeting = false, prompt = null, excluding = emptyList(), atRandom = false)` *(SDK-internal step; cards use `Effects.Pipeline { selectTarget }` — §5.5.)* — have a player pick from a valid set mid-resolution. `nonTargeting = true` makes it a plain "choose" that hexproof, shroud and protection don't restrict (Spectral Searchlight's "choose a player"); `TargetFinder` honours `ignoreTargetingRestrictions` for player requirements too. **Since `selectTarget` is only for choices the Oracle text doesn't call "target", nearly every card use wants `nonTargeting = true`** — "you may sacrifice an artifact. When you do, …" (Cornered Crook), "put a counter on a creature you control", "tap another untapped creature you control": without it an artifact with shroud or protection from red can't be sacrificed and the prompt reads "Choose target …". `ReflexiveTriggerEffect`'s "is the action possible" check honours the flag too, so a lone shrouded artifact still makes the "may" askable. `prompt` replaces the derived "Choose <requirement>" the player sees — use it when the choice only makes sense alongside the rest of the card (Crush Underfoot's Giant, chosen on resolution after its target was declared at cast). `excluding` names earlier pipeline slots whose members are dropped from the legal set before the choice is offered or auto-picked — `selectTarget(..., excluding = listOf(first, second))` is "choose a second player … then a third player" where every pick differs (Gluntch, the Bestower); an exclusion that leaves nobody stores an empty slot, so a following `ForEachPlayer(slot.asPlayers, …)` does nothing. `atRandom = true` is "choose … at random": the engine, not a player, draws one legal candidate uniformly with the game's seeded RNG (`state.nextRandom`), presents no decision, and stores the pick like a chosen one (an empty slot when there's no candidate). Only a single mandatory pick can be random — the SDK rejects an optional or multi-count requirement. Filters on later steps can name the drawn player through `ControlledByReferencedPlayer(slot.asTarget)` (the resolution's earlier slots are threaded into `selectTarget`'s candidate filter). **Vial Smasher the Fierce**: `val opp = selectTarget(TargetOpponent(), nonTargeting = true, atRandom = true)`, then `val pw = selectTarget(TargetObject(optional = true, filter = TargetFilter(GameObjectFilter.Planeswalker.withControllerPredicate(ControlledByReferencedPlayer(opp.asTarget)))), nonTargeting = true, prompt = …)` — the controller is asked only when that opponent has a planeswalker, and may decline it — then `ifNotEmpty(pw) { DealDamage(mv, pw.asTarget) } orElse { DealDamage(mv, opp.asTarget) }`.
 
 > **Authoring rule:** prefer composing primitives over adding parameters to an existing effect. Use `CompositeEffect`
 > and the gather/select/move pipeline before writing a new executor.
@@ -4582,12 +4971,24 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   gather → pick → move → shuffle) as one sentence — "Search your library for a basic Island, Swamp, or
   Mountain card, put it onto the battlefield tapped, then shuffle" — and a bare `gather(search = true)`
   reads "Search your library for …", never "Look at …".
-- `searchMultipleZones(zones, filter, count?, destination?, tapped?, reveal?)` — search several zones (e.g. library and/or graveyard) in one effect; shuffles automatically if `LIBRARY` is among the zones. Pass `reveal = true` for "reveal it" tutors (Delivery Moogle).
+- `gather(source, search = true, searcher = Player.X)` — who performs the search (`GatherCardsEffect.searcher`,
+  default `Player.You`, the effect's controller). Leave it at `You` for "search your library" and for "search target
+  player's library" (Cranial Extraction, Supreme Inquisitor — *you* search theirs; no searched event). When **another
+  player searches their own library** — "Its controller may search their library" (Erode, Sandworm:
+  `Player.ControllerOf("target")`), "target player … searches their library" (Restorative Technique, Settle the
+  Wreckage: `Player.TargetPlayer`), "that player … searches their library" (Mornsong Aria: `Player.TriggeringPlayer`) —
+  name that player as the searcher, the same ref as the source's player, and end the pipeline with
+  `run(EmitLibrarySearchedEventEffect)`. The can't-search check (Shadow of Doubt) and an `Effects.May` that leads with
+  the search read the searcher, and the emit tail reports the search as the searcher's, so "whenever an opponent
+  searches their library" (Wan Shi Tong, Librarian) sees the right player. `LibrarySearchFlagTest` flags a
+  "… search(es) their library" card whose other-player search gather leaves the searcher at `You`.
+- `searchMultipleZones(zones, filter, count?, destination?, tapped?, reveal?)` — search several zones in one combined search; shuffles and fires the searched-library event only if `LIBRARY` is among the zones. The pick is up to `count` when any zone is hidden (CR 701.23b — a hidden-zone search may fail to find), exactly `count` (clamped to what is there) over public zones alone. It is **one combined search** that always shuffles — for "search your library and/or graveyard … If you search your library this way, shuffle" use `searchLibraryAndOrGraveyard` below, which lets the player leave the library out. Pass `reveal = true` for "reveal it" tutors (Delivery Moogle).
+- `searchLibraryAndOrGraveyard(filter, count = 1, destination = HAND, entersTapped = false, reveal = false, optional = false)` — "[you may] search your library and/or graveyard for … If you search your library this way, shuffle." A resolution-time `ChooseAction` (never a modal, which would be chosen at cast or trigger time) of *Search your library* / *Search your graveyard* / *Search your library and graveyard* (plus *Don't search* when `optional`), each a `searchMultipleZones` over those zones, so only a search that includes the library shuffles it. Use `optional = true` for the "you may" wording instead of `Effects.May` or an optional trigger — one prompt, not two. Basri's Aegis / Garruk's Warsteed (`named(...)`, `reveal = true, optional = true`), The Hunger Tide Rises (mandatory, `destination = BATTLEFIELD`).
 
 **Sideboard / wish (`Patterns.Sideboard.*`)**
 
 - `wish(filter = Any, count = 1, destination = HAND, revealed = true, optional = true)` — the **wish** mechanic (Burning Wish,
-  Living Wish, Cunning Wish, Death Wish, Glittering Wish, Wish, …): "you may [reveal] a [type] card
+  Living Wish, Cunning Wish, Death Wish, Glittering Wish, …): "you may [reveal] a [type] card
   you own from outside the game and put it into your hand." A player's sideboard is modelled as the
   private per-player `Zone.SIDEBOARD` ("outside the game", CR 100.4 / 400.11a; strictly not a zone
   per CR 400.11, but a pseudo-zone lets the wish reuse the ordinary pipeline). The recipe composes
@@ -4605,7 +5006,7 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   `Effects.ReplaceNextDraw(Patterns.Sideboard.wish(GameObjectFilter.Any, revealed = false, optional = false))`.
   The varying axis across the cycle is `filter`
   (`Filters.Sorcery` for Burning Wish, `Filters.Instant` for Cunning Wish, creature-or-land for
-  Living Wish, `Any` for Death Wish/Wish); `destination` is `HAND` for every printed wish but is
+  Living Wish, `Any` for Death Wish); `destination` is `HAND` for every printed wish but is
   parameterized for the rare future "from outside the game onto the battlefield"/Karn-style case.
   Pair with `spell { selfExile() }` for the cards (Burning/Cunning/Living Wish) that exile
   themselves on resolution instead of going to the graveyard (CR 608.2g). The sideboard is private
@@ -4620,6 +5021,15 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   gather(FromZone(SIDEBOARD, You)) → chooseExactly(2, restrictions = [OnePerCardName]) → reveal },
   Pipeline { gather(FromVariable(revealed)) → chooseExactly(1, chooser = Opponent) → toHand },
   CollectionNonEmpty(revealed, min = 2)))`.
+- **Playing a card from outside the game** — "You may play a card you own from outside the game this
+  turn" (**Wish**, AFR) is not a fetch: the card goes straight from the sideboard onto the stack (or,
+  a land, onto the battlefield with the turn's land play), paid for and timed normally. Compose it as
+  a may-play grant over the gathered sideboard: `Pipeline { val outside = gather(FromZone(SIDEBOARD,
+  You)); run(Effects.GrantMayPlayFromExile(outside, MayPlayExpiry.EndOfTurn, maxPlays = 1)) }`.
+  The stored `MayPlayPermission` reaches the owner's own sideboard on every play path (cast
+  enumerator, `CastZoneResolver`, `PlayLandHandler`, `SpellCaster`'s zone removal), and
+  `maxPlays = 1` makes it one card — the first play revokes the grant for the rest. The client
+  highlights the Deck pile and the playable tiles in its "Outside the game" browser.
 
 **Top-deck manipulation**
 
@@ -4630,9 +5040,11 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   twin of `scry(count)`: when `target` is the controller it is identical (returns the compact
   `ScryEffect` macro); otherwise it expands to a `scryPipeline` whose gather + library moves read the
   **target** player's library and whose top/bottom decision is made by that player
-  (`Chooser.TargetPlayer`) — the scry analogue of `mill(count, target)`. Used by modal "• Target
+  (the shared `effectTargetToChooser` mapping: `Chooser.TargetPlayer` for a target, and
+  `Chooser.ChosenOpponent` for `PlayerRef(Player.ChosenOpponent)`). Used by modal "• Target
   player scries N" modes (Bumi, King of Three Trials), where `target` is the chosen mode's local
-  `EffectTarget.ContextTarget(0)`.
+  `EffectTarget.ContextTarget(0)`, and by "an opponent … and they scry 2" after `ChooseOpponent`
+  (Ingenious Mastery).
   The target also orders the cards left on top (`MoveCollectionEffect(order = CardOrder.OwnerChooses)`
   — the player whose library receives the cards gets the reorder prompt; `ControllerChooses` would
   hand it to the caster), and the `ScriedEvent` it emits names the **scrying** player, so the
@@ -4900,6 +5312,10 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   (`MoveType.Discard`), so madness and "whenever you discard a card" payoffs see it. Collection
   names are `learn_`-prefixed so a nested Learn can't collide with its host pipeline's `hand` /
   `discarded`. Academic Dispute.
+  Returned wrapped in `LearnEffect(body = …)`, which names the action so "if you would learn, …
+  instead" replacements apply to it — `ReplaceKeywordAction` over `EventPattern.LearnEvent`
+  (Retriever Phoenix). `LearnEffectExecutor` collects them first (battlefield and graveyards, by
+  `activeZones`), offers each in turn, and runs the body only if none applied.
 - `Patterns.Mechanic.temptingOffer(offer, description)` — **Tempting offer** (an ability word, CR
   207.2c): "[offer]. Each opponent may [offer]. For each opponent who does, [offer] again." Follows
   the cycle's ruling: you take the offer; every opponent answers yes/no in turn order, knowing the
@@ -4921,11 +5337,12 @@ one-off pipeline belongs inline in the card file via `Effects.Pipeline { }` (§5
   facade. Lake-town Lookout, Patient Instructor, Long Lake Nuisance, Esgaroth Garrison, Great Gilded Boat.
 - `readTheRunes()` — "draw X cards; for each, discard a card unless you sacrifice a permanent." Composes `RepeatDynamicTimesEffect(XValue, ChooseActionEffect(...))` with feasibility guards. Exposed as `Effects.ReadTheRunes()`.
 - `eachOpponentMayPutFromHand(filter?)` — each opponent may dump a matching card.
-- `putFromHand(filter?, count?, entersTapped?, entersAttacking?, anyNumber?, prompt?)` — you may put N
+- `putFromHand(filter?, count?, entersTapped?, entersAttacking?, anyNumber?, prompt?, attackDefender?)` — you may put N
   from hand onto battlefield. `entersAttacking = true` puts them in **tapped and attacking**
   (`ZonePlacement.TappedAndAttacking`; the engine adds an `AttackingComponent` against the defending
   player), e.g. Shadowfax, Lord of Horses ("put a creature card with lesser power from your hand onto
-  the battlefield tapped and attacking"). `anyNumber = true` swaps the default `ChooseUpTo(count)`
+  the battlefield tapped and attacking"); `attackDefender = EnteringAttackDefender.CONTROLLER_CHOOSES` lets the
+  controller pick each card's defender per CR 508.4 (Minion of the Mighty — see `MoveCollectionEffect`). `anyNumber = true` swaps the default `ChooseUpTo(count)`
   selection for `SelectionMode.ChooseAnyNumber`, i.e. the unbounded *"put **any number** of … cards
   from your hand onto the battlefield"* wording (`count` is then ignored); zero is a legal choice, so
   declining and an empty hand are both no-ops rather than stuck decisions. Redshift, Rocketeer Chief's
@@ -5069,16 +5486,20 @@ with cards):
 | `forEachCaptured(collection, original, controllers) { count -> … }` | `ForEachCapturedControllerEffect` |
 | `forEachPlayerCollecting(players) { …; listOf(slotA, slotB) }` → the per-iteration collections unioned across players | `ForEachPlayerCollectingEffect` |
 | `repeatCollecting(repeatCondition) { …; listOf(slotA, slotB) }` → the body run as a do-while loop, each returned collection unioned across every pass (published once the loop stops). Struggle for Sanity: `repeatCollecting(WhileCondition(Exists(opponent.asPlayer, Zone.HAND))) { gather hand; chooseExactlySplit(1, chooser = TargetPlayer) → exile; chooseExactly(1, rest) → exile; listOf(theirPick, yourPick) }` then `toHand(theirs)` / `toGraveyard(yours)` | `RepeatWhileEffect(collectCollections = …)` |
+| `repeatProcess { …; RepeatCondition }` → the body run as a do-while loop whose condition the block *returns*, so it can read the slots the body just filled. Delina, Wild Mage: `repeatProcess { val roll = rollDiceResult(sides = 20); ifThen(…) { run(token) }; PlayerChooses(Controller, "Roll again?", onlyIf = between(15, 20)) }` | `RepeatWhileEffect` |
 | `eachPlayerChoosesCreatureType()` → `StringListSlot` | `EachPlayerChoosesCreatureTypeEffect` |
 | `gatherSubtypes(from)` | `GatherSubtypesEffect` |
 | `storeCardName(from)` | `StoreCardNameEffect` |
 | `storeNumber(amount)` | `StoreNumberEffect` |
 | `runStoringNumber { Effects.ChooseSpellCastThisTurn(caster, spellFilter, it) }` → the damage dealt by the spell the controller picks among `caster`'s matching spells cast this turn (its cast record's total over every recipient while it was a spell; no prompt when they all dealt the same, 0 with none). Backdraft: `selectTarget(TargetPlayer(restriction = Conditions.candidateCastSpellsThisTurn(Sorcery)), nonTargeting = true)`, then this, then `DealDamage(damage.amount / 2, player.asTarget)` | `ChooseSpellCastThisTurnEffect` |
 | `storePlayer(player = You, onlyIf?)` → the players recorded (a `CollectionSlot`; with `onlyIf`, only when the condition holds then). Inside `forEachPlayerCollecting` it records the iterated player, so the aggregate is "each player who …" snapshotted before anyone acts — Plaguecrafter: `forEachPlayerCollecting(ActivePlayerFirst) { listOf(storePlayer(onlyIf = YouControl(CreatureOrPlaneswalker, negate = true))) }` then sacrifice, then `ForEachPlayer(cant.asPlayers, discard)` | `StorePlayerEffect` (wrapped in `Effects.If` for `onlyIf`) |
-| `chooseOption(optionType, …)` / `chooseCardName(prompt?, excludeBasicLandNames?, pool?, chooser?)` / `noteCreatureType(…)` | `ChooseOptionEffect` / `NoteCreatureTypeEffect` |
+| `chooseOption(optionType, …, recordOnSource?)` / `chooseCardName(prompt?, excludeBasicLandNames?, pool?, chooser?, recordOnSource?)` / `noteCreatureType(…)` | `ChooseOptionEffect` / `NoteCreatureTypeEffect` |
 | `choosePile(a, b, chooser?, …)` → `(chosen, other)` | `ChoosePileEffect` |
-| `selectTarget(requirement, nonTargeting?, prompt?, excluding?)` (resolution-time choice — never printed "target"; `excluding` drops earlier picks) | `SelectTargetEffect` |
+| `selectTarget(requirement, nonTargeting?, prompt?, excluding?, atRandom?)` (resolution-time choice — never printed "target"; `excluding` drops earlier picks; `atRandom` lets the engine draw one candidate with no decision — Vial Smasher the Fierce's "choose an opponent at random") | `SelectTargetEffect` |
 | `ifNotEmpty(slot, filter?, minSize?) { … } orElse { … }` | `ConditionalOnCollectionEffect` |
+| `ifThen(condition) { … }` (the branch sees the surrounding handles — a die-result row: `ifThen(CompareAmounts(result.amount, LTE, 0)) { … }`) | `GatedEffect` (`Effects.If`) |
+| `vote("wild", "free")` → one `NumberSlot` per choice, holding how many votes it received | `VoteEffect` (see "Voting") |
+| `rollDice(count, sides, player, resultSets)` → one `NumberSlot` per result set / `rollDiceResult(count, sides, player, modifier)` → the summed (modified) result | `RollDiceEffect` (see "Numerical dice") |
 | `whenMatches(slot, filter)` (returns a `Condition`, adds no step) | `CollectionContainsMatch` |
 | `run(effect)` | any other `Effect`, verbatim |
 | `runStoringCollection { key -> effect }` / `runStoringNumber { … }` / `runStoringChoice { … }` | a non-step effect that *writes* a slot under the key it is handed (`Effects.DestroyAll(filter, storeDestroyedAs = it)`, `Patterns.Exile.impulse(…, storeAs = it)`, `Effects.FlipCoins(…, storeHeadsAs = it)`), returning the typed handle |
@@ -5328,11 +5749,19 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   "its controller" read already was: an object off the battlefield answers with the last-known
   controller its card carries from its latest battlefield exit, and the resolution's own capture
   stands in only once the object has ceased to exist.
+  A chosen target (`ContextTarget`) has the same policy: a single-target `MoveToZoneEffect`
+  (`Effects.ReturnToHand` / `Exile` / `Destroy` …) publishes the target's snapshot too, so a later
+  instruction reads "that creature" as it last existed on the battlefield — "You gain life equal to
+  its power" after the bounce, or **Absorb Identity**'s `Effects.ReturnToHand(creature) then
+  Effects.May(Effects.EachPermanentBecomesCopyOfTarget(creature, filter = …Shapeshifter…youControl(),
+  duration = Duration.EndOfTurn))`, which copies the creature's last-known copiable values. A target
+  that left the battlefield before this resolution (a creature card targeted in a graveyard) is read
+  as the card it is now.
   - **Self-noun rendering (type-aware text).** `EffectTarget.Self.description` is "this creature"
     (most self-referential effects live on creatures). Effects that also apply to *non-creature*
     permanents — `TransformEffect` / `ExileAndReturnTransformedEffect`, `SacrificeTargetEffect`
     (`Effects.SacrificeTarget`, which a land or artifact uses to sacrifice itself), `TapUntapEffect`
-    (`Effects.Tap(EffectTarget.Self)` — Multiversal Passage's "if you don't, it enters tapped"), and
+    (`Effects.Tap(EffectTarget.Self)` — "tap this land"), and
     `GatedEffect` (which builds its template from its sub-effects' templates), and the ability
     grants `GrantTriggeredAbility` / `GrantActivatedAbility` / `GrantStaticAbility` /
     `GrantReplacementEffect` — must not hard-code either noun, so they implement
@@ -5363,7 +5792,11 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   stack (threaded `ActivatedAbilityOnStackComponent.granterId` → `EffectContext.granterId`), so it
   survives the granter leaving play — the referencing effect no-ops if it's gone (CR 113.7a). For an
   ability whose source already *is* the granter (Territory Forge / Sharkey-style gains), it resolves
-  to the same entity as `Self`.
+  to the same entity as `Self`. In the `count` of an `otherOnly` `EntersWithDynamicCounters` — where
+  `Self` is the *entering* creature — it names the **replacement's source**: Arwen, Weaver of Hope's
+  "each other creature you control enters with … additional +1/+1 counters equal to **Arwen's
+  toughness**" is `count = DynamicAmounts.toughnessOf(EffectTarget.GrantingSource)`, read as the
+  creature enters.
 - `EffectTarget.TriggeringEntity` — the entity that caused the trigger to fire.
 - `EffectTarget.TargetingSource` — "that spell or ability" in a becomes-the-target trigger: the stack
   object that did the targeting (`TriggerContext.targetingSourceEntityId`), where `TriggeringEntity` is
@@ -5376,6 +5809,14 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   resolution. Read live (a departed source makes the effect a no-op). Ogre-Head Helm: "whenever
   equipped creature deals combat damage to a player, you may sacrifice it" is
   `Effects.SacrificeTarget(EffectTarget.DamageSource)`.
+- `EffectTarget.DamageRecipient` — "that creature / that planeswalker" in a deals-damage trigger: what
+  was dealt the damage (`TriggerContext.damageRecipientId`). A deals-damage observer with a source filter
+  ("whenever a creature you control deals combat damage to …") binds `TriggeringEntity` to the damage's
+  *source*, so the damaged permanent is reachable only through this; on every other deals-damage trigger
+  it is the same object as `TriggeringEntity`. Fixed when the trigger fires, read live (a recipient that
+  left in response makes the effect a no-op). Zagras, Thief of Heartbeats:
+  `Triggers.a(GameObjectFilter.Creature.youControl()).dealsCombatDamage(Recipient.Object(GameObjectFilter.Planeswalker))`
+  with `Effects.Destroy(EffectTarget.DamageRecipient)`.
 - `EffectTarget.ControllerOfDamageSource` — "that creature's controller" in a deals-damage trigger:
   the damage source's current controller while it is on the battlefield, else its controller when it
   dealt the damage (CR 608.2h; a token that died to the same combat damage still names a player).
@@ -5417,12 +5858,16 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   frozen copiable values let `CreateTokenCopyOfTarget(SacrificedAsCost())` copy it once it's gone — a token
   included. A `ReflexiveTriggerEffect`'s reflexive half still reads what its action (or the resolving
   ability's cost) sacrificed, carried across the stack round-trip.
-- `EffectTarget.TappedAsCost(index = 0)` — a permanent **tapped to pay this activation's cost**, read
-  from `EffectContext.tappedPermanents`; the tap counterpart of `DiscardedAsCost`. Every printed use taps
+- `EffectTarget.TappedAsCost(index = 0)` — a permanent **tapped to pay this activation's cost, or this
+  spell's additional cost** (`Costs.additional` tap atoms, recorded at payment as
+  `SpellOnStackComponent.tappedPermanents`; convoke taps don't count), read from
+  `EffectContext.tappedPermanents`; the tap counterpart of `DiscardedAsCost`. Every printed use taps
   exactly one, hence the `index` default. Used by Vodalian War Machine (FEM), whose abilities each tap an
   untapped Merfolk and whose death trigger destroys the Merfolk that paid: each activation schedules its
   own delayed trigger naming *its* Merfolk, so the reference is baked into a concrete id when the trigger
-  is created, and the whole accumulated set dies with the War Machine. **Not to be confused with
+  is created, and the whole accumulated set dies with the War Machine. Swallow Whole (IKO) is the spell
+  use: `Effects.AddCounters(CounterType.PLUS_ONE_PLUS_ONE, 1, EffectTarget.TappedAsCost())` — "put a +1/+1
+  counter on the creature tapped to pay this spell's additional cost". **Not to be confused with
   `CardSource.TappedAsCost`** (§ dynamic values), which is the *value* role reading the same permanents —
   same name, different vocabulary: this one is a target, that one feeds `EntityProperty` reads and
   collection gathers.
@@ -5469,11 +5914,25 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   in event filters (`SpellCastEvent(player = …)`), exists-conditions, and battlefield
   aggregations ("creatures your opponents control").
 - `Player.ActivePlayerFirst` — all players in APNAP order.
+- `Player.ActivePlayer` — the single active player (whose turn it is), read at resolution. Only the
+  active player declares attackers, so it is "that attacking player" on an attack trigger that binds
+  the *attacked* player as `TriggeringPlayer`: Breena, the Demagogue's "that attacking player draws a
+  card" is `DrawCards(1, PlayerRef(Player.ActivePlayer))` under
+  `Triggers.anyPlayer.attacksAPlayer(attacked = Player.EachOpponent)`. Under shared team turns
+  (CR 805.10a) every player on the active team attacks; this still names only the active player.
 - `Player.EachDefendingPlayer` — all defending seats during combat, in APNAP order, including
   before attackers are declared and opponents with no attackers assigned. Includes all opponents
   regardless of attack-left/right limits, respecting shared team turns. Outside combat this names nobody. Use it with
   `Effects.ForEachPlayer`, plural effect targets, zone gathering, or counting; the single-player
   resolver deliberately returns null.
+- `Player.EachAttackedPlayer` — every player **being attacked**, in APNAP order: each player some
+  attacking creature is attacking directly. Narrower than `EachDefendingPlayer`: a player whose
+  planeswalker or battle is the only thing attacked isn't "being attacked" (CR 802.4 tells the two
+  apart), nor is an opponent no creature attacks. Read live — a player stops being attacked once the
+  last creature attacking them leaves combat; outside combat or before attackers are declared it names
+  nobody. List-only, like `EachDefendingPlayer`. "If one or more players being attacked are poisoned"
+  (Norn's Decree) is `CompareAmounts(greatestAmongPlayers(playerCounterCount(POISON), players =
+  Player.EachAttackedPlayer), GTE, 1)`.
 - `Player.TargetPlayer` / `Player.TargetOpponent` — the bound player target (resolved from the
   chosen targets, never from turn order). Both resolve to a **single** player, so on a spell that
   targets several they silently read only the first — reach for `EachTargetedPlayer` there.
@@ -5491,8 +5950,15 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   `storePlayer` handle. List-only like `EachTargetedPlayer`: `ForEachPlayer` and the counting
   primitives read it; the single-player resolver returns null. Plaguecrafter's "each player who
   can't discards" and the tempting-offer accepters (`Patterns.Mechanic.temptingOffer`).
-- `Player.DefendingPlayer` — CR 802.2a: the player the ability's source is attacking, read from
-  the source's attack assignment (a creature attacking a planeswalker defends against its
+- `Player.DefendingPlayer` — CR 802.2a: the player the triggering attacker is attacking — or, when
+  the trigger isn't an attacker's, the player the ability's source is attacking. The triggering
+  attacker wins (CR 508.5: an ability naming an attacking creature and a defending player means
+  that creature's defender), so in a per-attacker `Triggers.a(Creature.youControl()).attacks()`
+  each trigger names its own attacker's player even when the source attacks someone else
+  (Silumgar, the Drifting Death:
+  `modifyStatsForAll(-1, -1, GroupFilter(Creature.targetPlayerControls(PlayerRef(Player.DefendingPlayer))))`
+  — not `defendingPlayerControls()`, which matches every defending seat). Read from the attack
+  assignment (a creature attacking a planeswalker defends against its
   controller); once the source has left the battlefield the defender frozen into its exit snapshot
   answers instead (CR 608.2h), so an ability that **sacrifices its own attacking source before
   naming the defending player** — Mindstab Thrull, Necrite — still resolves against the right
@@ -5527,7 +5993,7 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   (`DynamicAmount.LifeTotal(EnchantedPlayer)`, `EffectTarget.PlayerRef(EnchantedPlayer)`) and to scope a
   `PreventLifeGain` (`LifeGainEvent(player = EnchantedPlayer)`), a cast trigger
   (`Triggers.player(Player.EnchantedPlayer).casts(filter)` — "whenever enchanted player casts …", Curse of
-  Silence) or a spell tax (`SpellCostTarget.PlayerCasts(EnchantedPlayer, filter)`). Resolves to nothing if the source isn't
+  Silence; `.isAttacked()` — "whenever enchanted player is attacked", Curse of Opulence) or a spell tax (`SpellCostTarget.PlayerCasts(EnchantedPlayer, filter)`). Resolves to nothing if the source isn't
   an Aura attached to a player. Once the Aura has left the battlefield, effects and group filters
   (`controlledByEnchantedPlayer()`) read the player it was last attached to (CR 608.2h), so an
   enters trigger still pays off when the Aura is destroyed in response. (Grievous Wound, Overencumbered.)
@@ -5548,6 +6014,13 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   printed "its" refers to the loop variable. It survives the pay-or-decline pause: a `PayOrSufferEffect`
   nested in the loop carries the iteration binding into its continuation, so the consequence still knows
   which creature "its" meant after the toll is declined.
+- `Player.OwnerOfIterationEntity` — the **owner** of the entity an enclosing ForEach-over-entities is
+  currently iterating over: "then each player who owns a spell you cast this way loses life equal to its
+  mana value" (Kefka, Dancing Mad) is `ForEachInCollection(cast, LoseLife(manaValueOf(IterationEntity),
+  PlayerRef(Player.OwnerOfIterationEntity)))`. Distinct from `Player.ControllerOfIterationEntity` exactly
+  when ownership and control diverge — a spell you cast out of an opponent's graveyard is yours to control
+  and theirs to own — and from `Player.OwnerOfSource` / `Player.OwnerOf`, which read the source and the
+  first chosen target. Null outside a ForEach-over-entities.
 - `Player.ControllerOfAffectedEntity` — the controller of the permanent a **continuous effect is
   currently modifying** (the player-side twin of `EffectTarget.AffectedEntity`): "enchanted creature gets
   -X/-0, where X is the number of cards in **its controller's** graveyard" (Disturbing Conversion) is
@@ -5563,8 +6036,10 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   that candidate, so `Player.You` inside the loop means "the player being tested" and the ability's own
   controller is otherwise unreachable. That is the shape of "for each opponent who has more cards in
   hand **than you**" (Wojek Investigator): `CountPlayersWith(EachOpponent, CompareAmounts(Count(You,
-  HAND), GT, Count(ControllerOfSource, HAND)))`. Pairs with `Player.OwnerOfSource`, which follows
-  *ownership* instead of control.
+  HAND), GT, Count(ControllerOfSource, HAND)))`. It also scopes filters through
+  `ControllerPredicate.ControlledByReferencedPlayer(PlayerRef(ControllerOfSource))` — negated, "a
+  creature you don't control" inside a per-player loop (Sadistic Shell Game). Pairs with
+  `Player.OwnerOfSource`, which follows *ownership* instead of control.
 - `Player.OwnersOfLinkedExile` — the **distinct owners** of the cards still in the effect source's
   linked-exile pile (`LinkedExileComponent`, populated by `Effects.ExileUntilLeaves`). A *list*
   reference: reach it only through `Effects.ForEachPlayer(Player.OwnersOfLinkedExile, …)`, typically
@@ -5632,6 +6107,25 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   until no one puts a card onto the battlefield") = `RepeatWhile(Pipeline {
   forEachPlayerCollecting(Player.EachStartingWithYou) { chooseUpTo(1, permanents in hand) → move(→
   BATTLEFIELD) } }, WhileCondition(CollectionContainsMatch(putThisRound)))`.
+- `Player.EachStartingWithNextOpponent` — every player in turn order **starting with the next
+  opponent** after you and ending with you — "Starting with the next opponent in turn order, each
+  player …". The `EachStartingWithYou` rotation moved on to the first opponent after you, so you act
+  after every opponent; in a team game a teammate seated before that opponent is passed over and acts
+  after you. Resolves wherever `EachStartingWithYou` does. Sadistic Shell Game ("… each player chooses
+  a creature you don't control. Destroy the chosen creatures.") = `Pipeline { val (chosen) =
+  forEachPlayerCollecting(Player.EachStartingWithNextOpponent) { listOf(chooseExactly(1,
+  gather(BattlefieldMatching(Creature.copy(controllerPredicate = Not(ControlledByReferencedPlayer(
+  PlayerRef(Player.ControllerOfSource))))))) }; destroy(chosen) }` — inside the loop `Player.You` is
+  the chooser, so "you don't control" names the caster through `ControllerOfSource`.
+- `Player.EachOtherPlayer` — every player **other than you**, in turn order — "each other player".
+  Not `Player.EachOpponent`: a player's opponents are everyone not on their team (CR 102.3), so in a
+  team game (Two-Headed Giant) "each opponent" skips your teammate while "each other player" includes
+  them; outside team play the two name the same players. A plural reference: it fans out in
+  `PlayerRef` effect targets (edicts, life loss, draws), `ForEachPlayer`, the gathers,
+  `AnyPlayerMayPay`, player counts, and matches "another player" in player predicates and event
+  patterns. Grave Pact ("whenever a creature you control dies, each other player sacrifices a creature
+  of their choice") = `Effects.Sacrifice(GameObjectFilter.Creature, 1,
+  EffectTarget.PlayerRef(Player.EachOtherPlayer))` — in 2HG the teammate sacrifices too.
 - `handle.asPlayer` (`Player.BoundVariable(name)`) — the player chosen for a named target, read in a
   player-typed slot: `CardSource.FromZone(Zone.HAND, opponent.asPlayer)`,
   `DynamicAmounts.damageReceivedThisTurn(opponent.asPlayer)`. It shares `EffectTarget.BoundVariable`'s
@@ -5640,13 +6134,27 @@ A resolving nonpermanent spell retains its stack instance through serialized eff
   to map every handle to `ContextPlayer(0)`, reading the first target whatever the handle named).
 - `Player.ContextPlayer(i)` / `Player.Candidate` / `Player.Any` — positional target (engine- and
   pattern-internal; a card writes `handle.asPlayer`), CR 115 candidate during target-restriction
-  evaluation, and "a player" matching.
+  evaluation, and "a player" matching. Inside an **object** filter's dynamic cap (`ManaValueAtMostDynamic`,
+  `ManaValueEqualsDynamic`, `PowerAtMostDynamic`, `PowerEqualsDynamic`, `ToughnessEqualsDynamic`,
+  `CompareNumericProperty`) the
+  candidate is an object and `Player.Candidate` is **its controller** (a spell's caster, a permanent's
+  controller), bound per candidate at targeting and at the CR 608.2b re-check: "target spell with mana
+  value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch) is
+  `TargetFilter.SpellOnStack.manaValueAtMostDynamic(DynamicAmounts.cardsInYourGraveyard(Player.Candidate))`.
+  Written directly there — the `Conditions.candidate*` facade is for player restrictions only.
 - `EffectTarget.ContextProperty(key)` — value plumbed into `EffectContext` (damage amount, life gained, blight
   amount, …).
 - `EnchantedCreature` / `EquippedCreature` — resolve via `AttachedToComponent`; requires the state-aware
   `resolveTarget(state, target)` overload.
 - `EnchantedPermanent` — same `AttachedToComponent` resolution as `EnchantedCreature`, but type-agnostic; use for
   Auras that enchant non-creature permanents (e.g. Wellspring enchants a land: "gain control of enchanted land").
+- `AttackedBy(attacker = TriggeringEntity)` — "the player or planeswalker [attacker] is attacking":
+  the defender itself, so an attacked planeswalker is named rather than its controller (Raid
+  Bombardment, Hellrider: `Triggers.a(Creature.youControl()).attacks()` +
+  `DealDamage(1, EffectTarget.AttackedBy())`). Read from the attacker's `AttackingComponent`, else the
+  defender frozen in its exit snapshot once it has left the battlefield; names nothing for a
+  creature that isn't attacking, one attacking a battle ("player or planeswalker" is literal), or
+  a planeswalker that has since left. For the defending *player* use `PlayerRef(Player.DefendingPlayer)`.
 - `AttachedToTriggeringPermanent` — the permanent on the other end of an attachment trigger; requires
   the state-aware `resolveTarget(target, state)` overload. Inside `Triggers.<subject>.becomesAttached(to, controller)` it is the
   host the triggering attachment became attached to, resolved **live** from the triggering object's
@@ -5676,6 +6184,9 @@ non-object shapes are the `Targets.*` presets.
   many are still legal ("divided evenly") must be frozen with `Effects.StoreNumber(name,
   DynamicAmounts.xValue() / DynamicAmounts.targetCount())` *before* the loop — the resolver hands the
   effect only still-legal targets (CR 608.2b), but inside `ForEachTarget` the context holds just one.
+- `Targets.AnyUpTo(max)` — "each of up to X targets" (Crackle with Power): `AnyTarget(optional = true,
+  dynamicMaxCount = max)`, zero to `max` targets, `max` resolved when targets are chosen (the announced X,
+  or a board amount snapshotted as a trigger goes on the stack). Read them with `Effects.ForEachTarget(…)`.
 - `Targets.AnyChosenByOpponent` — "any target **of an opponent's choice**" (Cuombajj Witches). A real
   target of *your* spell/ability that an **opponent** selects: announced at the same time as your own
   targets, equally respondable, and with legality (hexproof/protection/shroud) measured relative to
@@ -5715,6 +6226,7 @@ non-object shapes are the `Targets.*` presets.
 - `target(TargetFilter.InstantOrSorcerySpellOnStack.youControl())` — an instant or sorcery spell on the stack you control (copy-your-spell modes).
 - `target(TargetFilter.CreatureSpellOnStack.youControl())` — a creature spell on the stack you control (Choreographed Sparks' "Copy target creature spell you control").
 - `target(TargetFilter.ActivatedOrTriggeredAbilityOnStack)` / `target(TargetFilter.ActivatedAbilityOnStack)` — an ability on the stack (Stifle).
+- `target(TargetFilter.LoyaltyAbilityOnStack)` — a loyalty ability on the stack (`CardPredicate.IsLoyaltyAbility`; Verdant Command).
 - `target(TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl())` — an activated or triggered ability **you control** on the stack (`TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl()`). Mana abilities never use the stack, so they're excluded automatically. Pair with `Effects.CopyTargetSpellOrAbility` — **Gogo, Master of Mimicry**.
 - `target(TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl().abilitySourceMatches(sourceFilter))` — the same, narrowed to abilities whose **source** matches `sourceFilter` (`CardPredicate.AbilitySourceMatches`): "copy target activated or triggered ability you control **from a creature source**" (**Echo, Perceptive Prodigy**, `GameObjectFilter.Creature`) / "**from an artifact source**" (**Scientist Supreme of A.I.M.**, `GameObjectFilter.Artifact`). The restriction is on the ability's source per CR 113.7, matched with last known information when the source has already left the battlefield (CR 113.7a), so a dead creature's dies trigger still qualifies.
 - `target(TargetFilter.SpellOrAbilityOnStack)` — a spell or ability whose single target is changed (Willbender; pair with `Effects.ChangeTarget()`).
@@ -5759,7 +6271,20 @@ reading `SpellOnStackComponent.castFromZone`, which a copy put onto the stack ne
 a cast copy does (CR 707.12); e.g. `TargetFilter.SpellOnStack.notCast(Zone.HAND)` for "target spell that
 wasn't cast from its owner's hand" — Wash Away, since a card in a hand is owned by that hand's player,
 CR 108.3 — and `TargetFilter.SpellOnStack.youControl().notCast()` for "target spell you control that
-wasn't cast" — Errant, Street Artist);
+wasn't cast" — Errant, Street Artist). Also honoured by the zone-change redirect path on a **battlefield
+entry**: only a spell resolving off the stack carries a cast origin, so anything reanimated, flickered,
+put onto the battlefield or played as a land "wasn't cast" — Containment Priest's "if a nontoken creature
+would enter and it wasn't cast, exile it instead" is `replacementEffect(RedirectZoneChange(newDestination =
+Zone.EXILE, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.Creature.nontoken().notCast(),
+to = Zone.BATTLEFIELD)))`. The zone-transition service asks a battlefield-entry redirect on every
+effect move (single and collection), and land plays (the land drop is still spent) and linked-exile returns
+ask it too. Movers skip the entry prompts — Aura host, "as this enters" choices, enters-only-if-paid — of
+a card that won't enter, after settling any "enters as a copy" choice first (CR 616.1c). A `Creature` /
+`Noncreature` predicate on such a redirect judges the card as it would exist on the battlefield (CR
+614.12, `EntryCharacteristics.wouldBeCreature`): March of the Machines makes an entering artifact a
+creature, a Heliod short of devotion isn't one, a Metamorph copying an artifact is what it copies, and a
+face-down entry (manifest, cloak) is a 2/2 creature (CR 708.2). Cards entering in one instruction enter
+simultaneously, so a Priest returned alongside them doesn't exile them;
 `.withSingleTarget()` (a spell or ability on the stack with exactly one *chosen* target — `StatePredicate.HasSingleTarget`;
 `TargetFilter.InstantOrSorcerySpellOnStack.withSingleTarget()` is "target instant or sorcery spell with a single
 target", Hydroelectric Specimen. It counts chosen targets, legal or not, so a spell with two targets never
@@ -5858,7 +6383,7 @@ spell {
 - **Several object targets under one requirement** — "two target creatures", "up to X target
   creatures", "any number of target cards from a single graveyard" — are
   `targets(filter, count, minCount, optional, unlimited, dynamicMaxCount, exactly, sameController,
-  sameOwner, sameNumericProperty, sameCreatureType, sameCardType, totalManaValueAtMost, differentNames, differentControllers,
+  sameOwner, sameNumericProperty, differentNumericProperty, sameCreatureType, sameCardType, totalAtMost, differentNames, differentControllers,
   onePerCardType, onePerColor, chooser)`, which returns one handle per slot:
   `val (first, second) = targets(TargetFilter.Creature, count = 2)`. An ability that treats the
   targets uniformly ignores the handles and reads them with `Effects.ForEachTarget(…)`.
@@ -5867,7 +6392,7 @@ spell {
   unlimited = true, minCount = 1)` (**Touch of Darkness**) — still uncapped, but the spell can't be
   cast without a legal target and an empty target list is rejected (CR 601.2c).
 - **Any other shape** — players, "any target", the mixed "X or Y" shapes — is `target(Targets.X)`:
-  `Targets.Player`, `Targets.Opponent`, `Targets.Any`, `Targets.Any(filter)`, `Targets.AnyNumber`, `Targets.AnyChosenByOpponent`,
+  `Targets.Player`, `Targets.Opponent`, `Targets.Any`, `Targets.Any(filter)`, `Targets.AnyNumber`, `Targets.AnyUpTo(max)`, `Targets.AnyChosenByOpponent`,
   `Targets.AnyOtherThanEnchantedCreature`, `Targets.CreatureOrPlayer`, `Targets.PermanentOrPlayer`,
   `Targets.CreatureOrPlaneswalker`, `Targets.PlayerOrPlaneswalker`, `Targets.OpponentOrPlaneswalker`,
   `Targets.PlayerOrBattle` (`TargetPermanentOrPlayer(permanentFilter = TargetFilter.Battle)` — Onakke
@@ -5962,6 +6487,9 @@ Every `TargetRequirement` carries count semantics (defaults shown):
   `count` / `minCount` pair, and the Oracle wording says which spelling a card takes:
   - "**up to** X target creatures" — `targets(filter, optional = true, dynamicMaxCount = X)`
     (Crashing Wave, Prismabasher, Red Sun's Twilight): zero to X.
+  - "each of **up to X targets**" (players included) — `Targets.AnyUpTo(X)`, i.e.
+    `AnyTarget(optional = true, dynamicMaxCount = X)` (Crackle with Power). `AnyTarget` takes only
+    the cap, not `dynamicMinCount`.
   - "**X** target creatures" — `targets(filter, exactly = X)` (Icy Blast, Builder's Bane, Doppelgang,
     Foggy Swamp Visions, Lost in the Maze): exactly X. `exactly` sets `dynamicMinCount` and
     `dynamicMaxCount` to the same amount; it can't be combined with `dynamicMaxCount`, `optional` or
@@ -5969,7 +6497,9 @@ Every `TargetRequirement` carries count semantics (defaults shown):
   - `dynamicMaxCount` + `unlimited = true` — "any number of target …" with a cap the effect imposes
     (Chandra, Flameshaper's divided damage).
 
-  `dynamicMaxCount: DynamicAmount?` is the cap, `dynamicMinCount: DynamicAmount?` the floor. Both are
+  `dynamicMaxCount: DynamicAmount?` is the cap, `dynamicMinCount: DynamicAmount?` the floor — both
+  declared on `TargetRequirement` (default null), carried by `TargetObject` (and the cap by
+  `AnyTarget`), and passed through by a `TargetOther` wrapper. Both are
   resolved where X is known (CR 601.2b announces X before 601.2c chooses targets): cast and activation
   validation with the announced X — from mana, from a waterbend {X} additional cost, or from board
   state — and a trigger's snapshot as it goes on the stack (CR 603.3d), which turns an exact dynamic
@@ -6045,6 +6575,15 @@ Every `TargetRequirement` carries count semantics (defaults shown):
   values invalidate the whole requirement. Server-computed `selectionGroups` guide board targeting
   and AI choices without client rules. V.A.T.S. uses
   `targets(TargetFilter.Creature, unlimited = true, sameNumericProperty = CardNumericProperty.TOUGHNESS)`.
+- `differentNumericProperty: CardNumericProperty? = null` — on `TargetObject` and `targets(...)`; the
+  inverse of `sameNumericProperty`: no two chosen targets may share a value of the property
+  ("**X target cards with different mana values from your graveyard**" — Long Rest). Read the same
+  way (projected on the battlefield, the card elsewhere). The targeting pause offers the candidates
+  as server-computed `exclusiveGroups`, one per value (at most one pick from each), and caps the count
+  at the number of distinct values; `TargetValidator` is authoritative. At resolution, remaining
+  targets that now share a value are all illegal. E.g.
+  `targets(TargetFilter(GameObjectFilter.Any.ownedByYou(), zone = Zone.GRAVEYARD), exactly = DynamicAmount.XValue,
+  differentNumericProperty = CardNumericProperty.MANA_VALUE)`.
 - `sameCardType = false` — on `TargetObject` / `TargetObject(filter = TargetFilter.Permanent, count = ...)`; the **card-type** sibling of
   `sameCreatureType`. When `true` and the requirement picks more than one target, the chosen **permanent**
   targets must all share at least one *card type* per CR 205.2a — artifact, creature, enchantment,
@@ -6054,23 +6593,31 @@ Every `TargetRequirement` carries count semantics (defaults shown):
   both being legendary. A target off the battlefield contributes nothing and rejects the set. A no-op for
   single-target requirements and non-permanent targets. E.g. `TargetObject(filter = TargetFilter.NonlandPermanent, count = 2, sameCardType = true)` (Burglar's Plot, the Adventure half of
   Bilbo, Luckwearer).
-- `totalManaValueAtMost = null` — on `TargetObject`; when set to a `DynamicAmount`, the **combined
-  mana value** of the chosen card or permanent targets may not exceed the resolved amount ("**any
-  number of target creature cards with total mana value X or less**", Kairi, the Swirling Sky's
-  "any number of target nonland permanents with total mana value 6 or less"). The amount is resolved
-  once the ability is put on the stack — for a reflexive after a pay-`{X}` (`DynamicAmount.XValue`
-  reads the X just paid), and per mode when the requirement sits on a chosen `Mode` of a modal
-  triggered ability, whether its targets are picked as it goes on the stack or at resolution — and
-  enforced cross-target against the summed `manaValue` by both `TargetValidator`
-  (authoritative, resolving the `DynamicAmount` against `xValue`) and, on the interactive target
-  decision, `DecisionValidators` (which sees the cap already baked to a concrete int in
-  `TargetRequirementInfo`). Pair with `unlimited = true` for the "any number … with total mana value
-  N or less" shape. Distinct from `dynamicMaxCount`, which caps the target *count*, not their summed
-  mana value. The web-client's graveyard target picker enforces the same cap eagerly (blocks a pick
-  that would exceed it). E.g. `TargetObject(unlimited = true, filter =
-  TargetFilter(GameObjectFilter.Creature.ownedByTriggeringPlayer(), zone = Zone.GRAVEYARD),
-  totalManaValueAtMost = DynamicAmount.XValue)` — **Fire Lord Sozin** (back face of The Rise of Sozin),
-  reanimating post-payment via a `Effects.MayPayX(ReflexiveTriggerEffect(...))`.
+- `totalAtMost = null` — on `TargetObject`; a `TotalCap(property: CardNumericProperty, amount:
+  DynamicAmount)` caps the **summed value of one numeric property** over the chosen card or permanent
+  targets: `TotalCap.manaValue(amount)` — "**any number of target creature cards with total mana
+  value X or less**" (Fire Lord Sozin; Kairi, the Swirling Sky's "any number of target nonland
+  permanents with total mana value 6 or less") — and `TotalCap.power(amount)` — "**any number of
+  target creature cards with total power 10 or less from your graveyard**" (Nethroi, Apex of Death).
+  The cap-on-a-sum sibling of `sameNumericProperty` / `differentNumericProperty`, over the same
+  `CardNumericProperty` axis, so a "total toughness" card is data. Each target counts its *current*
+  value (`NumericTargetEquality.value`): power projected on the battlefield; off it, the card's own
+  power with a `*` evaluated by its characteristic-defining ability (CR 604.3 — a Lhurgoyf in the
+  graveyard counts the creature cards in graveyards); 0 for an object without the property. The
+  amount is resolved once the targets are chosen — for a reflexive after a pay-`{X}`
+  (`DynamicAmount.XValue` reads the X just paid), and per mode on a modal triggered ability — and
+  floored at 0. `TargetValidator` is authoritative; an interactive target pause carries the resolved
+  cap, its property's label and each candidate's value (`TargetRequirementInfo.totalCap` /
+  `totalCapLabel` / `targetValues`), so `DecisionValidators`, the AI and every web-client picker
+  (board, single pile, multi-pile) sum the server's numbers. Because a value can change while the
+  spell or ability waits, the cap is re-checked as a restriction on the *set* at resolution
+  (CR 608.2b): when a requirement's still-legal targets now exceed it, every one of them is illegal.
+  Pair with `unlimited = true` for the "any number … with total … N or less" shape. Distinct from
+  `dynamicMaxCount`, which caps the target *count*. E.g. `targets(TargetFilter.CreatureInYourGraveyard,
+  unlimited = true, totalAtMost = TotalCap.power(DynamicAmounts.fixed(10)))` (Nethroi); `TargetObject(
+  unlimited = true, filter = TargetFilter(GameObjectFilter.Creature.ownedByTriggeringPlayer(), zone =
+  Zone.GRAVEYARD), totalAtMost = TotalCap.manaValue(DynamicAmount.XValue))` — **Fire Lord Sozin**
+  (back face of The Rise of Sozin), reanimating post-payment via `Effects.MayPayX(ReflexiveTriggerEffect(...))`.
 - `differentNames = false` — on `TargetObject`; when `true` and more than one target is chosen, no two
   chosen targets may share a **name** ("**up to six target creature cards with different names**" —
   Behold the Sinister Six!). Enforced cross-target by `TargetValidator` (authoritative) and, on the
@@ -6170,7 +6717,15 @@ Author the restriction through the `Conditions.candidate*` facade (never hand-wr
 - `Conditions.candidateLostLifeThisTurn()` — the targeted player lost life this turn (Rix Maadi Guildmage).
 - `Conditions.candidateLifeAtMost(n)` — the targeted player has `n` or less life.
 - `Conditions.candidateCastSpellsThisTurn(filter, atLeast = 1)` — the candidate player cast `atLeast` or more spells matching `filter` this turn (`PlayerCastSpellsThisTurn(Player.Candidate, …)`). With a non-targeting `selectTarget` it backs "choose a player who cast one or more sorcery spells this turn" (Backdraft).
-- `Conditions.candidateHasMostLife()` — the candidate player has the most life or is tied for the most (`PlayerHasMostLife(Player.Candidate)`). With a non-targeting `selectTarget` it backs "choose a player with the most life or tied for most life" (The Black Gate); a lone candidate is chosen without a prompt.
+- `Conditions.candidateHasMostLife()` — the candidate player has the most life or is tied for the most (`PlayerHasMost(Player.Candidate, LifeTotal(You))`). With a non-targeting `selectTarget` it backs "choose a player with the most life or tied for most life" (The Black Gate); a lone candidate is chosen without a prompt.
+- `Conditions.candidateIs(player)` — the candidate is `player` (`PlayerIs(Player.Candidate, player)`).
+  Wrapped in `Conditions.Not` it reads "another target player" relative to a bound player. A
+  triggered ability binds `Player.TriggeringPlayer` both when its targets are chosen and at the
+  CR 608.2b re-check, so The Lord of Pain's "Whenever a player casts their first spell each turn,
+  choose another target player" is `Triggers.anyPlayer.castsNth(1)` + `TargetPlayer(restriction =
+  Conditions.Not(Conditions.candidateIs(Player.TriggeringPlayer)), descriptionOverride = "another
+  target player")`. With no trigger bound (spells, activated abilities) `TriggeringPlayer` names no
+  one, so every player stays legal.
 - `Conditions.candidateWasDealtDamageBySourceThisTurn()` — this ability's **source** dealt damage (combat
   or noncombat) to the targeted player this turn; backed by `SourceDealtDamageToPlayerThisTurn(player)`,
   which reads the source's per-recipient damage memory. "Target player dealt damage by this creature this
@@ -6337,6 +6892,15 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   ChosenTargets)` → `MoveCollectionEffect(destination = ToZone(LIBRARY, player = Player.TargetPlayer,
   placement = Top), order = CardOrder.ControllerChooses)` to put the chosen cards on top of *their*
   (the target player's) library in a player-chosen order.
+  The card slot is offered **per chosen player** too: an owner predicate that reads an earlier target
+  (`.ownedByTargetPlayer()`, or `.ownedBy(player)` over a target handle) makes the slot dependent, so
+  legal actions, a modal spell's per-mode target prompt and trigger target selection all offer only
+  that player's graveyard once the player is picked (`DependentTargetSelection`, which covers
+  graveyard slots as well as permanents). "Target player shuffles up to three target cards from their
+  graveyard into their library" is `val player = target(Targets.Player)` then
+  `targets(TargetFilter(GameObjectFilter.Any.ownedByTargetPlayer(), zone = Zone.GRAVEYARD), count = 3,
+  optional = true)` and `ForEachTargetOf(cards, Move(IterationEntity, LIBRARY)) then ShuffleLibrary(player)`
+  — Gaea's Blessing, and Quandrix Command as a mode.
 - `.ownedByTriggeringPlayer()` (`ControllerPredicate.OwnedByTriggeringPlayer`, FQL
   `own:triggering-player`) — owned by the trigger's associated player: the damaged player for a
   combat/damage trigger, the event's player otherwise. The *non-targeted* "that player" sibling of
@@ -6345,7 +6909,7 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   Sozin's "put any number of target creature cards … from that player's graveyard" reads "that player"
   as whoever Sozin just damaged. Works at target-validation/finding time in a graveyard zone:
   `TargetObject(unlimited = true, filter = TargetFilter(GameObjectFilter.Creature.ownedByTriggeringPlayer(),
-  zone = Zone.GRAVEYARD), totalManaValueAtMost = DynamicAmount.XValue)`.
+  zone = Zone.GRAVEYARD), totalAtMost = TotalCap.manaValue(DynamicAmount.XValue))`.
 - `.controlledByTriggeringPlayer()` (`ControllerPredicate.ControlledByTriggeringPlayer`, FQL
   `ctrl:triggering-player`) — the **control** sibling of `.ownedByTriggeringPlayer()`: controlled by the
   trigger's associated player (the damaged player for a combat/damage trigger). Reads *projected*
@@ -6373,6 +6937,11 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   typecycling (CR 702.29e). Read off the card's printed keyword abilities (stamped as
   `CardComponent.hasCycling`), so it works in any zone — "target card with a cycling ability from your
   graveyard" (Rooting Moloch).
+- `.withKicker()` — `CardPredicate.HasKicker`: a card with a kicker ability — kicker, multikicker or
+  "kicker [A] and/or [B]" (CR 702.33), but not Offspring, Bargain, Squad, Replicate or a flash-timing
+  unlock (`KeywordAbility.OptionalAdditionalCost.isKicker`). Stamped as `CardComponent.hasKicker` from
+  the printed keyword abilities, so it works in any zone — "target card with a kicker ability from your
+  graveyard" (Murasa Sproutling), "a card with a kicker ability from among them" (Coralhelm Chronicler).
 - `.couldProduceColorlessMana()` — `CardPredicate.CouldProduceColorlessMana`: a land one of whose mana
   abilities (intrinsic, printed or granted) adds `{C}` — Wastes, an Eldrazi Temple. Like
   `ManaColorSet.LandsCouldProduce` it ignores costs and tapped state, a land that lost all abilities
@@ -6380,6 +6949,9 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   **type** a land you control could produce" (Naga Vitalist): author that as two `{T}` mana abilities —
   `Effects.AddManaOfColorLandsCouldProduce(YOU)` and `Effects.AddColorlessMana(1)` gated by
   `ActivationRestriction.OnlyIfCondition(Conditions.YouControl(GameObjectFilter.Land.couldProduceColorlessMana()))`.
+  That gate is read as reflection, not legality: when the engine asks whether a land *with* such a gated
+  `{C}` half (Reflecting Pool) could produce `{C}`, it recurses into the other lands the gate names,
+  excluding the lands already on the chain — so a Pool's own `{C}` never unlocks itself.
 - `.ofColor(c)` / `.ofColors(set)` — color predicate.
 - `.withColor(c)` / `.withAnyColor(c…)` / `.notColor(c)` — fixed-color predicates (`CardPredicate.HasColor`/`NotColor`).
 - `.nonartifact()` — appends `CardPredicate.IsNonartifact` ("nonartifact creature", the Terror template);
@@ -6410,7 +6982,10 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   GroupFilter(GameObjectFilter.Creature.youControl().withChosenColor()))` expresses "creatures you
   control of the chosen color get +X/+Y" (Heraldic Banner). Fails closed until a color is chosen.
 - `.sharingCreatureTypeWith(entity)` — `CardPredicate.SharesCreatureTypeWith(entity)`: shares ≥1 (projected)
-  creature subtype with a referenced entity. `entity` may be `EffectTarget.AffectedEntity`, which resolves
+  creature subtype with a referenced entity. A Changeling on either side off the battlefield (a spell on
+  the stack, a card in a graveyard) has every creature type (CR 702.73a) — Volo, Guide to Monsters'
+  "a creature spell that doesn't share a creature type with a creature you control" never copies a
+  Changeling spell. `entity` may be `EffectTarget.AffectedEntity`, which resolves
   to the creature a continuous effect is being applied to during projection — combine with
   `AggregateBattlefield(Player.Each, GameObjectFilter.Creature.sharingCreatureTypeWith(EffectTarget.AffectedEntity), excludeSelf = true)`
   for "+X/+X for each OTHER creature that shares a creature type with it" (Alpha Status). In a granted
@@ -6454,8 +7029,9 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   spell you cast, so "a card exiled with Circu" is the whole pile and
   `.sharingNameWith(EffectTarget.LinkedExiledCard())` could only ever name one index of it. Printed
   names on both sides — neither an exiled card nor a card in a hand or library has a battlefield
-  projection a Layer-3 rename could have touched. An empty pile matches nothing; no source in context
-  fails closed. Circu's third line is
+  projection a Layer-3 rename could have touched. A split card compares half by half, so an exiled
+  `Wear // Tear` matches a `Tear` half being cast (Ashiok's Erasure's ruling). An empty pile matches
+  nothing; no source in context fails closed. Circu's third line is
   `PlayersCantCastSpells(affected = Player.EachOpponent, spellFilter = GameObjectFilter.Any.sharingNameWithLinkedExile())`
   — and note that a `PlayersCantCastSpells` filter is evaluated with the *granting permanent* as its
   source, which is what makes any source-relative predicate usable there.
@@ -6490,7 +7066,7 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   creature you control") with `filter = GameObjectFilter.Creature.legendary()`. Colorless candidates
   never match. Evaluated for real in targeting/search/count contexts; inert (false) in
   static-projection / trigger-gating, permissive (true) in cost-calculation.
-- `.sharingNameWithPermanentYouControl(filter)` — `CardPredicate.SharesNameWithPermanentYouControl(filter,
+- `.sharingNameWithPermanentYouControl(filter)` — `CardPredicate.SharesNameWithYourCard(filter,
   excludeSelf = false)`: has the **same name** as at least one permanent the evaluating player controls
   matching `filter`. The name sibling of `.sharingColorWithPermanentYouControl`; names compare exactly and are
   read through the projection on both sides (Layer 3 renames such as Witness Protection count), and a
@@ -6501,6 +7077,13 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   the activating player, so the battlefield side is scoped to "you control". Evaluated for real in
   targeting/search/cost contexts; inert (false) in static-projection / trigger-gating, permissive (true)
   in cost-calculation.
+- `.sharingNameWithCardInYour(zone, filter = GameObjectFilter.Any)` — `CardPredicate.SharesNameWithYourCard(filter,
+  zone = zone)`: the same predicate pointed at one of the evaluating player's **own** zones instead of
+  the battlefield — "has the same name as a card in your graveyard". Off the battlefield the compared set
+  is keyed by owner (the zone's cards), on it by control; face-down cards (foretold, face-down exile)
+  have no name and never match. Frostpyre Arcanist: `Patterns.Library.searchLibrary(filter =
+  GameObjectFilter.InstantOrSorcery.sharingNameWithCardInYour(Zone.GRAVEYARD), destination = HAND, reveal = true)`. Same
+  evaluation contexts as the battlefield form.
 - `.notSharingCreatureTypeWithPermanentYouControl(filter)` —
   `CardPredicate.DoesNotShareCreatureTypeWithPermanentYouControl`: shares **no** (projected) creature
   type with any permanent the evaluating player controls matching `filter`. Negative analogue of
@@ -6528,8 +7111,9 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   `CastChoicesComponent` under `slot` (case-insensitive). Unlike `.namedFromVariable` (transient pipeline variable,
   fails closed in projection), this is **static-projection / activation-legality safe**: it keys off the granting
   permanent's id, which the predicate context supplies as the source wherever a static ability's filter is
-  evaluated. Pair with `replacementEffect(EntersWithChoice(ChoiceType.CARD_NAME))`. Fails closed (no match) before
-  a name is chosen. Used by name-keyed static abilities (Petrified Hamlet — "sources with the chosen name … /
+  evaluated. Pair with `replacementEffect(EntersWithChoice(ChoiceType.CARD_NAME))` for a choice made as it enters,
+  or `Effects.ChooseCardName(recordOnSource = true)` for one made by a resolving ability (Medomai's Prophecy).
+  Fails closed (no match) before a name is chosen. Used by name-keyed static abilities (Petrified Hamlet — "sources with the chosen name … /
   Lands with the chosen name …").
 - `.ofChosenCardTypeComponent(slot = ChoiceSlot.CARD_TYPE)` — `CardPredicate.CardTypeEqualsChosenComponent`:
   the card-type analogue of `.namedFromChosenComponent`. Matches cards whose **card type** equals the type
@@ -6537,6 +7121,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   static-projection / cost-calculation safety and source-id keying. Pair with a trigger running
   `Effects.ChooseCardTypeForSource`. Fails closed before a type is chosen. Used by card-type-keyed taxes
   (Arachne, Psionic Weaver — "Spells of the chosen type cost {1} more").
+- `.ofChosenCardTypeFromVariable(variableName)` (or the `ChosenSlot` overload) — `CardPredicate.CardTypeEqualsChosen`:
+  the pipeline-variable sibling of `.ofChosenCardTypeComponent`, as `.namedFromVariable` is of
+  `.namedFromChosenComponent`. Matches cards with the card type stored in `chosenValues[variableName]` by an
+  earlier `chooseOption(OptionType.CARD_TYPE)` step (projected types on the battlefield, printed types
+  elsewhere; case-insensitive). Fails closed in static/projection contexts. Used by "choose a card type, then …
+  cards of the chosen type" (Alrund, God of the Cosmos).
 - `.originallyPrintedInSet(setCode)` — `CardPredicate.OriginallyPrintedInSet`: matches a card whose
   *canonical* set code equals `setCode` (case-insensitive), i.e. the set it was *originally printed* in —
   reprints still match their original set, regardless of the printing in play. Reads the entity's
@@ -6551,7 +7141,7 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   site. Used by Central Elevator ("search your library for a Room card that doesn't have the same name as a
   Room you control").
 - `.nameNotSharedWithPermanentYouControl(filter, another = false)` —
-  `Not(SharesNameWithPermanentYouControl(filter, excludeSelf = another))`: a permanent whose name isn't
+  `Not(SharesNameWithYourCard(filter, excludeSelf = another))`: a permanent whose name isn't
   shared with any permanent the evaluating player controls matching `filter`; matches with no controller
   in scope. The Apprentice's Folly ("… that doesn't have the same name as a token you control"):
   `Creature.youControl().nontoken().nameNotSharedWithPermanentYouControl(GameObjectFilter.Token)`. Yenna,
@@ -6725,6 +7315,19 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   printed cost. Face-down objects (no mana cost) never match; the cast-record path returns `false`
   (a record stores the resolved mana value, not the printed cost). Used by *Paradox Surveyor*
   ("a card with {X} in its mana cost"). Underlying predicate: `CardPredicate.HasXInManaCost`.
+- `.hasRepeatedManaSymbol()` — the card's **printed** mana cost holds the same symbol more than once
+  (`{1}{G}{G}`, `{X}{X}{R}`, `{R/G}{R/G}`). Exact symbols compare, per Jegantha's ruling: hybrid
+  `{R/G}` is its own symbol (`{R}{R/G}` has no repeat) and `{4}` is one symbol. No mana cost and
+  face-down objects never match; the cast-record path returns `false`. Deck construction reads a split
+  card's halves combined (CR 709.4b — `{1}{R} // {1}{U}` repeats `{1}`). Jegantha, the Wellspring's
+  companion condition negates it: `EachCard(Any.withCardPredicate(Not(HasRepeatedManaSymbol)))`.
+  Underlying predicate: `CardPredicate.HasRepeatedManaSymbol`.
+- `.manaCostIs(vararg costs)` — the card's **printed** mana cost is exactly one of `costs`
+  (symbols, not mana value): *Urza's Saga*'s "an artifact card with mana cost {0} or {1}" is
+  `GameObjectFilter.Artifact.manaCostIs("{0}", "{1}")` (an `Or` of two). Per its ruling `{U}` and
+  `{X}` don't match, and a card with no mana cost (a land, *Ancestral Vision*) is not a `{0}` card.
+  Face-down objects never match; the cast-record path returns `false`. Underlying predicate:
+  `CardPredicate.ManaCostIs(manaCost)`.
 - `.coloredManaSymbolsAtLeast(vararg colors, min = 1)` — the card's **printed** mana cost contains
   at least `min` mana symbols of `colors`: "a noncreature spell with one or more blue mana symbols
   in its mana cost" (*Namor the Sub-Mariner*, `coloredManaSymbolsAtLeast(Color.BLUE)`), and the
@@ -6886,9 +7489,17 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   damaged it this turn (the `DamageSourceLki` snapshots Shelob's observer death trigger reads, through
   the same matcher), so a source that has since left the battlefield or changed control still counts as
   it was then — unlike `.wasDealtDamageBySourceThisTurn()`, which needs its one source to still be around.
-  The snapshot holds the source's controller, whether it was a creature, its creature subtypes and its
-  name, so `sourceFilter` may use `youControl()` / `opponentControls()` ("you" = the effect source's
-  controller), `Creature`, `withSubtype(...)` and `named(...)`; any other predicate fails closed. Honoured by the zone-change
+  The snapshot holds the source's controller, whether it was a creature, an instant or a sorcery, its
+  subtypes and its name, so `sourceFilter` may use `youControl()` / `opponentControls()` ("you" = the
+  effect source's controller), `Creature`, `InstantOrSorcery` ("a spell" that dealt damage),
+  `withSubtype(...)`, `named(...)` and `or` unions of them; any other predicate fails closed. Creatures
+  and planeswalkers both keep the record. In a damage trigger's recipient filter it is read as of that
+  damage, the hit included, even when the damage destroyed the permanent — Aegar, the Freezing Flame's
+  "whenever a creature or planeswalker an opponent controls is dealt excess damage, if a Giant, Wizard,
+  or spell you controlled dealt damage to it this turn" is `Triggers.a().dealsDamage(to =
+  Recipient.Object(CreatureOrPlaneswalker.opponentControls().wasDealtDamageThisTurnBy(
+  (withSubtype(GIANT) or withSubtype(WIZARD) or InstantOrSorcery).youControl())), requireExcess = true)`
+  (the record only grows during the turn, so the trigger-time check is the resolution-time answer too). Honoured by the zone-change
   redirect path (printed and granted replacements alike), so Etching of Kumano's "if a creature dealt
   damage this turn by a source you controlled would die, exile it instead" is
   `replacementEffect(RedirectZoneChange(newDestination = Zone.EXILE, appliesTo =
@@ -6951,6 +7562,19 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
   `HasNonManaActivatedAbility` flags, it sees granted and removed abilities.
 - `.faceDown()` — face-down state.
 - `.commander()` — `StatePredicate.IsCommander`: the object **is a commander**, any player's (CR 903.3). The designation is an attribute of the card, not a characteristic: it follows the card across zones and stays on a face-down commander, and a copy (token or Clone) is never one. Compose with a zone: "you control a commander" is a battlefield permanent (CR 903.3d) — `Conditions.YouControlACommander`.
+  **The command zone as an effect source and destination** composes from this predicate, no dedicated
+  effect: "put a commander you own from the command zone onto the battlefield" is
+  `gather(CardSource.FromZone(Zone.COMMAND, Player.You, GameObjectFilter.Any.commander().ownedByYou()))` →
+  `chooseUpTo(1, …)` (the "may"; partners offer both) → `moveTracked(…, ToZone(BATTLEFIELD))`, and "return it
+  to the command zone" is `Effects.Move(target, Zone.COMMAND)` — a real zone change into the **owner's**
+  command zone (whoever resolves it), never intercepted by the commander rules (CR 903.9b replaces only
+  moves to hand/library; 903.9a acts after a move to graveyard/exile). Each player's command zone is keyed by owner, so the gather
+  never sees an opponent's commander, and `.commander()` keeps emblems, Vanguard avatars and dungeons out;
+  a game without commanders gathers nothing. Leaving the command zone this way isn't a cast, so commander
+  tax doesn't grow. For "at the beginning of the next end step", wrap the haste grant and the
+  `CreateDelayedTrigger(Step.END, Move(IterationEntity, Zone.COMMAND))` in `ForEachInCollection` over the
+  moved slot: the trigger captures that object's identity (CR 603.7c), so a commander that left — or left
+  and came back as a new object — stays where it is. Hellkite Courser.
 - `.transformed()` — a **transformed permanent** (CR 701.27g): back face up on the battlefield. "Each transformed permanent you control" (Mutagen Connoisseur), "other transformed permanents you control have …" (Gargantuan Slabhorn). Not `Filters.DoubleFaced` — that is the *card*, true in every zone and of a front-face werewolf too.
 - `.withMorph()` — has a morph *procedure*: the printed keyword (`HasMorphAbilityComponent`, any
   zone) **or** a turn-up procedure whose mechanic is morph. "Creature with a morph ability"
@@ -6992,6 +7616,19 @@ Named constants keep card code readable: `Any` (default — any player or object
 `AnyPlayerOrPlaneswalker`, `AnyPlayerOrBattle` ("deals combat damage to a player or battle" — Beamtown
 Beatstick), `OpponentOrBattle` ("deals damage to an opponent or battle" — Bloodfeather Phoenix), `CreatureOrPlayer`, `OpponentOrPermanentTheyControl`. Anything else is
 spelled with the constructors: `Recipient.Object(GameObjectFilter.Creature.withSubtype("Vampire"))`.
+
+`PermanentOrPlayer` ("a permanent or player") reaches every damage recipient `Any` does but is a
+*recipient-restricted* form, so it does not take the simultaneous-damage fold: one source dealing combat
+damage to a blocker and (trampling over) the player triggers once per recipient, each with its own
+`TRIGGER_DAMAGE_AMOUNT`, where an unrestricted `Any` trigger fires once with the total. Use it whenever the
+effect names "that permanent or player" or gates on the per-recipient amount. Ghyrson Starn, Kelermorph —
+"whenever another source you control deals exactly 1 damage to a permanent or player, Ghyrson Starn deals 2
+damage to that permanent or player" — is `Triggers.a(Any.youControl().notSourceItself()).dealsDamage(
+Recipient.PermanentOrPlayer)` + `triggerRestriction = CompareAmounts(triggerDamageAmount(), EQ, fixed(1))` +
+`Effects.DealDamage(2, EffectTarget.DamageRecipient)`. A damage trigger's source filter reads source-relative
+predicates against the observing permanent, so "another source you control" is `notSourceItself()` right in
+the filter (Talon of Pain too), and a source that died to the damage it dealt — a token that traded in combat,
+already gone when triggers are detected — is read as it last existed (CR 603.10).
 
 Zone-change trigger filters also honor `sourceItself()` and its negation against the observing
 source identity, including branches of a heterogeneous filter union. This permits a single
@@ -7062,6 +7699,11 @@ work for abilities-on-stack (which carry no `CardComponent`).
 - `CardPredicate.IsActivatedAbility` — activated abilities only (excludes triggered abilities and
   spells). Mana abilities never use the stack, so they're never matched. Exposed as the
   `TargetObject(filter = TargetFilter.ActivatedAbilityOnStack)` target requirement (Bind: "Counter target activated ability").
+- `CardPredicate.IsLoyaltyAbility` — loyalty abilities only: activated abilities on the stack with a
+  loyalty symbol in their cost (CR 606.2), read off the captured `ActivatedAbilityOnStackComponent.activatedAbility`
+  (`isPlaneswalkerAbility`), so a copy of a loyalty ability matches too. Exposed as
+  `TargetFilter.LoyaltyAbilityOnStack`; Verdant Command narrows it with
+  `.abilitySourceMatches(GameObjectFilter.Planeswalker)` for "Counter target loyalty ability of a planeswalker".
 - `CardPredicate.TargetsMatching(subfilter)` — true when the stack object's `TargetsComponent`
   includes at least one chosen target matching `subfilter`. Player targets are skipped. The
   subfilter inherits the outer `PredicateContext`, so `Land.youControl()` inside the subfilter
@@ -7240,13 +7882,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
   Choose target creature that's blocking equipped creature…" =
   `target(TargetFilter(Creature.blockingEntity(EffectTarget.EquippedCreature)))`. The same pin applies
   to every host-relative predicate in a target filter; retargets keep it.
-- `ControllerControls(filter)` (filter builder `controllerControls(subfilter)`) — the candidate's
-  **controller** controls something matching `subfilter`: "target creature whose controller controls
-  an Island" (Seasinger, FEM). The load-bearing detail is that the subfilter's `youControl()` is
-  rebound to the *candidate's* controller, not the ability's — `PredicateEvaluator` swaps
-  `PredicateContext.controllerId` for the candidate's before evaluating the nested filter. That is the
-  whole point: the constraint is about whose creature it is right now, not about who is casting. The
-  nested filter reads projected battlefield state.
+- `ControllerMeets(condition)` (filter builder `controllerMeets(condition)`) — the candidate's
+  **controller** satisfies `condition`: "target creature whose controller controls an Island"
+  (Seasinger, FEM: `Creature.controllerMeets(Conditions.YouControl(Land.withSubtype(ISLAND)))`), "a
+  creature whose controller has eight or more cards in their graveyard" (Lullmage's Domination, ZNR:
+  `Creature.controllerMeets(Conditions.CardsInGraveyardAtLeast(8))`, fed to
+  `CostReductionSource.FixedIfAnyTargetMatches`). The load-bearing detail is that every "you" in the
+  condition is rebound to the *candidate's* controller, not the ability's — `PredicateEvaluator`
+  evaluates it with an `EffectContext` whose `controllerId` is the candidate's (projected) controller.
+  That is the whole point: the constraint is about whose creature it is right now, not about who is
+  casting. Not usable in a group-static projection filter (it reads as no match there).
 - `IsCombatPairedWithSource` (filter builder `blockingOrBlockedBySource()`) — the same CR 509
   pairing read **live in both directions**: the candidate blocks the source, or the source blocks
   the candidate. "Each creature blocking or blocked by this creature" (Spitting Slug =
@@ -7356,6 +8001,12 @@ work for abilities-on-stack (which carry no `CardComponent`).
   1:1 onto the N granters. Not populated for leaves-the-battlefield granted triggers (a granted "dies"
   ability): the source is already gone when the trigger fires, so the granter can't be recovered from its
   attachment index — reference the granter by other means there, or scope with `notAttachedToSource()`.
+- `IsTriggeringEntity` (negated builder `notTriggeringEntity()`) — matches the resolving trigger's *triggering
+  entity* (the evaluation context's `triggeringEntityId`). Negate for "any target other than that permanent" on
+  target kinds that carry a `GameObjectFilter` instead of a `TargetFilter` — Toralf, God of Fury's
+  `Targets.Any(GameObjectFilter.Any.notTriggeringEntity())`, where the damaged permanent is excluded but players
+  stay legal. `TargetFilter`-based requirements keep `otherThanTriggeringEntity()`. False with no trigger
+  context (projection, untap and trigger-matching evaluate it as false).
 - `HasGreatestPower` (filter builder `hasGreatestPower()`) / `HasLeastPower` (filter builder
   `hasLeastPower()`) — has the greatest / least projected power among creatures *its controller*
   controls (ties all qualify). Used for "creature with the greatest/least power" target and edict
@@ -7470,6 +8121,15 @@ work for abilities-on-stack (which carry no `CardComponent`).
   Darkness Crystal: `TargetObject(filter = TargetFilter(GameObjectFilter.Creature.exiledWithSource(),
   zone = Zone.EXILE))`. Resolves against `PredicateContext.sourceId`; inert with no source, and never
   matches in group-static projection or trigger-gating contexts.
+  **On an emblem**, the source is the object that created the emblem: Tibalt, Cosmic Impostor's "As
+  Tibalt enters, you get an emblem with 'You may play cards exiled with Tibalt, Cosmic Impostor, and you
+  may spend mana as though it were mana of any color to cast those spells'" is
+  `OnEnterRun(Effects.CreatePermanentEmblem(ownedStaticAbilities = listOf(MayPlayCardsFromExile(GameObjectFilter.Any.exiledWithSource(), withAnyManaColor = true)), …))`,
+  with Tibalt's loyalty abilities exiling via `linkToSource = true` / `ExileLinkedToSource`. The emblem
+  records its creator's battlefield visit and reads that visit's pile — live while Tibalt is on the
+  battlefield, the retained departed-visit pile after he leaves (including what a −8 that cost his last
+  loyalty exiled) — so his cards stay playable after he dies, while a later Tibalt (a new object,
+  CR 400.7) is a different visit with its own emblem.
 - `ExiledByYou` (filter builder `exiledByYou()`) — player-relative: the candidate card is in exile and
   the spell or ability that exiled it was controlled by the evaluating player
   (`PredicateContext.controllerId`) — "if it was exiled by an ability you controlled" (Evelyn, the
@@ -7480,6 +8140,18 @@ work for abilities-on-stack (which carry no `CardComponent`).
   rules actions, other executors) match nobody. Never matches in group-static projection.
 - `IsWarpExiled` (filter builder `warpExiled()`) — card in exile via warp's
   end-of-turn delayed trigger (CR 702.185b).
+- `IsForetold` (filter builder `foretold()`) — a **foretold card** (CR 702.143): a card its owner
+  exiled face down with the foretell special action, still in exile. Reads `ForetoldComponent`, which
+  the engine strips when the card leaves exile; a card exiled face down by any other effect never
+  matches. "Each foretold card you own in exile" is
+  `DynamicAmount.Count(Player.You, Zone.EXILE, GameObjectFilter.Any.foretold())` (Niko Defies
+  Destiny, Alrund, God of the Cosmos).
+- `IsSuspended` (filter builder `suspended()`) — a **suspended card** (CR 702.62b): in exile, with
+  suspend, and at least one time counter on it. "Has suspend" reads the engine's `SuspendedComponent`
+  marker — the one that grants the suspend triggers — so a card exiled with time counters by an unrelated
+  effect never matches, and a card whose last time counter is gone stops matching. "Target permanent or
+  suspended card" is the cross-zone union `TargetFilter.Permanent.or(TargetFilter(GameObjectFilter.Any
+  .suspended()).inZone(Zone.EXILE))` (Clockspinning). Never matches in group-static projection.
 - `WasCastForWarp` (filter builder `castForWarp()`) — battlefield permanent that
   was cast for its warp cost (CR 702.185). Pair with
   `Conditions.TargetMatchesFilter(GameObjectFilter.Creature.castForWarp(), …)` to
@@ -7608,8 +8280,8 @@ moves), `attacks(requires)`, `blocks(attackerFilter?, minBlockedAttackers?)`, `b
 `blocksOrBecomesBlocked(by?, oncePerCombat?)`, `attacksAndIsntBlocked()`, `dealsDamage(to, damageType,
 requireExcess, batch, requires)`, `dealsCombatDamage(to, …)`, `isDealtDamage(by)`,
 `damagedCreatureDies(dying?)`, `becomesTapped(reason?, firstTimeEachTurn?)`, `becomesUntapped()`, `tappedForMana()` (SELF / ATTACHED), `manaAbilityResolves()` (SELF only),
-`turnedFaceUp()`, `mutates()` (SELF only), `transforms(intoBackFace?)`, `phasesIn()`, `becomesTarget(of?, byYou, byOpponent,
-spellsOnly, abilitiesOnly, firstTimeEachTurn, includeSpellTargets, includePlayerTargets, ofBackupAbility,
+`turnedFaceUp()`, `mutates()` (SELF / ANY / OTHER), `transforms(intoBackFace?)`, `phasesIn()`, `becomesTarget(of?, byYou, byOpponent,
+spellsOnly, abilitiesOnly, firstTimeEachTurn, includeSpellTargets, players, ofBackupAbility,
 targetsOnlyIt)`,
 `getsCounters(type?, by?, firstTimeEachTurn?, batch?, orPlayer?)`, `losesCounters(type?, lastRemoved?,
 byDamagePrevention?, by?)`, `trains()`, `evolves()`, `champions()`, `crews()`, `saddles()`, `becomesCrewed()`, `becomesSaddled()`,
@@ -7620,7 +8292,7 @@ only, `beginningOf(step)` (the enchanted creature's controller's step) and
 `hasAbilityActivated(by, tapInCost?, includeManaAbilities)`.
 
 **Batch verbs** (`oneOrMore` / `oneOrMoreOther`): `enter()`, `die()`, `leaveWithoutDying()`,
-`dealCombatDamageToAPlayer()`, `dealCombatDamageToAPlayerOrBattle()`, `dealCombatDamageToYou()`, `becomeTapped(reason?)`, `becomeUntapped()`,
+`dealCombatDamageToAPlayer()`, `dealCombatDamageToAnOpponent()`, `dealCombatDamageToAPlayerOrBattle()`, `dealCombatDamageToOneOrMorePlayers()`, `dealCombatDamageToOneOrMoreOpponents()`, `dealCombatDamageToYou(perSourceController = false)`, `becomeTapped(reason?)`, `becomeUntapped()`,
 `putIntoYourGraveyard(fromLibrary?, firstTimeEachTurn?)`, `putIntoGraveyards()`, `leaveYourGraveyard()`, `putIntoExile(from, includeTokens)`.
 For `enter()` and `die()`, a filter with no controller predicate means "you control"; say
 `.youControl()` anyway.
@@ -7629,16 +8301,16 @@ For `enter()` and `die()`, a filter with no controller predicate means "you cont
 `castsOrCopies(spell)`,
 `choosesTargets()`, `putsSpellOrAbilityOnStack()`, `activatesAbility(of?, targeting?, loyalty,
 minLoyaltyRemoved, exhaust, includeManaAbilities, excludeManaAbilities, tapInCost?)`,
-`attackTriggersAbility()`, `attacks(with?, minAttackers?)` (you declare attackers), `isAttacked(…)`,
+`attackTriggersAbility()`, `permanentEnteringTriggersAbility()`, `attacks(with?, minAttackers?)` (you declare attackers), `isAttacked(…)`,
 `isDealtDamage(by?, damageType?)`, `isDealtCombatDamage()`, `getsCounters(type?)` (`you` only — counters
 put on the player by anyone: "whenever you get one or more {E}", `CountersPlacedEvent.recipient`),
 `draws(firstInDrawStep?)`,
-`drawsNth(n)`, `revealsFirstDraw(card?)`, `discards(card?, batch?, firstTimeEachTurn?)`, `mills(card?, batch?)`, `cycles()`, `playsLand(…)`,
+`drawsNth(n)`, `revealsFirstDraw(card?)`, `discards(card?, batch?, firstTimeEachTurn?)`, `mills(card?, batch?)`, `cycles(firstTimeEachTurn?)`, `playsLand(…)`,
 `permanentTurnedFaceUp(filter)`, `searchesLibrary()`, `shufflesLibrary()`, `gainsLife(firstTimeEachTurn?)`,
-`losesLife(batch?, exactly?)`, `losesGame()`, `sacrifices(filter, batch?)`,
+`losesLife(batch?, exactly?, firstTimeEachTurn?)`, `paysLife()`, `losesGame()`, `sacrifices(filter, batch?)`,
 `sacrificesAnother(filter)`, `taps(filter, batch?)`, `tapsLandForMana(land?)`, `createsToken(token?)`,
 `exploits(nontoken?)`, `commitsCrime()`, `givesAGift()`, `scries()`, `surveils()`, `scriesOrSurveils()`, `proliferates()`,
-`discovers()`, `collectsEvidence()`, `forages()`, `investigates(firstTimeEachTurn?)`, `solvesACase()`, `clashes(andWins?)`,
+`discovers()`, `collectsEvidence()`, `forages()`, `foretells()`, `investigates(firstTimeEachTurn?)`, `solvesACase()`, `clashes(andWins?)`,
 `isTemptedByTheRing(bearerChosen?)`, `bends(types)`, `manifestsDread()`, `expends(n)`,
 `venturesIntoTheDungeon()`, `completesADungeon()`, `takesTheInitiative()`, `becomesTheMonarch()`,
 `fullyUnlocksARoom()`, `sagaChapterResolves(finalOnly?)`.
@@ -7721,6 +8393,15 @@ per-event matcher never matches a damage pattern. Bloodfeather Phoenix — "when
 spell you control deals damage to an opponent or battle, you may pay {R}. If you do, return this card
 from your graveyard to the battlefield" — is `Triggers.a(InstantOrSorcery.youControl()).dealsDamage(
 Recipient.OpponentOrBattle)` + `triggerZone = Zone.GRAVEYARD` + `Effects.MayPay(…, then = Move(Self, BATTLEFIELD))`.
+
+Filtered attack triggers (`Triggers.a(filter).attacks()`, `binding = ANY`/`OTHER`, bare or inside a
+`Triggers.or`) behave from `GRAVEYARD` and `COMMAND` exactly as on the battlefield: the filter is read
+relative to the card's owner and the trigger fires once per matching attacker, each bound as the
+triggering entity (CR 603.2c) — both passes share `TriggerMatcher.matchingAttackers`. Vivi's
+Persistence — "whenever your commander enters or attacks, you may pay {2}. If you do, return this card
+from your graveyard to your hand" — is `Triggers.or(Triggers.a(Any.commander().ownedByYou()).enters(),
+Triggers.a(Any.commander().ownedByYou()).attacks())` + `triggerZone = Zone.GRAVEYARD` +
+`Effects.MayPay({2}, then = ReturnToHandFromGraveyard(Self))`.
 
 Exile has no general per-event pass on purpose: suspend, madness and paradigm each already have a
 dedicated detector, and a general pass would fire them twice.
@@ -7884,6 +8565,12 @@ The shapes in this family, with their engine notes.
   it enters, CR 508.4), so creatures entering outside combat don't match. A creature that enters attacking
   was never declared as an attacker, so it never fires `attacks()`; "attacks or enters attacking" (Arni
   Metalbrow) is `Triggers.or(Triggers.a(f).attacks(), Triggers.a(f).entersAttacking())`.
+- `Triggers.a(filter).entersTapped()` — "whenever a permanent you control **enters tapped**" (Amulet of
+  Vigor): the enters trigger with `.tapped()` folded into the filter. A zone-change trigger reads
+  `.tapped()` / `.untapped()` as the entrant's status **as it entered** (`EntryTapStateComponent`, frozen by
+  the first tap/untap transition of the visit), not its tap state at detection — so a permanent that enters
+  untapped and is then tapped doesn't match, per the card's ruling. On a leaves/dies trigger the same
+  predicates read the last-known tap state (`.tapped()` on `dies()` is "whenever a tapped creature dies").
 
 **Leaves / dies**
 
@@ -7985,19 +8672,35 @@ The shapes in this family, with their engine notes.
   `CollectionSlot.TriggerCaptured`, frozen at declaration (CR 508.4: a creature put onto the battlefield
   attacking was never declared). "Create **that many** …" is
   `DynamicAmounts.distinctEntitiesIn(CollectionSlot.TriggerCaptured)`; it still counts an attacker
-  removed before the trigger resolves (Rabble Rousing). Battlefield trigger path only.
+  removed before the trigger resolves (Rabble Rousing). The capture holds on every detection path —
+  battlefield, graveyard/command zone, an `Effects.CreateDelayedTrigger(trigger = …attacks(…))` ("whenever
+  one or more nontoken creatures attack this turn, create that many 1/1 white Soldier creature tokens that
+  are tapped and attacking" — Basri Ket's −2: `Triggers.anyPlayer.attacks(with = Creature.nontoken())`, so
+  attacking tokens neither trigger it nor count) and an emblem/global grant.
 - `Triggers.you.attacksAPlayer(with?, minAttackers?)` — "whenever you attack **a player**" /
   "whenever one or more [with] you control attack a player" / "two or more creatures you control
-  attack a player" (CR 508.3e). `YouAttackEvent(perAttackedPlayer = true)`: fires **once per player
+  attack a player" (CR 508.3e). `YouAttackEvent(attackedPlayer = Player.Each)`: fires **once per player
   attacked** (Echoing Assault, Meriadoc Brandybuck, Bitter Work, Dollmaker's Shop rulings), binding that
   player as `Player.TriggeringPlayer` ("that player"). Attackers aimed at a planeswalker or battle count
   toward no player, and `with` / `minAttackers` are counted per attacked player — two creatures split
   across two players don't satisfy "two or more … attack a player". Expanded only on the battlefield
   trigger path; a delayed or emblem trigger with the flag would fire once, unbound.
+- `Triggers.anyPlayer.attacksAPlayer(with?, minAttackers?, attacked = Player.Each)` — the same
+  once-per-attacked-player form for any player's declaration. `attacked` (`YouAttackEvent.attackedPlayer`)
+  scopes which attacked players count, relative to the trigger's controller: `Player.EachOpponent` is
+  "whenever a player attacks **one of your opponents**" (Breena, the Demagogue) — an attack on you
+  doesn't fire it, your own attacks do. The attacked opponent is `Player.TriggeringPlayer`; "that
+  attacking player" is `Player.ActivePlayer`.
 - `Triggers.anyPlayer.attacks(minAttackers = 2)` — "whenever two or more creatures attack": any
   player's declaration, once per declaration (Argent Dais). `Triggers.anOpponent.attacks(...)` is
-  "whenever an opponent attacks with …". All three read `YouAttackEvent.player` against the active
+  "whenever an opponent attacks with …", `Triggers.player(Player.EachOtherPlayer).attacks(...)`
+  "whenever another player attacks with …" (Firemane Commando; a teammate's attack on your shared
+  2HG turn is your own). Every form freezes whom each counted attacker was declared attacking, read
+  by `Conditions.TriggeringAttackersAttackedPlayer` ("if none of those creatures attacked you"). All read `YouAttackEvent.player` against the active
   player (team), the way step triggers do, since only the active player declares attackers.
+  On these forms (not `attacksAPlayer`) `Player.TriggeringPlayer` is **the attacking player** (the declaration's
+  `attackingPlayerId`), so "whenever a player attacks, … the attacking player draws a card" (Norn's
+  Decree) is `Triggers.anyPlayer.attacks()` → `DrawCards(1, PlayerRef(Player.TriggeringPlayer))`.
 - `Triggers.you.isAttacked()` — defender side; fires once per `AttackersDeclaredEvent`,
   not per attacker. Excludes creatures attacking a planeswalker you control
   (CR 509.1b). Pair with `DynamicAmounts.creaturesAttackingYou()` for
@@ -8027,6 +8730,16 @@ The shapes in this family, with their engine notes.
   together in 2HG): "that player draws three cards" is
   `Effects.DrawCards(3, EffectTarget.PlayerRef(Player.TriggeringPlayer))`. Creatures attacking you
   are always an opponent's, so the trigger carries no controller filter.
+- `Triggers.player(Player.EnchantedPlayer).isAttacked()` — "whenever **enchanted player** is attacked"
+  on a Curse (CR 303.4, enchant player): `CreaturesAttackYouEvent(attackedPlayer = Player.EnchantedPlayer)`.
+  The trigger is the Curse controller's, but only creatures declared attacking the player the Curse
+  enchants count (not their planeswalkers), once per combat; they're the firing's captured collection
+  and the attacking player is the triggering player, as on the "you" form. It never fires while the
+  source enchants no player. `includePlaneswalkers` / `unblocked` are "you"-only. "Each opponent
+  attacking that player does the same" is judged on resolution (a player is attacking another if they
+  control a creature attacking them — the Curse cycle's ruling): `ForEachPlayer(EachOpponent,
+  If(YouControl(Creature.attackingEnchantedPlayer()), …))`, `Player.You` being the visited opponent
+  (Curse of Opulence).
 - `Triggers.anOpponent.isAttacked()` — the "your opponents are attacked" counterpart of
   `Triggers.you.isAttacked()`; fires once per `AttackersDeclaredEvent` when one or more declared
   attackers have one of the controller's opponents (a player, via `state.getOpponents`) as
@@ -8181,8 +8894,8 @@ The shapes in this family, with their engine notes.
 - `Triggers.self.dealsDamage()` — source deals any damage (SELF binding).
 - `Triggers.self.dealsCombatDamage(Recipient.AnyPlayer)` — source deals combat damage to a player (SELF binding).
 - `Triggers.self.dealsCombatDamage(Recipient.AnyCreature)` — source deals combat damage to a creature (SELF binding).
-- `OneOrMoreDealCombatDamageToPlayerEvent(sourceFilter = Creature)` — **offensive combat-damage batch trigger** (ANY binding, via `TriggerSpec(OneOrMoreDealCombatDamageToPlayerEvent(sourceFilter = …), TriggerBinding.ANY)`): "whenever one or more [matching creatures] you control deal combat damage to a player" (Kastral, the Windcrested: `Creature.withSubtype("Bird")`; Vaan, Street Thief: `Creature.withAnySubtype("Scout", "Pirate", "Rogue")`). The `sourceFilter`'s "you control" is implied by the observer — don't add `youControl()`. Fires **once per damaged player** (a batch per recipient): multiple matching creatures hitting the same player still fire a single trigger, but two players each dealt damage fire it twice. `Player.TriggeringPlayer` resolves to the damaged player, so effects can reference "that player" (e.g. exile the top card of *that player's* library); `triggeringEntityId` is an arbitrary matching source for that player (batch triggers don't dispatch per source). **Face-down attackers count**: a face-down permanent is a creature (CR 708.2), so it satisfies an unfiltered "creatures you control" batch trigger, and the filtered forms are decided by `PredicateEvaluator`'s face-down masking alone (subtypes, colors, mana value and **name** all read as absent) — which is why Yarus, Roar of the Old Gods can filter *to* `Creature.faceDown()` while Kastral's `Bird` filter still excludes one. **Captured sources**: the matching creatures that hit that recipient are the trigger's captured collection, so `triggerCaptured` in a pipeline is "those creatures". **"…to a player or battle"** is the same event with `orBattle = true` — `Triggers.oneOrMore(filter).dealCombatDamageToAPlayerOrBattle()` — firing once per player *and* once per battle hit; on a battle's trigger `Player.TriggeringPlayer` is unset. A battle the same damage defeated still counts (the detector reads the damage event's recipient snapshot). Zurgo and Ojutai: `oneOrMore(Creature.withSubtype("Dragon")).dealCombatDamageToAPlayerOrBattle()`, then `filter(triggerCaptured, Any.currentlyIn(BATTLEFIELD))` → `chooseUpTo(1)` → move to hand for "you may return one of those Dragons".
-- `Triggers.oneOrMore(filter).dealCombatDamageToYou()` — **defensive combat-damage batch trigger** (ANY binding): "whenever one or more creatures deal combat damage to *you*" (Witch-king of Angmar). Fires at most once per combat-damage batch regardless of how many creatures connected with the trigger's controller (the damaged player), unlike per-source `Triggers.<subject>.dealsDamage(to, damageType, requireExcess, batch, requires)` / `.dealsCombatDamage(to, …)` which fires once per connecting creature. The triggering entity is an arbitrary matching damager. A damager that died to the same combat damage (a trampler that traded with its blocker) still counts: both combat-damage batches (this and `dealCombatDamageToAPlayer()`) read a source gone from the battlefield from its last-known information at the instant of damage (CR 603.10): its controller then, and the filter against that snapshot (type, subtypes, keywords, token-ness, face-down status, power vs. base power; a predicate the snapshot can't answer doesn't match) — so "whenever combat damage is dealt to you" (Risona, Asari Commander) is this trigger over `GameObjectFilter.Creature`. Pair with the `dealtCombatDamageToSourceControllerThisTurn()` filter for "...each opponent sacrifices a creature that dealt combat damage to you this turn".
+- `OneOrMoreDealCombatDamageToPlayerEvent(sourceFilter = Creature)` — **offensive combat-damage batch trigger** (ANY binding, via `TriggerSpec(OneOrMoreDealCombatDamageToPlayerEvent(sourceFilter = …), TriggerBinding.ANY)`): "whenever one or more [matching creatures] you control deal combat damage to a player" (Kastral, the Windcrested: `Creature.withSubtype("Bird")`; Vaan, Street Thief: `Creature.withAnySubtype("Scout", "Pirate", "Rogue")`). The `sourceFilter`'s "you control" is implied by the observer — don't add `youControl()`. Fires **once per damaged player** (a batch per recipient): multiple matching creatures hitting the same player still fire a single trigger, but two players each dealt damage fire it twice. `Player.TriggeringPlayer` resolves to the damaged player, so effects can reference "that player" (e.g. exile the top card of *that player's* library); `triggeringEntityId` is an arbitrary matching source for that player (batch triggers don't dispatch per source). **Face-down attackers count**: a face-down permanent is a creature (CR 708.2), so it satisfies an unfiltered "creatures you control" batch trigger, and the filtered forms are decided by `PredicateEvaluator`'s face-down masking alone (subtypes, colors, mana value and **name** all read as absent) — which is why Yarus, Roar of the Old Gods can filter *to* `Creature.faceDown()` while Kastral's `Bird` filter still excludes one. **Captured sources**: the matching creatures that hit that recipient are the trigger's captured collection, so `triggerCaptured` in a pipeline is "those creatures". **"…to a player or battle"** is the same event with `orBattle = true` — `Triggers.oneOrMore(filter).dealCombatDamageToAPlayerOrBattle()` — firing once per player *and* once per battle hit; on a battle's trigger `Player.TriggeringPlayer` is unset. A battle the same damage defeated still counts (the detector reads the damage event's recipient snapshot). Zurgo and Ojutai: `oneOrMore(Creature.withSubtype("Dragon")).dealCombatDamageToAPlayerOrBattle()`, then `filter(triggerCaptured, Any.currentlyIn(BATTLEFIELD))` → `chooseUpTo(1)` → move to hand for "you may return one of those Dragons". **"…to one or more players"** is `toOneOrMorePlayers = true` — `Triggers.oneOrMore(filter).dealCombatDamageToOneOrMorePlayers()` — firing **once per combat-damage batch** however many players were hit, with every matching creature that hit any of them captured; no triggering player is bound (there is no single "that player"). Each combat damage step (first strike, then regular) is its own batch. Contaminant Grafter: `oneOrMore(Creature).dealCombatDamageToOneOrMorePlayers()` → `Effects.Proliferate()` proliferates once for a swing that hits two opponents. The players it hit are seeded into the resolving ability's pipeline as the well-known collection `IterationSpace.TRIGGER_DAMAGED_PLAYERS`: "the number of players/opponents dealt damage this way" is `DynamicAmounts.playersDealtDamageThisWay()` (its `_count`), "those players" is `Player.InCollection(IterationSpace.TRIGGER_DAMAGED_PLAYERS)`. **Opponents only** is `toOpponents = true`: damage to a non-opponent neither fires the trigger nor counts. Per player it's `Triggers.oneOrMore(filter).dealCombatDamageToAnOpponent()` ("… deal combat damage to an opponent", binding that opponent as `Player.TriggeringPlayer`); batched it's `dealCombatDamageToOneOrMoreOpponents()` — Hordewing Skaab: `oneOrMore(Creature.withSubtype("Zombie")).dealCombatDamageToOneOrMoreOpponents()` → `May(Composite(DrawCards(playersDealtDamageThisWay()), Patterns.Hand.discardCards(playersDealtDamageThisWay())))`, so the discard is "that many" even if a replacement changed the draw. `toOpponents` has no battle form (`orBattle` is rejected with it). **"That damage"**: the trigger binds the combat damage its matching sources dealt in that batch as `DynamicAmounts.triggerDamageAmount()` — summed over that recipient on the per-recipient forms, over every recipient on the one-or-more forms. Broodcaller Scourge: `oneOrMore(Creature.withSubtype("Dragon")).dealCombatDamageToAPlayer()` → `Patterns.Hand.putFromHand(Permanent.manaValueAtMostDynamic(triggerDamageAmount()))`. **"Each other opponent"** (every opponent except the damaged one) is `ForEachPlayer(Player.EachOpponent, If(Not(TriggeringPlayerIs(Player.You)), …))` — the loop rebinds "you" to the visited player while `TriggeringPlayer` stays the damaged one (Parapet Thrasher's "deals 4 damage to each other opponent").
+- `Triggers.oneOrMore(filter).dealCombatDamageToYou()` — **defensive combat-damage batch trigger** (ANY binding): "whenever one or more creatures deal combat damage to *you*" (Witch-king of Angmar). Fires at most once per combat-damage batch regardless of how many creatures connected with the trigger's controller (the damaged player), unlike per-source `Triggers.<subject>.dealsDamage(to, damageType, requireExcess, batch, requires)` / `.dealsCombatDamage(to, …)` which fires once per connecting creature. The triggering entity is an arbitrary matching damager. A damager that died to the same combat damage (a trampler that traded with its blocker) still counts: both combat-damage batches (this and `dealCombatDamageToAPlayer()`) read a source gone from the battlefield from its last-known information at the instant of damage (CR 603.10): its controller then, and the filter against that snapshot (type, subtypes, keywords, token-ness, face-down status, power vs. base power; a predicate the snapshot can't answer doesn't match) — so "whenever combat damage is dealt to you" (Risona, Asari Commander) is this trigger over `GameObjectFilter.Creature`. Pair with the `dealtCombatDamageToSourceControllerThisTurn()` filter for "...each opponent sacrifices a creature that dealt combat damage to you this turn". **Per controller:** `dealCombatDamageToYou(perSourceController = true)` (`OneOrMoreDealCombatDamageToYouEvent.perSourceController`) fires once for **each player controlling** matching creatures that hit you in the batch, binding that player as `Player.TriggeringPlayer` and capturing their creatures — "whenever one or more creatures an opponent controls deal combat damage to you, that opponent gets a poison counter" (Norn's Decree: `oneOrMore(Creature.opponentControls()).dealCombatDamageToYou(perSourceController = true)`). The filter is read relative to the trigger's controller, so `opponentControls()` compares each source's live (or last-known) controller with you. The default stays one trigger per batch with only a triggering entity bound.
 - `Triggers.anOpponent.isDealtCombatDamage()` — **opponent-keyed combat-damage batch trigger** (ANY binding, event `OpponentsDealtCombatDamageEvent`): "when(ever) one or more of your opponents are dealt combat damage" (Fblthp, Impossibly Lost). Keyed on the *damaged players*, not the sources: it fires at most once per combat-damage step however many of the controller's opponents (CR 102.3 — teammates excluded) were hit and whoever controlled the damage sources, unlike `OneOrMoreDealCombatDamageToPlayerEvent`, which fires once per damaged player for sources you control. `triggeringPlayerId` is one damaged opponent. "During your turn" is `triggerRestriction = Conditions.IsYourTurn`.
 - `Triggers.self.isDealtDamage()` — source is dealt damage by any source (SELF binding).
 - `Triggers.you.isDealtDamage()` — "whenever **you're** dealt damage" (ANY binding, `DealsDamageEvent(recipient = You)` with no source filter): the *player*-recipient sibling of `Triggers.self.isDealtDamage()`, firing for **every** source — a creature in combat, a burn spell, an artifact. Fires once per damage instance; read the amount with `DynamicAmount.ContextProperty(ContextPropertyKey.TRIGGER_DAMAGE_AMOUNT)` for "put that many counters" payoffs (Sun Droplet), and the triggering entity is the damage source.
@@ -8294,14 +9007,28 @@ in the repo today):
   DrawEvent(firstInDrawStep = EXCLUDED))` — Bard, King of Dale). The singled-out card is identified
   by a per-player draw-step-start snapshot (`GameState.drawStepStartDrawCountByPlayer`): it is the
   draw made while the player's cards-drawn-this-turn count still equals that snapshot.
+- `DrawEvent.cyclingOf: GameObjectFilter?` (facade `Triggers.you.draws(cyclingOf = …)`) scopes the
+  pattern by the draw's **cause**: non-null, only a draw a cycling ability causes (CR 702.29a,
+  "[Cost], Discard this card: Draw a card") matches, and only when the cycled card matches the
+  filter; null (the default) is every draw. Works on triggers and on draw replacements alike. The
+  cycled card rides the draw (`PendingGameEvent.DrawPending.cycledCardId`, `CardsDrawnEvent.cycledCardId`)
+  and is the replacement effect's `EffectTarget.TriggeringEntity` — "the cycled card", read where it
+  now is (graveyard, or exile after madness). **Unpredictable Cyclone**: `ReplaceDrawWith(Pipeline {
+  gatherUntilMatch(Any.sharingCardTypeWith(TriggeringEntity)) → exile → May(CastFromCollectionWithoutPayingCost)
+  → toLibraryBottom(still exiled, Random) }, appliesTo = DrawEvent(cyclingOf = GameObjectFilter.Nonland))`.
+  Typecycling searches rather than draws, so it never matches.
 - `Triggers.<player>.drawsNth(n)` — fires when the drawing player draws their Nth card each turn
   (CR 121.2). Draw analogue of `Triggers.<player>.castsNth(n, spell)`; backed by `CardsDrawnThisTurnComponent` (reset
   per turn). Fires exactly once per crossing — a single multi-card draw that spans the
   threshold triggers it once, not N times. Putting cards into hand without "draw" (CR 121.5)
   does not advance the count. Used by Knights of Dol Amroth, Prince Imrahil the Fair,
   Stalwarts of Osgiliath ("Whenever you draw your second card each turn, …").
-- `Triggers.you.revealsFirstDraw(GameObjectFilter.Creature)` — Hatching Plans-style top-card reveal.
-- `Triggers.you.revealsFirstDraw()` — generic reveal-from-draw trigger.
+- `Triggers.you.revealsFirstDraw(card?)` — "whenever you reveal a [card] card this way", paired with the
+  `RevealFirstDrawEachTurn(yourTurnsOnly = false)` static ("Reveal the first card you draw each turn";
+  `yourTurnsOnly = true` is "…on each of your turns", Keranos, God of Storms). The trigger is linked to
+  its own source's reveal (CR 607.1): it fires only when that permanent's reveal applied to the draw, so
+  Primitive Etchings revealing on an opponent's turn doesn't fire Keranos's triggers. `card` is a full
+  `GameObjectFilter` on the revealed card (`Creature` for Primitive Etchings, `Land` / `Nonland` for Keranos).
 - `Triggers.oneOrMore(filter).putIntoYourGraveyard()` — when matching cards enter your yard.
 - `Triggers.oneOrMore(GameObjectFilter.Permanent).putIntoYourGraveyard()` — only permanent cards.
 - `Triggers.oneOrMore(GameObjectFilter.Creature).putIntoGraveyards()` — "… are put into **graveyards** from anywhere":
@@ -8465,14 +9192,26 @@ The shapes in this family, with their engine notes.
   entirely. A trigger that sets `includeManaAbilities` must not itself be able to add mana, or CR 605.1b would make
   it a mana ability (and it would resolve off the stack).
 
+  **"On the battlefield."** A type filter alone reads a card's printed types in any zone, so a creature card's
+  graveyard ability (embalm) matches `GameObjectFilter.Creature`. Wordings that mean a *permanent* — "an ability of
+  an artifact, creature, or land on the battlefield" (Harsh Mentor), the bare "a creature or land" whose rulings
+  exclude hand and graveyard abilities (Runic Armasaur), the tribal "an Elemental" (Ceaseless Searblades) — add
+  `.onBattlefield()`: `activatesAbility(of = (GameObjectFilter.Artifact or GameObjectFilter.Creature or
+  GameObjectFilter.Land).onBattlefield())`. A source its own cost sacrifices or exiles (a fetch land, a Clue, a
+  Treasure tapped for mana) is gone by the time the trigger is matched; the engine matches it as it last existed on
+  the battlefield (CR 113.7a), types and `onBattlefield()` included.
+
   **Engine note.** The engine emits `AbilityActivatedEvent` for *every* activated mana ability, on the manual
   activation path and on the auto-tap fast path used to pay for spells and abilities, with `isManaAbility = true`
   and `costsTap` set from the cost. Mana-ability activations are deliberately kept out of the client game log.
-- `Triggers.you.activatesAbility(exhaust = true)` — you activate an ability marked `isExhaust`. Backed by
-  `EventPattern.AbilityActivatedEvent(player = Player.You, requireExhaust = true)` and the activation event's
-  `isExhaust` flag. The event is emitted as soon as the exhaust ability is put on the stack, so the triggered
-  ability is stacked above it and resolves first (Adrenaline Jockey, Rangers' Aetherhive). This is the plain
-  Aetherdrift wording, which counts an exhaust *mana* ability too.
+- `Triggers.you.activatesAbility(onceOnlyKind = OnceOnlyAbilityKind.EXHAUST)` — you activate an ability marked
+  `isExhaust`. Backed by `EventPattern.AbilityActivatedEvent(player = Player.You, onceOnlyKind = EXHAUST)` and the
+  activation event's `onceOnlyKind` (read off `ActivatedAbility.onceOnlyKind`, the one mapping of the
+  `isExhaust` / `isPowerUp` / `isBoast` markers onto `OnceOnlyAbilityKind`). The event is emitted as soon as the
+  exhaust ability is put on the stack, so the triggered ability is stacked above it and resolves first
+  (Adrenaline Jockey, Rangers' Aetherhive). This is the plain Aetherdrift wording, which counts an exhaust *mana*
+  ability too. `OnceOnlyAbilityKind.BOAST` is "whenever you activate a boast ability" (Frenzied Raider), and
+  `POWER_UP` "a power-up ability" — the same axis.
 - `Triggers.you.activatesAbility(keyword = Keyword.NINJUTSU)` — you activate a **ninjutsu** ability (or any keyword
   ability whose `ActivatedAbility.keyword` is set). Backed by `EventPattern.AbilityActivatedEvent(keyword = …)` and the
   activation event's `keyword`. Counts a printed or a granted ninjutsu alike; Satoru Umezawa pairs it with
@@ -8486,8 +9225,8 @@ The shapes in this family, with their engine notes.
   `AbilityActivatedEvent(requireLoyalty = true, minLoyaltyRemoved = n)`, matched against the activation
   event's `loyaltyCountersRemoved` — N for a [−N] cost (CR 606.4), the chosen X for [−X], 0 for [+N] / [0].
   The count is fixed once the cost is paid, so matching it on the event is the same as the CR 603.4 recheck.
-- `Triggers.you.activatesAbility(exhaust = true, excludeManaAbilities = true)` — the same, but with the "that isn't a mana ability" clause
-  (`EventPattern.AbilityActivatedEvent(requireExhaust = true, excludeManaAbilities = true)`). Pit Automaton's
+- `Triggers.you.activatesAbility(onceOnlyKind = OnceOnlyAbilityKind.EXHAUST, excludeManaAbilities = true)` — the same, but with the
+  "that isn't a mana ability" clause (`EventPattern.AbilityActivatedEvent(onceOnlyKind = EXHAUST, excludeManaAbilities = true)`). Pit Automaton's
   Oracle text was updated on release to add that clause so its copy payoff can't latch onto a mana ability;
   the activated ability is exposed as `EffectTarget.TriggeringEntity`, so
   `Effects.CopyTargetSpellOrAbility(EffectTarget.TriggeringEntity)` copies it. Usable as a **delayed** trigger
@@ -8523,17 +9262,39 @@ The shapes in this family, with their engine notes.
   under the default mana-ability gate. On both the global and the ATTACHED path the triggering entity is the
   activated ability on the stack (the permanent itself for a mana ability, which never uses the stack), so
   `Effects.CounterTriggeringAbility()` is "counter that ability".
+  `Effects.CounterTargetingSourceUnlessPays(WardCost.Mana("{1}"))` is "counter **that spell or ability**
+  unless its controller pays {1}" on a becomes-the-target trigger (Valkmira, Protector's Shield): the
+  ward keyword's own counter (`WardCounterEffect`), aimed at the object that did the targeting, so any
+  `WardCost` shape works. Its payment prompt is labelled with the source card's name rather than "Ward".
 - `Triggers.you.attackTriggersAbility()` — **a creature you control attacking causes a triggered ability of that
-  creature to trigger** (Firebender Ascension). Backed by `EventPattern.AbilityTriggeredEvent(player, requireAttackCause,
+  creature to trigger** (Firebender Ascension). Backed by `EventPattern.AbilityTriggeredEvent(player, cause,
   sourceFilter?)`, which matches the engine's `AbilityTriggeredEvent` when a triggered ability is put on the stack.
-  With `requireAttackCause = true` it fires only for a creature's **own** "whenever this creature attacks" ability — a
-  SELF-bound `AttackEvent`. The engine stamps `causedByAttack` on the event in `StackResolver.putTriggeredAbility` (from
-  `TriggerProcessor.isAttackCausedTrigger`) so unrelated in-combat triggers (deals damage, dies, ETB) never match; the
-  SELF binding is what ties the ability to "that [attacking] creature", excluding anthem-style ANY-bound
-  "whenever a creature you control attacks" abilities on other permanents. The triggering ability is exposed as
-  `EffectTarget.TriggeringEntity` (`AbilityTriggeredEvent` sets the triggering entity to the ability on the stack), so a
-  `Effects.CopyTargetTriggeredAbility(EffectTarget.TriggeringEntity)` can copy it and reprompt for new targets (CR
-  707.10c). `sourceFilter` optionally restricts which permanent's ability counts; `player` scopes whose ability it is.
+  With `cause = AbilityTriggerCause.ATTACK` it fires only for a creature's **own** "whenever this creature attacks"
+  ability — a SELF-bound `AttackEvent`. The engine stamps `triggerCause` on the event in
+  `StackResolver.putTriggeredAbility` (from `TriggerProcessor.triggerCauseOf`) so unrelated in-combat triggers (deals
+  damage, dies, ETB) never match; the SELF binding is what ties the ability to "that [attacking] creature", excluding
+  anthem-style ANY-bound "whenever a creature you control attacks" abilities on other permanents. The triggering
+  ability is exposed as `EffectTarget.TriggeringEntity` (`AbilityTriggeredEvent` sets the triggering entity to the
+  ability on the stack), so a `Effects.CopyTargetTriggeredAbility(EffectTarget.TriggeringEntity)` can copy it and
+  reprompt for new targets (CR 707.10c). `sourceFilter` optionally restricts which permanent's ability counts;
+  `player` scopes whose ability it is. Give a `cause`: only cause-stamped placements are re-detected in the second
+  CR 603.3b wave, so a null-cause pattern would miss most triggered abilities.
+- `Triggers.anyPlayer.permanentEnteringTriggersAbility()` — **a permanent entering causes a triggered ability to
+  trigger** (Strict Proctor). `cause = AbilityTriggerCause.PERMANENT_ENTERING`: stamped on
+  triggers an entry caused — a `ZoneChangeEvent` to the battlefield (the entering permanent's own ETB,
+  another permanent's "whenever a [...] enters", landfall), a `PermanentsEnteredEvent` batch, or a `Triggers.or`
+  trigger that fired through its enters atom ("enters or is turned face up" on entry, not on the face-up turn), the same
+  classification Torpor Orb's `SuppressZoneChangeTriggers` uses — wherever the ability's source is (a graveyard card's
+  landfall counts under the current Oracle text). Both meta-triggers go on the stack in the second
+  CR 603.3b wave, above the ability they saw, so
+  `Effects.CounterUnlessPays("{2}", target = CounterTarget.Ability, targetSource = CounterTargetSource.TriggeringEntity)`
+  is "counter that ability unless its controller pays {2}".
+- `Triggers.you.finalSagaChapterTriggers()` — **the final chapter ability of a Saga you control triggers**
+  (Historian's Boon; CR 714.2e). `cause = AbilityTriggerCause.FINAL_SAGA_CHAPTER`: stamped on a Saga's final
+  chapter ability as it goes on the stack, however the lore counters arrived (the precombat-main counter, several at
+  once from read ahead or an effect, a one-chapter Saga's entry counter). It goes on the stack in the second
+  CR 603.3b wave, above the chapter, so it resolves first and still counts if the chapter is later countered —
+  compare `sagaChapterResolves(true)` (Tom Bombadil), which waits for the chapter to resolve.
 
 **Other casters.** The same shape, scoped to a different caster via the runtime
 `Player.Each` / `Player.EachOpponent` matching on `SpellCastEvent`. Bind the payoff to the
@@ -8617,6 +9378,13 @@ matcher branch — `SpellCastEvent` does not grow a new field per axis.
   are snapshotted at production from the *projected* type line (an animated land's mana is creature
   mana), and restricted mana carries its source tag too. Read via `ManaSpentReader.cardTypeSpent`
   (stack spell, then `CastRecordComponent`).
+- `SpellCastPredicate.PaidWithSnowManaOfItsColors` — snow mana (mana from a snow source, CR 107.4h)
+  of at least one of the spell's own colors was spent on the cast, on any part of the cost. Boreal
+  Outrider: "Whenever you cast a creature spell, if {S} of any of that spell's colors was spent to
+  cast it, …" is `Triggers.you.casts(GameObjectFilter.Creature, requires = setOf(PaidWithSnowManaOfItsColors))`.
+  Snow colorless mana and snow mana of another color don't count, nor does a colorless spell. The
+  colors of the snow units spent are recorded on the spell (`SpentManaProvenance.snowColors`) from
+  tapped sources, the floating pool and restricted units alike; read via `ManaSpentReader.snowColorsSpent`.
 - `SpellCastPredicate.PaidWithManaFromSource` — mana produced by the trigger's own source permanent
   was spent on the cast ("Whenever you cast a … spell using mana produced by this" — Tecutlan, the
   Searing Rift / Barracks of the Thousand / The Myriad Pools). Matched against the source that made
@@ -8722,6 +9490,9 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
 ### State change & misc
 
 - `Triggers.self.mutates()` — "whenever this creature mutates" (Gemrazer); see `Mutate` under parameterized keywords.
+- `Triggers.a(Creature.youControl()).mutates()` — "whenever a creature you control mutates" (Essence Symbiote). The
+  subject filter is matched against the merged permanent (projected, after the merge), which is the triggering entity —
+  `EffectTarget.TriggeringEntity` is "that creature". `Triggers.another(…)` excludes the source's own permanent.
 - `Triggers.self.turnedFaceUp()` — source turns face up. Use `Triggers.self.turnedFaceUp()` / `Triggers.attached.turnedFaceUp()` for the ATTACHED-binding aura variant (Fatal Mutation).
 - `Triggers.<player>.permanentTurnedFaceUp(filter)` — when a creature you control turns face up. `filter`
   narrows *which* creature and is evaluated against the permanent's **post-flip** characteristics
@@ -8755,11 +9526,12 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
   creature spell you control" wording (Surrak, Elusive Hunter); the `filter` is then also matched
   against the spell's card data, so a `Creature` filter matches a creature spell on the stack. Ward
   never sees spell targets because it is generated only from battlefield permanents.
-  Set `includePlayerTargets = true` for the "a **player** or permanent becomes the target" wording
-  (Loki, God of Mischief). A player carries no card data for a `filter` to read, so the opt-in
-  **requires** `filter` to stay `GameObjectFilter.Any` and throws at load time otherwise, rather than
-  silently firing on permanents only; the only printed wording today pairs the two anyway. A future
-  "a player or *creature*" needs the object half and the player half kept apart. The
+  Pass `players` (`EventPattern.BecomesTargetEvent.playerTargets`, a `Player` reference) to let
+  targeted **players** fire it too: `players = Player.Any` is "a **player** or permanent becomes the
+  target" (Loki, God of Mischief), `players = Player.You` is "**you** or another permanent you control"
+  (Valkmira, Protector's Shield — `Triggers.another(Permanent.youControl()).becomesTarget(byOpponent =
+  true, players = Player.You)`). Null (the default) matches no player. The two halves are independent:
+  the subject's `filter` and binding narrow only targeted objects, `players` only targeted players. The
   **retarget/reselect** effects (`Effects.ChangeTarget`, `Effects.ChangeSpellTarget`,
   `Effects.ReselectTargetRandomly`, "change the triggering object's targets") rewrite a stack
   object's targets without emitting a fresh `BecomesTargetEvent` — for any target kind — so no
@@ -8770,6 +9542,17 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
   redirect makes it one. Pre-existing and orthogonal to the player axis, so it is pinned rather than
   fixed by `BecomesTargetPlayerAndAbilityAxesTest`, which characterizes current-and-wrong behaviour —
   when a later unit fixes it, invert that test rather than deleting it.
+- `Triggers.a(filter).becomesTarget(..., batch = true)` — the "**one or more** … become the target" template
+  (CR 603.2c): fires **once per targeting spell or ability**, however many of its targets match. Sets
+  `BecomesTargetEvent(batch = true)`; every other axis still decides which targets count, and one is
+  enough. ANY-bound only; a dedicated batch pass in `TriggerDetector` groups the per-target engine events
+  by the targeting object (the per-event path skips batch triggers). The first matching target is the
+  triggering entity; the targeting object is `EffectTarget.TargetingSource` / `Player.ControllerOfCause`.
+  Leyline of Combustion — "Whenever you and/or at least one permanent you control becomes the target of a
+  spell or ability an opponent controls, this enchantment deals 2 damage to that player" —
+  `Triggers.a(Permanent.youControl()).becomesTarget(byOpponent = true, players = Player.You, batch = true)`
+  + `Effects.DealDamage(2, EffectTarget.PlayerRef(Player.ControllerOfCause))`. Contrast Valkmira's per-target
+  "you or another permanent you control becomes the target", which fires once per matching target.
 - `Triggers.a(filter.youControl()).becomesTarget(byOpponent = true, includeSpellTargets)` — your creature
   gets targeted by an opponent's spell or ability. Permanent-only unless `includeSpellTargets = true`
   (Surrak), which also fires when an opponent targets a matching creature spell you control.
@@ -8779,7 +9562,7 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
 - `Triggers.self.becomesTarget(byYou = true, spellsOnly = true)` — the source becomes the target of a **spell you control** (Stormchaser
   Drake: "Whenever this creature becomes the target of a spell you control, draw a card"). Self-bound
   `BecomesTargetEvent(byYou = true, spellsOnly = true)` — the same two axes `Triggers.a(filter).becomesTarget(spellsOnly = true)` and
-  `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, includePlayerTargets)` read, crossed. It is `Triggers.self.becomesTarget(byYou = true, firstTimeEachTurn = true)` without the once-a-turn limit and without
+  `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, players = Player.Any)` read, crossed. It is `Triggers.self.becomesTarget(byYou = true, firstTimeEachTurn = true)` without the once-a-turn limit and without
   abilities.
 - `Triggers.self.becomesTarget(abilitiesOnly = true, targetsOnlyIt = true)` — the source becomes the target of an
   **ability that targets only it** (Agrus Kos, Eternal Soldier). `targetsOnlyIt` sets
@@ -8809,13 +9592,20 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
   permanent is already enchanted by — only for a new one being cast at it. `sourceFilter` is
   general: any `EventPattern.BecomesTargetEvent` may carry one, and its `description` prints the
   filter's subtype alone when it has one ("an Aura spell", not "an Aura enchantment spell").
-- `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, includePlayerTargets)` — the exact mirror of
+- `Triggers.another(Creature).becomesTarget(of = Land.youControl().named("Labyrinth of Skophos"), abilitiesOnly = true)` —
+  "becomes the target of an **ability of** a land you control named Labyrinth of Skophos" (Skophos Maze-Warden).
+  An ability on the stack has no card data, so `sourceFilter` reads the **source permanent** of the
+  targeting ability instead — its projected types, name and controller while it is on the battlefield,
+  or its last-known snapshot when the ability's own cost sacrificed it (CR 113.7a). A source that left
+  any other way fails closed. Pair with `abilitiesOnly = true` so a spell matching the same filter
+  (a land can't be cast, but an artifact named in a filter can) doesn't count.
+- `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, players = Player.Any)` — the exact mirror of
   `Triggers.a(filter).becomesTarget(spellsOnly = true)`: something becomes the target of an **ability** (activated *or* triggered),
   never a spell. Sets `BecomesTargetEvent(abilitiesOnly = true)`, reading the same `sourceIsSpell`
   axis from the other side; the two are mutually exclusive and asking for both throws. `byYou` is
-  the "an ability **you control**" half and `includePlayerTargets` the "a **player** or permanent"
+  the "an ability **you control**" half and `players = Player.Any` the "a **player** or permanent"
   half (which keeps `filter` at `Any` — see `Triggers.a(filter).becomesTarget()` above) —
-  Loki, God of Mischief is `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, includePlayerTargets)` plus
+  Loki, God of Mischief is `Triggers.a(filter).becomesTarget(abilitiesOnly = true, byYou, players = Player.Any)` plus
   `oncePerTurn = true` on the ability for "This ability triggers only once each turn". ANY-bound.
   The trigger fires at target announcement (CR 601.2c for spells, CR 602.2b / 603.3d for activated
   and triggered abilities), so it still fires when the ability is later countered or fizzles.
@@ -8852,6 +9642,9 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
 - `Triggers.anyPlayer.cycles()` — anyone cycles. `Triggers.you.cycles()` is also "whenever you cycle
   **another** card" (Drannith Stinger): the observer only functions on the battlefield and a card is cycled
   from hand, so the source can't see its own cycling — only a `self.isCycled()` trigger fires off that.
+  `Triggers.you.cycles(firstTimeEachTurn = true)` is "whenever you cycle another card **for the first time
+  each turn**" (Valiant Rescuer): only the player's first cycle of the turn (plain or typecycling) matches,
+  and a cycle made before the observer entered still uses it up (`CardCycledEvent.firstThisTurn`).
 - `Triggers.anyPlayer.tapsLandForMana()` / `Triggers.<player>.tapsLandForMana(land)` — "whenever
   [player] taps a [land] for mana" (`EventPattern.LandTappedForMana`). `Triggers.self.tappedForMana()`
   is "whenever you tap **this** land for mana" (Forbidden Orchard — no subject filter);
@@ -8886,6 +9679,9 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
   cast-time additional cost — because every path emits `EventPattern.ForagedEvent` (see § Forage).
   Never fires for a declined forage or one no mode was feasible for. The forager is whoever paid,
   so a forage an opponent pays resolves "you" as that opponent. Corpseberry Cultivator.
+- `Triggers.you.foretells()` — "whenever you foretell a card" (CR 702.143a): the foretell special action,
+  once per card (`EventPattern.ForetoldEvent`), never casting a foretold card later and never a card
+  that *becomes* foretold by an effect. Dream Devourer.
 - `Triggers.you.investigates(firstTimeEachTurn?)` — investigate (CR 701.16a,
   `EventPattern.InvestigatedEvent`). Fires once per investigate performed by `Effects.Investigate`,
   so "investigate twice" fires it twice; never for a plain `Effects.CreateClue` ("create a Clue
@@ -8987,6 +9783,12 @@ Triggers.you.casts(GameObjectFilter.Noncreature or
 - `Triggers.anOpponent.losesLife()` — an opponent loses life (fires per opponent life-loss event; read the amount via `ContextPropertyKey.TRIGGER_LIFE_LOST`). Bloodthirsty Conqueror; Kefka, Ruler of Ruin (pair with `triggerRestriction = Conditions.IsYourTurn` for "during your turn").
 - `Triggers.anOpponent.losesLife(batch = true)` — "whenever one or more opponents lose life": `LifeLossEvent(batch = true)`, fires **once per life-loss occurrence** however many opponents lost life in it. The triggering player is one opponent who lost life, `damageAmount` their total.
 - `Triggers.anOpponent.losesLife(exactly = 1)` — "whenever one or more opponents each lose exactly 1 life" (Ob Nixilis, Captive Kingpin): `LifeLossEvent(batch = true, exactAmount = 1)`. An action's life loss is split into occurrences: all its damage is one simultaneous occurrence, **summed** per player (three 1/1s connecting at once are a loss of 3, so it doesn't fire; first-strike and regular damage are separate steps); every other loss ("loses N life", radiation, a life payment) is split into runs that end when a player repeats ("each opponent loses 1 life" is one occurrence, "loses 1 life, then loses 1 life" is two). The trigger fires once per occurrence in which any opponent's total is exactly N. `exactAmount` requires `batch`. Detected by `TriggerDetector.detectLifeLossBatchTriggers`; the per-event matcher skips batch patterns.
+- `Triggers.anOpponent.losesLife(firstTimeEachTurn = true)` — "whenever an opponent loses life **for the first time each turn**": `LifeLossEvent(firstTimeEachTurn = true)`, the life-loss twin of `gainsLife(firstTimeEachTurn = true)`. Matches only the losing player's first life-losing `LifeChangedEvent` of the turn (`firstThisTurn`, stamped before the per-turn life-lost marker is set) — damage, a "loses N life" effect and a life payment all count, and a gain in between doesn't reset it. Turn history, not a trigger cap: a player who lost life earlier this turn, even before the watching permanent entered, can't fire it again until next turn. Per-event only (`batch` rejects it). "During each of their turns" adds `triggerRestriction = Conditions.IsPlayersTurn(Player.TriggeringPlayer)` — **Valgavoth, Harrower of Souls**.
+- `Triggers.you.paysLife()` — "whenever you pay life" (Font of Agonies): `LifePaymentEvent` as a trigger, once per
+  life **payment** (a cost, Phyrexian mana, Festival of Embers' graveyard life cost — everything through
+  `LifePaymentService`); never damage or a "loses N life" effect. "That many" is `DynamicAmounts.triggerLifeLost()`.
+  A payment Ashiok replaced with a library exile isn't a life payment and doesn't fire it. `losesLife()` still
+  sees payments too.
 - `Triggers.or(Triggers.you.gainsLife(), Triggers.you.losesLife())` — "gain or lose life" as **one** ability, so a "triggers only once each turn" limit covers both halves (Moonstone Harbinger, Wax-Wane Witness). There is no combined verb.
 - `Triggers.anyPlayer.losesGame()` — a player loses the game (CR 104.3; backed by `EventPattern.PlayerLostGameEvent`, matched against the engine's `PlayerLostEvent`). Fires for every player's loss; `Player.TriggeringPlayer` inside the effect is the loser. Narrow to one player with a `triggerRestriction` — Shinryu, Transcendent Rival's "When the chosen player loses the game, you win the game" uses `triggerRestriction = Conditions.TriggeringPlayerIs(Player.ChosenOpponent)` + `Effects.WinGame()`.
 
@@ -9231,15 +10033,28 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   ability triggers only once each turn."
 - `Triggers.you.sagaChapterResolves()` — same, but matches *any* chapter ability's resolution
   (`finalChapterOnly = false`).
+- "Whenever the final chapter ability … **triggers**" (Historian's Boon) is a different moment — the
+  ability going on the stack, not resolving: `Triggers.you.finalSagaChapterTriggers()` (see the
+  `AbilityTriggeredEvent` meta-triggers).
+- Either way the Saga is the trigger's `EffectTarget.TriggeringEntity`, snapshotted as its chapter
+  ability began resolving — so "where X is that Saga's mana value" is
+  `DynamicAmounts.triggeringManaValue()` and still reads the Saga after CR 714.4 has sacrificed it
+  (a token Saga included). **Narci, Fable Singer**: `LoseLife(triggeringManaValue(), EachOpponent)
+  then GainLife(triggeringManaValue())`.
 - **Read ahead** (CR 702.155 / 714.3b) — `card { readAhead() }` (`readAhead(finalChapter = 3)`). Adds the
   `Keyword.READ_AHEAD` tag plus an `EntersWithChoice(ChoiceType.NUMBER, minValue = 1, maxValue = finalChapter)`, so
   the controller picks a chapter as the Saga enters, however it enters (CR 702.155b) — stored in
   `ChoiceSlot.CHOSEN_NUMBER` before entry on the cast and put-onto-battlefield paths, and on arrival for a token copy
-  (whose lore counters the as-enters choice resumer then places) or a permanent entering as a copy. The engine reads the keyword twice: Saga entry
-  (`ZoneMovementUtils.sagaEntryLoreCount`) places the chosen number of lore counters instead of one, and
-  `TriggerDetector.detectSagaChapterTriggers` lets a chapter trigger the turn the Saga entered only when its lore
+  (whose lore counters the as-enters choice resumer then places) or a permanent entering as a copy. Saga entry
+  (`ZoneMovementUtils.sagaEntryLoreCount`) places the chosen number of lore counters instead of one, and the projected
+  keyword gates `TriggerDetector.detectSagaChapterTriggers`, which lets a chapter trigger the turn the Saga entered only when its lore
   count is *exactly* that chapter number (CR 702.155a) — skipped chapters don't trigger, later lore counters
   (including a same-turn proliferate to exactly N) trigger normally. Founding the Third Path is the reference card.
+  **Granted read ahead** — `GrantKeyword(Keyword.READ_AHEAD, <group>)` (Barbara Wright's "Sagas you control have read
+  ahead": `GroupFilter(Permanent.withSubtype(Subtype.SAGA).youControl())`). A grant isn't printed on the entering
+  Saga, so `ReadAheadSynthesis` synthesizes the same `NUMBER` choice at every entry seam — cast, land play (Urza's
+  Saga: asked before its lore counters), token, an effect's put-onto-the-battlefield — matched against the controller
+  it enters under. One choice however many sources grant it; a Saga with printed read ahead keeps its own.
 
 ### Sacrifice & counters
 
@@ -9327,8 +10142,11 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   the "you put" scope can't come from a `.youControl()` recipient filter) — Earth Kingdom General.
   The placer is the controller of the placing effect, the entering permanent's controller (for a
   permanent entering with counters, CR 122.6a), the mover's controller (CR 122.5 — *moving* a counter
-  "puts" it on the destination), or the damage source's controller (wither, CR 702.80). A few
-  low-value paths carry no placer (saga lore counters) and never match a non-null `placedBy`; combat
+  "puts" it on the destination), or the damage source's controller (wither, CR 702.80). A Saga's
+  lore counters — its entry counter (cast or put onto the battlefield) and the precombat-main
+  turn-based one — are put by its controller, so Sigurd, Jarl of Ravensthorpe's "whenever you put a
+  lore counter on a Saga you control" is `Triggers.a(Enchantment.withSubtype(SAGA).youControl())
+  .getsCounters(CounterType.LORE, by = Player.You)` and sees all three; combat
   poison from toxic is placed by the toxic creature's controller (CR 702.164c). Default `null` matches any placer. A planeswalker's **[+N] loyalty cost** is
   a placement too (CR 606.4): paying it emits `CountersAddedEvent(loyalty, N, placedBy = activator)`
   (a cost, so counter-placement replacements such as Doubling Season don't apply), while [−N]/[0]
@@ -9379,6 +10197,21 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   whoever's effect put them (that is `placedBy`'s axis, not this one), and no permanent ever does. It
   folds per recipient like the permanent template, so "that much" is the summed amount. Aether Revolt:
   `Triggers.you.getsCounters(CounterType.ENERGY)` + `Effects.DealDamage(DynamicAmounts.triggerCountersPlaced(), target)`.
+  **Per counter.** `perCounter = true` (`CountersPlacedEvent.perCounter`) is the "whenever **a**
+  <type> counter is put on a creature" template: the ability triggers once for **each counter**, not
+  once per recipient — a creature entering with two -1/-1 counters, or two -1/-1 counters from one
+  wither hit, trigger it twice. `TriggerDetector.expandPerCounterTriggers` fans each folded
+  per-recipient trigger out into `counterCount` copies, each with a count of 1. Not combinable with
+  `batch` or `firstTimeEachTurn` (both fire at most once). Flourishing Defenses:
+  `Triggers.a(GameObjectFilter.Creature).getsCounters(CounterType.MINUS_ONE_MINUS_ONE, perCounter = true)`
+  + `optional = true` + `Effects.CreateToken(1/1 green Elf Warrior)`.
+  **The Nth counter.** `nth = N` (`CountersPlacedEvent.nth`) is the ordinal "when the **twelfth**
+  <type> counter is put on ~" template: it fires for the placement that takes the recipient's count
+  of that kind from below N to N or more — one placement jumping from eleven to thirteen fires it,
+  the thirteenth counter alone doesn't, and a count that is reset and climbs back fires it again.
+  The count after the placement is read from `CountersAddedEvent.totalCount` (live count when an
+  emitter didn't record it). Needs a named `type`; not combinable with `batch`, `perCounter` or
+  `firstTimeEachTurn`. Midnight Clock: `Triggers.self.getsCounters(CounterType.HOUR, nth = 12)`.
 - `Triggers.self.getsCounters()` — "whenever you put one or more counters on ~" (any kind, SELF-bound).
   Aragorn, Company Leader.
 - `Triggers.<subject>.losesCounters(type, lastRemoved, byDamagePrevention, by)`
@@ -9451,6 +10284,10 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   still closes the window for that turn. Without a filter it is the flat total, the Hearthborn Battler shape.
   Like any triggered ability of a permanent card it functions only on the battlefield (CR 113.6): a card that
   is *itself* the Nth spell cast doesn't trigger off its own cast (Hearthborn Battler, Plan for All Outcomes).
+  Usable as a **delayed** trigger too: "when you cast a spell with the chosen name for the first time this
+  turn" is `CreateDelayedTrigger(trigger = Triggers.you.castsNth(1, GameObjectFilter.Any.namedFromChosenComponent()),
+  fireOnce = true, expiry = EndOfTurn)` (Medomai's Prophecy III). The count still reads the whole turn's
+  history, so a spell with that name cast *before* the delayed trigger existed means a later one isn't the first.
 - `Triggers.self.isCast()` — a "cast trigger" that fires on the spell's **own** cast while it is on
   the stack (`EventPattern.CastThisSpellEvent`, `binding = SELF`). Distinct from a battlefield
   `SpellCast`/`Triggers.<player>.castsNth(n, spell)` trigger that observes *other* spells: this one travels with the spell
@@ -9489,7 +10326,12 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   the `DelayedTriggeredAbility` and seeded into the pipeline its `effect` resolves in, under the same
   names, so the effect can `MoveCollection(from = "<name>")` or `PipelineTarget("<name>")` them; an
   object that has since changed zones (a new object) or ceased to exist is dropped when it fires
-  (Flickerform). Two orthogonal axes control *whose / which* turn fires the trigger:
+  (Flickerform). An amount in `effect` that reads a collection the creating pipeline holds ("for each
+  creature returned **this way**") is frozen at scheduling; one reading a collection it doesn't hold —
+  the firing's own `CollectionSlot.TriggerCaptured`, and for a filter-scoped event trigger always its
+  own — stays late-bound, so "whenever one or more nontoken creatures attack this turn, create **that
+  many** …" (Basri Ket's −2) counts its own attackers. Two orthogonal axes control *whose / which* turn
+  fires the trigger:
   - `fireOnPlayer: EffectTarget?` — the single "whose turn" gate. Resolved to a concrete player
     at scheduling time; only matches when that player is active. Defaults to `null` (no player
     gate — fires on the next matching step of *any* turn). Two common shapes:
@@ -9553,7 +10395,12 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
 - **Event-based delayed triggers** — pass `trigger = <TriggerSpec>` (instead of `step`) and the
   delayed ability fires whenever a matching *event* occurs, staying resident until `expiry`
   (`DelayedTriggerExpiry.EndOfTurn`) removes it. Supported events include `DealsDamageEvent`,
-  `ZoneChangeEvent`, the internal `DamagePreventedEvent`, and the attack-declaration events
+  `ZoneChangeEvent`, the recipient form of `DamageReceivedEvent` ("until end of turn, whenever a creature an
+  opponent controls is dealt damage, destroy it" — Green Dragon: `trigger =
+  Triggers.a(Creature.opponentControls()).isDealtDamage()`, the damaged creature the triggering entity;
+  simultaneous combat damage to one creature is one trigger; in a filter-scoped trigger
+  `EffectTarget.TriggeringEntity` stays late-bound to the delayed trigger's own event, never to the creating
+  trigger's object), the internal `DamagePreventedEvent`, and the attack-declaration events
   `YouAttackEvent` / `AttackEvent` and the defender-side batch events `CreaturesAttackYouEvent` /
   `CreaturesAttackYourOpponentEvent` (Garruk, Curse Breaker's −4: `trigger =
   Triggers.anOpponent.isAttacked(), expiry = UntilControllersNextTurn`, paying off "those
@@ -9561,13 +10408,20 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
   which events match:
   - **Entity-scoped** — set `watchedTarget` to bind the trigger to one concrete entity (resolved at
     creation time): "when **that** creature deals combat damage / dies this turn" (Long River Lurker,
-    Deflecting Palm). Only `DealsDamageEvent` (scoped on the damage source) and `ZoneChangeEvent`
+    Deflecting Palm). Only `DealsDamageEvent` (scoped on the damage source), `DamageReceivedEvent`
+    (scoped on the damaged entity — "whenever that creature is dealt damage this turn") and `ZoneChangeEvent`
     (scoped on the moving entity) use this, plus `SpellCastEvent`, where a `PlayerRef` watched
     target scopes the **caster** ("that player gets two rad counters whenever they cast a spell" —
     Nuka-Nuke Launcher: `trigger = Triggers.anyPlayer.casts(), watchedTarget =
     PlayerRef(Player.DefendingPlayer)`; the spell filter still applies, and the spell stays the
     triggering entity, its caster `Player.TriggeringPlayer`); the spec's `GameObjectFilter` is *not* applied — the
     watched entity is the whole scope.
+    An object watched target follows that **object** (CR 400.7): a `ZoneChangeEvent` matches only the
+    departure of the object captured at creation, so the same card back on the battlefield later
+    ("reanimated, bounced, recast") is a new object the trigger ignores, and the cleanup step drops
+    the trigger once its object is gone. An object watched target that resolves to nothing — "put a
+    creature card onto the battlefield … when that creature dies" with no creature card to put —
+    creates no trigger (The Deck of Many Things).
   - **Recipient-scoped** — set `watchedRecipient` to bind a `DealsDamageEvent` trigger to the damaged
     *recipient* (rather than the source): "whenever a creature you control deals combat damage to
     **that player** this turn, …" (Great Train Heist's Treasure-on-hit mode). The target is resolved at
@@ -9601,6 +10455,17 @@ Dominant back faces that "stay" instead self-exile on their final chapter, dodgi
     control on your next attack). With `fireOnce = false` (default) it fires on every matching event
     until expiry (double-strike combat damage). One-shot consumption happens when the trigger goes
     on the stack (`TriggerProcessor`), so a second matching event the same turn won't re-fire it.
+  - **Any-of events** — a `Triggers.or(a, b, …)` disjunction is a delayed trigger like any other:
+    each atom is matched with its own scoping (a cast atom scopes the caster, an activation atom the
+    activator), the atom that matched shapes the triggering entity, and a one-shot is consumed by
+    whichever atom fires first. "When you next cast an instant spell, cast a sorcery spell, or
+    activate a loyalty ability this turn, copy that spell or ability twice" (**Repeated
+    Reverberation**) = `CreateDelayedTrigger(trigger = Triggers.or(Triggers.you.casts(Instant),
+    Triggers.you.casts(Sorcery), Triggers.you.activatesAbility(loyalty = true)), effect =
+    CopyTargetSpellOrAbility(TriggeringEntity, DynamicAmounts.fixed(2)), fireOnce = true, expiry = EndOfTurn)`.
+    "Copy that spell or ability" reads the triggering object as it last existed on the stack when it
+    was countered first, so the copies are still made (`GameState.departedSpells` /
+    `departedAbilities`).
   - **Return a source exiled as its own cost when a made object dies** — no new vocabulary: an
     activated ability with `Costs.ExileSelf` makes the object, then arms
     `CreateDelayedTrigger(trigger = Triggers.self.dies(), watchedTarget = PipelineTarget(CREATED_TOKENS, 0),
@@ -9755,6 +10620,13 @@ staticAbility {
 **Composite static abilities**
 
 - `ModifyStatsForCreatureGroup` — lord-style P/T booster targeting a group.
+- `SetBasePowerToughnessStatic(power: Int?, toughness: Int?, filter = GroupFilter.attachedCreature())` —
+  *sets* base power and/or toughness of a group to fixed values (Layer 7b SET_VALUES, CR 613.4b).
+  Leave a half `null` to leave that characteristic alone (at least one must be set): Deep Freeze
+  "enchanted creature has base power and toughness 0/4" sets both; Withercrown "enchanted creature has
+  base power 0" is `power = 0, toughness = null`; Maha, Its Feathers Night "creatures your opponents
+  control have base toughness 1" is `power = null, toughness = 1`. A later layer-7b setter overwrites
+  only the half it sets; counters and 7c modifiers apply on top either way.
 - `SetBasePowerToughnessDynamicStatic(power, toughness, filter = GroupFilter.source())` —
   characteristic-defining ability (CDA): *sets* base power and toughness each to a `DynamicAmount`,
   recomputed continuously at projection (Layer 7b SET_VALUES). Distinct from
@@ -9766,18 +10638,23 @@ staticAbility {
 - `GrantKeywordByCounter` — Aurification — keyword based on counters present.
 - `AddCreatureTypeByCounter` — subtype based on counters present.
 - `SetEnchantedLandType(landType)` — "Enchanted land is an Island" — replaces the enchanted
-  land's basic land types with a fixed type (Rule 305.7). (Sea's Claim)
+  land's land types (every one, basic or not — `Subtype.ALL_LAND_TYPES`, CR 205.3i) with a fixed
+  type (Rule 305.7). (Sea's Claim)
 - `SetLandTypesForGroup(filter, landTypes)` — the **group** counterpart of `SetEnchantedLandType`
   (and the "set/replace" counterpart of `GrantAdditionalTypesToGroup`, which *adds* and keeps
   abilities): "[filter] are [types]. (They lose all other land types and abilities and have the new
   type's mana ability.)" Realizes CR 305.7 over a whole group of lands as two continuous effects —
-  Layer 4 `SetBasicLandTypes` (replace the basic land subtypes) + Layer 6 `RemoveAllAbilities`
+  Layer 4 `SetBasicLandTypes` (remove every land type — Desert, Gate, Urza's… too — keeping non-land
+  subtypes, then add the new ones) + Layer 6 `RemoveAllAbilities`
   (strip printed abilities). The new type's **intrinsic** mana ability (Mountain → "{T}: Add {R}")
   is derived from the projected subtype by `IntrinsicManaAbilities` and survives the ability
   suppression, so the lands still tap for the appropriate color. Gate behind a
   `ConditionalStaticAbility` for conditional variants. Blood Moon / Magus of the Moon
   (`filter = GroupFilter(GameObjectFilter.NonbasicLand)`, `landTypes = setOf("Mountain")`); Zhao,
   the Moon Slayer gates the same on `Conditions.SourceCounterCountAtLeast(CounterType.CONQUEROR, 1)`.
+  An **empty** `landTypes` is "loses all land types and abilities": pair it with
+  `filter = GroupFilter(GameObjectFilter.Land, scope = Scope.AttachedTo)` and `GrantActivatedAbility` for the replacement mana
+  abilities (granted abilities survive the wipe). (Lithoform Blight)
 - `SetEnchantedLandTypeFromChosen` — "Enchanted land is the chosen type" — same, but reads the
   type from the source's `ChosenLandTypeComponent` (paired with
   `EntersWithChoice(ChoiceType.BASIC_LAND_TYPE)`). Chosen-value counterpart to
@@ -9809,17 +10686,43 @@ staticAbility {
   source removes its printed grant immediately; an already activated ability remains on the
   stack. Self-references bind to the receiving card, not the granting permanent. Ordinary
   battlefield grants do not leak onto cards in other zones. No new effect or keyword type is needed.
+  **A granted mana ability reaches the auto-payer** through `ManaStaticsIndex`, which collects
+  battlefield-group, enchanted-permanent (`Scope.AttachedTo`) and self grants, and unwraps a
+  `ConditionalStaticAbility` around the grant, keeping it only while the condition holds (evaluated
+  against the granter, the same gate a manual activation applies). The World Tree's "As long as you
+  control six or more lands, lands you control have '{T}: Add one mana of any color.'" =
+  `staticAbility { condition = Conditions.ControlLandsAtLeast(6); ability = GrantActivatedAbility(
+  ActivatedAbility({T}: AddAnyColorMana(1), isManaAbility = true, timing = ManaAbility),
+  GroupFilter(GameObjectFilter.Land.youControl())) }`; Nature's Embrace's land half is the
+  enchanted-permanent form.
 - `GrantStaticAbility(ability, filter = GroupFilter.attachedCreature())` — "[filter] have '<static ability>'",
   the static sibling of `GrantTriggeredAbility` / `GrantActivatedAbility` and the continuous counterpart of the
   one-shot `Effects.GrantStaticAbility`. Lowered to a Layer 6 (CR 613.1f) ability grant over `filter` (relative
   to the granter: `Filters.EnchantedCreature`, `GroupFilter.source()`, or a battlefield lord group), so the
   holder *has* the ability and its "you" is the holder's controller. Nerd Rage:
-  `GrantStaticAbility(NoMaximumHandSize, Filters.EnchantedCreature)` — an Aura on an opponent's creature frees
+  `GrantStaticAbility(NoMaximumHandSize(), Filters.EnchantedCreature)` — an Aura on an opponent's creature frees
   the opponent's hand. `ability` is typed `ProjectedStaticAbility` — the sealed marker for kinds whose engine
   read consults the holder's projected statics (`ProjectedState.getStaticAbilities`): today `NoMaximumHandSize`,
-  `Enlist`, `GrantCantLoseGame` and `GrantOpponentsCantWinGame` (Cloudsteel Kirin: "Equipped creature has 'You
-  can't lose the game and your opponents can't win the game'" is one `GrantStaticAbility` per clause over
-  `Filters.EquippedCreature`). To grant another kind this way, route its read through projection and mark it.
+  `Enlist`, `GrantCantLoseGame`, `GrantOpponentsCantWinGame` and `ModifySpellCost` (Cloudsteel Kirin: "Equipped
+  creature has 'You can't lose the game and your opponents can't win the game'" is one `GrantStaticAbility` per
+  clause over `Filters.EquippedCreature`). A granted `ModifySpellCost` is one modifier per holder, read relative to
+  that holder — Jubilant Skybonder's "Creatures you control with flying have 'Spells your opponents cast that target
+  this creature cost {2} more to cast'" = `GrantStaticAbility(ModifySpellCost(OpponentsCastTargeting(GroupFilter.source()),
+  IncreaseGeneric(2)), GroupFilter(Creature.youControl().withKeyword(FLYING)))`, so a spell targeting two of those
+  flyers costs {4} more (the scan in `CostCalculator.scanModifySpellCost` adds projected instances to printed ones). To grant another point-of-use kind this way, route its read through projection and
+  mark it. **A granted ability that lowers to a continuous effect** (`ModifyStats`, `GrantKeyword`, a
+  `CompositeStaticAbility` of them, …) is generated *by the holder* exactly as if printed on it — sourced from the
+  holder, its filters resolved relative to the holder, timestamped at the later of holder and granter (CR 613.7a),
+  and stopped when the holder loses its abilities, the granter loses its abilities, or the grant's own condition
+  fails. That is the Kaldheim Runes' second static: "As long as enchanted permanent is an Equipment, it has
+  'Equipped creature gets +1/+1 and has trample'" (Rune of Might) =
+  `ConditionalStaticAbility(GrantStaticAbility(CompositeStaticAbility(listOf(ModifyStats(1, 1), GrantKeyword(TRAMPLE)))),
+  Conditions.EnchantedPermanentMatches(GameObjectFilter.Artifact.withSubtype(Subtype.EQUIPMENT)))` — the default
+  attached scope makes the Equipment the holder, and the inner statics' default attached scope is then read from
+  the Equipment, reaching whichever creature it equips. Granting a kind that neither projects nor lowers fails
+  loudly when the granter's statics are lowered. This holder-generation is the *static* grant's; a resolved
+  `Effects.GrantStaticAbility` lowers its ability on the holder by its own route (its step 3 in `StateProjector`)
+  and does not nest a further `GrantStaticAbility` inside it.
 - `GrantTriggeredAbility(ability, filter)` — "[filter] have '<triggered ability>'". On a battlefield-scoped
   `GroupFilter` it is the lord shape — Unctus, Grand Metatect's "Other blue creatures you control have 'Whenever
   this creature becomes tapped, draw a card, then discard a card'" is `GrantTriggeredAbility(<becomesTapped → loot>,
@@ -9844,6 +10747,9 @@ staticAbility {
   display keyword (via the layer system) and the enforcement trigger (via
   `TriggerAbilityResolver.getWardTriggeredAbilities`) are generated by the engine.
   **For a creature's own printed ward, use `keywordAbility(KeywordAbility.Ward(WardCost.Mana("{N}")))`, not this.**
+  The exception is ward the creature has only *some* of the time — "has ward {10} as long as it was cast"
+  (The Tarrasque), "during your turn, Yuna … ha[s] ward {2}": a `Scope.Self` grant (`Filters.Self`)
+  under `staticAbility { condition = … }`, whose trigger is built while the condition holds.
   The `filter` default is attached-scope (`GroupFilter.attachedCreature()`, i.e. `Scope.AttachedTo`),
   and the engine reaches attach-scoped grants only by walking the permanents attached to a creature —
   so on a creature that is nobody's Aura or Equipment host the grant matches nothing and the card ends
@@ -9886,8 +10792,8 @@ staticAbility {
   uses (`HexproofFromRules.keywordsFor`), so it blocks targeting by matching spells and abilities
   opponents control; the controller can still target their own permanents. Accepts the scopes with a
   hexproof keyword — `Color`, `Colors`, `NonColor`, `Monocolored`, `Multicolored`, `CardType`, `Spells`,
-  `PermanentsCastThisTurn`, `RingBearers`, `ActivatedAbilities`, `TriggeredAbilities`; the rest are rejected at
-  construction. `ProtectionScope.Monocolored` = exactly one color (CR 105.2a): Dragonfire Blade
+  `PermanentsCastThisTurn`, `RingBearers`, `ActivatedAbilities`, `TriggeredAbilities`, `ManaValueParity`; the rest are
+  rejected at construction. `ProtectionScope.Monocolored` = exactly one color (CR 105.2a): Dragonfire Blade
   (`GrantHexproofFromToGroup(ProtectionScope.Monocolored)`). `ProtectionScope.Multicolored` = two or more
   colors (CR 105.2b): Niv-Mizzet, Guildpact, printed on itself
   (`GrantHexproofFromToGroup(ProtectionScope.Multicolored, GroupFilter.source())`). "Hexproof from each of
@@ -9896,9 +10802,9 @@ staticAbility {
   (CR 702.16): the protection twin of `GrantHexproofFromToGroup`. Adds the same projected `PROTECTION_FROM_*`
   keyword a printed `KeywordAbility.Protection(scope)` uses (`ProtectionKeywords.keywordsFor`), so every
   protection leg — targeting, damage, enchanting/equipping, blocking — honours it with no extra wiring.
-  Accepts `Colors`, `Multicolored`, `Subtype`, `Supertype`, `EachOpponent`, and the source kinds
-  (`Spells`, `PermanentsCastThisTurn`, `RingBearers`, `ActivatedAbilities`, `TriggeredAbilities`);
-  `NonColor`, `Monocolored` and `Everything` (no keyword) and `Color` / `CardType` (one spelling per
+  Accepts `Colors`, `Multicolored`, `Subtype`, `Supertype`, `EachOpponent`, `ChosenCardType`, and the source kinds
+  (`Spells`, `PermanentsCastThisTurn`, `RingBearers`, `ActivatedAbilities`, `TriggeredAbilities`) and
+  `ManaValueParity`, `ManaValueOtherThan`; `NonColor`, `Monocolored` and `Everything` (no keyword) and `Color` / `CardType` (one spelling per
   concept) are rejected at construction. Lord of
   the Nazgûl: `GrantProtectionFromToGroup(ProtectionScope.RingBearers,
   GroupFilter(GameObjectFilter.Permanent.withSubtype("Wraith").youControl()))`. A single color or card type
@@ -9934,6 +10840,22 @@ staticAbility {
   projected statics (`UntargetableByRules.zoneLocks`) at the same three sites — legal-target enumeration,
   cast/activation validation, and the resolution re-check (a lock arriving after targeting makes that
   target illegal, CR 608.2b) — and lifts when the holder loses all its abilities.
+- `SetColors(colors, filter, offBattlefield = null)` — Layer 5 color-*setting* static (CR 613.1e): the objects
+  `filter` matches have exactly `colors`, replacing their own; an empty set is "are colorless". The add-a-color
+  siblings are `GrantColor` / `GrantChosenColor`. `offBattlefield` (a `Player`, read relative to the static's
+  controller) extends it past the battlefield to the spells that player controls and the cards they own in every other
+  zone — `Player.You` for "the same is true for spells you control and cards you own that aren't on the battlefield",
+  `Player.Each` for every player's. Only the card predicates of `filter` qualify an off-battlefield object, so a
+  `GameObjectFilter.Any` filter reaches instants and sorceries too. Off the battlefield it is an overlay
+  `ProjectedState` applies lazily, per object, from rules `StateProjector` collects (so a spell mid-resolution is
+  still reached, and nothing is allocated without such a static); every engine read of "what color is this"
+  for an object that may be a spell or a card off the battlefield goes through `ProjectedState.colorsOf` /
+  `colorSetOf` (color predicates, cast triggers and cast history, protection and hexproof against a spell, damage
+  source colors, "colorless spells only" mana, the client's card view), and spell-cost / spell-keyword /
+  cast-permission filters that only hold a card definition read `ProjectedState.spellColors(caster, printed, cardId)`
+  — so a Medallion stops discounting a spell Lattice made colorless.
+  **Mycosynth Lattice** — "All cards that aren't on the battlefield, spells, and permanents are colorless" →
+  `SetColors(emptySet(), GroupFilter(GameObjectFilter.Any), offBattlefield = Player.Each)`.
 - `GrantCardType(cardType, filter)` / `RemoveCardType(cardType, filter)` — Layer 4 type-changing statics that add or
   remove a card type (e.g. `"CREATURE"`). `RemoveCardType` backs Impending's "isn't a creature while it has a time
   counter" (wrapped in a `ConditionalStaticAbility`); reuse it for any "it's no longer a [type]" effect — the Theros
@@ -9943,6 +10865,11 @@ staticAbility {
   object's creature subtypes for as long as the removal lasts unless it is still a creature or kindred (CR 205.1a — a
   god below its threshold loses the creature type God), and an attacking or blocking creature that stops being a
   creature is removed from combat by a state-based check (CR 506.4) and doesn't rejoin it.
+  Granting `"LAND"` together with a basic land subtype (`GrantSubtype("Forest", …)` over the same filter) makes a
+  real land with that type's intrinsic mana ability: the mana enumerator, activation and `ManaSolver` auto-pay all
+  read the *projected* type line, so a creature that is a Forest only by the grant taps for {G} — still subject to
+  summoning sickness while it's a creature (Ashaya, Soul of the Wild: "Nontoken creatures you control are Forest lands
+  in addition to their other types").
   `GrantCardType` also takes `includeControlledSpells` / `includeOwnedCardsOutsideBattlefield` (default `false`), the
   card-type twin of `GrantChosenSubtype`'s flags, for "the same is true for permanent spells you control and nonland
   permanent cards you own that aren't on the battlefield" (Encroaching Mycosynth:
@@ -9957,9 +10884,19 @@ staticAbility {
   **`filter` defaults to the source, not the attached creature** — unlike `ModifyStats` / `GrantKeyword`, which
   default to `attachedCreature()`. An Aura must pass `Filters.EnchantedCreature` explicitly or it silently makes
   *itself* the Knight and leaves the enchanted creature alone.
+  **On the card itself it is a characteristic-defining ability.** A top-level, unconditional
+  `GrantSubtype(subtype)` with the default source filter is the printed "[this] is also a [subtype]" — a CDA
+  (CR 604.3), which functions in **every zone**. `CardDefinition.selfDefinedSubtypes` derives those subtypes
+  (as `colors` derives devoid), and the engine folds them into the entity's own type line wherever the card is —
+  so a hand, graveyard, library or stack check ("Wizard card", "Cleric spell") sees them — rather than projecting
+  them as a timestamped layer-4 effect (CDAs apply first in their layer, CR 613.3, so a later "becomes a Frog"
+  still overwrites them). `CardDefinition.typeLine` stays as printed; `CardDefinition.characteristicTypeLine` is the
+  folded one, read by cast-time and cost checks that judge a spell from its definition. One static per subtype: Tajuru Paragon is
+  `GrantSubtype("Cleric")`, `…("Rogue")`, `…("Warrior")`, `…("Wizard")` on a `Creature — Elf`, a full party by
+  itself. Wrapped in a condition, or granted by another object, it is an ordinary layer-4 effect. (Tajuru Paragon)
 - `HasCreatureTypesOf(source, retainedTypes = emptySet(), filter = GroupFilter.source())` — Layer 4
   type-changing static that gives the group **the creature types of the object `source` names**,
-  replacing their own and leaving non-creature subtypes alone (CR 205.1b). `source` is an ordinary
+  replacing their own and leaving non-creature subtypes alone (CR 205.1a). `source` is an ordinary
   `EffectTarget.SingleEntity`, so the same static reads a card exiled with this permanent
   (`EffectTarget.LinkedExiledCard()`) or anything else the evaluator can resolve; the set is
   re-read on every projection pass, so the gainer's types track the referenced object live. Pair it
@@ -9994,7 +10931,7 @@ staticAbility {
   GroupFilter.AllCreaturesYouControl, includeControlledSpells = true, includeOwnedCardsOutsideBattlefield = true)` is
   Maskwood Nexus's "Creatures you control are every creature type. The same is true for creature spells you control and
   creature cards you own that aren't on the battlefield." (Maskwood Nexus)
-- `TransformPermanent(setCardTypes, setSubtypes, setColors?, setName?, clearSubtypes, filter)` — Layer 3/4/5 "becomes a
+- `TransformPermanent(setCardTypes, setSubtypes, setColors?, setName?, clearSubtypes, filter, setCreatureSubtypes)` — Layer 3/4/5 "becomes a
   whole new identity" (Sugar Coat, Darksteel Mutation, Witness Protection, Imprisoned in the Moon). A non-empty `setSubtypes` replaces all
   subtypes; an empty `setSubtypes` leaves subtypes alone **unless** `clearSubtypes = true`, which replaces them with
   none ("has no subtypes" — the Enduring return strips Sheep/Glimmer). `setColors = null` keeps colors. `setName`
@@ -10003,6 +10940,17 @@ staticAbility {
   so two same-controller permanents renamed to the same name can trigger the legend rule (Witness Protection: "named
   Legitimate Businessperson"). `ClientCard.name` and `LegendRuleCheck` both prefer the projected name over the base
   `CardComponent.name` when one is active.
+  `setCreatureSubtypes` is the "is a [creature type]" wording that names **no card type** (Ichthyomorphosis's "is a blue
+  Fish", Lignify's "is a Treefolk", Spider-Man No More's "is a Citizen"): it lowers to `Modification.SetCreatureSubtypes`,
+  replacing only the creature types and keeping every card type, supertype and non-creature subtype (CR 205.1a) — an
+  enchanted artifact creature stays an artifact. Don't spell that wording as `setCardTypes = {"CREATURE"}` +
+  `setSubtypes`: that is "is a [type] **creature**", which loses all other card types (Eaten by Piranhas).
+  `setCardTypes` alone (no `setSubtypes`) still drops the subtypes of every card type the object **lost** (CR 205.1a):
+  `Modification.SetCardTypes` prunes each subtype whose `Subtype.correlatedCardTypes` (the CR 205.3 lists) no longer
+  includes a type the object has. One with the Stars' "is an enchantment and loses all other card types" turns a
+  Spirit enchantment creature into a plain enchantment that keeps Aura/Saga-style enchantment types but is no longer a
+  Spirit; Imprisoned in the Moon keeps a Plains's land type but strips a creature's. Creature types survive while the
+  object is still kindred; subtypes on no official list are left alone.
 - `SetName(name, filter)` — a standalone static that overrides the matching permanents' **name** with a fixed string
   (Layer 3 / TEXT; CR 612 / 613.1c — setting a name is a text-changing effect). Lowers to the same `Modification.SetName`
   as `TransformPermanent.setName`, exposed by `ProjectedState.getName` and surfaced to the client by
@@ -10016,11 +10964,21 @@ staticAbility {
   way: on in the owner's graveyard, **off on the battlefield**. "You" (for the condition and for "creatures you
   control") is the card's **owner** (CR 108.4a, 109.5). Anger: `staticAbility { ability = GrantKeyword(HASTE,
   GroupFilter(Creature.youControl())); condition = Conditions.YouControl(Filters.MountainCard); activeZones =
-  setOf(Zone.GRAVEYARD) }`; Wonder is the flying/Island twin. Scope today: `activeZones` must be a non-empty subset of
-  `ZoneScopedStaticAbility.SUPPORTED_ZONES` (`{GRAVEYARD}`), and only layer-projected abilities (keyword grants, stat
-  changes, type changes, …) are accepted — the engine refuses one that lowers to no continuous effect rather than let
-  it sit inert. Engine: lowered once per card at entity creation into a card-intrinsic `ZoneStaticEffectsComponent`,
-  which `StateProjector` collects from every graveyard on each projection.
+  setOf(Zone.GRAVEYARD) }`; Wonder is the flying/Island twin. **Eminence / "in the command zone or on the
+  battlefield"** names the battlefield too: `activeZones = setOf(Zone.BATTLEFIELD, Zone.COMMAND)` makes the builder
+  emit **two** statics — the bare ability (an ordinary battlefield static every battlefield scanner already reads) plus
+  `ZoneScopedStaticAbility(ability, {COMMAND})`. A card is in one zone at a time, so they never both function. The
+  Ur-Dragon: `staticAbility { ability = ModifySpellCost(YouCast(Any.withSubtype(DRAGON)), ReduceGeneric(1));
+  activeZones = setOf(Zone.BATTLEFIELD, Zone.COMMAND) }`. "Other … spells" needs no filter: the spell is on the stack
+  as its cost is determined (CR 601.2a, 601.2f), and the cost calculator excludes the card being cast as a source, so
+  casting it from the command zone isn't self-discounted (another commander still is). Scope today: the zone part of
+  `activeZones` must be a non-empty subset of `ZoneScopedStaticAbility.SUPPORTED_ZONES` (`{GRAVEYARD, COMMAND}`), and
+  the wrapped ability must be one the zone readers understand — a layer-projected ability (keyword grants, stat
+  changes, type changes, …), collected by `StateProjector`, or a spell-cost modifier (`ModifySpellCost`), collected by
+  `CostCalculator`; the engine refuses anything else rather than let it sit inert. Engine: lowered once per card at
+  entity creation into a card-intrinsic `ZoneStaticEffectsComponent` (`effectsByZone` + `costModifiersByZone`), which
+  both readers collect from the supported zones of every player — one component read per card there, and only the
+  entry for the zone the card is in.
 - `ConditionalStaticAbility` — static gated by a runtime `Condition`. A conditional wrapping a *multi-effect* ability
   (e.g. `TransformPermanent`) lowers through the plural converter and gates every resulting effect on the condition.
   The gate is honored for **non-projection** grants too, not just layer-projected effects: a conditional wrapping a
@@ -10059,8 +11017,14 @@ staticAbility {
   permanent is face down (a face-up permanent can't be "turned face up"), so it's applied
   unconditionally. Unable to Scream: "As long as enchanted creature is face down, it can't be turned
   face up."
-- `CantReceiveCounters(filter)` — matching permanents can't have counters put on them (projects the
-  `AbilityFlag.CANT_RECEIVE_COUNTERS` flag).
+- `CantReceiveCounters(filter, counterType = null)` — matching permanents can't have counters put on
+  them (projects the `AbilityFlag.CANT_RECEIVE_COUNTERS` flag). Set `counterType` to scope it to one
+  kind — "Creatures your opponents control can't have +1/+1 counters put on them" (Blightbeetle):
+  `CantReceiveCounters(GroupFilter.AllCreaturesOpponentsControl, CounterType.PLUS_ONE_PLUS_ONE)`.
+  Every placement path asks `ProjectedState.canReceiveCounters(id, kind)` through the placement
+  chokepoint, so only that kind is refused: other kinds still go on, a creature entering with that
+  kind enters without it, a cost that would put that kind on it can't be paid (CR 614.17b), and
+  counters already on it stay (unlike `MaxCounters(kind, 0)`, no state-based removal).
 - `MaxCounters(counterType, max)` — "This permanent can't have more than `max` `counterType` counters
   on it" (Rasputin Dreamweaver). A `ProjectedStaticAbility` on the holder, read by the
   counter-placement chokepoint (`ReplacementEffectUtils.applyCounterPlacementModifiers`) after every
@@ -10070,10 +11034,21 @@ staticAbility {
   `max` anyway (it gained the limit later) loses the excess as a state-based action
   (`CounterLimitCheck`, CR 704.5r). A cast entrant's own printed limit caps its entry counters;
   limits granted to it by other permanents apply once it is on the battlefield.
-- `CantBeSacrificed(filter)` — matching permanents can't be sacrificed (projects the
+- `CantBeSacrificed(filter, scope = Scope.ANY)` — matching permanents can't be sacrificed (projects the
   `AbilityFlag.CANT_BE_SACRIFICED` flag, honored by the sacrifice executor — a sacrifice that can't
-  happen simply no-ops). Wrap in `ConditionalStaticAbility` for time-restricted forms, e.g. Zurgo,
+  happen simply no-ops — and by every sacrifice *cost*, which can't take such a permanent). Wrap in
+  `ConditionalStaticAbility` for time-restricted forms, e.g. Zurgo,
   Thunder's Decree: `ConditionalStaticAbility(CantBeSacrificed(GroupFilter(Token.youControl().withSubtype("Warrior"))), IsInStep(listOf(Step.END)))`.
+  `scope = CantBeSacrificed.Scope.CASTING_AND_ACTIVATION_COSTS` narrows it to costs: "Players can't
+  sacrifice creatures to cast spells or activate abilities" (Angel of Jubilation) is
+  `CantBeSacrificed(GroupFilter.AllCreatures, CantBeSacrificed.Scope.CASTING_AND_ACTIVATION_COSTS)`,
+  projecting `AbilityFlag.CANT_BE_SACRIFICED_FOR_COSTS`. The engine's `SacrificeCostLegality` is the
+  one check every sacrifice-cost pool, validator and payment consults — additional costs (Bone
+  Splinters), alternative costs (emerge), casualty, forage's Food, "Sacrifice this", and activated
+  abilities including mana abilities (Ashnod's Altar, auto-pay included). It is per permanent, as the
+  ruling reads it: an artifact creature can't pay "Sacrifice an artifact", a noncreature artifact
+  still can. Sacrifices a resolving spell or ability performs (edicts, exploit, "unless you
+  sacrifice") ignore it. Pair with `PlayersCantPayLifeForCosts()` for "pay life or sacrifice".
 - `OpponentsCantMakeYouSacrifice` — "Spells and abilities your opponents control can't cause you to
   sacrifice permanents" (Sigarda, Host of Herons). The **player-scoped** counterpart of
   `CantBeSacrificed`: it protects the controller rather than a set of permanents, so it also covers
@@ -10129,6 +11104,16 @@ staticAbility {
   toughness rather than its power"), grant the `AbilityFlag.ASSIGNS_COMBAT_DAMAGE_AS_TOUGHNESS` flag via
   `Effects.GrantKeyword(AbilityFlag.ASSIGNS_COMBAT_DAMAGE_AS_TOUGHNESS, target, duration)`; the same combat
   util reads it from projected keywords (unconditional — no toughness > power gate).
+- `LethalDamageDeterminedByPower(filter = GroupFilter.AllCreaturesYouControl)` — static rule
+  modification: "lethal damage dealt to creatures you control is determined by their power rather than
+  their toughness" (Zilortha, Strength Incarnate). Lowered to a projected flag on the matching creatures
+  (`Modification.SetLethalDamageByPower`, which a later "loses all abilities" on an affected creature does
+  not strip — only the source losing its abilities ends it). Every lethal-damage read goes through
+  `ProjectedState.lethalDamageThreshold` — the lethal-damage SBA (CR 704.5g), lethal damage in combat
+  damage assignment (trample, CR 702.19b), and excess damage (CR 120.4a: `DamageUtils`, combat excess,
+  `EntityNumericProperty.ExcessMarkedDamage`, `TargetMarkedDamageExceedsToughness`). Under the rule a
+  creature with 0 or less power still needs 1 damage marked; deathtouch and the 0-toughness SBA are
+  unaffected.
 - `AssignCombatDamageAsUnblocked(filter = source())` — static: "you may have this creature assign its
   combat damage as though it weren't blocked" (Thorn Elemental, Deathcoil Wurm). A battlefield-scoped
   `filter` covers every creature it matches, evaluated with the source's controller as "you": Zilortha,
@@ -10199,7 +11184,9 @@ staticAbility {
     artifact. It doesn't untap during its controller's untap step for as long as Phyrexian Gremlins
     remains tapped" — compose `Effects.Tap(target) then Effects.GrantKeyword(AbilityFlag.DOESNT_UNTAP,
     target, Duration.WhileSourceTapped("…"))`: the one-way `WhileSourceTapped` latch drops the grant the
-    instant the source untaps.
+    instant the source untaps, and a source that untapped between activation and resolution never
+    locks the target at all (**Entrancing Lyre** — the X-bounded target is
+    `GameObjectFilter.Creature.compareNumericProperty(POWER, LTE, DynamicAmounts.xValue())`).
     For "doesn't untap during its controller's **next** untap step" pass
     `Duration.UntilAfterAffectedControllersNextUntap()` (Crippling Chill); for "… next **two** untap
     steps" pass `Duration.UntilAfterAffectedControllersNextUntap(count = 2)` (Telekinesis).
@@ -10222,7 +11209,10 @@ staticAbility {
     (Teferi, Who Slows the Sunset's emblem) — the two differ only for a Team vs. Team teammate's own turn.
     Also read off an emblem's own statics (`CreatePermanentEmblem(ownedStaticAbilities = …)`).
   - `UntapFilteredDuringOtherUntapSteps(filter)` — untap each permanent you control matching `filter`
-    (Ivorytusk Fortress).
+    (Ivorytusk Fortress; `Filters.Artifact` for Unwinding Clock).
+  - All three ignore `AbilityFlag.DOESNT_UNTAP`: it is scoped to the controller's own untap step, and
+    this is another player's (Seedborn Muse / Unwinding Clock rulings — a Rust Tick'd artifact still
+    untaps). `CANT_BECOME_UNTAPPED` and stun counters still apply.
   - `UntapSelfDuringOtherUntapSteps` — untap **only the source permanent itself** ("Untap this artifact
     during each other player's untap step" — Bender's Waterskin). Guarded on the source still being tapped,
     so it never double-untaps / double-consumes a stun counter alongside the broad/filtered variants.
@@ -10262,7 +11252,15 @@ staticAbility {
   MustAttackDefender.EnchantedCreatureController)`): the player is the host's projected controller, read at
   declaration; only attacking that player (not their planeswalker) obeys it, and a creature that player
   controls, or one that can't attack them at no cost, is under no requirement; it means something only on
-  an attached source (granted to a creature attached to nothing, it names nobody). Grant it for a
+  an attached source (granted to a creature attached to nothing, it names nobody).
+  `MustAttackDefender.PlayerOtherThanYou` is "attack each combat if able **and attack a player other than
+  you** if able" (Kardur, Doomscourge): goad's two requirements (CR 701.15b) without the goad designation —
+  the creature isn't goaded. "You" is the holder's projected controller. It still attacks when every
+  player it could attack is you; otherwise attacking you (or your planeswalker) is rejected. It stacks
+  with goad: `GoadRules.playersToAttackOtherThan` lists one entry per "other than X" requirement
+  (goaders included), and the attacked player must be named no more often than another opponent player
+  the creature could legally attack (CR 508.1d). The durational group form is `Effects.MustAttackGroup`.
+  Grant it for a
   duration with `Effects.GrantStaticAbility(MustAttack(defender = MustAttackDefender.APlayer), creature, Duration.UntilYourNextTurn)`
   (Nahiri, the Unforgiving) — a granted static's `UntilYourNextTurn` ends at the start of the *granting*
   player's next turn, even when an opponent controls the creature.
@@ -10413,6 +11411,18 @@ in the declare-blockers step, even before the turn-based block action has comple
   the tax is always active. When `totalTax > 0`, the engine pauses `DeclareAttackers` for a
   `SelectManaSourcesDecision` *before* tapping any mana — declining is a clean no-op that leaves the
   player in `DECLARE_ATTACKERS` to re-declare.
+  - **Floating, from a resolved effect** — "until your next turn, creatures can't attack you unless
+    their controller pays {2} for each of those creatures" (Summon: Yojimbo chapters II–III) is the
+    same tax granted to the player: `Effects.GrantStaticAbility(AttackTax(DynamicAmounts.fixed(2)),
+    EffectTarget.Controller, Duration.UntilYourNextTurn)`. `CombatTaxes.attackTax` prices
+    player-held grants exactly like a printed tax on a permanent that player controls, so the tax
+    outlives its source, and shows as an
+    "Attack Tax" badge on the player until the granting player's next turn begins.
+  - **Taxes and attack requirements (CR 508.1d).** A player is never required to pay a cost to obey
+    a requirement, printed tax or granted: a creature that "attacks each combat if able" (or is
+    goaded, taunted, or must attack a player) need not attack when every defender it could attack
+    would tax it or the attack demands a sacrifice, and a directed requirement ("a player other
+    than X", "a player", Taunt's player) only counts a defender it could attack for free.
 - `BlockTax(amountPerBlocker: DynamicAmount, condition: Condition? = null)` — Archangel of Tithes'
   second ability ("creatures can't block unless their controller pays {1} for each of those
   creatures"). A *global* per-blocker generic-mana tax: while any permanent with this ability — whose
@@ -10578,12 +11588,18 @@ in the declare-blockers step, even before the turn-based block action has comple
   that slot's own requirement, and not already chosen for another slot of the same "target" word
   (CR 115.3) — is a candidate, and the controller picks which one changes when there are several.
   Only the chosen-new-target form (`to = null`) no-ops on a spell with more than one target.
-- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, creaturesOnly = false, optional = false, fromSource = null)` —
-  **`creaturesOnly`** protects the *class* of creatures rather than a fixed list of entities: Blood
-  of the Martyr's "if damage would be dealt to any creature". Checked against projected state at
-  damage time, so a creature that entered after the shield resolved is covered and a player never
-  is — an empty `protectedTargets` otherwise means "anything", players included. Pair it with
-  `RedirectScope.CONTINUOUS` for the turn-long form. **`optional`** makes it a printed "you may"
+- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, protectedFilter = null, optional = false, fromSource = null, duration = EndOfTurn)` —
+  **`protectedFilter`** protects a *class* of permanents rather than a fixed list of entities: Blood
+  of the Martyr's "if damage would be dealt to any creature" (`GameObjectFilter.Creature`), Ascent of
+  the Worthy's "all damage that would be dealt to creatures you control" (`Creature.youControl()`,
+  "you" being the shield's controller, so a chosen creature that changes control still soaks the
+  damage). Matched against projected state at damage time, so a permanent that entered after the
+  shield resolved is covered, a player never is, and damage already headed for `redirectTo` stays
+  there — an empty `protectedTargets` otherwise means "anything", players included. Pair it with
+  `RedirectScope.CONTINUOUS` for the "all damage" form. **`duration`** is how long the shield lasts:
+  "this turn" by default, `Duration.UntilYourNextTurn` for Ascent of the Worthy. A shield whose
+  recipient has left the battlefield redirects nothing (Ascent of the Worthy ruling). The
+  client badges a filter shield's recipient ("Takes damage"), since it protects no listed entity. **`optional`** makes it a printed "you may"
   (Blood of the Martyr): the shield's controller is asked **once per damage instance** the shield
   covers, *before* any of that damage is dealt, so a sweeper hitting four creatures asks four times
   and each answer stands on its own. The question is raised by `OptionalDamageRedirect`'s pre-pass —
@@ -10616,6 +11632,11 @@ in the declare-blockers step, even before the turn-based block action has comple
   symmetric grant usually sits on another player's side) and unwraps a `ConditionalStaticAbility`;
   both `PlayLandHandler` and `EnumerationContext` ask `LandDropUtils.hasLandPlayLeft`. Pair it with
   `DynamicAmounts.landsPlayedThisTurn()` for "if it wasn't the first land you played this turn".
+- `Effects.PlayAdditionalLands(count)` — the one-shot sibling: "you may play [count] additional lands
+  **this turn**" (Explore, Summer Bloom). `count` is an `Int` or a `DynamicAmount` read once as the
+  effect resolves — Nahiri's Lithoforming's "You may play X additional lands this turn" is
+  `Effects.PlayAdditionalLands(DynamicAmounts.xValue())`; 0 or less grants nothing. It raises the
+  controller's `LandDropsComponent.remaining` for the turn and stacks with `GrantAdditionalLandDrop`.
 - `PlayersCantPlayLands(affected = Player.Each, condition = null, landFilter = GameObjectFilter.Any)`
   — the land-play sibling of `PlayersCantCastSpells` (Worms of the Earth). Playing a land is a
   *special action*, not casting a spell, so a card stopping one says nothing about the other.
@@ -10628,6 +11649,35 @@ in the declare-blockers step, even before the turn-based block action has comple
   **when** (`condition`). A *filtered* lock never suppresses the land drop wholesale: the blanket
   `canPlayLand` probe deliberately ignores it and `EnumerationContext.cantPlayLand(cardId)` removes
   only the named cards, so the unaffected lands in a hand stay playable.
+- `PlayersCantSearchLibraries(affected = Player.Each, scope = LibrarySearchProhibition.ANY_LIBRARY)` —
+  a static prohibition on searching libraries (CR 701.23); the battlefield twin of the one-shot
+  `CantSearchLibrariesEffect`. `affected` is relative to the source's controller. `scope`:
+  `ANY_LIBRARY` forbids every search (Stranglehold, `affected = Player.EachOpponent`);
+  `OWN_LIBRARY_BY_OWN_EFFECTS` forbids only a search of the player's *own* library caused by a spell
+  or ability *they* control — Ashiok, Dream Render ("Spells and abilities your opponents control
+  can't cause their controller to search their library"); another player's spell may still make them
+  search, and their own spell may still search someone else's library. The cause is the resolving
+  spell/ability's controller (`effectControllerId`, stable across "each player searches"). A
+  forbidden search is no search: the library contributes no cards, no searched event fires, a "you may
+  search …" can't be chosen (so it doesn't shuffle), and a mandatory "search … then shuffle" still
+  shuffles. Stamped as `ForbidsLibrarySearchComponent` by `StaticAbilityHandler` (bare abilities only,
+  ignored while the source has lost its abilities) and read through `LibrarySearchRestrictions` by the
+  search gather, `EmitLibrarySearchedEventExecutor` and the may-gate.
+- `ControlOpponentsLibrarySearches` — Opposition Agent's "You control your opponents while they're
+  searching their libraries. While an opponent is searching their library, they exile each card they
+  find. You may play those cards for as long as they remain exiled, and you may spend mana as though
+  it were mana of any color to cast them." Applies to any search (a `GatherCardsEffect` with
+  `search = true`) an opponent of the source's controller makes that looks through their *own*
+  library, whoever's spell caused it. The pick over the searched pool goes to the source's controller
+  (same eligibility, so they can't find a card the instruction doesn't ask for). The found cards —
+  the ones picked, or every match of a search with no pick — in any zone a multi-zone search read are
+  exiled by the first `MoveCollection` that would move them and get a permanent
+  `MayPlayPermission(withAnyManaColor = true)` for that player; the unpicked rest moves as written. The
+  rest of the instruction runs without them: they are dropped from every pipeline collection, so a
+  later step can't move them out of exile (shuffle and searched event still happen). Several sources: the latest to enter the
+  battlefield wins. Stamped as `ControlsOpponentsLibrarySearchesComponent` by `StaticAbilityHandler`,
+  ignored while the source has lost its abilities, read through `LibrarySearchControl`. Sibling of
+  `PlayersCantSearchLibraries` (forbids instead of taking over).
 - `RestrictCardsDrawnPerTurn(affected = Player.EachOpponent, maxPerTurn = 1)` — a per-turn cap on
   cards drawn (CR 121.2b): Narset, Parter of Veils / Leovold ("Each opponent can't draw more than one
   card each turn"), `affected = Player.Each` for Spirit of the Labyrinth, and `maxPerTurn = 0` for
@@ -10640,6 +11690,14 @@ in the declare-blockers step, even before the turn-based block action has comple
   remaining allowance. Read through `standingStatics` (face-down, ability-loss, conditional and
   granted statics handled like `SkipStepOrPhase`). Not modelled: refusing "you may draw two" outright
   (CR 121.2b's optional multi-draw) — choosing yes draws up to the cap.
+- `RestrictVenturesPerTurn(affected = Player.EachOpponent, maxPerTurn = 1)` — a per-turn cap on
+  venturing into the dungeon (CR 701.49): Keen-Eared Sentry ("Each opponent can't venture into the
+  dungeon more than once each turn"). Same shape as `RestrictCardsDrawnPerTurn`: `affected` relative to
+  the source's controller, the smallest applicable cap wins, and ventures earlier in the turn count even
+  before the source entered (tally: `VenturesThisTurnComponent`, cleared each turn). Every venture
+  counts — "venture into Undercity" and the initiative's ventures too. A venture the cap forbids simply
+  doesn't happen (no marker move, no dungeon completed or entered, no room trigger); enforced in
+  `VentureIntoTheDungeonExecutor` through `VentureRestrictions`.
 - `CantEnterTheBattlefield(filter = GameObjectFilter.Any, fromZones = null)` — an entry prohibition:
   cards matching `filter` can't enter the battlefield from `fromZones` (`null` = any zone). The other
   half of Worms of the Earth's lock — `CantEnterTheBattlefield(GameObjectFilter.Land)` — and
@@ -10663,7 +11721,11 @@ in the declare-blockers step, even before the turn-based block action has comple
   face-down or ability-stripped holder contributes nothing). Arboria = `CantAttackUnless(Conditions.Any(
   CompareAmounts(spellsCastDuringTheirLastTurn(DefendingPlayer), GTE, 1),
   CompareAmounts(nontokenPermanentsPutDuringTheirLastTurn(DefendingPlayer), GTE, 1)),
-  GroupFilter.AllCreatures, coversPlaneswalkers = false)`.
+  GroupFilter.AllCreatures, coversPlaneswalkers = false)`. The creature being checked is bound as the
+  iteration entity, so `Player.ControllerOfIterationEntity` ("its controller") is the player attacking
+  with it — Two-Headed Giant teammates included: Angelic Arbiter's "each opponent who cast a spell this
+  turn can't attack with creatures" = `CantAttackUnless(CompareAmounts(spellsCastThisTurn(
+  Player.ControllerOfIterationEntity), EQ, 0), GroupFilter.AllCreaturesOpponentsControl)`.
 - `CantAttackUnlessSacrifice(sacrificeFilter, count = 1)` — a **non-mana** attack cost, paid as
   attackers are declared: Leviathan's "this creature can't attack unless you sacrifice two Islands".
   The clause is a restriction (CR 508.1c) whose cost is determined and paid at CR 508.1h–j — not an
@@ -10705,6 +11767,17 @@ in the declare-blockers step, even before the turn-based block action has comple
   `CantAttackUnless` (which is defender-relative), this depends on the whole proposed attacker
   group, so it's validated against the other declared attackers at declaration time (CR 508.1c,
   projected state; self never counts as its own co-attacker).
+- `CanOnlyAttackAlone(filter = source)` — "This creature can only attack alone" (Master of
+  Cruelties). A declaration with it and any other attacker is illegal (CR 508.1c); "alone" is the
+  declared set (CR 506.5), so a creature put onto the battlefield attacking later changes nothing.
+  It weighs into CR 508.1d by counting requirements (a creature goaded by two players carries two):
+  the declaration obeying more of them wins — when it isn't required itself, any other required
+  creature attacks and it stays home (the card's ruling); when it is, it attacks alone only if its
+  own requirements outnumber the others', and equal counts tie (either declaration is legal).
+  `mandatoryAttackers` lists only what every best declaration attacks with, and the
+  declare-attackers legal action lists the restricted creatures in `loneAttackers`. Like
+  `CantAttackUnlessCoAttacker`, read self-scoped off the card definition and
+  `grantedStaticAbilities` (tokens); a face-down creature or one that lost all abilities is free.
 - `CantBlockUnlessCoBlocker(coBlockerFilter, filter = source)` — the blocking sibling: "This
   creature can't block unless [a creature matching coBlockerFilter] also blocks." Validated against
   the whole proposed blocker group at declaration time (CR 509.1b, `BlockPhaseManager`); the
@@ -10725,9 +11798,18 @@ in the declare-blockers step, even before the turn-based block action has comple
     controller, projected state) may be attacked by at most `maxAttackers` creatures per combat;
     attacks on players and non-matching permanents are unaffected. **Tomik, Orzhov Lawmage** —
     "Planeswalkers you control have 'No more than one creature can attack this planeswalker each
-    combat.'" = `AttackerCountLimit(1, defenders = GroupFilter.PlaneswalkersYouControl)`. A
-    face-down permanent imposes no cap of either shape. Neither shape is pre-filtered by the
-    attack enumerator — an over-cap declaration is rejected at validation.
+    combat.'" = `AttackerCountLimit(1, defenders = GroupFilter.PlaneswalkersYouControl)`.
+  - `AttackerCountLimit(maxAttackers, defendingPlayers = Player.You)` — the **per-player** axis
+    (`You`, `EachOpponent` or `Each`, relative to the limiting permanent's controller; exclusive
+    with `defenders`): each matching player may be attacked by at most `maxAttackers` creatures
+    per combat; attacks on their planeswalkers and battles don't count. **Mirri, Weatherlight
+    Duelist** — "As long as Mirri is tapped, no more than one creature can attack you each combat"
+    = `staticAbility { condition = Conditions.SourceIsTapped; ability = AttackerCountLimit(1,
+    defendingPlayers = Player.You) }`.
+  `AttackerCountLimit` is read through `CombatStaticScan` — conditions evaluated, text changes
+  applied, granted copies honoured — and a face-down or ability-stripped permanent imposes no cap
+  of any shape. No shape is pre-filtered by the attack enumerator — an over-cap declaration is
+  rejected at validation. Checked only at declaration: tapping Mirri afterwards removes nobody.
 - `AdditionalETBOrLTBTriggers(filter, mustBeYouControl = true, directions = setOf(ENTERING))` —
   the Panharmonicon family (CR 603.2d "triggers additional times"). When a permanent matching
   `filter` crosses the battlefield boundary in one of `directions`, triggered abilities of
@@ -10752,6 +11834,11 @@ in the declare-blockers step, even before the turn-based block action has comple
   `CardPredicate.HasChosenSubtype`). Roaming Throne pairs it with `EntersWithChoice(CREATURE_TYPE)` +
   `GrantChosenSubtype()` for "another creature you control of the chosen type" (`excludeSelf = true`).
   `TriggerDetector.duplicateSourceTriggers` (and `ActivateAbilityHandler` for triggered mana abilities).
+- `AdditionalDungeonRoomTriggers` — Hama Pashar, Ruin Seeker: "Room abilities of dungeons you own
+  trigger an additional time." The room-ability analogue of `AdditionalSourceTriggers`: room abilities
+  (CR 309.4c) trigger from a dungeon card in the command zone, which no permanent filter reaches, so the
+  scope is fixed — every room ability of a dungeon card (the Undercity included) owned by this ability's
+  controller. `TriggerDetector.duplicateDungeonRoomTriggers`; additive across copies.
 - `AdditionalAttackTriggers(attackerFilter = GameObjectFilter.Any)` — Windcrag Siege (Mardu): the
   attack-cause analogue of `AdditionalETBOrLTBTriggers`. If a creature matching `attackerFilter`
   being declared as an attacker causes an attack-related triggered ability ("whenever a creature
@@ -10804,9 +11891,17 @@ staticAbility {
 
 - `target: SpellCostTarget` — `SelfCast`, `YouCast(filter)`, `AnyCaster(filter)`, `OpponentsCast(filter)`,
   `OpponentsCastTargeting(GroupFilter)`, `OpponentsCastFromZones(zones, filter?)`, `YouCastFromZones(zones, filter?)`, `PlayerCasts(player, filter?)`, `FaceDownYouCast`, `MorphActivation`.
+  - `OpponentsCastTargeting(targetFilter)` — spells the source-controller's opponents cast with at least one chosen target matching `targetFilter` relative to the source: `GroupFilter.source()` is "that target this creature" (Syr Elenora), a battlefield group is "that target a Merfolk you control" (Kopala — once per spell however many Merfolk it targets). Granted by `GrantStaticAbility`, each holder taxes separately (Jubilant Skybonder).
   - `OpponentsCast(filter = Any)` — spells matching `filter` cast by an **opponent** of the source's controller, from any zone; the controller's own spells are untouched. Thalia, the Survivor: `OpponentsCast(Noncreature)` + `IncreaseGeneric(1)`. Like `AnyCaster`, it also taxes alternative costs such as flashback (CR 118.9d).
   - `OpponentsCastFromZones(zones, filter = Any)` — spells the source-controller's opponents cast **from one of `zones`** (matched against the spell's actual cast zone, threaded as `fromZone`), matching `filter`. Pair with `CostModification.IncreaseGeneric(n)` for the Aven Interrupter shape: `OpponentsCastFromZones(setOf(Zone.GRAVEYARD, Zone.EXILE))` + `IncreaseGeneric(2)` = "Spells your opponents cast from graveyards or from exile cost {2} more to cast."
   - `YouCastFromZones(zones, filter = Any)` — the you-cast analogue: spells the **source's controller** casts **from one of `zones`**, matching `filter`. Pair with `CostModification.ReduceGeneric(n)` for Doc Aurlock, Grizzled Genius: `YouCastFromZones(setOf(Zone.GRAVEYARD, Zone.EXILE))` + `ReduceGeneric(2)` = "Spells you cast from your graveyard or from exile cost {2} less to cast." (Only the normal-cast path threads `fromZone`; alternative-cost casts such as flashback compute their own base cost and are unaffected.)
+  - **A filter on mana value counts the announced X** (CR 202.3e — the spell is on the stack as its
+    cost is determined). Spectacle Mage: `YouCast(InstantOrSorcery.manaValueAtLeast(5))` +
+    `ReduceGeneric(1)` discounts `{X}{U}` cast with X = 4 (mana value 5), not with X = 3. The cast is
+    priced with `CastSpell.xValue`, and every offer priced from the printed mana cost takes its X
+    ceiling from `CostCalculator.maxAffordableX`, which prices each X a mana-value modifier could
+    move — so the offered `maxAffordableX` reaches the discounted X, and stops where a "mana value
+    N or less" discount ends. Nothing extra to author.
   - `PlayerCasts(player, filter = Any)` — spells matching `filter` cast by the **one player the source names**: `Player.EnchantedPlayer` (the player an "enchant player" Aura is attached to), `Player.ChosenOpponent` or `Player.ChosenPlayer` (recorded as the source entered). Any other reference is rejected at construction — "you" / "your opponents" are `YouCast` / `OpponentsCast` — and a source that names no player right now taxes nobody. Curse of Silence: `PlayerCasts(Player.EnchantedPlayer, GameObjectFilter.Any.namedFromChosenComponent())` + `IncreaseGeneric(2)` = "Spells with the chosen name enchanted player casts cost {2} more to cast."
 - `optionalLifePayment: Int? = null` — an optional additional life cost declared once per source
   instance while casting. Paying it enables this modifier; declining leaves the cost unchanged.
@@ -10820,7 +11915,11 @@ staticAbility {
   and the hand-cast enumerator's `maxAffordableX` counts it. Applies to the printed and escape
   costs; face casts and other alternative bases still price X symbolically, and `xManaRestriction`
   keeps X apart),
-  `ReduceColored(symbols)`, `ReduceColoredPerUnit(symbols, source)`,
+  `ReduceColored(symbols)` (each pip removes one cost pip it could pay for — an exact pip first,
+  else a hybrid, monocolor-hybrid or Phyrexian pip offering that color, matched to reduce as many
+  as possible; never spills into generic, so Morophon's `ReduceColored("{W}{U}{B}{R}{G}")` takes
+  `{2}{W/U}{W/U}` to `{2}`), `ReduceColoredPerUnit(symbols, source)` (same pip matching; the excess
+  reduces generic, CR 118.7c),
   `ReduceColoredIfAnyTargetMatches(symbols, filter)` (target-gated **colored** reduction — the
   colored analogue of the `FixedIfAnyTargetMatches` reduction source, which only reduces generic;
   removes the given colored pips if the spell targets a matching object. Brush Off's "costs
@@ -10974,62 +12073,45 @@ staticAbility {
     `NthOfTypePerTurn(2)` with `target = YouCast(GameObjectFilter.Any)` for Uthros Psionicist's "the
     second spell you cast each turn costs {2} less". Requires a filter-bearing target
     (`YouCast` / `AnyCaster`) — it needs a notion of "type" to count.
-  - `OnlyIf(condition)` — applies only while `condition` holds at cast time (evaluated with the
-    caster as controller). Gates the *whole* modification, so it composes with the dynamic per-unit
+    `NthOfTypePerTurn(n, declaredCost = slot)` narrows "such spell" to casts that declared that
+    optional additional cost: the priced cast must declare it, and only earlier casts this turn that
+    declared it count (including ones cast before the modifier's source arrived). Vine Gecko's "the
+    first kicked spell you cast each turn costs {1} less" is
+    `NthOfTypePerTurn(1, declaredCost = ChoiceSlot.KICKED)` over `YouCast(GameObjectFilter.Any)`.
+  - `OnlyIf(condition)` — applies only while `condition` holds at cast time. "You" in the condition
+    is the modifier's controller (the caster only for a `SelfCast` modifier), so a tax on other
+    players' spells reads its own controller's state: Paladin Class's "spells your opponents cast
+    during your turn cost {1} more" is `OpponentsCast(GameObjectFilter.Any)` gated by
+    `OnlyIf(Conditions.IsYourTurn)`. Gates the *whole* modification, so it composes with the dynamic per-unit
     reductions that a fixed-amount source can't express: Temur Battlecrier's "During your turn, …"
     is `OnlyIf(Conditions.IsYourTurn)` over `ReduceGenericBy(PermanentsYouControlMatching(…))`. For a
     fixed conditional reduction pair it with `ReduceGeneric` (Mental Modulation:
     `ReduceGeneric(1)` gated by `OnlyIf(IsYourTurn)`; Lashwhip Predator / Arwen's Gift gate on a
     `Compare(...)`).
 
-**Plot cost statics — `ModifyPlotCost`**
+**Special-action cost statics — `ModifySpecialActionCost`**
 
-Plot (CR 718) is a *special action*, not a spell, so `ModifySpellCost` never touches it.
-`ModifyPlotCost(target, modification)` is its dedicated cost modifier, evaluated by the engine's
-`PlotCostReducer` (consulted by both the plot legal-action enumerator and the plot handler so
-affordability and payment stay in lockstep).
+Plotting (CR 702.170), unlocking a Room door (CR 709.5e) and foretelling (CR 702.143a) are *special
+actions* (CR 116.2), not spells, so `ModifySpellCost` never touches them.
+`ModifySpecialActionCost(action, modification)` is their shared cost modifier, evaluated by the
+engine's `SpecialActionCostReducer` (consulted by each action's legal-action enumerator and handler,
+so affordability and payment stay in lockstep). It applies to the special actions the source's
+controller takes; several stack additively.
 
 ```kotlin
 staticAbility {
-    ability = ModifyPlotCost(
-        target = PlotCostTarget.YouPlotFromHand,
-        modification = CostModification.ReduceGeneric(2),
-    )
+    ability = ModifySpecialActionCost(SpecialActionKind.PLOT, CostModification.ReduceGeneric(2))
 }
 ```
 
-- `target: PlotCostTarget` — currently `YouPlotFromHand` (cards the source's controller plots from
-  hand; a future "plot from top of library" / Fblthp variant slots in as a new `PlotCostTarget`
-  without changing call sites).
+- `action: SpecialActionKind` — `PLOT` ("Plotting cards from your hand costs {N} less", Doc Aurlock,
+  Grizzled Genius), `UNLOCK_DOOR` ("Unlock costs you pay cost {N} less", Inquisitive Glimmer — its
+  "Enchantment spells you cast cost {1} less" half is a plain `ModifySpellCost`), `FORETELL`
+  ("Foretelling cards from your hand costs {N} less" — the {2} paid to exile the card, not the
+  foretell cost paid to cast it later; Cosmos Charger).
 - `modification: CostModification` — reuses the spell-cost vocabulary, but only the flat generic
-  shapes (`ReduceGeneric` / `IncreaseGeneric`) are meaningful since a printed plot cost is a flat
-  mana cost; generic is floored at {0} and colored pips are never reduced. Doc Aurlock, Grizzled
-  Genius: "Plotting cards from your hand costs {2} less" = `ReduceGeneric(2)`.
-
-**Door-unlock cost statics — `ModifyUnlockCost`**
-
-Unlocking a Room door (CR 709.5e) is a *special action*, so neither `ModifySpellCost` nor
-`ModifyPlotCost` touches it. `ModifyUnlockCost(target, modification)` is its dedicated cost modifier,
-evaluated by the engine's `UnlockCostReducer` (consulted by both the unlock legal-action enumerator
-and `UnlockRoomDoorHandler` so affordability and payment stay in lockstep — the same lockstep pattern
-as `ModifyPlotCost`).
-
-```kotlin
-staticAbility {
-    ability = ModifyUnlockCost(
-        target = UnlockCostTarget.YouUnlock,
-        modification = CostModification.ReduceGeneric(1),
-    )
-}
-```
-
-- `target: UnlockCostTarget` — currently `YouUnlock` (unlock actions performed by the source's
-  controller; a future "opponents' unlock costs" tax slots in as a new variant without changing call
-  sites).
-- `modification: CostModification` — like plot, only the flat generic shapes are meaningful (printed
-  unlock cost is a flat mana cost); generic is floored at {0}, colored pips untouched. Inquisitive
-  Glimmer: "Unlock costs you pay cost {1} less" = `ReduceGeneric(1)` (its "Enchantment spells you cast
-  cost {1} less" half is a plain `ModifySpellCost(YouCast(GameObjectFilter.Enchantment), ...)`).
+  shapes (`ReduceGeneric` / `IncreaseGeneric`) are meaningful since every printed special-action cost
+  is a flat mana cost; generic is floored at {0} and coloured pips are never reduced.
 
 **Global denial statics** (no `filter`/`duration` block — they're singleton-style)
 
@@ -11059,7 +12141,10 @@ staticAbility {
   `craft(...)` cost (CR 702.167c); `YOUR_GRAVEYARD` reads the graveyard of the source's *current
   controller*; `ALL_GRAVEYARDS` reads every player's graveyard (Mirran Safehouse); `ALL_EXILE` reads
   every card in exile, whoever exiled it (Rex, Cyber-Hound with `cardFilter = GameObjectFilter.Any.withCounter(CounterType.BRAIN)`
-  — counters on an exiled card are its own state). Face-down donors (CR 406.3a) donate nothing. A land donor with basic
+  — counters on an exiled card are its own state); `TOP_OF_YOUR_LIBRARY` reads only the top card of the
+  source controller's library, re-read live as it changes (Conspicuous Snoop with
+  `cardFilter = GameObjectFilter.Any.withSubtype("Goblin")`, paired with `RevealTopOfLibrary` so the donor
+  is public). Face-down donors (CR 406.3a) donate nothing. A land donor with basic
   land types also lends the intrinsic mana abilities those types give it (CR 305.6), so a Watery Grave
   donates "{T}: Add {U}" and "{T}: Add {B}" though its definition declares none. Resolved dynamically at activation-legality time: the engine pulls each donor card's
   `activatedAbilities` and surfaces them on every matching permanent, with **that permanent** as granter
@@ -11068,7 +12153,8 @@ staticAbility {
     - `receivedBy = GroupFilter.source()` (the default) → "This permanent has all activated abilities of
       the donor cards" — the source grants to *itself* (Territory Forge with `LINKED_EXILE`; Locus of
       Enlightenment with `CRAFT_MATERIALS`; Thranduil, the Elvenking with `YOUR_GRAVEYARD`; Mirran
-      Safehouse with `ALL_GRAVEYARDS` + `cardFilter = Filters.Land`; Rex, Cyber-Hound with `ALL_EXILE`).
+      Safehouse with `ALL_GRAVEYARDS` + `cardFilter = Filters.Land`; Rex, Cyber-Hound with `ALL_EXILE`;
+      Conspicuous Snoop with `TOP_OF_YOUR_LIBRARY`).
     - any battlefield filter → the source grants to *other* matching permanents ("Creatures you control
       with +1/+1 counters on them have all activated abilities of all creature cards exiled with this" —
       Agatha's Soul Cauldron →
@@ -11084,7 +12170,7 @@ staticAbility {
       granter-dedup. Left `false`, abilities are granted unmodified (Territory Forge, Agatha, Thranduil).
       Locus → `HasAllActivatedAbilitiesOfCards(donors = DonorCards.CRAFT_MATERIALS, oncePerTurnEach = true)`.
     - Fill a `LINKED_EXILE` pool with `Effects.ExileLinkedToSource(target)`; a `CRAFT_MATERIALS` pool is
-      filled by the `craft(...)` cost; a `YOUR_GRAVEYARD` / `ALL_GRAVEYARDS` / `ALL_EXILE` pool needs no wiring — it follows the zone
+      filled by the `craft(...)` cost; a `YOUR_GRAVEYARD` / `ALL_GRAVEYARDS` / `ALL_EXILE` / `TOP_OF_YOUR_LIBRARY` pool needs no wiring — it follows the zone
       (fill Rex's with `Effects.Exile(card, addCounterType = CounterType.BRAIN)`).
 - `HasAbilitiesOfChosenLinkedExiledCard(grantActivated = true, grantTriggered = true)` — the source
   permanent has all **activated and/or triggered abilities of the single card it most recently *chose***
@@ -11099,32 +12185,50 @@ staticAbility {
   `Effects.RecordChosenLinkedExile(...)` to choose. (Koh, the Face Stealer — "Pay 1 life: Choose a
   creature card exiled with Koh. Koh has all activated and triggered abilities of the last chosen card"
   → `HasAbilitiesOfChosenLinkedExiledCard()`.)
-- `SuppressEntersTriggers(filter = GameObjectFilter.Creature, abilitiesOf = null)` — permanents matching `filter`
-  entering the battlefield don't cause abilities to trigger (CR 603.6 enters-the-battlefield
+- `SuppressZoneChangeTriggers(filter = GameObjectFilter.Creature, abilitiesOf = null, causes = setOf(ZoneChangeTriggerCause.ENTERING))` —
+  permanents matching `filter` entering the battlefield (and/or dying, per `causes`) don't cause abilities to trigger (CR 603.6 enters-the-battlefield
   triggers). Suppresses both the entering permanent's *own* ETB triggers and any other permanent's
   "whenever a [...] enters" trigger whose triggering object is that permanent — the gate is whether
   the *entering object* matches `filter` in projected state (continuous effects apply), not what the
   watching trigger names. Replacement effects (enters with counters/tapped) and `EntersWithChoice`
   "as it enters" choices are unaffected (they aren't triggered abilities). Torpor Orb / Hushwing Gryff
-  → `SuppressEntersTriggers()`; Tocatli Honor Guard → `SuppressEntersTriggers(GameObjectFilter.Creature.youControl())`.
+  → `SuppressZoneChangeTriggers()`; Tocatli Honor Guard → `SuppressZoneChangeTriggers(GameObjectFilter.Creature.youControl())`.
   `abilitiesOf` narrows *whose* abilities are suppressed: only triggers whose source is a battlefield
   permanent matching it (projected, reference player = this ability's controller); a graveyard card's
-  enters trigger is untouched. Elesh Norn, Mother of Machines → `SuppressEntersTriggers(GameObjectFilter.Permanent,
+  enters trigger is untouched. Elesh Norn, Mother of Machines → `SuppressZoneChangeTriggers(GameObjectFilter.Permanent,
   abilitiesOf = GameObjectFilter.Permanent.opponentControls())`.
-- `GainActivatedAbilitiesOfPermanents(grantedTo, sourceFilter, includeManaAbilities = false, includeLoyaltyAbilities = true, spendAsThoughAnyColor = false)` —
+  `ZoneChangeTriggerCause.DYING` adds deaths: every dies / put-into-a-graveyard-from-the-battlefield /
+  leaves-the-battlefield trigger a matching permanent's death causes (per-object and the batched
+  `CreaturesYouControlDiedEvent` / `CardsPutIntoGraveyardEvent` alike), the dying object matched by its
+  last-known information. Those abilities look back in time, so the lock still applies when its source
+  dies at the same time (or is the one dying); a "put into a graveyard from anywhere" trigger is stopped
+  only while the lock is still on the battlefield, and never for the dying card's own ability. Triggers
+  on the cause of the death ("whenever you sacrifice") and replacement effects are untouched.
+  Hushbringer → `SuppressZoneChangeTriggers(causes = setOf(ZoneChangeTriggerCause.ENTERING, ZoneChangeTriggerCause.DYING))`.
+- `GainActivatedAbilitiesOfPermanents(grantedTo, sourceFilter, abilities = CopiedAbilities.NON_MANA, spendAsThoughAnyColor = false)` —
   permanents matching `grantedTo` (a `GroupFilter`; use `GroupFilter.source()` for "this permanent")
-  gain copies of the activated abilities of every permanent matching `sourceFilter`. The copy uses
-  the gaining permanent as its source (CR 113.2), so a copied `SacrificeSelf`/`{T}` refers to the
-  gainer. The dynamic, copy-from-other-permanents sibling of `GrantActivatedAbility`. Mana abilities
-  are excluded unless `includeManaAbilities = true`; loyalty abilities are copied unless
-  `includeLoyaltyAbilities = false` ("except for loyalty abilities"). `spendAsThoughAnyColor = true` is "you may spend
+  gain copies of the activated abilities of every permanent matching `sourceFilter` (never their own).
+  The copy uses the gaining permanent as its source (CR 113.7), so a copied `SacrificeSelf`/`{T}` refers
+  to the gainer. The dynamic, copy-from-other-permanents sibling of `GrantActivatedAbility`. `abilities`
+  is the printed clause: `ALL` ("all activated abilities"), `NON_MANA` ("… except mana abilities"),
+  `NON_LOYALTY` ("… except for loyalty abilities"), or `LOYALTY` ("all loyalty abilities"). A copied
+  loyalty ability is the gainer's own: it pays loyalty off the gainer and shares its
+  one-loyalty-ability-per-turn limit (CR 606.3, 606.4). `spendAsThoughAnyColor = true` is "you may spend
   mana as though it were mana of any color to activate those abilities": each copy's colored pips accept any mana
   (`{C}` stays strict), scoped to the copies so abilities other sources grant the gainer aren't relaxed. (Sharkey, Tyrant of the Shire — "Sharkey has all
   activated abilities of lands your opponents control except mana abilities"; Scheming Fence —
-  `sourceFilter = GameObjectFilter.ChosenBySource`, `includeManaAbilities = true`,
-  `includeLoyaltyAbilities = false`, `spendAsThoughAnyColor = true`.)
-- `SpendManaAsColor(fromColor, toColor)` — the controller may spend mana of one color as though it were
-  another for **any** mana payment (Sunglasses of Urza: `WHITE` → `RED`). This is directional:
+  `sourceFilter = GameObjectFilter.ChosenBySource`, `abilities = CopiedAbilities.NON_LOYALTY`,
+  `spendAsThoughAnyColor = true`; Nicol Bolas, Dragon-God — `sourceFilter = GameObjectFilter.Planeswalker`,
+  `abilities = CopiedAbilities.LOYALTY`.)
+- `SpendManaAsColor(fromColor, toColor, players = Player.You)` — the controller may spend mana of one color as though it were
+  another for **any** mana payment (Sunglasses of Urza: `WHITE` → `RED`). `fromColor = null` is "mana" of every
+  type — each color **and colorless** — and `toColor = null` is "mana of any color", so
+  `SpendManaAsColor(null, null, players = Player.Each)` is Mycosynth Lattice's "Players may spend mana as though it
+  were mana of any color" (its ruling: "even colorless mana", restrictions still apply). `players` is who holds the
+  permission, relative to the static's controller: `Player.You` (default), `Player.Each` or `Player.EachOpponent`;
+  the permission is read from every battlefield permanent, not only the payer's. The payment pool carries the result
+  as required color → actual mana (`null` = colorless), so the floating-pool matcher and the auto-tap solver both let
+  a colorless source stand in for a colored pip. This is directional:
   white remains usable for white or generic costs, while red gains no permission to pay white.
   Colored, hybrid, monocolored hybrid, and Phyrexian mana halves accept the substitution; `{C}`
   and actual-color spending restrictions (including color-restricted X) remain unchanged.
@@ -11215,6 +12319,9 @@ staticAbility {
   mana becomes plain mana. Scoped to the controller of the bearing permanent, unlike Upwelling's
   all-players prevention. A player controlling two naming different colours gets the longest-standing
   one's. Ozai, the Phoenix King (`Color.RED`), Omnath, Locus of All (`Color.BLACK`).
+  `ConvertEmptyingMana(null)` is the colorless form ("that mana becomes colorless instead"): every
+  colour becomes that much colorless mana, restricted units become colorless but stay restricted.
+  (Kruphix, God of Horizons)
 - `RetainUnspentColoredMana(color)` — "You don't lose unspent [color] mana as steps and phases end."
   The durable, single-colour, controller-scoped mana-retention static (Electro, Assaulting Battery —
   red). Where `PreventManaPoolEmptying` keeps *all* colours for *everyone* and `ConvertEmptyingMana`
@@ -11253,8 +12360,10 @@ staticAbility {
     skip it or preserve its durations.
   The resolving counterparts are `Effects.SkipNextStepOrPhase` (spent by the step it skips) and
   `Effects.SkipStepOrPhaseThisTurn` (dropped at end of turn) — one `SkipStepOrPhaseEffect` over a `SkipDuration`.
-- `NoMaximumHandSize` — controller has no hand-size limit *while this permanent is on the
-  battlefield and has the ability*. (Thought Vessel, Reliquary Tower) It is lowered into Layer 6 like any
+- `NoMaximumHandSize(player = Player.You)` — the `player` scope (resolved relative to the holder's
+  controller: `You` / `EachOpponent` / `Each`) has no hand-size limit *while this permanent is on the
+  battlefield and has the ability*. (Thought Vessel, Reliquary Tower: `NoMaximumHandSize()`; Folio of
+  Fancies' "Players have no maximum hand size": `NoMaximumHandSize(Player.Each)`) It is lowered into Layer 6 like any
   ability, and `MaximumHandSize` reads it off each permanent's **projected** static abilities, so the same
   read covers a printed one, one gained from `Effects.GrantStaticAbility`, and one granted by the
   `GrantStaticAbility` static (Nerd Rage: "Enchanted creature has 'You have no maximum hand size'" frees
@@ -11273,8 +12382,9 @@ staticAbility {
   Projected to `GrantsCantLoseGameComponent`, read by every player-loss SBA via `playerCantLoseGame`.
   Also a `ProjectedStaticAbility`: granted to a creature by the `GrantStaticAbility` static (Cloudsteel Kirin's
   equipped creature), it protects the *holder's* controller, read off projection
-  (`ControllerGrants.anyHoldingProjected`), and ends with the grant. (A one-shot `Effects.GrantStaticAbility` of
-  it isn't lowered yet — no card needs it.)
+  (`ControllerGrants.anyHoldingProjected`), and ends with the grant. A one-shot `Effects.GrantStaticAbility` of it
+  lowers the same way (The Book of Exalted Deeds: target Angel gains it with `Duration.Permanent`), so the lock
+  lasts until that creature leaves the battlefield.
 - `GrantOpponentsCantWinGame` — the complementary half: an effect that would make an *opponent* of this
   permanent's controller win the game does nothing at all (Herald of Eternal Dawn, "You can't lose the
   game and your opponents can't win the game" — pair it with `GrantCantLoseGame` for the full lock).
@@ -11296,18 +12406,35 @@ staticAbility {
   `ConditionalStaticAbility`. `PlayerProtectionRules.isProtectedFromSource` unions
   these battlefield-sourced scopes with any one-shot `PlayerProtectionComponent` on the player, so the
   protection appears/disappears with the permanent (no cleanup). General over any `ProtectionScope`
-  (single color, `Everything`, `EachOpponent`, …), mirroring the controller-grant statics
+  (single color, `Everything`, `EachOpponent`, the entry choices `ChosenCardType` — Serra's Emissary — and
+  `ChosenCardName` — Runed Halo, …), mirroring the controller-grant statics
   `GrantHexproofToController` / `GrantShroudToController`.
 - `SetMaximumHandSize(player, amount)` — sets the maximum hand size of a `player` scope (`You` /
   `EachOpponent` / `Each`, resolved relative to the source's controller) to a `DynamicAmount`, read at
-  cleanup (Twenty-Toed Toad: `SetMaximumHandSize(Player.You, DynamicAmounts.fixed(20))`). It, `NoMaximumHandSize` and
-  the rest-of-game `RemoveMaximumHandSize` apply in **timestamp order** (CR 613.11; a static takes its
+  cleanup (Twenty-Toed Toad: `SetMaximumHandSize(Player.You, DynamicAmounts.fixed(20))`). It, `NoMaximumHandSize`,
+  `ModifyMaximumHandSize` and the rest-of-game `RemoveMaximumHandSize` apply in **timestamp order** (CR 613.11; a static takes its
   permanent's battlefield-entry timestamp, or for a granted `NoMaximumHandSize` the later of the holder's and
   the granter's, CR 613.7a) and the latest wins — Spellbook then Toad is twenty, Toad
   then Spellbook is no maximum. Gate it behind a `ConditionalStaticAbility` for an "as
   long as …" form — the cleanup read unwraps the conditional and evaluates its condition against the
   source's controller. (Winter, Misanthropic Guide — `ConditionalStaticAbility(SetMaximumHandSize(
   EachOpponent, Subtract(Fixed(7), AggregateZone(You, GRAVEYARD, Any, DISTINCT_TYPES))), Delirium())`.)
+- `ModifyMaximumHandSize(player, amount)` — raises or lowers a `player` scope's maximum hand size by a
+  signed `DynamicAmount` (negative reduces) while the holder has the ability (Jin-Gitaxias, Core Augur:
+  `ModifyMaximumHandSize(Player.EachOpponent, DynamicAmounts.fixed(-7))`). A `ProjectedStaticAbility`:
+  `MaximumHandSize` reads it off projection like `NoMaximumHandSize`, the scope resolved relative to the
+  holder's controller, so a granted one counts and losing all abilities ends it. It joins
+  `SetMaximumHandSize` / `NoMaximumHandSize` / `RemoveMaximumHandSize` in **timestamp order** (CR 613.11):
+  it adjusts whatever limit stands at its timestamp, a later set overrides it, and a player with no maximum
+  hand size has nothing to modify. The result is clamped to ≥ 0. For the one-shot "reduced by N for the rest
+  of the game" use the effect `Effects.ReduceMaximumHandSize` (§4).
+- `ModifyDevotion(amount = 1)` — "Your devotion to each color and each combination of colors is increased
+  by one" (Altar of the Pantheon). Every `DynamicAmount.DevotionTo` count of the holder's controller — one
+  color, a combination (raised once, not once per color — ruling), or the chosen color — rises by `amount`,
+  so god thresholds, Nykthos and "equal to your devotion" amounts all see it. Stamped as a marker when the
+  permanent enters (devotion is read mid-projection by the gods' Layer 4 type change, before Layer 6
+  assembles projected statics), so it is printed-only: not grantable and not behind an "as long as …"
+  gate. Per the Altar's ruling the bonus survives the holder losing its abilities; face down it does nothing.
 - `DampLandManaProduction` — a land tapped for 2+ mana produces `{C}` instead. (Damping Sphere)
 - `WinCoinFlips(firstFlipEachTurn = false)` — a coin-flip result replacement (CR 705.3): the
   controller's coin flips come up heads / are won. `firstFlipEachTurn = true` restricts it to the
@@ -11332,6 +12459,8 @@ staticAbility {
   targets. Each coin really flipped emits a `CoinFlipEvent`, with the discarded ones carrying
   `ignored = true` so the log and the client animation show what was flipped without reporting a win
   nobody got. Not a Rule 613 continuous effect.
+- `RollAdditionalDice(extraDice = 1)` — the die-roll replacement: roll that many dice plus
+  `extraDice` and ignore that many of the lowest (Pixie Guide, Barbarian Class). See "Numerical dice".
 - `RestrictSpellsCastPerTurn(maxPerTurn, eachPlayer = false, spellFilter = GameObjectFilter.Any)` — a
   per-turn cap on spells cast. `eachPlayer = false` (default) limits only the source's controller
   (Yawgmoth's Agenda: "You can't cast more than one spell each turn."); `eachPlayer = true` is a
@@ -11349,22 +12478,40 @@ staticAbility {
 - `PlayersCantCastSpells(affected = Player.EachOpponent, spellFilter = GameObjectFilter.Any, condition = null, conditionFromCaster = false, fromZones = null)`
   — continuous cast *prohibition* parameterized along independent axes, each a reused
   primitive: **who** (`affected`, a `Player` reference *relative to the source's controller* —
-  `EachOpponent`/`Opponent`, `You`, `Each`), **which** (`spellFilter`, matched against the card being
-  cast), and **when** (`condition`, evaluated in the controller's context, so `IsYourTurn` = "during
+  `EachOpponent`/`Opponent`, `You`, `Each`), **which** (`spellFilter`, matched against the spell *as
+  proposed* — the face or alternative cost chosen for it, CR 601.2e — so "you can't cast permanent
+  spells" (Codie, Vociferous Codex = `PlayersCantCastSpells(Player.You, GameObjectFilter.Permanent)`)
+  still lets an Adventure's instant half, a modal card's instant face or a face-down creature through
+  exactly when that spell isn't a match, and a mana-value filter reads the chosen X; the same check
+  a resolved `CantCastSpells` ban gets), and **when** (`condition`, evaluated in the controller's context, so `IsYourTurn` = "during
   your turn", `IsNotYourTurn` = "during an opponent's turn"; `null` = always). Read at cast-legality
   time through the single `CastPermissionUtils.reasonCannotCast` chokepoint, so it covers every
-  casting zone (hand, flashback/harmonize, exile, top of library) uniformly; control is read from
+  casting zone (hand, flashback/harmonize, exile, top of library) and resolution-time casts uniformly; control is read from
   projected state. Examples: Voice of Victory = `PlayersCantCastSpells(Player.EachOpponent, condition
   = IsYourTurn)`; Grand Abolisher's cast clause = `PlayersCantCastSpells(Player.EachOpponent, condition
   = IsYourTurn)`; Void Winnower = `PlayersCantCastSpells(Player.EachOpponent, spellFilter =
-  GameObjectFilter(cardPredicates = listOf(CardPredicate.ManaValueIsEven)))`. `conditionFromCaster =
-  true` evaluates `condition` from the *casting player's* seat instead, for timing relative to each
+  GameObjectFilter(cardPredicates = listOf(CardPredicate.ManaValueIsEven)))`. The `spellFilter` is
+  matched with the *casting player* as "you" (the granting permanent stays the source), so a dynamic
+  cap in it is caster-relative: Lavinia, Azorius Renegade ("can't cast noncreature spells with mana
+  value greater than the number of lands that player controls") = `PlayersCantCastSpells(Player.EachOpponent,
+  GameObjectFilter.Noncreature.withCardPredicate(CardPredicate.Not(CardPredicate.ManaValueAtMostDynamic(
+  DynamicAmounts.landsYouControl()))))` counts the caster's lands, and an {X} spell's chosen X counts.
+  `conditionFromCaster = true` evaluates `condition` from the *casting player's* seat instead, for timing relative to each
   restricted player: Dosan the Falling Leaf = `PlayersCantCastSpells(Player.Each, condition =
   IsNotYourTurn, conditionFromCaster = true)` ("Players can cast spells only during their own turns"
-  — correct in multiplayer, where a controller-relative pair of statics is not). **where**
+  — correct in multiplayer, where a controller-relative pair of statics is not); Angelic Arbiter's
+  "each opponent who attacked with a creature this turn can't cast spells" =
+  `PlayersCantCastSpells(Player.EachOpponent, condition = YouAttackedThisTurn, conditionFromCaster = true)`
+  (the per-player attack record — an attacking token that has since ceased to exist still counts). **where**
   (`fromZones`, the zones the card is cast *from*, read before it moves to the stack; `null` = any):
   Soulless Jailer = `PlayersCantCastSpells(Player.Each, GameObjectFilter.Noncreature, fromZones =
-  setOf(Zone.GRAVEYARD, Zone.EXILE))`. Teferi, Time Raveler = `PlayersCantCastSpells(Player.EachOpponent, condition =
+  setOf(Zone.GRAVEYARD, Zone.EXILE))`; Drannith Magistrate ("can't cast spells from anywhere other than
+  their hands") = `PlayersCantCastSpells(Player.EachOpponent, fromZones = PlayersCantCastSpells.OUTSIDE_HAND)`.
+  Casts an effect makes *while resolving* (cascade, discover, "cast it without paying its mana cost")
+  skip timing but not this: `CastSpellHandler.resolutionCastProhibition` asks the same chokepoint before
+  any free-cast grant or target prompt, so a forbidden cast never initiates and the effect takes its
+  "if you don't cast it" branch (the cascade hit is bottomed, the discovered card goes to hand).
+  Teferi, Time Raveler = `PlayersCantCastSpells(Player.EachOpponent, condition =
   Conditions.Not(Conditions.CouldCastSorcery), conditionFromCaster = true)` ("Each opponent can cast
   spells only any time they could cast a sorcery" — CR 307.5; it outranks any flash permission the
   opponent holds).
@@ -11429,7 +12576,11 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
 - `AdditionalManaOnTap(color, amount, anyColor = false)` — aura: "Whenever enchanted land is tapped
   for mana, its controller adds additional mana." `color = null` reads the aura's `ChosenColorComponent`;
   `anyColor = true` makes it one mana of **any color the controller chooses** each tap (prompts on a
-  manual tap; flexible for the solver). (Elvish Guidance = fixed `{G}`; **Fertile Ground** = `anyColor`)
+  manual tap; flexible for the solver). The aura is the bonus mana's source (CR 106.3), so a **snow**
+  aura's bonus is snow mana, whether or not the land is snow: it floats marked snow and counts as
+  `{S}` spent. When auto-pay taps a snow land for a `{S}` pip, it also spends that land's any-color
+  snow-aura bonus on a further `{S}` pip (a fixed-color bonus floats instead). (Elvish Guidance = fixed `{G}`; **Fertile
+  Ground** = `anyColor`; **Glittering Frost** = `anyColor` + `GrantSupertype("SNOW")` on a snow Aura)
 - `AdditionalManaOnSourceTap(sourceFilter, color = null, amount = 1, rider = null, whenProducing = TappedForManaType.ANY)` — global: "Whenever
   a `<sourceFilter>` is tapped for mana, that player adds …". `color = null` mirrors the produced color.
   `rider` is an optional non-mana `Effect` resolved inline, controlled by the tapping player
@@ -11450,7 +12601,12 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   `AdditionalManaOnSourceTap`, sharing its filter convention (the filter is evaluated from the static's own
   projected controller, so `.youControl()` is the printed "**If you** tap …" — only a permanent's controller
   can activate its mana abilities). (**Virtue of Strength** = `GameObjectFilter.BasicLand.youControl()`,
-  `multiplier = 3`.) Three narrowings, all from the printed rulings: (1) **`{T}` is required** — you are
+  `multiplier = 3`; **Nyxbloom Ancient** = `GameObjectFilter.Permanent.youControl()`,
+  `multiplier = 3`.) Every shape of mana the tapped permanent's ability makes scales: fixed, choice and
+  dynamic amounts, both branches of a conditional mana ability (`Effects.If` — Raucous Audience), "one mana
+  of each color among …" (`AddOneManaOfEachColorAmong`, Bloom Tender — run that many times), and "X mana in
+  any combination of …" (`AddManaInAnyCombination` — the player splits the printed X, then each chosen unit
+  is multiplied, so two {R}/{G} under a tripler give RRRRRR, RRRGGG or GGGGGG). Three narrowings, all from the printed rulings: (1) **`{T}` is required** — you are
   "tapping a permanent for mana" only when the mana ability's cost carries the tap symbol, so a tapless mana
   ability (Ashnod's Altar) is untouched; (2) **only the ability's own output scales** — a bonus from a
   *separate* triggered mana ability (`AdditionalManaOnTap` / `AdditionalManaOnSourceTap`: Fertile Ground,
@@ -11550,7 +12706,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   cost `{amount}` less to activate" (Bladehold War-Whip): the reduction skips the bearer's own equip
   abilities and applies to every other equip ability its controller activates. Mutually exclusive with
   `onlyOwnEquip`.
-- `ReduceActivatedAbilityCost(filter, amount, manaFloor = 0, exhaustOnly = false, powerUpOnly = false,
+- `ReduceActivatedAbilityCost(filter, amount, manaFloor = 0, onceOnlyKind = null,
   onlyIfTargetIsSource = false, excludeManaAbilities = false, reach = ActivatedAbilityReach.MATCHING_PERMANENTS,
   keyword = null, firstEachTurn = false)`
   — the activated abilities of permanents
@@ -11570,19 +12726,21 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   from both the enumerator (displayed cost) and `ActivateAbilityHandler` (paid cost), keyed on the
   ability's source permanent; non-mana costs (`{T}`, sacrifice) and abilities with no mana cost are
   unaffected. Backed by `ManaCost.reduceGenericWithManaFloor(amount, minTotalMana)`.
-  `exhaustOnly = true` narrows the reduction to abilities marked `isExhaust` (CR 702.177) — it gates
+  `onceOnlyKind = OnceOnlyAbilityKind.EXHAUST` narrows the reduction to abilities marked `isExhaust` (CR 702.177) — it gates
   on the **ability**, not the permanent, so a matching permanent's ordinary activated abilities stay
   at full price while its exhaust ability is discounted. Boom Scholar: "Exhaust abilities of other
   permanents you control cost {2} less to activate" →
-  `ReduceActivatedAbilityCost(GroupFilter(GameObjectFilter.Permanent.youControl(), excludeSelf = true), DynamicAmount.Fixed(2), exhaustOnly = true)`.
+  `ReduceActivatedAbilityCost(GroupFilter(GameObjectFilter.Permanent.youControl(), excludeSelf = true), DynamicAmount.Fixed(2), onceOnlyKind = OnceOnlyAbilityKind.EXHAUST)`.
   Note that `GroupFilter.excludeSelf` (the printed "**other** permanents") is honored by this read
   site directly — the projection layer never sees this static — so a lord never discounts its own
-  abilities. `powerUpOnly = true` is the same qualifier for power-up abilities (`isPowerUp`,
+  abilities. `onceOnlyKind = POWER_UP` is the same qualifier for power-up abilities (`isPowerUp`,
   CR 702.193) — Hulk, Gamma Goliath: "Power-up abilities of other creatures you control cost {3} less
   to activate" →
-  `ReduceActivatedAbilityCost(GroupFilter(GameObjectFilter.Creature.youControl(), excludeSelf = true), DynamicAmount.Fixed(3), powerUpOnly = true)`.
+  `ReduceActivatedAbilityCost(GroupFilter(GameObjectFilter.Creature.youControl(), excludeSelf = true), DynamicAmount.Fixed(3), onceOnlyKind = OnceOnlyAbilityKind.POWER_UP)`.
   It stacks with power-up's own reduction, which is applied first (CR 601.2f lets multiple reductions
-  apply in any order).
+  apply in any order). `onceOnlyKind = BOAST` with the `ACTIVATED_BY_YOU` reach is Dragonkin Berserker:
+  "Boast abilities you activate cost {1} less to activate for each Dragon you control" →
+  `ReduceActivatedAbilityCost(GroupFilter(GameObjectFilter.Any), DynamicAmounts.battlefield(Player.You, GameObjectFilter.Any.withSubtype(Subtype.DRAGON)).count(), reach = ActivatedAbilityReach.ACTIVATED_BY_YOU, onceOnlyKind = OnceOnlyAbilityKind.BOAST)`.
   `keyword = <Keyword>` narrows the reduction to activations of that keyword ability — the activated
   ability's own `ActivatedAbility.keyword` marker. Silver-Fur Master: "Ninjutsu abilities you activate
   cost {1} less to activate" →
@@ -11641,6 +12799,21 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   Peacekeeper: "Activated abilities of sources with the chosen name cost {2} more to activate unless
   they're mana abilities" →
   `IncreaseActivatedAbilityCost(GroupFilter(GameObjectFilter.Any.namedFromChosenComponent()), DynamicAmounts.fixed(2), excludeManaAbilities = true)`.
+  `loyaltyAbilitiesOnly = true` taxes only loyalty abilities (the ability's `isPlaneswalkerAbility`)
+  and leaves every other activated ability of a matching source alone. The tax is mana prepended to
+  the loyalty cost — "+1:" becomes "{1}, +1:" — so the loyalty change, a [−X]'s X choice and its cap
+  are untouched. Eidolon of Obstruction: "Loyalty abilities of planeswalkers your opponents control
+  cost {1} more to activate" →
+  `IncreaseActivatedAbilityCost(GroupFilter(GameObjectFilter.Planeswalker.opponentControls()), DynamicAmounts.fixed(1), loyaltyAbilitiesOnly = true)`.
+  (Carth the Lion's loyalty-symbol surcharge is the separate `LoyaltyAbilitiesCostAdditional`.)
+- `LoyaltyAbilitiesCostAdditional(amount = 1)` — planeswalkers' loyalty abilities this permanent's
+  controller activates cost an additional [+`amount`]. Carth the Lion: "Planeswalkers' loyalty abilities
+  you activate cost an additional [+1] to activate" → `LoyaltyAbilitiesCostAdditional(1)`. The surcharge is
+  netted into the one loyalty payment when the total cost is determined (CR 601.2f via CR 602.2b): [+1]
+  costs [+2] (all counters put on at once, so a placement replacement like Vorinclex applies once), [0]
+  costs [+1], [−3] costs [−2] and can be activated with two loyalty, and [−X] costs [−X+1] with X itself
+  unchanged — X may be announced up to loyalty + surcharge. Several are cumulative; an opponent's never
+  reaches your activations. The ability menu shows the surcharged cost.
 - `ManaAbilitiesCostAdditionalLife(amount = 1, filter = GroupFilter.source())` — **mana** abilities of
   permanents matching `filter` cost `amount` additional life to activate. Thran Portal: "Mana abilities of this
   land cost an additional 1 life to activate" → `ManaAbilitiesCostAdditionalLife(1)`. Lowered to a Layer 6
@@ -11672,6 +12845,12 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   grant has no `Self`, so source-relative predicates fail closed). A source-relative cap therefore reads
   the granting object live, when the cast is offered and when it is made — Arcade Gannon =
   `MayCastFromGraveyard((Artifact or Any.withSubtype("Human")).manaValueAtMostDynamic(DynamicAmounts.countersOnSelf(CounterType.QUEST)), duringYourTurnOnly = true, oncePerTurn = true)`.
+  **A printed grant may sit behind a condition** (`staticAbility { condition = …; ability = MayCastFromGraveyard(…) }`):
+  both graveyard-cast scans read battlefield statics through `controlledActiveStaticAbilities`, so the
+  grant applies only while its condition holds against the granting permanent — a Spacecraft's station
+  threshold block, Exploration Broodship = `condition = Conditions.SourceCounterCountAtLeast(CounterType.CHARGE, 8)`
+  over `MayCastFromGraveyard(NonlandPermanent, duringYourTurnOnly = true, oncePerTurn = true,
+  additionalCost = Costs.additional.SacrificePermanent(GameObjectFilter.Land))`.
   The spent-grant gate lives in two places that must stay in step — `CastFromZoneEnumerator`
   (which offers the action) and `CastZoneResolver.mayCastFromGraveyardGrantApplies` (which authorizes
   it) — with `CastSpellHandler` marking the source via
@@ -11694,13 +12873,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   Journal back) = `GrantStaticAbility(MayCastFromGraveyard(Creature, entersWithCounter =
   CounterType.FINALITY, addedSubtypeOnEntry = "Vampire"), EffectTarget.Self, Duration.EndOfTurn)`. The
   rider is frozen onto the stack spell at cast time (`CastSpellHandler` reads the authorizing grant via
-  `CastZoneResolver.findMayCastFromGraveyardGrant`) as a `GraveyardCastRiderComponent`, and applied on
+  `CastZoneResolver.findMayCastFromGraveyardGrant`) as a `CastThisWayEntryRiderComponent`, and applied on
   entry by `StackResolver` →
   `EntersWithReplacements.applyCastFromGraveyardRider` (finality counter placed → the
   `ZoneMovementUtils` death-replacement exiles it instead of dying; added subtype = floating `Layer.TYPE`
   effect). This is the reusable "cast from graveyard, enters with a finality counter" mechanism:
   Osteomancer Adept's forage permission (`MayCastCreaturesFromGraveyardWithForageComponent`) shares it —
-  `CastSpellHandler` freezes the same `GraveyardCastRiderComponent(entersWithCounter = FINALITY)` onto a
+  `CastSpellHandler` freezes the same `CastThisWayEntryRiderComponent(entersWithCounter = FINALITY)` onto a
   forage-cast creature, applied on entry by the identical `StackResolver` path.
   **Play, not just cast — one shared allowance:** `playsLands = true` turns the grant's verb into
   *play*: land cards matching `filter` may also be played from your graveyard, as the turn's land
@@ -11783,39 +12962,35 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   and `CastZoneResolver`) match the bare type without unwrapping it — so the grant never applies
   rather than applying conditionally. Teach those read sites to unwrap first;
   `FlashTypeGrants.activeGrant` is the worked example.
-- `GraveyardCardsHaveFlashback(filter, cost = null, duringYourTurnOnly = false)` — a **whole-graveyard
-  flashback grant** (CR 702.34): a continuous static that grants flashback to *every* card in the
-  controller's graveyard matching `filter` (not a single-card grant like `Effects.GrantFlashback` /
-  Archmage's Newt). `cost = null` means "flashback cost equal to that card's mana cost"; pass a
-  `ManaCost` for a fixed cost. `duringYourTurnOnly = true` gates the grant to the controller's turn.
-  A matching card is castable from the graveyard for the flashback cost and is exiled on resolution,
-  exactly like printed flashback — all four read sites (enumeration, cast cost, permission, and the
-  stack resolver's exile-on-resolution clause) route through the shared `FlashbackGrants.effectiveFlashback`
-  resolver, which now also scans the battlefield for this static (matching on the card's
-  zone-independent characteristics, so it resolves the same whether the card is still in the
-  graveyard or already on the stack). Used by Iroh, Grand Lotus: one grant for
-  `InstantOrSorcery.notSubtype(Lesson)` with `cost = null` ("each non-Lesson instant and sorcery card
-  in your graveyard has flashback … equal to that card's mana cost") and one for
-  `InstantOrSorcery.withSubtype(Lesson)` with `cost = {1}` ("each Lesson card in your graveyard has
-  flashback {1}"), both `duringYourTurnOnly = true`.
-  **Gating this with a condition is silently inert today.** `staticAbility { condition = … }`
-  wraps the ability in a `ConditionalStaticAbility`, and `FlashbackGrants` matches the bare type
-  without unwrapping it — so the grant never applies rather than applying conditionally. Teach
-  that read site to unwrap first; `FlashTypeGrants.activeGrant` is the worked example.
-- `GraveyardCardsHaveMayhem(filter, cost = null, duringYourTurnOnly = false)` — the Mayhem (CR 702.187)
-  analogue of `GraveyardCardsHaveFlashback`: a whole-graveyard group grant of the Mayhem keyword to
-  every graveyard card matching `filter`. `cost = null` means "mayhem cost equal to that card's mana
-  cost". Read through the shared `MayhemGrants.effectiveMayhem` resolver (enumerator, cast cost,
-  permission), which now scans the battlefield for this static; the mayhem discarded-this-turn gate
-  still applies, and (unlike flashback) the spell is not exiled on resolution. Used by Green Goblin's
-  "Goblin Formula — Each nonland card in your graveyard has mayhem. The mayhem cost is equal to its
-  mana cost" (`GraveyardCardsHaveMayhem(GameObjectFilter.Nonland)`).
-  **Gating this with a condition is silently inert today.** `staticAbility { condition = … }`
-  wraps the ability in a `ConditionalStaticAbility`, and `MayhemGrants` matches the bare type
-  without unwrapping it — so the grant never applies rather than applying conditionally. Teach
-  that read site to unwrap first; `FlashTypeGrants.activeGrant` is the worked example.
+- `GraveyardCardsHaveCastKeyword(keyword, filter, cost = null, duringYourTurnOnly = false)` — a
+  **whole-graveyard grant of a graveyard-casting keyword**: every card in the controller's graveyard
+  matching `filter` has `keyword` (not a single-card grant like `Effects.GrantFlashback` / Archmage's
+  Newt). `cost = null` means "equal to that card's mana cost"; pass a `ManaCost` for a fixed cost.
+  `duringYourTurnOnly = true` gates the grant to the controller's turn; gate it any other way with
+  `staticAbility { condition = … }`, which every read site resolves against the granter. The filter
+  matches the card's zone-independent characteristics with the granter as the source. All read sites
+  share one battlefield scan (`GraveyardCastGrants`): controlled permanents, live statics (Class
+  levels), skipping face-down granters and ones that lost all abilities. `keyword` is a
+  `GraveyardCastKeyword`, each variant carrying only its own keyword's data:
+  - `GraveyardCastKeyword.Flashback` (CR 702.34) — castable for the flashback cost and exiled as it
+    leaves the stack, exactly like printed flashback; read through `FlashbackGrants.effectiveFlashback`
+    (enumeration, cast cost, permission, exile on resolution). Iroh, Grand Lotus: one grant for
+    `InstantOrSorcery.notSubtype(Lesson)` with `cost = null` and one for `InstantOrSorcery.withSubtype(Lesson)`
+    with `cost = {1}`, both `duringYourTurnOnly = true`; Lier, Disciple of the Drowned:
+    `GraveyardCardsHaveCastKeyword(GraveyardCastKeyword.Flashback, GameObjectFilter.InstantOrSorcery)`.
+  - `GraveyardCastKeyword.Mayhem` (CR 702.187) — read through `MayhemGrants.effectiveMayhem`; the
+    discarded-this-turn gate still applies and the spell is not exiled on resolution. Green Goblin's
+    "Goblin Formula": `GraveyardCardsHaveCastKeyword(GraveyardCastKeyword.Mayhem, GameObjectFilter.Nonland)`.
+  - `GraveyardCastKeyword.BeamMeUp(returnFilter = Creature)` — read through `BeamMeUp.options`; each
+    granter is its own offer beside the card's printed beam me up (see `beamMeUp` in the keywords
+    section). `returnFilter` narrows the creatures that may be returned to pay *this grant's* offers,
+    matched with the granter as the source. Scotty, Miracle Worker: `staticAbility { condition =
+    Conditions.IsYourMainPhase; ability = GraveyardCardsHaveCastKeyword(GraveyardCastKeyword.BeamMeUp(
+    GameObjectFilter.Creature.notSourceItself()), GameObjectFilter.Any) }` — "Scotty can't be beamed up
+    to cast a spell this way" excludes him from his own grant only.
 - `GraveyardCardsHaveEscape(filter, cost = null, additionalCost = null, duringYourTurnOnly = false)` —
-  the Escape (CR 702.138) analogue of `GraveyardCardsHaveFlashback`: every card in your graveyard
+  the Escape (CR 702.138) analogue of `GraveyardCardsHaveCastKeyword` (read through the same
+  `GraveyardCastGrants` scan): every card in your graveyard
   matching `filter` has escape. `cost = null` means "equal to the card's mana cost" (a card with no
   mana cost then can't escape — its escape cost is unpayable); `additionalCost` is the non-mana half.
   `EscapeCasts.availableEscape` enumerates every distinct printed, individual, or group-granted
@@ -11823,6 +12998,16 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   payment. Granted escape uses the ordinary destination on resolution and marks an escaped
   permanent (`Conditions.Escaped`); the player chooses among available costs. Underworld Breach: `GraveyardCardsHaveEscape(GameObjectFilter.Nonland,
   additionalCost = Costs.additional.ExileOtherCards(3))`.
+- `GrantForetellToCardsInHand(filter, costReduction = 0)` — "Each `filter` card in your hand without
+  foretell has foretell. Its foretell cost is equal to its mana cost reduced by {`costReduction`}"
+  (Dream Devourer: `GrantForetellToCardsInHand(GameObjectFilter.Nonland, costReduction = 2)`). Read with
+  printed foretell through `ForetellGrants.effectiveForetellCost` by the foretell enumerator and
+  handler; a printed foretell wins. The reduction comes off the **generic** part only ({1}{G}{G} →
+  {G}{G}), and the cost is fixed on the card as it is foretold, so the foretold card can still be cast
+  for it after the grant is gone (Dream Devourer ruling).
+- `MayForetellOnAnyTurn` — "Foretelling cards from your hand … can be done on any player's turn"
+  (Cosmos Charger): while you control it, you may foretell any time you have priority, not only during
+  your turn (CR 116.2h). The "costs {1} less" half is `ModifySpecialActionCost(FORETELL, …)`.
 - `GrantMayCastFromLinkedExile(filter = Nonland, duringYourTurnOnly = false, additionalCost = null, ownedByYou = false, withoutPayingManaCost = false, oncePerTurn = false, maxManaValue = null, exiledThisTurnOnly = false, entersWithCounter = null, withAnyManaType = false)`
   — "you may cast cards exiled with this permanent" — reads the source's `LinkedExileComponent` (Rona,
   Disciple of Gix; Maralen, Fae Ascendant; Dawnhand Dissident). Casting spells from linked exile is
@@ -11845,7 +13030,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   **Cast-this-way entry rider:** `entersWithCounter` (a `CounterType`) mirrors
   `MayCastFromGraveyard.entersWithCounter` for the linked-exile path — a permanent cast from this pile
   *under this grant* enters the battlefield with one such counter (`CastSpellHandler` freezes the same
-  `GraveyardCastRiderComponent` it uses for graveyard casts, applied at resolution by `StackResolver`).
+  `CastThisWayEntryRiderComponent` it uses for graveyard casts, applied at resolution by `StackResolver`).
   Intrepid Paleontologist = `GrantMayCastFromLinkedExile(filter = Creature.withSubtype("Dinosaur"),
   ownedByYou = true, entersWithCounter = CounterType.FINALITY)` — "You may cast Dinosaur creature spells
   from among cards you own exiled with this creature. If you cast a spell this way, that creature enters
@@ -11868,7 +13053,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   `effectiveSneakCost` are read by `SneakCastEnumerator` (a graveyard loop) and four sites in
   `CastSpellHandler` (zone gate, both cost paths, the enters-tapped/bounce resolution). No
   exile-on-resolution (unlike flashback) — the creature simply moves graveyard → stack → battlefield.
-- `MayPlayCardsFromExile(filter, condition = null, withAnyManaType = false, withAnyManaColor = false, oncePerTurn = false)` — "you may **play** cards
+- `MayPlayCardsFromExile(filter, condition = null, withAnyManaType = false, withAnyManaColor = false, oncePerTurn = false, spendAsAnyColor = null)` — "you may **play** cards
   in exile matching `filter`" (spells *and* lands, CR 601.3). The sibling of
   `GrantMayCastFromLinkedExile` for the case where the playable set is a **filter over every exile
   zone** rather than the cards linked to this permanent. Tinybones, Bauble Burglar = "During your turn,
@@ -11884,7 +13069,8 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   spells cast **through this permission only** (CR 118.14 / 609.4b) — the reason it rides here instead of
   being a blanket `SpendAnyManaTypeForSpells`. Nothing else is waived: normal timing and all costs still
   apply, so a stash-countered land is playable only during your main phase with an empty stack.
-  Engine-side, `StaticMayPlayGrants` derives a live `MayPlayPermission` per matching exiled card, which
+  An emblem may carry it too (`CreatePermanentEmblem(ownedStaticAbilities = …)`; Tibalt, Cosmic
+  Impostor). Engine-side, `StaticMayPlayGrants` derives a live `MayPlayPermission` per matching exiled card, which
   is unioned into `GameState.activeMayPlayFor`, so the existing exile play/cast machinery (enumeration,
   cast handler, land handler, cost paths, and the client's `playableFromExile` ghost-card affordance)
   covers it with no separate code path.
@@ -11904,7 +13090,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   a second granter is a second allowance, and a play an unlimited grant also covered spends nothing.
   `CounterType.COLLECTION` (the same kind Charitable Levy tallies) carries no rule here; it is placed by a pipeline
   `move(..., CardDestination.ToZone(Zone.EXILE), addCounterType = CounterType.COLLECTION)`.
-- `MayCastSelfFromZones(zones, condition = null, additionalCost = null, castUsing = null, alternativeManaCost = null)` — intrinsic *self*
+  Draugr Necromancer uses `spendAsAnyColor` — "You may cast spells from among cards in exile your
+  opponents own with ice counters on them, and you may spend mana from snow sources as though it were
+  mana of any color to cast those spells" =
+  `MayPlayCardsFromExile(GameObjectFilter.Nonland.ownedByOpponent().withCounter(CounterType.ICE), spendAsAnyColor = ManaSpentAsAnyColor.SNOW)`
+  ("cast spells" is a `Nonland` filter: an iced animated land can't be played). `ManaSpentAsAnyColor`
+  names *which* mana stands in for a color (`COLORLESS`, `SNOW`) without rewriting the cost — the same
+  field and semantics as `GrantMayPlayFromExile`'s `spendAsAnyColor`. Its ice counters come from a
+  `RedirectZoneChangeWith(EXILE, AddCounters(ICE, 1, TriggeringEntity))` death shield.
+- `MayCastSelfFromZones(zones, condition = null, additionalCost = null, castUsing = null, alternativeManaCost = null, exileCastThisWay = CastThisWayExile.NONE)` — intrinsic *self*
   permission: this card may be cast from any of `zones` (graveyard/exile) following normal timing
   and for its normal mana cost. Squee, the Immortal = `MayCastSelfFromZones(listOf(GRAVEYARD,
   EXILE))`. When `condition` is non-null the permission is **gated**: it is available only while the
@@ -11937,6 +13131,14 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   Costs.additional.ExileOtherCards(4)`. Exclusive with `castUsing`. The cast is announced as
   `AlternativeCostType.SELF_ZONE` (the enumerator offers it that way), so a plain cast from the
   same zone still goes through any other permission (Muldrotha, Lurrus) at the printed cost.
+  `exileCastThisWay` is the instant/sorcery exile rider of `MayCastFromGraveyard`, scoped to this
+  permission: armed (as an `AfterResolveDestinationComponent`, `CastRecords.applyCastThisWayRiders`)
+  only when the cast goes through it, and it catches a countered or fizzled spell too. Glimpse the
+  Cosmos (KHM) = `MayCastSelfFromZones(listOf(GRAVEYARD), condition = Conditions.ControlPermanentOfType(Subtype.GIANT),
+  alternativeManaCost = ManaCost.parse("{U}"), exileCastThisWay = CastThisWayExile.INSTEAD_OF_GRAVEYARD)` for
+  "As long as you control a Giant, you may cast this card from your graveyard by paying {U} rather than
+  paying its mana cost. If you cast this card this way and it would be put into your graveyard, exile it
+  instead." — a hand cast of the same card goes to the graveyard as usual.
   Wired through `CastZoneResolver.findMayCastSelfFromZoneAbility` (returns the applicable
   ability so callers can read its `additionalCost`), validated/collected in `CastSpellHandler`
   alongside the other additional-cost sources, and surfaced to legal-action enumeration in
@@ -11983,8 +13185,11 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   and paid for, and `SpellOnStackComponent.castFromZone` once it is on the stack. A zone-scoped grant needs the spell's
   id, so every `GrantedKeywordResolver` read takes an optional `spellId` and a caller without one sees the grant fail
   closed. Convoke on a spell cast through a may-play permission from exile or a graveyard is offered by
-  `CastFromZoneEnumerator` (printed or granted), so the grant is reachable from the cast menu. Read by the cast
-  machinery via `GrantedKeywordResolver`:
+  `CastFromZoneEnumerator` (printed or granted), so the grant is reachable from the cast menu. `spellFilter` is
+  matched against the printed card with the spell's actual colors, so type, subtype and color predicates work —
+  including `IsMulticolored` / `IsMonocolored` ("Multicolored spells you cast have convoke", **Fallaji Wayfarer**:
+  `GrantKeywordToOwnSpells(CONVOKE, GameObjectFilter.Multicolored)`); any other predicate fails closed. Read by the
+  cast machinery via `GrantedKeywordResolver`:
   - **Cost-modifying keywords** (CONVOKE, DELVE, IMPROVISE) surface in the cast enumerator / alternative-payment handler —
     e.g. **Eirdu, Carrier of Dawn** (`GrantKeywordToOwnSpells(CONVOKE, Creature)`), **Teval, Arbiter of Virtue**
     (`DELVE`), **Ironheart, Clever Champion** (`IMPROVISE`, `GameObjectFilter.Noncreature`).
@@ -12148,8 +13353,9 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
   (the enumerator threads the card being cast and its zone through
   `EnumerationContext.freeCastPermissionFor(cardId, castFromZone)` — `Zone.HAND` on the hand path,
   `Zone.EXILE` on the cast-from-exile path). For a **one-shot** permission created by a resolved
-  ability ("the next … spell you cast this turn can be cast without paying its mana cost"), use the
-  `GrantNextSpellFreeCastEffect` rider (§ stack effects) instead: it isn't tied to a permanent
+  ability ("the next … spell you cast this turn can be cast without paying its mana cost", or
+  "until end of turn, you may cast spells from your hand without paying their mana costs"), use the
+  `GrantFreeCastThisTurnEffect` rider (§ stack effects) instead: it isn't tied to a permanent
   staying on the battlefield, and the same `hasFreeCastPermission` call answers for both.
   Cast-legality is checked by `CostCalculator.hasFreeCastPermission`. Surfaced as a dedicated
   `CastWithoutPayingManaCost` `LegalAction` variant routed through
@@ -12180,7 +13386,7 @@ concerns — the `ClientStateTransformer` reveals the top card for `PlayFromTopO
   it can't be spelled as the self-scoped variant. (**Wizened Snitches**)
 - `PlayFromTopOfLibrary` — public reveal **and** "play lands and cast spells from the top of your
   library" (all card types). (Future Sight)
-- `PlayFromTopWithAlternativeCost(withoutPayingManaCost = false, additionalCost = null, filter = null)`
+- `PlayFromTopWithAlternativeCost(withoutPayingManaCost = false, additionalCost = null, filter = null, libraryOwner = EffectTarget.Controller, withAnyManaColor = false)`
   — "you may play cards from the top of your library; a spell cast this way pays an alternative cost"
   (mana waived and/or an `AdditionalCost` substituted). Gwenom, Remorseless grants this until end of
   turn (`GrantStaticAbility(..., Duration.EndOfTurn)`) with `withoutPayingManaCost = true` +
@@ -12188,6 +13394,15 @@ concerns — the `ClientStateTransformer` reveals the top card for `PlayFromTopO
   mana value rather than its mana cost." Read through the top-of-library cast path, which scans
   `grantedStaticAbilities` for it (so a durationally-granted permission works), waives the mana, and
   charges the life. Pass `filter` to restrict which cards it covers (null = all).
+  `libraryOwner` names **whose** library, relative to the holder (`Controller` = your own). Granted
+  with a context-bound player — a target, a chosen player — it is pinned to that player as the grant
+  resolves, so the permission reads another player's top card: the holder casts the spell / plays the
+  land (using their land drop) and controls the result, the card's owner is unchanged.
+  `withAnyManaColor = true` lets mana be spent as though it were any color on spells cast this way
+  (CR 609.4b — colored pips only; `{C}` still needs colorless). Xanathar, Guild Kingpin grants its
+  controller (`target = EffectTarget.Controller`, so it outlives Xanathar)
+  `PlayFromTopWithAlternativeCost(libraryOwner = opponent, withAnyManaColor = true)` plus
+  `LookAtTopOfLibrary(libraryOwner = opponent)` until end of turn.
 - `PlayLandsAndCastFilteredFromTopOfLibrary(spellFilter, landFilter = GameObjectFilter.Land)` — like
   `PlayFromTopOfLibrary` but only spells matching `spellFilter` are castable (`null` = lands only),
   only lands matching `landFilter` are playable, and **no public reveal** (pair with
@@ -12210,9 +13425,25 @@ concerns — the `ClientStateTransformer` reveals the top card for `PlayFromTopO
   GameObjectFilter.Nonland, additionalCost = Costs.additional.RemoveCounters(counterType = null,
   count = 1, filter = GameObjectFilter.Creature))`. It is surfaced and checked like any zone-cast
   additional cost, and isn't owed when a cost-free permission (Future Sight, a costless grant, a
-  card-specific MayPlay) also covers the card.
-- `LookAtTopOfLibrary` — *private*: the controller may look at their own top card any time (revealed
-  only to them, not opponents). (Lens of Clarity, Vizier of the Menagerie)
+  card-specific MayPlay) also covers the card. Source-relative filter predicates read the granting
+  permanent: `withChosenSubtype()` is its "as this enters" creature-type choice (Realmwalker =
+  `CastSpellTypesFromTopOfLibrary(GameObjectFilter.Creature.withChosenSubtype())` + `EntersWithChoice(
+  CREATURE_TYPE)`; a changeling card matches any chosen type, no choice matches nothing), and
+  `sharingCardTypeWithLinkedExile()` its linked-exile pile (Cemetery Illuminator).
+  `castThisWayKeyword` (+ `castThisWayKeywordDuration`, default `Duration.EndOfTurn`) is the
+  cast-this-way rider: a spell cast off the top that this permission covers gains the keyword, and the
+  permanent it becomes keeps it for the duration — Thundermane Dragon = `CastSpellTypesFromTopOfLibrary(
+  GameObjectFilter.Creature.powerAtLeast(4), castThisWayKeyword = Keyword.HASTE)`. It is frozen onto the
+  spell as it is cast (the `GrantKeywordToSpell` entry path), so it holds if the granter leaves first;
+  when another permission also covers the card the rider still applies (the caster would choose it),
+  but a card only another permission covers gets nothing, and so does a cast the engine routes through
+  a card-specific MayPlay or a payment-changing `PlayFromTopWithAlternativeCost` (Bolas's Citadel,
+  Gwenom). Only unlimited, cost-free permissions may carry it (`maxCastsPerTurn`/`additionalCost`
+  with a rider is rejected).
+- `LookAtTopOfLibrary(libraryOwner = EffectTarget.Controller)` — *private*: the holder may look at the
+  top card of a library any time (revealed only to them). Default is their own (Lens of Clarity,
+  Vizier of the Menagerie); a granted copy can name another player's library, pinned at grant
+  resolution like `PlayFromTopWithAlternativeCost.libraryOwner` (Xanathar, Guild Kingpin).
 - `PlotFromTopOfLibrary(filter = Nonland)` — the controller may **plot** (CR 718) the top card of
   their library if it matches `filter`, paying a plot cost equal to the card's mana cost. The plot
   legal-action enumerator offers the top card as a plot action and `PlotCardHandler` moves it from
@@ -12265,6 +13496,16 @@ activatedAbility {
 }
 ```
 
+**Sorcery-speed mana abilities.** `manaAbility = true` derives `timing = TimingRule.ManaAbility`,
+except when the ability also sets `timing = TimingRule.SorcerySpeed` — "Activate only as a sorcery" on
+a mana ability (CR 602.5d). Grinning Ignus: `cost = Costs.Composite(Costs.Mana("{R}"),
+Costs.ReturnSelfToHand); effect = Effects.AddMana(...); manaAbility = true; timing =
+TimingRule.SorcerySpeed`. It is still a mana ability (no stack, can't be responded to), but
+`ManaAbilityEnumerator` offers it only when its controller could cast a sorcery, and the `ManaSolver`
+never auto-pays with it or counts it toward affordability: costs are paid with the spell or ability
+already on the stack (CR 601.2a/601.2g), so sorcery timing can't hold mid-payment. The player
+activates it at priority first and pays from the floating mana.
+
 **`activateFromZone` — where the ability can be activated (default `Zone.BATTLEFIELD`).** An ability
 whose source functions from another zone sets `activateFromZone` to that zone. Four zones are
 enumerated as legal actions today, each by its own `ActionEnumerator`:
@@ -12284,7 +13525,15 @@ enumerated as legal actions today, each by its own `ActionEnumerator`:
   (`ManaPaymentWindow.hasManualOnlyMana`) so the player exiles the card themselves. Every battlefield
   mana reader (`ManaSolver`, `ManaAbilityEnumerator`, `ManaAbilityPresence`) skips abilities whose
   `activateFromZone` isn't `BATTLEFIELD`, so the card on the battlefield has no usable mana ability.
-- `Zone.COMMAND` — `CommandZoneAbilityEnumerator` (Momir Basic avatar).
+  **Graveyard mana abilities** work the same way (`ManaPaymentWindow.OFF_BATTLEFIELD_MANA_ZONES` is
+  hand + graveyard): Jack-o'-Lantern's "{1}, Exile this card from your graveyard: Add one mana of any
+  color." is `cost = Costs.Composite(Costs.Mana("{1}"), Costs.ExileSelf); effect = Effects.AddAnyColorMana();
+  manaAbility = true; activateFromZone = Zone.GRAVEYARD`. Such a `{N}` → N-any-colour converter adds no mana, so
+  affordability counts it as colour fixing instead (`ManaSolver.offBattlefieldColorFixers`: each lets one
+  coloured pip be paid by any mana); the payment window opens and offers it, and its {1} is auto-paid on
+  activation.
+- `Zone.COMMAND` — the same `ZoneActivatedAbilityEnumerator` (Momir Basic avatar, Derevi, commander ninjutsu),
+  so a command-zone ability gets every cost the hand and graveyard do (a `ReturnToHand` bounce, sacrifice, X).
 
 `ActivateAbilityHandler` accepts any non-battlefield `activateFromZone` generically (it just checks
 the source is in that zone), so adding an ability in an already-enumerated zone needs no engine
@@ -12332,6 +13581,8 @@ before `genericCostReduction` and the battlefield statics. Kami of Jealous Thirs
   opponents may activate this ability"* (Clergy of the Holy Nimbus) is `All(AnyPlayerMay,
   OnlyIfCondition(Conditions.SourceMatches(GameObjectFilter.Any.opponentControls())))`; Merseine's
   "only the controller of the enchanted creature" is the same shape with `EnchantedPermanentMatches`.
+  `timing = TimingRule.SorcerySpeed` on such an ability ("... and only as a sorcery", Detention Vortex)
+  is timed for the activating player too: their turn, their main phase, an empty stack.
 
 - `MaxPerTurn(n)` — at most N activations per turn.
 - `OncePerTurn` — once each turn (resets at end of turn).
@@ -12407,7 +13658,7 @@ express any power-up cost whose reduction includes a colored pip — which is mo
 Two effects read the `isPowerUp` flag rather than the permanent, and both gate on the *ability*, so a
 permanent's ordinary activated abilities are untouched:
 
-- `ReduceActivatedAbilityCost(..., powerUpOnly = true)` — the sibling of `exhaustOnly`, for "Power-up
+- `ReduceActivatedAbilityCost(..., onceOnlyKind = OnceOnlyAbilityKind.POWER_UP)` — the axis Boom Scholar sets to `EXHAUST`, for "Power-up
   abilities of other creatures you control cost {3} less to activate" (Hulk, Gamma Goliath).
 - `TakeExtraTurn(powerUpAbilitiesCantBeActivated = true)` — "During that turn, power-up abilities
   can't be activated" (Kang the Conqueror). Not a static on the permanent: the lockout binds every
@@ -12430,7 +13681,11 @@ in the postcombat main phase and the end step; and the per-turn activation count
 every other "activate only once each turn" ability. Note boast is once **each turn**, not exhaust's
 once ever — so it never adds `ActivationRestriction.Once`, and a creature that attacks on two
 consecutive turns boasts on both. "Creatures you control can boast twice" (Birgi) raises that per-turn
-limit with `ExtraOnceOnlyActivations(OnceOnlyAbilityKind.BOAST, extraActivations = 1)`.
+limit with `ExtraOnceOnlyActivations(OnceOnlyAbilityKind.BOAST, extraActivations = 1)`. "Whenever you
+activate a boast ability" (Frenzied Raider) is `Triggers.you.activatesAbility(onceOnlyKind =
+OnceOnlyAbilityKind.BOAST)`, and "Boast abilities you activate cost {1} less to activate for each Dragon you
+control" (Dragonkin Berserker) is `ReduceActivatedAbilityCost(onceOnlyKind = OnceOnlyAbilityKind.BOAST,
+reach = ActivatedAbilityReach.ACTIVATED_BY_YOU)` — see its entry above.
 
 ```kotlin
 // Baron Helmut Zemo — Boast — Exile any number of black cards from your graveyard with fifteen or
@@ -12527,7 +13782,7 @@ copy of it (CR 707.10e). The activated-ability analogue of the spell-level `cant
 > **Where set-mechanic helpers live.** The `card { … }` keyword helpers below for *set-specific*
 > mechanics — `mayBeginGameOnBattlefield()`, `flurry { }`, `mobilize(…)`, `firebending(n)`, `sneak(cost)`, `webSlinging(cost)`, `mayhem(cost)`, `madness(cost)`, `decayed()`,
 > `vividEtb { }` / `vividCostReduction()`, `convergeEntersWithCounters(counterType?)`,
-> `impending(time, cost)`, `renew(cost) { }`, `embalm(cost)`, `unearth(cost)`, `enduring()`,
+> `impending(time, cost)`, `renew(cost) { }`, `embalm(cost)`, `unearth(cost)`, `encore(cost)`, `enduring()`,
 > `craft(filter, cost)`, `station()`, `jobSelect()`, `forMirrodin()`, `gift(kind)` — are `CardBuilder` **extension functions** in
 > `mtg-sdk/.../dsl/mechanics/` (one file per mechanic), not methods on the core `CardBuilder`. They
 > stay in package `com.wingedsheep.sdk.dsl`, so the call syntax is unchanged, but a card file that
@@ -12547,6 +13802,23 @@ copy of it (CR 707.10e). The activated-ability analogue of the spell-level `cant
 > doesn't rebound again. **Ojer Pakpatiq, Deepest Epoch** grants it to instants you cast from hand via
 > `Triggers.you.casts(GameObjectFilter.Instant, requires = setOf(SpellCastPredicate.CastFromZone(Zone.HAND)))`
 > → `GrantKeywordToSpellEffect(Keyword.REBOUND, EffectTarget.TriggeringEntity)`.
+
+> **Cipher** (`Keyword.CIPHER`, CR 702.99). "Then you may exile this spell card encoded on a creature
+> you control. Whenever that creature deals combat damage to a player, its controller may cast a copy
+> of the encoded card without paying its mana cost." A plain `keywords(Keyword.CIPHER)` on the instant
+> or sorcery (**Whispering Madness**) — nothing else to wire. As a cipher spell represented by a card
+> resolves, `NonPermanentSpellResolver` appends `Cipher.encodeStep` after its other effects: gather the
+> creatures you control, choose up to one on the battlefield (no targeting), and the SDK-internal
+> `EncodeOnCreatureEffect(from)` records the pick. The card then leaves the stack straight to exile
+> (never the graveyard — rebound and graveyard riders have nothing to replace), carries
+> `EncodedOnComponent(creature, its exile object)`, and the creature gets `Cipher.encodedCardTrigger`
+> in the triggered-ability grant store with `Duration.WhileSourceEncodedOnAffected` — live while the
+> card is the same object in exile and the creature is on the battlefield (CR 702.99c; a control
+> change keeps it, and the new controller casts the copy). The grant records its layer-6 timestamp,
+> so a *later* "loses all abilities" silences the trigger and an earlier one doesn't. The trigger is
+> `If(EntityMatches(SpecificEntity(card), Any.currentlyIn(EXILE)), May(CopyCardIntoCollection →
+> CastFromCollectionWithoutPayingCost))`, Paradigm's copy-and-cast pipeline; the cast copy isn't
+> represented by a card, so it never encodes. Each encoded card is its own trigger.
 
 > **Umbra armor** (`Keyword.UMBRA_ARMOR`, CR 702.89; printed as "totem armor" before 2023). "If
 > enchanted permanent would be destroyed, instead remove all damage marked on it and destroy this
@@ -12884,6 +14156,16 @@ derives `CardDefinition.colors` from it), Convoke, Delve, Improvise, Affinity, E
 Offspring, Persist, Undying, Enduring, Ascend, Storied, Start your engines!, Max speed, Wither, Toxic, Eerie, Vivid, Fateful Bite, Exploit, Champion, Evolve, Ravenous, Soulbond, Daybound, Nightbound, … (display-only — engine effect lives in handlers or
 composite abilities).
 
+**Infect** (`Keyword.INFECT`, CR 702.90) — a plain `keywords(Keyword.INFECT)`, grantable like any other
+keyword (`GrantKeyword(Keyword.INFECT)`, `Effects.GrantKeywordToSpell(Keyword.INFECT)`). Read at every damage
+site (combat and noncombat, via `DamageUtils.sourceHasInfect`): damage to a player gives that player that many
+poison counters from the source's controller instead of life loss (CR 120.3b) — no `LifeChangedEvent`, no
+life-lost-this-turn tally, and life-loss replacements never see it, but it is still damage dealt (combat-damage
+triggers, damage tallies, commander damage and lifelink all apply). Damage to a creature is dealt as -1/-1
+counters exactly like wither (CR 120.3d); damage to a planeswalker or battle is unchanged. A source that has left
+the battlefield is read by last-known information (CR 702.90d). Toxic on the same creature adds its poison on top.
+Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+
 **Parameterized `KeywordAbility.*`**
 
 - `Ward(cost: WardCost)` — the opponent pays `cost` or their spell/ability targeting this is countered
@@ -12975,6 +14257,25 @@ composite abilities).
 - `ProtectionScope.Monocolored` — the exactly-one-color twin (CR 105.2a). Engine-wired for granted hexproof
   (`GrantHexproofFromToGroup` — Dragonfire Blade) and player protection; creature *protection* from
   monocolored is not projected.
+- `ProtectionScope.ChosenCardType(slot = ChoiceSlot.CARD_TYPE)` — "protection from the chosen card type":
+  late-bound to the card type the **granting permanent** chose as it entered, read from its
+  `CastChoicesComponent` under `slot` wherever the protection applies, so it then behaves exactly like
+  `ProtectionScope.CardType` of that type (projected `PROTECTION_FROM_CARDTYPE_<TYPE>`; player protection
+  from sources of that type). Protects from nothing until a type is chosen. Valid in
+  `GrantProtectionFromToGroup` and `GrantProtectionToController`; a printed `Protection` keyword or a
+  one-shot `GrantPlayerProtection` has no permanent to read the choice from and protects from nothing.
+  Serra's Emissary pairs an `EntersWithChoice(ChoiceType.MODE)` over card-type ids (as Stenn, Paranoid
+  Partisan does) with `GrantProtectionFromToGroup(ProtectionScope.ChosenCardType(ChoiceSlot.MODE),
+  GroupFilter(Creature.youControl()))` + `GrantProtectionToController(ProtectionScope.ChosenCardType(ChoiceSlot.MODE))`.
+- `ProtectionScope.ChosenCardName(slot = ChoiceSlot.CARD_NAME)` — "protection from the chosen card name"
+  (Runed Halo): the name twin of `ChosenCardType`, late-bound to the card name the **granting permanent**
+  chose as it entered (`EntersWithChoice(ChoiceType.CARD_NAME)`, stored under `ChoiceSlot.CARD_NAME`).
+  Matches a source whose current name equals it — projected on the battlefield, printed elsewhere, so a
+  spell on the stack and a token named like a card both match — and never a face-down source (it has no
+  name). Protects from nothing until a name is chosen. Valid only in `GrantProtectionToController`
+  (damage, targeting and enchanting of the controller, via `PlayerProtectionRules`); there is no
+  creature-protection keyword for a name, so `Protection`/`Hexproof` keywords, `GrantPlayerProtection`
+  and the group grants reject it at construction.
 - `ProtectionScope.RingBearers` — "protection from Ring-bearers" (CR 701.54; the designation is a quality
   per CR 702.16a). Matches a battlefield source that is its controller's Ring-bearer — the same reading as
   `StatePredicate.IsRingBearer`, so a stolen bearer stops matching. Enforced like
@@ -12982,7 +14283,28 @@ composite abilities).
   targeting by abilities whose source is a Ring-bearer (CR 702.16b). Printed (`KeywordAbility.Protection`),
   granted to a group (`GrantProtectionFromToGroup` — Lord of the Nazgûl), as hexproof, or as player
   protection.
-- `Protection(ProtectionScope.Supertype("Legendary"))` / `KeywordAbility.protectionFromSupertype("Legendary")` — protection from a supertype, e.g. "protection from legendary creatures" (Tsabo Tavoc). Enforced across targeting, blocking, and combat damage via projected `PROTECTION_FROM_SUPERTYPE_<X>` keywords.
+- `ProtectionScope.ManaValueParity(Parity.ODD | Parity.EVEN)` — "protection from each odd/even mana value".
+  Mana value is a characteristic (CR 202.3), read off the source when protection is checked through
+  `SourceKindProtection` (kinds `ODD_MANA_VALUE` / `EVEN_MANA_VALUE`), so every leg applies: spells of that
+  parity (a spell's {X} counts as its announced value, CR 202.3e — checked at cast time too), abilities from
+  sources of it, damage, enchanting/equipping and blocking (CR 702.16b–f). Zero is even: non-copy tokens and face-down
+  permanents (mana value 0) are even; a source with no mana value (an emblem) matches neither. Printed, granted
+  (`GrantProtectionFromToGroup`), as hexproof, or as player protection. "As this creature enters, choose odd or
+  even … protection from each mana value of the chosen quality" (Lavabrink Venturer) is an `EntersWithChoice(MODE)`
+  with options "odd"/"even" plus one `SourceChosenModeIs(parity.displayName)`-gated
+  `GrantProtectionFromToGroup(ManaValueParity(parity), GroupFilter.source())` per parity (Ashling's Prerogative's
+  shape).
+- `ProtectionScope.ManaValueOtherThan(value)` — "protection from each mana value other than N": every mana value but
+  [value], enforced on the same legs as `ManaValueParity` (projected `PROTECTION_FROM_MANAVALUE_OTHER_THAN_<N>`, matched
+  against the source's mana value in `SourceKindProtection`; an X spell counts its announced X, an unannounced X and a
+  source with no mana value match nothing). Granted statics only — `GrantProtectionFromToGroup` and player protection
+  (`GrantProtectionToController`); a printed `KeywordAbility.Protection` and every hexproof spelling reject it, since the
+  only card that says it hangs it off a choice. Haktos the Unscarred: `EntersWithChoice(ChoiceType.NUMBER, minValue = 2,
+  maxValue = 4, atRandom = true)` plus one `Conditions.CastChoiceIs(ChoiceSlot.CHOSEN_NUMBER, "n")`-gated
+  `GrantProtectionFromToGroup(ManaValueOtherThan(n), GroupFilter.source())` per number.
+- `Protection(ProtectionScope.Supertype("Legendary", cardType = "Creature"))` / `KeywordAbility.protectionFromSupertype("Legendary", "Creature")` — protection from a supertype, optionally narrowed to a card type: "protection from legendary creatures" (Tsabo Tavoc) doesn't stop a legendary artifact or land.
+- `Protection(ProtectionScope.Subtype("God", cardType = "Creature"))` / `KeywordAbility.protectionFromSubtype("God", "Creature")` — "protection from God creatures" (Sigrid, God-Favored): a subtype narrowed to a card type, so a Theros God that isn't currently a creature doesn't match. Without `cardType` it's the plain "protection from Goblins".
+  Both type scopes are enforced across targeting, enchanting/equipping, blocking and damage through `TypeQualityProtection` (projected `PROTECTION_FROM_SUBTYPE_<X>[@<TYPE>]` / `PROTECTION_FROM_SUPERTYPE_<X>[@<TYPE>]` keywords).
 - `Protection(ProtectionScope.CardType("Instant"))` — protection from a card type, e.g. "protection from
   instants" (Emrakul, the Promised End). Projected as `PROTECTION_FROM_CARDTYPE_<TYPE>` — the same keyword
   the *granted* card-type protections emit ([`GrantProtectionFromCardType`](#14-static-abilities) on Sword of
@@ -13081,7 +14403,8 @@ composite abilities).
   the battlefield every component goes to the new zone (CR 730.3); a token component is a token
   there, and the permanent is a token only while a token is on top (CR 730.2d). "Whenever this
   creature mutates" is `Triggers.self.mutates()` — it fires for each mutate ability of the merged
-  permanent, whichever card carries it. Gemrazer:
+  permanent, whichever card carries it. "Whenever a creature you control mutates" is
+  `Triggers.a(Creature.youControl()).mutates()`. Gemrazer:
   `keywordAbility(KeywordAbility.mutate("{1}{G}{G}"))` + `keywords(REACH, TRAMPLE)` +
   `triggeredAbility { trigger = Triggers.self.mutates(); val p = target(TargetFilter.ArtifactOrEnchantment.opponentControls()); effect = Effects.Destroy(p) }`.
   Engine side: `MutateCasts` (target, merge, separation) and `MergedComponent`; the composite
@@ -13113,6 +14436,16 @@ composite abilities).
   annihilator eats any permanent, and the *defending player* chooses, which is why it's the edict
   facade rather than a targeted sacrifice.
 - `Absorb(n)` — prevent N damage each time it would be dealt to this.
+- **Buyback** (CR 702.27) — `keywordAbility(KeywordAbility.buyback("{3}"))`, or
+  `KeywordAbility.buyback(Costs.additional.SacrificePermanent(GameObjectFilter.Land))` for "Buyback—Sacrifice
+  a land". An `OptionalAdditionalCost` under `declaredSlot = ChoiceSlot.BOUGHT_BACK` (so it never reads as
+  kicked): the enumerators offer a second "Cast X (Buyback)" variant that pays it, and when the spell
+  *resolves* with that slot declared, `NonPermanentSpellResolver` puts the card into its owner's hand instead
+  of their graveyard. Countered or fizzled, it goes to the graveyard as usual (buyback only replaces the
+  resolution move). Flashback's "exile it instead of putting it anywhere else" still wins; against another
+  graveyard-worded replacement (a cast-this-way rider, rebound) the engine always applies buyback rather
+  than asking the controller to choose (CR 616.1) — a rare pairing, e.g. a buyback spell cast through Kylox's Voltstrider. A rest-in-peace redirect sees a move to hand and leaves it alone. The spell's effect is
+  untouched — Sprout Swarm, Lab Rats.
 - `Bushido(n)` — **engine-live.** Declare it and nothing else: `keywordAbility(KeywordAbility.bushido(2))`
   (Numai Outcast). The engine supplies the CR 702.45a trigger from
   [`Bushido`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bushido.kt) — partner-less
@@ -13133,12 +14466,14 @@ composite abilities).
   "Myriad, myriad" (Scurry of Squirrels). The engine supplies the CR 702.116a trigger from
   [`Myriad`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt) — pure composition:
   `Triggers.self.attacks()` → `ForEachPlayer(EachOpponent, If(Not(PlayerIs(You, DefendingPlayer)),
-  May(CreateTokenCopyOfTarget(Self, tapped, attacking, attackedPlayer = You, controller = ControllerOfSource,
-  exileAtStep = END_COMBAT), decisionMaker = ControllerOfSource)))`. Gated on the projected keyword (lost
-  with all abilities); one trigger per printed instance (CR 702.116b), exactly one for a static grant.
-  The copies enter attacking, so they never "attacked" and don't re-trigger it. The engine picks the
-  opponent rather than offering one of their planeswalkers — the CR 508.4 simplification every "enters
-  attacking" effect here makes. In a two-player game it does nothing.
+  May(CreateTokenCopyOfTarget(Self, tapped, attacking, attackedPlayer = You, attackDefender =
+  CONTROLLER_CHOOSES, controller = ControllerOfSource, exileAtStep = END_COMBAT), decisionMaker =
+  ControllerOfSource)))`. Gated on the projected keyword (lost with all abilities); one trigger per printed
+  instance (CR 702.116b), exactly one for a static grant — equipment, auras and "gains myriad until end of
+  turn" (Blade of Selves, Ironwill Forger) work through it. The copies enter attacking, so they never
+  "attacked" and don't re-trigger it. Each copy attacks "that player or a planeswalker they control": the
+  copy's controller picks, asked only when that opponent controls a planeswalker. In a two-player game it
+  does nothing.
 - `Rampage(n)` — **engine-live**, the same shape as `Bushido(n)`. Declare it with `card { rampage(n) }`
   (just this keyword ability); the engine derives CR 702.23a's "whenever this creature becomes blocked,
   it gets +N/+N until end of turn for each creature blocking it beyond the first" from
@@ -13217,13 +14552,11 @@ composite abilities).
     - `EachCard(filter)` — every card of the starting deck matches it. Gyruda `Any.manaValueIsEven()`,
       Obosh `Land or Any.manaValueIsOdd()`, Keruga `Land or Any.manaValueAtLeast(3)`, Lurrus
       `Nonpermanent or Permanent.manaValueAtMost(2)`, Kaheera `Noncreature or Any.withAnyOfSubtypes(…)`,
-      Zirda `Nonpermanent or Any.withCardPredicate(CardPredicate.HasActivatedAbility)`.
+      Zirda `Nonpermanent or Any.withCardPredicate(CardPredicate.HasActivatedAbility)`, Jegantha
+      `Any.withCardPredicate(CardPredicate.Not(CardPredicate.HasRepeatedManaSymbol))`.
     - `DeckSizeAboveMinimum(extra)` — Yorion's 20 over the format minimum (never in 100-card Commander).
     - `ShareACardType(among)` — Umori, `among = Nonland`: one card type common to all of them.
     - `DistinctNames(among)` — Lutri, `among = Nonland`: no repeated name.
-
-    Jegantha ("more than one of the same mana symbol") reads a mana-cost symbol multiset no filter
-    expresses and is not modelled.
   - **Game setup and play.** `GameInitializer` marks the named sideboard copy as the player's
     `CompanionComponent` (on the player). It stays in `Zone.SIDEBOARD` — outside the game — but
     `Visibility` shows it to every player and spectator (103.2b), and `ClientPlayer.companionId` points at
@@ -13408,7 +14741,7 @@ composite abilities).
   its third ability is "if you *can't* remove a counter, sacrifice it" — one turn earlier than
   vanishing's. Hand-lower it, or add the counter type first.
 - `Vanishing(n)` — **engine-live.** Declare it and nothing else: `keywordAbility(KeywordAbility.vanishing(3))`
-  (Deep Forest Hermit). The engine supplies all three CR 702.62 abilities from
+  (Deep Forest Hermit). The engine supplies all three CR 702.63a abilities from
   [`Vanishing`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Vanishing.kt) — the
   "enters with N time counters" replacement is synthesized at the entry seam from the printed `n`
   (so it runs through `placeEntryCounters` and honours Hardened Scales / Solemnity), and the upkeep
@@ -13416,8 +14749,8 @@ composite abilities).
   the **projected** keyword, the same way flanking and the Siege defeat trigger are. Deriving from
   the projection is what makes a token created *with* vanishing, or a creature that *gains* it,
   count down as well — and what makes "loses all abilities" stop the clock. Do **not** hand-write
-  the three parts; they would stack with the engine's. Note 702.62b and 702.62c stay two separate
-  abilities (unlike suspend, which fuses them): a vanishing permanent sits where instant-speed
+  the three parts; they would stack with the engine's. Note the countdown and the sacrifice stay two separate
+  abilities (as suspend's countdown and cast do): a vanishing permanent sits where instant-speed
   counter removal can reach it, and it is sacrificed whenever the last counter leaves, not only on
   an upkeep.
 - `Renown(n)` — **engine-live.** Declare it and nothing else:
@@ -13431,9 +14764,17 @@ composite abilities).
   the **projected** keyword (so "loses all abilities" strips it) while N is read from the printed
   `KeywordAbility.Numeric`, and each printed instance becomes its own trigger — the first to
   resolve renowns the creature and the rest find their `if` false, so renown 1 + renown 2 is never
-  a summed renown 3. A *granted* renown (Aragorn, Hornburg Hero) derives nothing today, the same
-  limitation granted vanishing has for its entry counters. Do **not** hand-write the trigger; it
-  would stack with the engine's. Pinned by `RenownKeywordTest`.
+  a summed renown 3. **Granted renown** — "Attacking creatures you control have first strike and
+  renown 1" (Aragorn, Hornburg Hero) — is `GrantKeyword(KeywordAbility.grantedRenown(1),
+  GroupFilter(GameObjectFilter.Creature.attacking().youControl()))`, the projected `RENOWN_<n>`
+  keyword carrying its own N. Like crew and unlike toxic/bushido, renown grants are **not summed**:
+  distinct Ns sit side by side, and projection tallies identical grants
+  (`ProjectedState.grantedKeywordInstances`), so two "have renown 1" sources derive two triggers.
+  Each granted instance adds its own trigger beside the printed ones, and the printed half is gated
+  on the bare `RENOWN` keyword alone — a creature that lost all abilities and was then granted
+  renown 1 has only the granted trigger. The client shows a granted `RENOWN_<n>` as the plain Renown
+  keyword. Do **not** hand-write the trigger; it would stack with the engine's. Pinned by
+  `RenownKeywordTest`.
 - `Fabricate(n)` — **engine-live.** Declare it and nothing else:
   `keywordAbility(KeywordAbility.fabricate(2))` (Weaponcraft Enthusiast). The engine supplies the
   CR 702.123 ability from
@@ -13494,12 +14835,18 @@ composite abilities).
   objects leave as one event, the freeze is taken before the whole batch moves — a state-based-action pass, a
   `MoveCollection` batch (`Effects.DestroyAll`), `ZoneTransitionService.moveToZoneBatch`, and a `ForEachInGroup`
   loop (via `EffectContext.lookBackGrants`) — so the Whelp still draws when the transformed permanent dies beside it.
+  The look-back holds for a source that **stays** on the battlefield too — "as long as you control a Cleric, this
+  artifact has 'Whenever a creature you control dies, …'" (Relic Vial): the same snapshot freezes every battlefield
+  permanent's conditional self-granted leaves-the-battlefield abilities (`LookBackGrants.observerSelfGrantIds`), and
+  a departure event reads those instead of the live grants. Sacrificing the only Cleric still triggers the Vial; a
+  grant whose condition only the death itself makes true (a creature card now in your graveyard) doesn't.
 - `Increment` — "Whenever you cast a spell, if the amount of mana you spent is greater than this creature's power
   or toughness, put a +1/+1 counter on this creature." (Secrets of Strixhaven). Display-only; wire the behavior with
   the `card { increment() }` builder helper, which adds the `KeywordAbility.Increment` display marker (surfacing
   `Keyword.INCREMENT`) plus a `Triggers.you.casts()` triggered `AddCounters(+1/+1, 1, Self)` gated by an
-  intervening-if (CR 603.4) that compares the triggering spell's mana spent (`EntityProperty(TriggeringEntity,
-  ManaSpent)`) against the source's power *or* toughness — modelled as an `AnyCondition` of two `Compare(GT)`
+  intervening-if (CR 603.4) that compares the triggering spell's mana spent
+  (`ContextProperty(MANA_SPENT_ON_TRIGGERING_SPELL)`, the cast-time snapshot, so the ability still resolves after
+  that spell is countered) against the source's power *or* toughness — modelled as an `AnyCondition` of two `Compare(GT)`
   arms, so it fires when the mana exceeds the smaller characteristic. No parameter (mirrors `firebending()` /
   `decayed()`).
 - `Opus` — "Opus — Whenever you cast an instant or sorcery spell, [base]. If five or more mana was spent to cast
@@ -13535,6 +14882,15 @@ composite abilities).
   generic cost (`{1}`, `{2}`) or repeated copies of one colored symbol (`{G}`, `{R}{R}`); a mixed mana cost or a
   non-mana cost ("pay 1 life", "sacrifice a creature") throws at authoring time instead of being approximated.
   Mystic Remora. Engine test: `CumulativeUpkeepTest`.
+- `Echo` — "Echo [cost] (At the beginning of your upkeep, if this came under your control since the beginning of
+  your last upkeep, sacrifice it unless you pay its echo cost.)" (CR 702.30). Display-only keyword; wire it with the
+  `card { echo(ManaCost.parse("{1}{R}")) }` builder helper, which composes `Triggers.you.beginningOf(UPKEEP)` with
+  the intervening if `All(SourceInZone(BATTLEFIELD), Not(SourceMatches(Any.controlledSinceYourLastUpkeep())))` →
+  `MayPay(PayMana(cost), then = Nothing, otherwise = SacrificeTarget(Self))`. It is owed on the first upkeep after
+  the permanent entered or came under your control, never again while you keep it, and anew after a blink or a
+  control change (see "Continuous control" under state predicates). An unaffordable cost skips straight to the
+  sacrifice. **Scope:** mana echo costs; Time Spiral's non-mana ones ("Echo—Discard a card") aren't covered.
+  Mogg War Marshal. Engine test: `EchoTest`.
 - `Riot` — "Riot (This creature enters with your choice of a +1/+1 counter or haste.)" (CR 702.136). Display-only
   keyword; wire it with the `card { riot() }` builder helper, which composes the Khans-Siege
   `EntersWithChoice(ChoiceType.MODE, [counter, haste])` + a mode-gated `EntersWithCounters(count = 1, selfOnly = true,
@@ -13745,8 +15101,19 @@ composite abilities).
   X-cost **typecycling** is not wired — no such card is printed.
 - `BasicLandcycling(cost)` — cycling that fetches a basic land type.
 - `Typecycling(type, cost)` — cycling that fetches a card type.
+- `GrantCyclingToCardsInHand(filter, cost)` — static: "Each creature card in your hand has cycling {1}{U}"
+  (Rhet-Tomb Mystic, `filter = GameObjectFilter.Creature`). Reaches only the granter's controller's hand.
+  `CyclingGrants.plainCyclingOptions` is the single read site for plain cycling — the enumerator and
+  `CycleCardHandler` both go through it — so granted cycling pays, discards, draws, counts toward
+  "cycled this game" and fires cycle triggers exactly like printed cycling; Stabilizer-style locks and
+  Zirda-style activated-ability reductions apply to it too. A card that already has cycling holds both
+  abilities: the legal actions offer one `CycleCard` per distinct cost, and `CycleCard.grantedBy` names
+  the granting permanent (null = printed). Grants are read through `controlledActiveStaticAbilities`:
+  a granter that has lost all abilities or is face down grants nothing, and a
+  `staticAbility { condition = … }` grant applies only while its condition holds. Each grant also
+  counts as an activated ability of the card in hand for `HasActivatedAbilities`.
 - `Plot(cost)` — `KeywordAbility.plot(cost)`. Special action available during your main phase while the stack is empty: pay [cost] and exile the card from your hand. It becomes plotted (stamped with a `PlottedComponent`). On a later turn you may cast it from exile without paying its mana cost, as a sorcery (CR 718). Cast permission is granted via the engine's standard `MayPlayPermission` + `PlayWithoutPayingCostComponent`, gated by `Conditions.SourcePlottedOnPriorTurn`. No card-side wiring needed — declare the keyword ability on the card and the engine handles the rest.
-- `Foretell(cost)` — `KeywordAbility.foretell(cost)` (Kaldheim, CR 702.143). A sorcery-speed **special action** available while you have priority during your own turn: pay the fixed **{2}** setup cost and exile the card from your hand **face down** (`ForetoldComponent` + `FaceDownComponent` — hidden from opponents in exile, visible to its owner). On a **later** turn (not the turn it was foretold) you may cast it from exile by paying its **foretell cost** `[cost]` rather than its mana cost. Cast permission is a standard permanent `MayPlayPermission` gated by `Conditions.SourceForetoldOnPriorTurn`, plus a `PlayWithFixedAlternativeManaCostComponent` carrying `[cost]` — the same fixed-alternative-cast machinery **Airbend** uses, honored by `CastFromZoneEnumerator` + `CastSpellHandler` and stripped on leaving exile by `StackResolver` (which also strips the `FaceDownComponent` as the card is cast face up). Structurally Plot's paid cousin (`ForetellCardHandler` / `ForetellEnumerator` mirror `PlotCardHandler` / `PlotEnumerator`): plot is free to set up and free to cast later, foretell costs {2} to exile and has a distinct foretell cost to cast. No card-side wiring needed — declare the keyword ability and the engine handles the rest.
+- `Foretell(cost)` — `KeywordAbility.foretell(cost)` (Kaldheim, CR 702.143). A **special action** available any time you have priority during your own turn (CR 116.2h — not only at sorcery speed; on any turn with `MayForetellOnAnyTurn`): pay the **{2}** setup cost (modified by `ModifySpecialActionCost(FORETELL, …)`) and exile the card from your hand **face down** (`ForetoldComponent` + `FaceDownComponent` — hidden from opponents in exile, visible to its owner). On a **later** turn (not the turn it was foretold) you may cast it from exile by paying its **foretell cost** `[cost]` rather than its mana cost. Cast permission is a standard permanent `MayPlayPermission` gated by `Conditions.SourceForetoldOnPriorTurn`, plus a `PlayWithFixedAlternativeManaCostComponent` carrying `[cost]` — the same fixed-alternative-cast machinery **Airbend** uses, honored by `CastFromZoneEnumerator` + `CastSpellHandler` and stripped on leaving exile by `StackResolver` (which also strips the `FaceDownComponent` as the card is cast face up). Structurally Plot's paid cousin (`ForetellCardHandler` / `ForetellEnumerator` mirror `PlotCardHandler` / `PlotEnumerator`): plot is free to set up and free to cast later, foretell costs {2} to exile and has a distinct foretell cost to cast. No card-side wiring needed — declare the keyword ability and the engine handles the rest. A rider on whether the spell **was foretold** ("If this spell was foretold, …") reads `Conditions.WasForetold` — true when the spell was a foretold card in exile before it was cast, whatever cost then paid for it (CR 702.143c); the engine stamps `ChoiceSlot.FORETOLD` as the spell is cast, so it answers from the resolving spell and from the permanent a permanent spell becomes (Poison the Cup, Starnheim Unleashed). The foretell cost may carry an `{X}` (`foretell("{X}{X}{W}")`, Starnheim Unleashed): it is announced and paid like a printed `{X}`, and the resolving spell reads it as `DynamicAmounts.xValue()`.
 - `Suspend(cost, timeCounters)` — `KeywordAbility.suspend(cost, n)` (Time Spiral, CR 702.62). Unlike every other
   entry in this list, exiling this way is **not a cast** — CR 702.62a: "this action doesn't use the stack" — so it's
   wired as its own special action (`SuspendCardFromHand` / `SuspendCardFromHandHandler` / `SuspendEnumerator`),
@@ -13755,7 +15122,7 @@ composite abilities).
   instant/flash, sorcery speed otherwise), independent of whether the card's mana cost could ever actually be paid.
   On exiling, the handler puts `timeCounters` time counters on the card and stamps it exactly like
   `GrantSuspendExecutor` (`SuspendedComponent` + dormant haste), handing off into the pre-existing
-  `Suspend.countdownAbility` — the same countdown-and-free-cast machinery a runtime-granted suspend (Taigam, Master
+  `Suspend.exileAbilities` — the same countdown-and-free-cast machinery a runtime-granted suspend (Taigam, Master
   Opportunist) uses. See the full mechanic writeup under §11 "Keywords" → `Suspend` above. **Ancestral Vision** is the reference
   card — a Sorcery with **no printed mana cost** (`hasNoManaCost = true`), playable only through Suspend.
 - `Hideaway(n)` — `KeywordAbility.hideaway(n)`; display tag rendered "Hideaway N". Mechanic is composed manually via `MoveCollectionEffect(faceDown = FaceDownMode.HIDDEN, linkToSource = true)` + `CardSource.FromLinkedExile()` — the keyword itself carries no engine behavior.
@@ -13763,7 +15130,7 @@ composite abilities).
   your graveyard for `cost` instead of its mana cost, then exile it whenever it would leave the stack. No card-side
   wiring: the engine enumerates `CastWithFlashback`, prices it, and exiles it (on resolution or when countered) through the
   shared `FlashbackGrants.effectiveFlashback` resolver (which also reads granted flashback — see `GrantFlashback`
-  and `GraveyardCardsHaveFlashback`). `KeywordAbility.flashback(cost, additionalCost)` bundles a non-mana cost paid
+  and `GraveyardCardsHaveCastKeyword`). `KeywordAbility.flashback(cost, additionalCost)` bundles a non-mana cost paid
   only on the flashback path ("Flashback—{1}{R}, Behold three Elementals"). `KeywordAbility.flashback(cost, condition)`
   is a flashback the card has only **while `condition` holds** — Viral Spawning: "Corrupted — As long as an opponent
   has three or more poison counters and this card is in your graveyard, it has flashback {2}{G}" is
@@ -13774,6 +15141,18 @@ composite abilities).
   `KeywordAbility.flashback(cost, additionalCost, minimumXValue = 1)` floors the spell's X on the flashback route only —
   "If you cast this spell this way, X can't be 0" (Light Up the Night). The `CastWithFlashback` offer carries `minX`, is
   unaffordable when the X ceiling is below it, and a flashback cast announcing less is rejected; hand casts keep X ≥ 0.
+- `BeamMeUp(cost)` — `beamMeUp("{2}{U}")` / `KeywordAbility.beamMeUp(cost)` (Star Trek; the published
+  Comprehensive Rules predate the set, so the spec is [Wizards' mechanics article](https://magic.wizards.com/en/news/feature/star-trek-mechanics)).
+  An instant or sorcery may be cast from its owner's graveyard at its normal timing for `cost` plus returning a
+  creature its caster controls to its owner's hand; the return is a cost, not a target. The spell keeps its printed
+  mana value and is exiled on every stack exit (resolve, fizzle, counter, return to hand) — `StackExitRider`. No
+  card-side wiring: `BeamMeUp.options` is the single source of offers — the printed ability and each granter
+  (`GraveyardCardsHaveCastKeyword(GraveyardCastKeyword.BeamMeUp(…), …)`, Scotty) is one `CastWithAlternativeCost`
+  action ("Cast X (Beam me up {U} — from Scotty, Miracle Worker)") whose `CastSpell.beamMeUpSource` names the
+  granter (null = printed), with the offer's creature pool as its `BouncePermanent` cost. Only instants and sorceries
+  can be cast this way, even when a grant reaches other cards. **Can't be beamed up** (Marooned) is the projected flag
+  `GrantKeyword(AbilityFlag.CANT_BE_BEAMED_UP.name)`: it removes the permanent from every beam me up return pool and
+  blocks no other return cost or effect.
 - `Harmonize(cost)` — `KeywordAbility.harmonize(cost)` (Tarkir: Dragonstorm). An alternative cost to cast an instant/sorcery **from your graveyard**, like Flashback, then exile it as it resolves. As you cast it you may tap **a single** untapped creature you control to reduce the **generic** portion of the harmonize cost by that creature's (projected) power — a Convoke-style reduction, but one creature paying generic-equal-to-power instead of one mana per creature. No card-side wiring: declare the keyword ability and the engine handles graveyard-cast enumeration (`CastWithHarmonize`), the per-creature reduction (routed through `AlternativePaymentChoice.harmonizeCreature`), and the exile-on-resolution. The chosen creature and its power are surfaced to the client via `LegalAction.harmonizeCreatures` / `hasHarmonize`; the client offers an on-battlefield single-creature tap step (the `harmonize` pipeline phase + `HarmonizeSelector` HUD, mirroring Convoke). **Harmonize {X}** (e.g. Nature's Rhythm `{X}{G}{G}{G}{G}`): the `CastWithHarmonize` action surfaces `hasXCost`/`maxAffordableX` (max X folds in the best single-creature tap reduction) so the client prompts for X. {X} is generic mana, so the tap reduces the mana paid *for X* — `CastCostTotaller.paymentXValue` lowers the X mana once `reduceGeneric` has consumed any printed generic — while the chosen X stamped onto `SpellOnStackComponent.xValue` (and read by the effect, e.g. "mana value X or less") is unchanged. Colored pips are never reduced. **Granting harmonize at runtime:** harmonize can also be granted to a graveyard card that doesn't print it via `Effects.GrantHarmonize(target, cost?, duration)` (Songcrafter Mage). The grant is a `GrantedKeywordAbility` record keyed to the card entity; every harmonize read site consults printed-**or**-granted harmonize through the `HarmonizeGrants.effectiveHarmonize` resolver, so a granted harmonize is castable, reducible, and exiled exactly like a printed one. The grant survives the graveyard → stack move (so exile-on-resolution still fires) and is cleared in the cleanup step.
 - **Tap-for-generic payments (the shared rail: Improvise, Waterbend).** Every mechanic shaped as *"you may tap an untapped permanent you control rather than pay {1} generic"* runs on **one** rail, not a field each. The chosen permanents travel in `AlternativePaymentChoice.tapForGenericPermanents` (a `Set<EntityId>`); the engine applies them through `AlternativePaymentHandler.applyTapForGeneric`, which takes a `TapForGeneric` eligibility value (`rules-engine/.../mechanics/mana/TapForGeneric.kt`) plus an optional cap. Each tap removes {1} of **generic** — never a colored pip, and never more taps than there is generic to pay. Enumeration surfaces it once, as `LegalAction.hasTapForGeneric` / `tapForGenericPermanents` / `tapForGenericAmount` (the cap, null when the bound is just the cost's generic) / `tapForGenericLabel` (the player-facing verb), built by `CostEnumerationUtils.findTapForGenericPermanents(state, playerId, eligibility)` + `canAffordWithTapForGeneric`. The client has one HUD for all of them: the `tapForGeneric` pipeline phase + `TapForGenericSelector`, which reads the label so the bar says "improvise" or "waterbend". **Adding another mechanic of this shape is one `TapForGeneric` entry, not a new payment field, handler branch, or UI.**
   - **"The creatures that convoked it"** (CR 702.51c — a creature tapped to pay for a spell's convoke "convoked" it). `Keyword.CONVOKE` itself needs no wiring; the creatures actually tapped for it are recorded on the spell (`SpellOnStackComponent.convokedCreatures`, each with its battlefield-entry stamp) and carried onto the resolving permanent's cast-choices bag under `ChoiceSlot.CONVOKED_CREATURES`. Two readers: `DynamicAmounts.convokedCreatureCount()` (= `CastChoice(CONVOKED_CREATURES)`; an entity-list slot reads as its size) counts every creature that tapped, **including one that has since left** — Ancient Imperiosaur `EntersWithDynamicCounters(count = convokedCreatureCount() * 2)`, Knight-Errant of Eos's "mana value X or less" (`ManaValueAtMostDynamic`); and `GameObjectFilter.Creature.thatConvokedSource()` (`CardPredicate.ConvokedSource`) matches each one still on the battlefield **as the same object** — a creature that left and returned is a new object (CR 400.7) and doesn't match — Zephyr Singer `ForEachInGroup(GroupFilter(Creature.thatConvokedSource()), AddCounters(FLYING, 1, IterationEntity))`. Reads the source's record, so it works from the permanent's own enters trigger and from the spell while it's still on the stack; a copy of the spell keeps the original's record (CR 707.10). Fails closed in layer projection and in cost calculation.
@@ -13783,7 +15162,7 @@ composite abilities).
 - **Spell-level waterbend additional cost** (Avatar: The Last Airbender) — *"As an additional cost to cast this spell, [you may] waterbend {N}."* Declared in the card builder with `waterbendCost(amount, optional = false, isX = false)`, which sets `CardScript.spellWaterbend: SpellWaterbendCost`. It adds {N} generic to the spell's cost; the same `AlternativePaymentChoice.tapForGenericPermanents` taps pay it, **bounded by N** so taps never cover the spell's own generic. `optional = true` models "you may waterbend {N}" — the enumerator offers a second, *paid* cast variant, and paying it sets `ChoiceSlot.WATERBEND_PAID` so the effect branches via `Conditions.WaterbendWasPaid` (the waterbend analogue of `BlightWasPaid`, e.g. `Effects.If(Conditions.WaterbendWasPaid, paidEffect, elseEffect = baseEffect)`); a mandatory cost always adds {N}. Wiring: `CastSpellHandler` adds {N} and applies `AlternativePaymentHandler.applyWaterbendForSpell` (capped at N); `CastSpellEnumerator` surfaces `hasTapForGeneric`/`tapForGenericPermanents`/`tapForGenericAmount = N` on the cast action, reusing the same client `tapForGeneric` pipeline phase + `TapForGenericSelector`. Cards: Benevolent River Spirit (mandatory {5}), Ruinous Waterbending (optional {4}), Spirit Water Revival (optional {6}). The **`isX` "waterbend {X}" shape** (`waterbendCost(isX = true)`) is fully wired: the enumerator folds a literal `{X}` into the cost so the spell reads as X-carrying (`maxAffordableX` bounded by available mana **plus** tappable permanents), the client prompts for X then runs the waterbend tap step (capped at the chosen X), and the resolver charges X as the waterbend generic — so X also feeds the effect via `DynamicAmount.XValue`. *(The two `isX` cards Crashing Wave and Foggy Swamp Visions each still need a card-specific effect beyond the cost — "distribute N counters among a filtered group chosen at resolution", and "token copy of each exiled card" + delayed sacrifice — before they can ship.)* The **in-resolution "unless you waterbend {N}" shape** (Waterbending Lesson) is wired separately as `Effects.UnlessYouWaterbend(amount, otherwise)` — a `Gate.MayPay` over a waterbend-flagged `PayManaCostEffect`, resolved during the spell's resolution rather than as a cast-time cost (see the gated-effects section).
 - `squad(manaCost?, additionalCost?)` — imports `sdk.dsl.mechanics.squad`. Squad's two linked abilities compose an `OptionalAdditionalCost(multi = true, declaredSlot = SQUAD)` with an enters trigger gated on `CastChoiceMade(SQUAD)`, creating token copies with `DynamicAmount.CastChoice(SQUAD)`. The cast menu offers each affordable payment count, including mana plus discard and graveyard-exile costs. Squad is distinct from kicker; token copies inherit the ability but no paid-cost record, so they do not recurse. Copies enter together in one token-creation batch. If the triggering object leaves or blinks before resolution, its departure snapshot retains numeric keywords and both transforming faces.
 - Repeatable optional-cost declarations now retain the numeric payment count under their own slot on the stack and permanent. `DynamicAmount.CastChoice(KICKED)` reads a multikicker count, and `CastChoice(SQUAD)` reads squad payments. Presence still means the cost was paid. Self-cast and self-entry triggers freeze the count so source removal does not erase it. `additionalCostPaid(n)` scales life, fixed player-counter payments, discard counts, exile counts, and composites using distinct selection channels, including nested composites; repeated single-graveyard constraints and unsupported non-amount shapes remain rejected at construction.
-- `OptionalAdditionalCost(manaCost?, additionalCost?, multi, displayPrefix, branchesEffect, grantsFlashTiming, declaredSlot)` — generalised "pay an optional extra cost while casting" primitive. `declaredSlot` (default `ChoiceSlot.KICKED`) is the durable slot the declaration stamps — i.e. *which mechanic* is riding the rail, so `ChoiceSlot.BARGAINED` makes the same machinery Bargain (CR 702.166) and `ChoiceSlot.TEAMWORK` makes it Teamwork N (CR 702.194), without either reading as kicked. Backs printed Kicker / Multikicker / Offspring / Bargain **and** the pre-kicker "pay {N} more to cast as though it had flash" pattern (Ghitu Fire). When `branchesEffect = true` (default) paying the cost marks the spell so `WasKicked` fires for the card's own effect/triggers; when `false` the payment is invisible to `WasKicked` (used by `flashKicker`). When `grantsFlashTiming = true` paying the cost unlocks instant-speed casting in addition to whatever else it does — the optional cost may be mana (Ghitu Fire: `KeywordAbility.flashKicker("{2}")`) **or** a non-mana `additionalCost` such as Behold (Molten Exhale: "you may cast this as though it had flash if you behold a Dragon", `KeywordAbility.flashKicker(Costs.additional.Behold(filter = Filters.WithSubtype("Dragon")))`). Prefer the factories: `KeywordAbility.kicker(cost)`, `KeywordAbility.kicker(additionalCost)`, `KeywordAbility.multikicker(cost)`, `KeywordAbility.replicate(cost)` (see Replicate), `KeywordAbility.offspring(cost)`, `KeywordAbility.flashKicker(cost)`, `KeywordAbility.flashKicker(additionalCost)`, `KeywordAbility.optionalAdditionalCost(additionalCost)` (see below). Serial name is `Kicker` for wire compatibility. **Kicker {X}** (variable kicker, e.g. `KeywordAbility.kicker("{X}")` on Verdeloth the Ancient): the kicked cast surfaces `hasXCost`/`maxAffordableX` so the client prompts for X exactly like a base-cost X spell; the chosen X is paid as part of the kicker and stamped onto `SpellOnStackComponent.xValue`, so the card's ETB trigger reads it via `DynamicAmount.XValue` ("create X tokens"). **Kicker [A] and/or [B]** (two kicker costs, CR 702.33b — Wastescape Battlemage, the Invasion battlemages): declare two `KeywordAbility.kicker(...)` entries in printed order. Each may be paid independently (CR 702.33d — paying either kicks the spell, so `WasKicked` / `SpellCastPredicate.WasKicked` read true for any of them): the enumerators offer one `CastWithKicker` variant per non-empty combination ("Kicked {G}", "Kicked {1}{U}", "Kicked {G} + {1}{U}"), carried on `CastSpell.declaredCostIndices` (printed positions; empty = every cost under the slot), and the handler charges every declared cost. The linked "if it was kicked with its [A]/[B] kicker" abilities (CR 702.33f) read `Conditions.WasKickedWithFirstKicker` / `Conditions.WasKickedWithSecondKicker` — facades over `CastChoiceMade(ChoiceSlot.FIRST_KICKER / SECOND_KICKER)`, which the cast stamps beside its other cast-choice slots, so they answer from a "when you cast this spell" trigger, from the spell's own resolving effect, and from an enters trigger on the permanent it became.
+- `OptionalAdditionalCost(manaCost?, additionalCost?, multi, displayPrefix, branchesEffect, grantsFlashTiming, declaredSlot, minimumXValue = 0)` — generalised "pay an optional extra cost while casting" primitive. `declaredSlot` (default `ChoiceSlot.KICKED`) is the durable slot the declaration stamps — i.e. *which mechanic* is riding the rail, so `ChoiceSlot.BARGAINED` makes the same machinery Bargain (CR 702.166) and `ChoiceSlot.TEAMWORK` makes it Teamwork N (CR 702.194) and `ChoiceSlot.BOUGHT_BACK` makes it Buyback (CR 702.27, `KeywordAbility.buyback(cost)`), without any of them reading as kicked. Backs printed Kicker / Multikicker / Offspring / Bargain **and** the pre-kicker "pay {N} more to cast as though it had flash" pattern (Ghitu Fire). When `branchesEffect = true` (default) paying the cost marks the spell so `WasKicked` fires for the card's own effect/triggers; when `false` the payment is invisible to `WasKicked` (used by `flashKicker`). When `grantsFlashTiming = true` paying the cost unlocks instant-speed casting in addition to whatever else it does — the optional cost may be mana (Ghitu Fire: `KeywordAbility.flashKicker("{2}")`) **or** a non-mana `additionalCost` such as Behold (Molten Exhale: "you may cast this as though it had flash if you behold a Dragon", `KeywordAbility.flashKicker(Costs.additional.Behold(filter = Filters.WithSubtype("Dragon")))`). Prefer the factories: `KeywordAbility.kicker(cost)`, `KeywordAbility.kicker(additionalCost)`, `KeywordAbility.multikicker(cost)`, `KeywordAbility.replicate(cost)` (see Replicate), `KeywordAbility.offspring(cost)`, `KeywordAbility.flashKicker(cost)`, `KeywordAbility.flashKicker(additionalCost)`, `KeywordAbility.optionalAdditionalCost(additionalCost)` (see below). Serial name is `Kicker` for wire compatibility. **Kicker {X}** (variable kicker, e.g. `KeywordAbility.kicker("{X}")` on Verdeloth the Ancient): the kicked cast surfaces `hasXCost`/`maxAffordableX` so the client prompts for X exactly like a base-cost X spell; the chosen X is paid as part of the kicker and stamped onto `SpellOnStackComponent.xValue`, so the card's ETB trigger reads it via `DynamicAmount.XValue` ("create X tokens"). "Kicker {X}. X can't be 0" (Thieving Skydiver) is `KeywordAbility.kicker("{X}", minimumXValue = 1)`: the kicked offer's `minX` starts the X choice there (and the offer is unaffordable when the ceiling is below it), and a kicked cast announcing less is rejected; it requires an `{X}` in the mana half and constrains only casts that pay the cost — the `Flashback.minimumXValue` shape on the kicker route. **Kicker [A] and/or [B]** (two kicker costs, CR 702.33b — Wastescape Battlemage, the Invasion battlemages): declare two `KeywordAbility.kicker(...)` entries in printed order. Each may be paid independently (CR 702.33d — paying either kicks the spell, so `WasKicked` / `SpellCastPredicate.WasKicked` read true for any of them): the enumerators offer one `CastWithKicker` variant per non-empty combination ("Kicked {G}", "Kicked {1}{U}", "Kicked {G} + {1}{U}"), carried on `CastSpell.declaredCostIndices` (printed positions; empty = every cost under the slot), and the handler charges every declared cost. The linked "if it was kicked with its [A]/[B] kicker" abilities (CR 702.33f) read `Conditions.WasKickedWithFirstKicker` / `Conditions.WasKickedWithSecondKicker` — facades over `CastChoiceMade(ChoiceSlot.FIRST_KICKER / SECOND_KICKER)`, which the cast stamps beside its other cast-choice slots, so they answer from a "when you cast this spell" trigger, from the spell's own resolving effect, and from an enters trigger on the permanent it became.
 - `KeywordAbility.optionalAdditionalCost(additionalCost)` — the **unnamed** optional additional cost: "As an additional cost to cast this spell, you may <cost>" printed with no keyword (Voltage Surge: "you may sacrifice an artifact"). Rides the `OptionalAdditionalCost` rail with `declaredSlot = ChoiceSlot.ADDITIONAL_COST_PAID`, so the cast menu offers a `CastWithKicker` variant named for the cost ("Cast Voltage Surge (Sacrifice an artifact)"), the cost is paid during casting, and the stack badge reads "Additional cost paid". The linked rider reads `Conditions.AdditionalCostWasPaid` ("if this spell's additional cost was paid") — a facade over `CastChoiceMade(ADDITIONAL_COST_PAID)` that answers from the spell's own effect and from an enters trigger on the permanent it became. The spell is never kicked: `WasKicked` and "whenever you cast a kicked spell" stay false. A mandatory additional cost is `additionalCost(...)`, not this.
 - `Impending(time, cost)` — `card { impending(n, cost) }` builder helper (CR 702.176, Duskmourn). A self-alternative
   cost: pay [cost] instead of the mana cost and the permanent enters with N **time counters**, isn't a creature until
@@ -13821,6 +15200,11 @@ composite abilities).
   `ReduceActivatedAbilityCost(..., reach = ActivatedAbilityReach.ACTIVATED_BY_YOU, keyword = Keyword.NINJUTSU)`
   (Silver-Fur Master). Used by *Kaito, Bane of Nightmares* (DSK) — a planeswalker with ninjutsu whose own static makes it
   a creature on your turn, so it can enter attacking.
+  **Commander ninjutsu** (CR 702.49d) — `card { commanderNinjutsu("{cost}") }` — adds the same marker with
+  `commander = true` ("Commander ninjutsu {cost}") plus `commanderNinjutsuAbilities(cost)`: the hand ability above and an
+  identical one with `activateFromZone = Zone.COMMAND` / `fromZone = Zone.COMMAND`, surfaced by the command-zone
+  `ZoneActivatedAbilityEnumerator`. Both keep `keyword = Keyword.NINJUTSU`, and neither casts the card, so commander tax
+  doesn't grow. Used by *Yuriko, the Tiger's Shadow* (C18).
 - `WebSlinging(cost)` — `card { webSlinging("{cost}") }` builder helper (CR 702.188, Marvel's Spider-Man). An
   alternative cost bundling a non-mana portion: *"You may cast this spell by paying [cost] and returning a **tapped**
   creature you control to its owner's hand rather than paying its mana cost."* Unlike `Sneak` it grants **no
@@ -13989,18 +15373,35 @@ composite abilities).
 - `Suspend` (CR 702.62) — an **exile-zone** mechanic, unlike Impending/Vanishing which live on the battlefield.
   A suspended card sits in exile with **time counters**; at the beginning of its **owner's** upkeep one is removed,
   and when the last is gone its owner **may play it for free**, with **haste** if it's a creature. The lifecycle is
-  **component-driven**, not definition-driven: the engine grants `Suspend.countdownAbility` (a synthesized
-  `activeZone = EXILE` upkeep trigger — remove a counter, then a `Effects.May` that gathers the card via
-  `CardSource.Entity(EffectTarget.Self)` and casts it with `CastFromCollectionWithoutPayingCostEffect`) to **any** exiled card carrying the
-  `SuspendedComponent` marker. So an arbitrary card with no printed suspend can be suspended.
+  **component-driven**, not definition-driven: the engine grants `Suspend.exileAbilities` — CR 702.62a's two
+  synthesized `activeZone = EXILE` triggers: `Suspend.countdownAbility` (owner's upkeep, if it has a time counter,
+  remove one) and `Suspend.lastCounterCastAbility` (`CountersRemovedEvent(TIME, lastRemoved = true)`, if it's still
+  exiled, an `Effects.May` that gathers the card via `CardSource.Entity(EffectTarget.Self)` and casts it with
+  `CastFromCollectionWithoutPayingCostEffect`) — to **any** exiled card carrying the `SuspendedComponent` marker. So an
+  arbitrary card with no printed suspend can be suspended, and the cast trigger fires for **whatever** removes the
+  last time counter, not only the upkeep countdown (Clockspinning). A "suspended card" target or filter is
+  `GameObjectFilter.Any.suspended()` in `Zone.EXILE` (`StatePredicate.IsSuspended`, CR 702.62b).
   - **Putting a card into suspend** is a chain you compose; `Effects.Suspend(target, timeCounters)` is the reusable
     two-step tail (`AddCounters(TIME, n)` + `GrantSuspendEffect` — the latter sets the marker **and** arms a dormant
     haste effect on the card with duration `WhileControlledByController`, so the haste ends the moment the player who
-    played it loses control of the permanent — CR 702.62g). The caller supplies the exile step first, because it differs by source zone:
+    played it loses control of the permanent — CR 702.62a). The caller supplies the exile step first, because it differs by source zone:
     a spell on the stack uses `CounterSpellToExile` / `CounterEffect(counterDestination = Exile())` (it can't be lifted
     off the stack with a zone-move).
   - **Taigam, Master Opportunist** is the first user: `Composite(CopyTargetSpell(TriggeringEntity),
     CounterEffect(TriggeringEntity → Exile), Suspend(TriggeringEntity, 4))`.
+  - **A spell that suspends itself as it resolves** — "Exile <card name> with N time counters on it." on a card
+    with a printed suspend (**Suspended Sentence**, Arc Blade, Inspiring Refrain, the rest of that cycle) — is
+    `spell { …; selfExile(timeCounters = n) }`, the `selfExile()` clause with its counter count
+    (`CardScript.selfExileTimeCounters`). It replaces the CR 608.2n destination exactly like a plain
+    `selfExile()`; as the card lands in exile `NonPermanentSpellResolver` puts the N time counters on it
+    (`CountersAddedEvent`) and runs the same `markSuspended` tail the special action and `GrantSuspendEffect`
+    use, so — having suspend and a time counter, it is suspended (CR 702.62b) — its owner counts it down and casts
+    it free, after which it exiles itself again. A countered or fizzled spell never reaches the instruction and
+    goes to the graveyard with no counters. Because the clause is the spell's own last instruction, the spell is
+    never put into a graveyard, so graveyard-worded replacements — a cast-this-way rider (Quistis Trepe, Kylox's
+    Voltstrider) or rebound (printed or granted; this holds for a plain `selfExile()` too) — have nothing to replace;
+    flashback's "exile it instead" agrees with it. The DSL rejects a nonzero count on a card without `KeywordAbility.Suspend` (every printed card
+    with the clause has it), and on a cast face.
   - **A printed `Suspend N—[cost]`** (`KeywordAbility.Suspend(cost, timeCounters)`, built via
     `KeywordAbility.suspend("{U}", 4)`) is a **different code path from every other alternative-cost keyword**
     (Flashback/Warp/Mayhem/Plot/Foretell): CR 702.62a is explicit that exiling this way "doesn't use the stack" —
@@ -14008,7 +15409,7 @@ composite abilities).
     Modelled with the same shape as Plot/Foretell (`SuspendCardFromHand` action, `SuspendCardFromHandHandler`,
     `SuspendEnumerator`): pay the printed cost, move hand → exile, put N time counters on it, then stamp
     `SuspendedComponent` + the dormant haste effect exactly like `GrantSuspendExecutor` — handing off into the same
-    `Suspend.countdownAbility` machinery a granted suspend uses. Legal any time the player could *begin* to cast the
+    `Suspend.exileAbilities` machinery a granted suspend uses. Legal any time the player could *begin* to cast the
     card (instant speed for an instant/flash, sorcery speed otherwise — `SuspendEnumerator` checks this, ignoring
     whether the card's own mana cost could ever actually be paid, per CR 702.62c). **Ancestral Vision** (Time
     Spiral) is the canonical user — a Sorcery with **no printed mana cost**, playable only through Suspend.
@@ -14111,6 +15512,16 @@ composite abilities).
   EXILE))` (entry-timestamp tracked, so a blinked permanent is a new object the old trigger ignores) +
   `GrantExileOnLeave(Self)` (a component, not an ability — it survives "loses all abilities", per the unearth rulings).
   Declares `Keyword.UNEARTH` for display.
+- `Encore(cost)` — `card { encore(cost) }` builder helper (CR 702.141, Commander Legends). "[Cost], Exile this card
+  from your graveyard: For each opponent, create a token that's a copy of this card that attacks that opponent this
+  turn if able. The tokens gain haste. Sacrifice them at the beginning of the next end step. Activate only as a
+  sorcery." Composed by the `encoreAbility(cost)` factory: `AbilityCost.Composite(Mana(cost), ExileSelf)` +
+  `activateFromZone = Zone.GRAVEYARD` + `timing = SorcerySpeed`, whose effect is `ForEachPlayer(EachOpponent, [
+  CreateTokenCopyOfTarget(Self, sacrificeAtStep = END, controller = PlayerRef(ControllerOfSource)),
+  ForEachInCollection(CreatedTokens, GrantKeyword(HASTE, IterationEntity, Permanent) then
+  MarkMustAttackThisTurn(IterationEntity, defender = PlayerRef(You)))])` — each visit rebinds "you" to that
+  opponent, so the copy is pinned to the activator and the mark names the visited opponent. Haste is *gained*, not
+  a copiable value. Declares `Keyword.ENCORE` for display (Impulsive Pilferer).
 - `scavengeAbility(cost: ManaCost? = null)` — the Scavenge ability (CR 702.97, Return to Ravnica) as an
   `ActivatedAbility` factory, for printed scavenge and whole-graveyard grants alike. "[Cost], Exile this card
   from your graveyard: Put a number of +1/+1 counters equal to the power of the card you exiled on target creature.
@@ -14181,7 +15592,10 @@ composite abilities).
   TargetFilter.CreatureYouControl.withSubtype(Subtype.HUMAN))`. `quality` supplies the wording only,
   landing in two places: `ActivatedAbility.equipQuality`, which makes the ability *render* as its
   printed line, and the target requirement's id/label ("Human creature you control"), which is the
-  targeting prompt and what `LegalActionInfo.targetDescription` carries. `targetFilter` is the rules
+  targeting prompt and what `LegalActionInfo.targetDescription` carries. A quality that already
+  names its noun isn't suffixed again: "planeswalker" labels "planeswalker you control" (Luxior) and
+  "creature token" labels "creature token you control" (Team Pennant: `quality = "creature token"`,
+  `targetFilter = TargetFilter(GameObjectFilter.Creature.token().youControl())`). `targetFilter` is the rules
   half and must stay controller-scoped, since CR 702.6c allows targeting
   "only a creature that's controlled by the player activating the ability and that has the chosen
   quality". Build it off `TargetFilter.CreatureYouControl` or a `GameObjectFilter` ending in
@@ -14258,7 +15672,10 @@ helper over it:
 
 The entity role fixes *when* the condition can be answered: `Self` and the enchanted/equipped
 attachment roles evaluate in both resolution and static-ability projection; `ContextTarget`,
-`TriggeringEntity`, and `DiscardedAsCost` are resolution-only (false under projection). Use `Conditions.EntityMatches`
+`TriggeringEntity`, and `DiscardedAsCost` are resolution-only (false under projection).
+The evaluator also answers `EffectTarget.SpecificEntity` (an engine-pinned object, e.g. cipher's
+encoded card) wherever the object is — projected on the battlefield, printed elsewhere. Only
+engine-synthesized abilities use it; the `CardLinter` still rejects it on a card. Use `Conditions.EntityMatches`
 directly only for a role the helpers don't name (e.g. the equipped creature). It is deliberately
 *not* a player check (`TargetIsPlayer`) nor a numeric/tracker check (`Compare`). Any other
 `EffectTarget` role is rejected by the `CardLinter` at card load (§21) — the evaluator can't
@@ -14387,8 +15804,10 @@ answer it and would silently return `false`.
   `filter`; the opponent-side mirror of `YouControl(filter, …)` and the general form of
   `OpponentControlsCreature`. Existential across opponents, so it holds when *any single* opponent
   has a match (Syr Ginger, the Meal Ender's "as long as an opponent controls a planeswalker").
-- `OpponentControlsMoreCreatures` — an opponent outpaces you.
-- `OpponentControlsMoreLands` — an opponent has more lands.
+- `OpponentControlsMoreCreatures` — some single opponent controls more creatures than you (the
+  greatest count among opponents, never their combined total; Garruk, Unleashed's −2).
+- `OpponentControlsMoreLands` — some single opponent controls more lands than you (same per-opponent
+  reading).
 - `OpponentHasMoreCardsInHand` — an opponent has more cards in hand than you (compares opponents' hand size to yours). Used by Beza, the Bounding Spring and Joined Researchers.
 - `DefendingPlayerControlsLandType(type)` — the defending player controls a land of a type (CantAttackUnless template; defender-relative, not any-opponent).
 - `CompareAmounts(left, operator, right)` — generic numeric comparison of two `DynamicAmount`s with a
@@ -14396,21 +15815,27 @@ answer it and would silently return `false`.
   entry point for any "if amount X (relation) amount Y" intervening-if or static gate. Used by Taii
   Wakeen, Perfect Shot's intervening-if: `CompareAmounts(ContextProperty(TRIGGER_DAMAGE_AMOUNT), EQ,
   ContextProperty(TRIGGER_RECIPIENT_TOUGHNESS))`.
-- `PlayerHasMostLife(player)` — `player` has the most life, or is tied for the most, among all
-  players (their life ≥ every player's). The "most life" check a binary `CompareAmounts` can't express
-  (it needs the max over every player). Resolve `player` to the controller (`Player.You`), the
-  attacked player (`Player.DefendingPlayer` — read from the source's attack assignment, so it works as
-  an attack-trigger intervening-if), etc. Preacher of the Schism gates its two attack triggers with
-  `PlayerHasMostLife(Player.DefendingPlayer)` ("attacks the player with the most life") and
-  `PlayerHasMostLife(Player.You)` ("attacks while you have the most life").
-- `PlayerControlsMostPermanents(player, filter = GameObjectFilter.Creature)` — `player` controls the
-  most permanents matching `filter`, or is tied for the most, among all players. The board-count
-  sibling of `PlayerHasMostLife`: the same "max over every player" shape a binary `CompareAmounts`
-  can't express. Counts are read off the **projected** battlefield, so an animated land counts as a
-  creature. Wrap it in a per-player loop for "each player who controls the most X" —
-  `ForEachPlayerEffect(Player.Each, Effects.If(PlayerControlsMostPermanents(Player.You,
-  GameObjectFilter.Creature), …))`, where `Player.You` inside the loop is the iterated player
-  (No Witnesses: "Each player who controls the most creatures investigates").
+- `PlayerHasMost(player, amount, includeTies = true)` — `player` has the most of `amount` among the
+  players still in the game: the "max over every player" check a binary `CompareAmounts` can't express.
+  `amount` is measured **once per player** with `Player.You` rebound to that player (the
+  `GreatestAmongPlayers` rebinding), so write it from the measured player's side —
+  `DynamicAmount.LifeTotal(Player.You)`, `DynamicAmount.Count(Player.You, Zone.HAND)`,
+  `DynamicAmount.Count(Player.You, Zone.BATTLEFIELD, filter)` (battlefield counts read projected
+  state). `includeTies = true` is "has the most … **or is tied for** the most" (no other player has
+  more); `false` is "has more … **than each other player**" (strictly more than every other player —
+  you and teammates included; alone in the game it holds). Never put an outward reference
+  (`Player.EachOpponent`, `Player.TargetPlayer`) inside `amount` — it would measure the same set for
+  every player. Facades:
+  - `PlayerHasMoreThanEachOtherPlayer(player, amount)` — the strict form. Battle Angels of Tyr checks
+    the damaged player (`Player.TriggeringPlayer`) three times: hand, lands, life.
+  - `PlayerHasMostLife(player)` — `PlayerHasMost(player, LifeTotal(You))`. Preacher of the Schism gates
+    its two attack triggers with `PlayerHasMostLife(Player.DefendingPlayer)` ("attacks the player with
+    the most life") and `PlayerHasMostLife(Player.You)`.
+  - `PlayerControlsMostPermanents(player, filter = GameObjectFilter.Creature)` — the battlefield count
+    of `filter`, ties included. Wrap it in a per-player loop for "each player who controls the most X" —
+    `ForEachPlayerEffect(Player.Each, Effects.If(PlayerControlsMostPermanents(Player.You,
+    GameObjectFilter.Creature), …))`, where `Player.You` inside the loop is the iterated player
+    (No Witnesses: "Each player who controls the most creatures investigates").
 - `AmountIsPrime(amount)` / `AmountIsEven(amount)` / `AmountIsOdd(amount)` /
   `AmountIsMultipleOf(amount, divisor)` — the **unary** numeric-predicate family, the counterpart to
   `CompareAmounts` for properties a two-sided threshold can't express (primality, parity,
@@ -14662,14 +16087,20 @@ answer it and would silently return `false`.
 
 ### Cast / cost
 
-- `WasCast` — source was cast (not put onto the stack).
+- `WasCast` — source was cast (not put onto the stack). Reads the same at resolution and under
+  projection (the permanent's cast marker), so it also gates a static: "has haste and ward {10} as long
+  as it was cast" is `staticAbility { condition = Conditions.WasCast; ability = … }` (**The Tarrasque**).
+  `WasCastFromHand` / `WasCastFromZone` are dual-mode the same way.
 - `TriggeringEntityWasCast` — the *triggering* entity (not the ability's source) was cast — i.e. it
   carries a cast-origin marker (`CastFromHandComponent` / `CastFromGraveyardComponent`). The
   cast-subject sibling of `WasCast`, for "whenever a creature you control enters, **if you cast it**,
   …" intervening-if triggers where the source is a separate permanent and the cast subject is the
   entering creature. Tokens, reanimated permanents, and "put onto the battlefield" permanents lack
   the markers and are correctly excluded. Used by **The Sibsig Ceremony** (a plain `WasCast` there
-  would test the enchantment, not the entering creature). Resolution-only.
+  would test the enchantment, not the entering creature). Resolution-only. Its `zone: Zone?` axis
+  (default null = any zone) narrows it to one cast zone: `Conditions.TriggeringEntityWasCastFrom(Zone.HAND)`
+  is "if you cast it from your hand", and negated it is **Chainer, Nightmare Adept**'s "if you didn't
+  cast it from your hand" — true for a creature cast from another zone *and* for one not cast at all.
 - `WasCastFromHand` — cast specifically from hand.
 - `WasCastFromZone(zone)` — cast from a specific zone. For resolving spells it reads the spell's
   cast-origin; for a permanent already on the battlefield it falls back to the cast-origin marker
@@ -14692,6 +16123,7 @@ answer it and would silently return `false`.
   after the trigger fires makes no token. See §8's `triggerZones`.
 - `WasKicked` — cast with kicker / multikicker / offspring (i.e. an `OptionalAdditionalCost` with `branchesEffect = true` whose extra cost was paid). FlashKicker payments are intentionally invisible to this condition.
 - `Conditions.WasKickedWithFirstKicker` / `Conditions.WasKickedWithSecondKicker` — "if it was kicked with its [A] / [B] kicker" on a card with two kicker costs (CR 702.33f). Facades over `CastChoiceMade(ChoiceSlot.FIRST_KICKER)` / `CastChoiceMade(ChoiceSlot.SECOND_KICKER)`; paying only the other kicker leaves it false even though the spell is kicked. Readable from a self-cast trigger, the spell's own effect, and the resulting permanent (see Kicker [A] and/or [B] under `OptionalAdditionalCost`).
+- `Conditions.WasForetold` — "if this spell was foretold" (CR 702.143c): the spell was a foretold card in exile before it was cast, even if it was cast for a cost other than its foretell cost. Facade over `CastChoiceMade(ChoiceSlot.FORETOLD)`, which the engine stamps as the spell is cast; readable from the spell's own effect and from the resulting permanent (Poison the Cup, Starnheim Unleashed).
 - `WasBargained` — the spell's **bargain** additional cost was declared as it was cast (CR 702.166b, Wilds of Eldraine). A facade over `CastChoiceMade(ChoiceSlot.BARGAINED)`, so bargain needs no condition type of its own. Reads the durable flag on a resolved permanent (an "if it was bargained" enters trigger) *and* the declaration carried on a still-on-the-stack spell (an "if this spell was bargained" rider), and is also the condition a `CostGating.OnlyIf` cost reduction gates on. Never true for a merely kicked spell.
 - `TeamworkWasPaid` — the spell was cast **using teamwork** (CR 702.194b, Marvel Super Heroes): its optional "tap any number of creatures you control with total power N or more" additional cost was declared as it was cast. A facade over `CastChoiceMade(ChoiceSlot.TEAMWORK)`, so teamwork needs no condition type of its own. Reads the declaration carried on a still-on-the-stack spell (an "if this spell was cast using teamwork" rider) *and* the durable flag on a resolved permanent, and is the condition `teamworkModal { }` gates both ends of the mode count on for "choose one; if cast using teamwork, choose both instead". Never true for a merely kicked or bargained spell.
 - `SneakCostWasPaid` — the source was cast for its `Sneak` cost (CR 702.190 — mana + returning an unblocked attacker). Reads the durable `ChoiceSlot.SNEAK` flag on a resolved permanent, falling back to the resolution context for a non-permanent spell's own effect. Backs riders like Leonardo, Leader in Blue and The Last Ronin's Technique.
@@ -14700,6 +16132,7 @@ answer it and would silently return `false`.
   `ChoiceSlot.ESCAPED` flag stamped when its escape-cast spell resolved, or a spell on the stack cast with
   `AlternativeCostType.ESCAPE`. Dual-mode (resolution and projection), so it gates enters triggers, enters-with
   replacements and conditional statics alike. A hard-cast copy of the same card did not escape.
+- `SelfAlternativeCostWasPaid` — the spell was cast by paying the card's **own printed alternative cost** (`selfAlternativeCost`, CR 118.9): "If the {1}{B} cost was paid, …" — the Strixhaven Mastery cycle (*Baleful Mastery*, *Ingenious Mastery*). A facade over `CastChoiceMade(ChoiceSlot.SELF_ALTERNATIVE_COST_PAID)`: a resolving spell answers from the alternative cost recorded on it as it was cast (`SpellOnStackComponent.alternativeCost`, also recorded for a cast that didn't name its mechanic), and a permanent spell stamps the flag on the permanent it becomes. False for a normal cast, a cast through any other alternative cost (flashback, evoke, a granted one) and a free cast; a copy answers as its original did (CR 707.10). Compose the branch with `Effects.If(Conditions.SelfAlternativeCostWasPaid, paid, otherwise = unpaid)`.
 - `MayhemCostWasPaid` — the source was cast from the graveyard for its Mayhem cost (CR 702.187). Reads the durable `ChoiceSlot.MAYHEM_CAST` flag on a resolved permanent, falling back to the resolution context (`wasMayhem`) for a non-permanent spell's own effect. Backs riders like *Sandman's Quicksand* ("if this spell's mayhem cost was paid, creatures your opponents control get -2/-2 instead").
 - `YouDiscardedThisCardThisTurn` — the source card in a graveyard was discarded by its owner this turn (CR 702.187b). Reads the per-player `CardsDiscardedThisTurnComponent` id list (entity ids are stable across the hand→graveyard move). Engine-internal — the Mayhem enumerator and cast-permission check wire it up; cards don't reference it directly.
 - `GiftWasPromised` — the spell's **gift** additional cost was paid, i.e. "if the gift was promised"
@@ -14743,21 +16176,25 @@ answer it and would silently return `false`.
   capture is vacuously true). Use as a resolution-time `Effects.If` gate on the payoff — **Satoru,
   the Infiltrator**: `Effects.If(Conditions.NoManaSpentToCastEntered, Effects.DrawCards(1))` under a
   `Triggers.oneOrMore(GameObjectFilter.Creature.nontoken()).enter()` trigger. Resolution-only.
-- `AnyEnteredOrWasCastFromExile` — the batch-enters *any*-of exile condition: "if one or more of them
-  entered from exile or was cast from exile." The exile twin of
-  `TriggeringEntityEnteredOrWasCastFromGraveyard`, evaluated over the same `trigger.captured` collection
-  as `NoManaSpentToCastEntered` — note the opposite quantifier (that one is "if **none** of them …", this
-  one is "if **one or more** of them …"; an empty capture is false here). Reads the two exile-provenance
-  markers the engine now stamps alongside their graveyard siblings: `CastFromExileComponent` (a spell
-  that resolved with `castFromZone == EXILE` — impulse draws, plot/foretell, an adventurer's permanent
-  half, linked-exile grants) and `EnteredFromExileComponent` (a direct exile → battlefield entry, e.g. a
-  blink). **Usable as a real intervening-"if" (`interveningIf`), not just a resolution gate** — batch
-  captures are now seeded into the condition context at trigger-detection time as well as at resolution.
-  That distinction is load-bearing whenever the ability also carries `oncePerTurn`: CR 603.4 says an
-  ability whose intervening-"if" is false never triggers, so it must not consume the turn's single
-  firing. **Extraordinary Journey**: `Triggers.oneOrMore(Creature.nontoken().anyController()).enter()`
-  + `interveningIf = Conditions.AnyEnteredOrWasCastFromExile` + `oncePerTurn = true`. The same
-  provenance marker also backs `WasCastFromZone(Zone.EXILE)` for a permanent already on the battlefield.
+- `AnyEnteredOrWasCastFrom(zone)` — the batch-enters *any*-of provenance condition: "if one or more of
+  them entered from `zone` or was cast from `zone`", `zone` ∈ {`EXILE`, `GRAVEYARD`}. Facades
+  `Conditions.AnyEnteredOrWasCastFromExile` and `Conditions.AnyEnteredOrWasCastFromGraveyard`. The batch
+  twin of `TriggeringEntityEnteredOrWasCastFromGraveyard`, evaluated over the same `trigger.captured`
+  collection as `NoManaSpentToCastEntered` — note the opposite quantifier (that one is "if **none** of
+  them …", this one is "if **one or more** of them …"; an empty capture is false here). Reads the
+  provenance markers the engine stamps on entry: `CastFromExileComponent` / `CastFromGraveyardComponent`
+  (a spell that resolved with `castFromZone` exile / graveyard — impulse draws, plot/foretell, an
+  adventurer's permanent half, flashback-style and `MayCastFromGraveyard` grants) and
+  `EnteredFromExileComponent` / `EnteredFromGraveyardComponent` (a direct entry, e.g. a blink or a
+  reanimation). **Usable as a real intervening-"if" (`interveningIf`), not just a resolution gate** —
+  batch captures are seeded into the condition context at trigger-detection time as well as at
+  resolution. That distinction is load-bearing whenever the ability also carries `oncePerTurn`: CR 603.4
+  says an ability whose intervening-"if" is false never triggers, so it must not consume the turn's
+  single firing. **Extraordinary Journey**: `Triggers.oneOrMore(Creature.nontoken().anyController()).enter()`
+  + `interveningIf = Conditions.AnyEnteredOrWasCastFromExile` + `oncePerTurn = true`. **Kotis, Sibsig
+  Champion**: `Triggers.oneOrMore(Creature.youControl()).enter()` + `interveningIf =
+  Conditions.AnyEnteredOrWasCastFromGraveyard`. The same exile marker also backs
+  `WasCastFromZone(Zone.EXILE)` for a permanent already on the battlefield.
 - `TriggeringSpellCastWithoutPayingMana` — triggering-entity counterpart of `NoManaSpentToCast`: "if no
   mana was spent to cast it" about the *triggering* spell (reads its `CastRecordComponent`). Used as a
   triggered-ability intervening-if (Boromir, Warden of the Tower: "Whenever an opponent casts a spell,
@@ -14818,6 +16255,22 @@ that works in both resolution and static-ability (projection) contexts.
 - `SourceAttackedThisTurn` — source was declared as an attacker at least once during the
   current turn (per-creature, derived from the controller's `PlayerAttackersThisTurnComponent`).
   Negate via `Conditions.Not(...)` for Erg Raiders-style "if it didn't attack this turn".
+- `SourceAttackedPlayerThisTurn(player = Player.You)` — source was declared attacking `player`
+  directly this turn (CR 508.1); attacking that player's planeswalker or a battle they protect
+  doesn't count. Reads the `attackedPlayerIds` on the creature's own `TimesAttackedThisTurnComponent`
+  (unioned across combats, scoped to the current object and turn), so it survives the creature
+  leaving combat; an ability that outlives the creature reads its last known record (CR 608.2h),
+  and a creature that returned to the battlefield has attacked nobody. Inside `ForEachPlayer(Player.Each, ...)`, `Player.You` is
+  the iterated player — Angel of Destiny's "each player this creature attacked this turn loses
+  the game" is `ForEachPlayer(Player.Each, If(SourceAttackedPlayerThisTurn(Player.You), LoseGame()))`.
+- `TriggeringAttackersAttackedPlayer(player = Player.You)` — one or more of the creatures a
+  `Triggers.<player>.attacks(…)` firing counted were declared attacking `player` directly (CR 508.1b;
+  a planeswalker that player controls or a battle they protect doesn't count). Whom each attacker
+  was declared attacking is frozen on the trigger as it fires (`TriggerContext.capturedAttackerDefenders`),
+  so removing an attacker from combat or the battlefield in response changes nothing; resolution-only,
+  false outside such a firing. Firemane Commando's "they draw a card if none of those creatures
+  attacked you" is `Triggers.player(Player.EachOtherPlayer).attacks(minAttackers = 2)` →
+  `If(Not(TriggeringAttackersAttackedPlayer()), DrawCards(1, PlayerRef(Player.TriggeringPlayer)))`.
 - `SourceAttackedThisCombat` / `SourceBlockedThisCombat` — source was declared as an attacker /
   blocker at least once during the current combat (per-creature `AttackedThisCombatComponent` /
   `BlockedThisCombatComponent`, stamped at declaration time, cleared when the combat phase ends;
@@ -14908,6 +16361,12 @@ that works in both resolution and static-ability (projection) contexts.
   turn and the game isn't in a combat phase now (the end of combat step is still combat; a main
   phase between two combats counts; a turn whose combat was skipped never qualifies). Glyph of
   Reincarnation's timing line: `castOnlyIf(Conditions.AfterCombat)`.
+- `IsFirstUpkeepStepOfTurn` — the game is in an upkeep step and no upkeep step has ended yet this
+  turn, so an extra upkeep added after this step (`AddAdditionalUpkeepSteps(.., afterThisStep = true)`)
+  or after a later phase (Obeka) is not the first. Board-derived (reads `state.step` + the active
+  player's "an upkeep step ended this turn" marker, cleared at cleanup). "At the beginning of enchanted
+  player's first upkeep each turn" is `Triggers.player(Player.EnchantedPlayer).beginningOf(Step.UPKEEP)`
+  with `interveningIf = Conditions.IsFirstUpkeepStepOfTurn` (Paradox Haze).
 - `IsFirstCombatPhaseOfTurn` — the combat analog of `IsFirstEndStepOfTurn`: it's the turn's first
   combat phase, i.e. no combat phase has ended yet this turn — an extra combat inserted *before* the
   natural one (Grim Reaper's Sprint cast precombat) is the first, and the natural one after it is not.
@@ -14935,7 +16394,11 @@ work in both resolution and static-ability (projection) contexts. The DSL helper
 default to "you" so card authors don't need to pass it explicitly.
 
 - `YouAttackedWithCreaturesThisTurn(filter, atLeast)` — Raid/Battalion shape. Backed by
-  `PlayerAttackedWithCreaturesThisTurn(Player.You, filter, atLeast)`.
+  `PlayerAttackedWithCreaturesThisTurn(Player.You, filter, atLeast)`. The filter is matched against
+  each attacker **as it was declared** — the attack record freezes a snapshot of its projected
+  characteristics at declaration — so "during any turn you attacked with a Rogue" (**Robber of the
+  Rich**, a permanent `GrantMayPlayFromExile` gated on it) stays true after the Rogue dies or stops
+  being a Rogue, and a creature that became a Rogue only after attacking doesn't count.
 - `CreaturesAttackedThisTurn(atLeast, filter = Creature)` — the **player-agnostic** count: at least
   `atLeast` creatures matching `filter` attacked this turn, whoever declared them
   (`PlayerAttackedWithCreaturesThisTurn(Player.Each, …)`, which unions every player's attack record
@@ -15126,6 +16589,10 @@ default to "you" so card authors don't need to pass it explicitly.
   `DynamicAmounts.permanentsSacrificedThisTurn()` amount for "that much" damage (Sawblade Skinripper:
   "At the beginning of your end step, if you sacrificed one or more permanents this turn, this creature
   deals that much damage to any target").
+- `YouSacrificedNontokenPermanentsThisTurn(atLeast = 1)` — the nontoken slice of the above, over
+  `TurnTracker.NONTOKEN_PERMANENTS_SACRIFICED` (token-ness read as the permanent was sacrificed). Evendo
+  Brushrazer: "During your turn, as long as you've sacrificed a nontoken permanent this turn, you may play
+  cards exiled with this creature."
 - `SacrificedArtifactThisTurn` — you sacrificed at least one artifact this turn. Composes through
   `Compare(DynamicAmount.TurnTracking(Player.You, TurnTracker.ARTIFACT_SACRIFICED), GTE, Fixed(1))`,
   the card-type sibling of `SacrificedFoodThisTurn`. Backed by the per-player marker
@@ -15145,9 +16612,15 @@ default to "you" so card authors don't need to pass it explicitly.
 - `DynamicAmounts.cardsPutIntoGraveyardFromLibraryThisTurn(player)` /
   `TurnTracker.CARDS_PUT_INTO_GRAVEYARD_FROM_LIBRARY` — the number of cards put into `player`'s graveyard
   from their library this turn: mill, surveil, and every other library → graveyard move. Backed by the
-  per-player `CardsPutIntoGraveyardFromLibraryThisTurnComponent`, incremented in `ZoneTransitionService`
+  per-player `CardsPutIntoGraveyardByOriginThisTurnComponent` (a count per origin zone), incremented in `ZoneTransitionService`
   (keyed on the owner) and cleared at end of turn. Turn history — a card that later leaves the graveyard
   still counts. Cruel Calculations: `DrawCards(cardsPutIntoGraveyardFromLibraryThisTurn(Player.ContextPlayer(0)))`.
+- `DynamicAmounts.cardsPutIntoGraveyardFromHandThisTurn(player)` /
+  `TurnTracker.CARDS_PUT_INTO_GRAVEYARD_FROM_HAND` — the hand sibling: cards put into `player`'s graveyard
+  from their hand this turn (discards and every other hand → graveyard move; a discard replaced to exile by
+  madness doesn't count). Same per-origin component, same turn-history semantics. "From your hand or
+  library" sums the two with `+` — Welcome the Dead:
+  `CreateToken(count = cardsPutIntoGraveyardFromHandThisTurn() + cardsPutIntoGraveyardFromLibraryThisTurn(), …)`.
 - `DynamicAmounts.cardsPutIntoGraveyardThisTurn(player)` / `TurnTracker.CARDS_PUT_INTO_GRAVEYARD` — the
   number of cards put into `player`'s graveyard **from anywhere** this turn (resolved or countered spells,
   discards, deaths, sacrifices, mills, …). Reads the size of the owner-keyed
@@ -15230,20 +16703,30 @@ default to "you" so card authors don't need to pass it explicitly.
   Used by Barrensteppe Siege (Mardu). Dual-mode.
 - `SubtypeCreatureDiedThisTurn(subtype, player = Player.Each)` /
   `NonSubtypeCreatureDiedThisTurn(subtype, player = Player.Each)` — subtype-filtered death gates,
-  **global** by default. Backed by `CreatureSubtypesDiedThisTurnComponent`, which records one
-  entry per death holding the dying creature's **last-known subtypes** (captured from projected state
-  at the moment it left the battlefield, CR 603.10), so a creature whose types change after death is
-  still recorded by the subtypes it had as it died. `SubtypeCreatureDiedThisTurn(Subtype.GOBLIN)` is
+  **global** by default. Backed by `CreatureDeathsThisTurnComponent`, which records one
+  last-known snapshot per death (the dying creature's projected name, type line, subtypes, colors,
+  P/T, keywords and token status, captured as it left the battlefield, CR 603.10), so a creature whose
+  types change after death is still recorded by the subtypes it had as it died. `SubtypeCreatureDiedThisTurn(Subtype.GOBLIN)` is
   true iff some dead creature *had* Goblin; `NonSubtypeCreatureDiedThisTurn(Subtype.ZOMBIE)` is true
   iff some dead creature *lacked* Zombie (note the asymmetry — a turn in which only Zombies died does
   not satisfy the non-Zombie form; a Zombie + a Human both dying satisfies both forms). Used by Undead
   Sprinter (DSK): "if a non-Zombie creature died this turn". Pass `player = Player.You` for "died
   **under your control**": each death is recorded under its last-known controller, so the scoped form
-  reads only that player's records and one death must satisfy both the subtype test and the scope —
-  don't spell it as `ControlledCreatureDiedThisTurn` AND a global subtype gate, which two different
+  reads only that player's records and one death must satisfy both the filter and the scope —
+  don't spell it as `ControlledCreatureDiedThisTurn` AND a global filtered gate, which two different
   deaths could satisfy between them. Used by Cult Conscript (DMU): "Activate only if a non-Skeleton
-  creature died under your control this turn". Dual-mode. The underlying SDK condition is
-  `CreatureWithSubtypeDiedThisTurn(subtype, present, player)`. Cleared at end of turn by `CleanupPhaseManager`.
+  creature died under your control this turn". Dual-mode. Cleared at end of turn by `CleanupPhaseManager`.
+- `CreatureNotNamedDiedThisTurn(name, player = Player.Each)` — "if a creature not named [name]
+  died this turn", **global** by default. True iff some dead creature's last-known name differs from
+  `name` — projected, so a copy dies under the name it was copying, and a face-down creature dies
+  nameless (CR 708.2a) and so counts. A turn in which only creatures named `name` died does not
+  satisfy it. Ebondeath, Dracolich (AFR): `MayCastSelfFromZones(listOf(Zone.GRAVEYARD), condition =
+  Conditions.CreatureNotNamedDiedThisTurn("Ebondeath, Dracolich"))`.
+- `CreatureDiedThisTurnMatching(filter, player = Player.Each)` — the SDK condition under the three
+  facades above: "if a [filter] creature died this turn", one death matching `filter` through
+  `PredicateEvaluator.matchesSnapshot` against its last-known snapshot. Any filter a snapshot can answer
+  composes (`Creature.withSubtype(...).notNamed(...)`, `.nontoken()`, `.withKeyword(...)`); predicates
+  it can't (a chosen name, a stored collection) never match.
 - `YouHadPermanentLeaveBattlefieldThisTurn` — intervening-if "if a permanent you controlled left
   the battlefield this turn". Per-player, scoped to the source's controller. Counts every permanent
   type (creatures, lands, artifacts, enchantments, planeswalkers) and includes tokens — broader
@@ -15412,7 +16895,7 @@ forbids `DynamicAmount.X` in card definitions.
   `lifeTotal(player)`, `yourLifeTotal()`, `startingLifeTotal(player)`, `playerCount(scope)`,
   `countPlayersWith(scope, condition)`, `greatestAmongPlayers(inner, players)`,
   `leastAmongPlayers(inner, players)`, `fewestControlledBySinglePlayer(filter, players)`, `totalManaSpent()`,
-  `manaSpentOnX(color)`, `manaSpentFromSubtype(subtype, payment)`, `triggerDieResult()`, `unspentMana(player)`,
+  `manaSpentOnX(color)`, `manaSpentFromSubtype(subtype, payment)`, `triggerDieResult()`, `triggerHighestDieResult()`, `unspentMana(player)`,
   `largestSharedCreatureTypeCount(player)`, `craftedMaterialsTotalPower() / TotalManaValue() /
   ColorCount()`, the entity readers `powerOf / toughnessOf / manaValueOf / countersOn /
   manaSpentToCast / propertyOf(entity, property)` (plus the `source…` / `triggering…` shortcuts), and
@@ -15450,6 +16933,10 @@ forbids `DynamicAmount.X` in card definitions.
   `ContextProperty(ADDITIONAL_COST_BLIGHT_AMOUNT)`.)
 - `TotalManaSpent` — total mana paid from the pool to cast the current spell (sum of every per-color
   bucket; for X spells the X portion is included). E.g. Memory Deluge "where X is the mana spent."
+  Also readable from the permanent's own abilities after it resolves — e.g. Toph, Greatest Earthbender's
+  "When Toph enters, earthbend X, where X is the amount of mana spent to cast her" — via the cast
+  record stamped on the permanent (generic/colorless included). `0` for a permanent that entered
+  without being cast (blink, reanimation, put onto the battlefield) or was cast without paying mana.
 - `ManaSpentOnX(color)` — the amount of `{color}` mana spent on the `{X}` portion specifically, broken
   down by color. Used by payoffs that scale with how much of a color went into X — Soul Burn ("you gain
   life equal to the amount of black mana spent on X"). Pair with `xManaRestriction` (see below) so the X
@@ -15497,17 +16984,25 @@ forbids `DynamicAmount.X` in card definitions.
   (CR 903.4f): an effect reads 0, and a `Costs.PayLife` priced from it is unpayable (War Room).
   Not `EntityNumericProperty.ColorCount` (one object's current colors) nor an `AggregateBattlefield`
   distinct-colors count (colors among permanents) — identity is fixed before the game (CR 903.4a).
-- `DevotionTo(colors, player = You)` — a player's **devotion** to one or more colors (CR 700.5):
+- `DevotionTo(colors, player = You, ofChosenColor = false)` — a player's **devotion** to one or more colors (CR 700.5):
   the number of mana symbols of those colors among the mana costs of permanents the player controls.
   One color = "devotion to red"; several = devotion to that combination ("white and black"), where a
   symbol matching more than one listed color is counted once. Every colored symbol contributes —
   plain colored, both halves of a two-color hybrid ({W/U} counts for white *and* blue), monocolored
   twobrid ({2/B} is black), and Phyrexian ({B/P} is black); generic/colorless/{X} never count.
   Face-down permanents have no mana cost and contribute 0. Controller read via projected state.
+  A `ModifyDevotion` static (Altar of the Pantheon) on a permanent the player controls adds its amount.
   Facade: `DynamicAmounts.devotionTo(color, …)`. Used by "draw cards equal to your devotion to red"
   (Clive, Ifrit's Dominant). For the pips inside **one object's** cost ("a spell with one or more
   blue mana symbols in its mana cost") use `DynamicAmounts.coloredManaSymbolsOf(entity, …)` — same
   counting rule (`ManaCost.coloredSymbolCount`), different scope.
+  `ofChosenColor = true` adds the color chosen earlier in the same resolution ("your devotion to
+  **that color**"): the color a wrapping `ChooseColorThen` picked, or — inside
+  `AddManaOfChoiceEffect`, whose amount is evaluated with the color it is adding — the mana color
+  just chosen, at activation or through its own prompt. Facade `DynamicAmounts.devotionToChosenColor()`;
+  Nykthos, Shrine to Nyx and Nyx Lotus are `Effects.AddAnyColorMana(DynamicAmounts.devotionToChosenColor())`.
+  With no color in context it reads only `colors`; the mana auto-payer sizes such an ability per color
+  (a color it would add nothing of isn't offered), so auto-pay and the AI use Nykthos like any land.
 - `UnlockedDoors(player = You, distinctNames = false)` — the number of unlocked doors among Rooms
   `player` controls (CR 709.5). Reads per-face door state, so a single Room with **both** doors
   unlocked counts as **two** — an entity-level `AggregateBattlefield`/`Count` cannot see this. With
@@ -15544,7 +17039,7 @@ forbids `DynamicAmount.X` in card definitions.
   matching permanents. `aggregation` defaults to `COUNT`; other modes: `MAX`/`MIN`/`SUM` over a
   `property` (`POWER`/`TOUGHNESS`/`MANA_VALUE`), and the distinct-set counters
   `DISTINCT_TYPES`, `DISTINCT_PERMANENT_TYPES`, `DISTINCT_COLORS`, `DISTINCT_COLOR_PAIRS`,
-  `DISTINCT_NAMES`, `DISTINCT_BASIC_LAND_SUBTYPES`
+  `DISTINCT_NAMES`, `DISTINCT_MANA_COSTS` (see `AggregateZone` below), `DISTINCT_BASIC_LAND_SUBTYPES`
   (Domain; reads *projected* subtypes, so a land that lost all land types — Ultima, Origin of
   Oblivion's blight — still matches a land filter but adds no type),
   `DISTINCT_PLANESWALKER_SUBTYPES` (planeswalker types, CR 205.3j, among the matched
@@ -15619,6 +17114,14 @@ forbids `DynamicAmount.X` in card definitions.
   `fewestControlledBySinglePlayer(Land)` lands, then `leastAmongPlayers(cardsInYourHand())` cards,
   then `fewestControlledBySinglePlayer(Creature)` creatures, each counted at its own part.
 - `AggregateZone(player, zone, filter?, aggregation?)` — count cards in a zone.
+  `DISTINCT_MANA_COSTS` counts the *different mana costs* (CR 202.1) among the matched cards — by
+  printed symbol, not mana value: {2}{B} and {1}{B}{B} are two costs, {X} and {0} are two, a hybrid
+  {B/R} is neither {B} nor {R}, and symbol order is ignored. A card with no mana cost (CR 202.1b)
+  adds nothing while a printed {0} counts; a split card's cost is its halves combined (CR 709.4b,
+  Fire // Ice is {2}{U}{R}); a Room on the battlefield has only its unlocked halves' costs. Facade
+  `DynamicAmounts.zone(Player.You, Zone.GRAVEYARD, GameObjectFilter.Nonland).distinctManaCosts()` —
+  Embodiment of Agonies' "a +1/+1 counter on it for each different mana cost among nonland cards in
+  your graveyard". The aggregation works over `AggregateBattlefield` too.
 - `CountPermanentsOfType(player, subtype)` — count by creature type.
 - `CountCreaturesYouControl` — shorthand for "your creatures".
 
@@ -15669,9 +17172,11 @@ both spellings, and the ability its bare-noun line grants says "Regenerate this 
   Samut, the Driving Force) and, via `Compare`, the whole max-speed gate. A player with no speed reads
   as 0 (CR 702.179f), so it never needs a has-speed guard. Not pooled in team games, unlike life and
   poison.
-- `DungeonsCompleted(player, dungeon?)` — dungeons that player has completed this game (CR 309.7; facade
-  `DynamicAmounts.dungeonsCompleted(player, dungeon)`). The same dungeon completed twice counts twice;
-  `dungeon` narrows it to one dungeon by name.
+- `DungeonsCompleted(player, dungeon?, distinctNames = false)` — dungeons that player has completed
+  this game (CR 309.7; facade `DynamicAmounts.dungeonsCompleted(player, dungeon, distinctNames)`). The same
+  dungeon completed twice counts twice; `dungeon` narrows it to one dungeon by name.
+  `distinctNames = true` counts each dungeon name once — "for each differently
+  named dungeon you've completed" (Ellywick Tumblestrum's emblem).
 - `TurnCount(player)` — turn number for that player.
 - `TurnTracking(player, TurnTracker)` — value of a per-turn counter (see below).
 - `SpellsCastThisTurn(player, filter?, excludeSelf?, fromZone?, countDistinctCardTypes?, beforeTriggeringSpell?)` — count of spells `player` has cast
@@ -15717,6 +17222,13 @@ both spellings, and the ability its bare-noun line grants says "Regenerate this 
   narrows to cards with that exact name — every physical copy counts, not just the source object. Yidaro,
   Wandering Monster: `Conditions.CompareAmounts(DynamicAmounts.cardsCycledThisGame("Yidaro, Wandering
   Monster"), GTE, Fixed(4))`. Backed by the never-cleared per-player `CardsCycledThisGameComponent`.
+- `SpellsCastThisGame(player = Player.You)` (facade `DynamicAmounts.spellsCastThisGame(player)`) — how
+  many spells `player` has cast **this game**: any zone, resolved or countered; uncast copies don't count
+  (CR 707.10). A spell counts once it has become cast, so a gate judged while it's being cast reads the
+  count from before it. Once Upon a Time ("If this spell is the first spell you've cast this game, you
+  may cast it without paying its mana cost"): `selfAlternativeCost = SelfAlternativeCost(ManaCost.ZERO,
+  condition = Conditions.CompareAmounts(DynamicAmounts.spellsCastThisGame(), EQ, Fixed(0)))`. Backed by
+  the never-cleared per-player `SpellsCastThisGameComponent`.
 - `CraftedMaterialsTotalPower` — total printed power of the cards exiled to craft the source
   permanent (CR 702.167c). Reads the source's `CraftedFromExiledComponent`. Used for the
   `*`-power CDA on Mastercraft Raptor (Saheeli's Lattice back face). Evaluates to 0 when the
@@ -15770,6 +17282,15 @@ both spellings, and the ability its bare-noun line grants says "Regenerate this 
   honored), restricted to actual creature types so artifact/land subtypes never inflate the count.
   Evaluates to 0 when no creature shares a type. Used by White Lotus Tile ("Add X mana of any one
   color, where X is …") — pair with `AddManaOfChoiceEffect(ManaColorSet.AnyColor, amount = …)`.
+- `PartySize(player = You)` (facade `DynamicAmounts.partySize()`) — the number of creatures in
+  `player`'s **party** (CR 700.8), 0–4: up to one Cleric, one Rogue, one Warrior and one Wizard they
+  control. Computed automatically (CR 700.8a); a creature with several of those types fills only one
+  slot, assigned to give the largest party (CR 700.8b) — a Cleric Wizard plus a Wizard is two, a
+  Changeling fills whichever slot is open. Reads projected subtypes. "If you have a full party"
+  (CR 700.8c) is `Conditions.FullParty()` (`PartySize >= 4`). Zendikar Rising: "for each creature in
+  your party" (Kabira Outrider), "power equal to the number of creatures in your party" (Archpriest
+  of Iona, via `dynamicPower`/`CharacteristicValue.Dynamic`), cost reductions via
+  `CostReductionSource.Dynamic(partySize())`.
 
 ### An object's characteristics
 
@@ -15951,6 +17472,24 @@ read is available to other snapshot-backed entity references once their captured
   zero. Turn changes make the value read zero and zone changes clear it. For “damage dealt this way”,
   store the value before the damage and subtract it afterward (Brightflame). The stored baseline and
   damage history survive resolution decisions, including optional damage redirection.
+- `EntityProperty(entity, EntityNumericProperty.TimesAttackedThisTurn)` — how many combat phases this
+  turn the creature was declared as an attacker in (CR 508.1): "for each time it has attacked this
+  turn". An attack in the natural combat and another in an added one count 2; removal from combat
+  doesn't undo one, and a creature put onto the battlefield attacking was never declared and counts
+  nothing. Backed by the per-creature `TimesAttackedThisTurnComponent`, stamped at declaration (before
+  attack triggers and the damage step, so a static fed it already pumps that combat's damage) and
+  scoped to the turn and the object's identity — a creature that changed zones is a new object at 0
+  (CR 400.7). Per affected creature in a lord — **Moraug, Fury of Akoum**:
+  `GrantDynamicStats(GroupFilter(Creature.youControl()), DynamicAmounts.propertyOf(EffectTarget.AffectedEntity, TimesAttackedThisTurn), DynamicAmounts.fixed(0))`.
+  The count-valued sibling of the `attackedThisTurn()` filter.
+- `EntityProperty(entity, EntityNumericProperty.TimesMutated)` — "the number of times this creature has
+  mutated": how many mutating creature spells have merged with the permanent (CR 702.140c), over or
+  under alike. Read in a `Triggers.self.mutates()` trigger it already includes the merge that fired it,
+  so the first mutate reads 1. A permanent that never mutated reads 0, and a mutated permanent that
+  changes zones is a new object at 0 (CR 400.7); a source that left before its ability resolved is read
+  as it last existed (CR 608.2h). Backed by the permanent's merged-pile record. As a
+  count — **Porcuparrot**: `Effects.DealDamage(DynamicAmounts.propertyOf(EffectTarget.Self, TimesMutated), target)`;
+  sizing a group pump — **Huntmaster Liger**.
 - `EntityProperty(entity, EntityNumericProperty.KeywordValue(keyword))` — the total N across the entity's
   instances of a numeric keyword ("for each point of bushido it has"); instances add, so bushido 1 plus
   bushido 2 is 3. Reads the *printed* N, stamped on the entity at creation (`NumericKeywordValuesComponent`)
@@ -16083,9 +17622,22 @@ For "X = the number of [things] attached to this permanent":
   `EffectTarget.EnchantedPermanent` names whatever the source is attached to, so this desugars to
   `EntityProperty(EnchantedPermanent, AttachmentCount(AttachmentKind.CURSE))`.
 
-`AttachmentCount(kind)` takes an `AttachmentKind` (`ANY` / `EQUIPMENT` / `AURA` / `CURSE`); the
-evaluator counts the entity's `attachedIds` (a permanent's or a player's) whose projected subtypes
-include the kind.
+- `DynamicAmounts.aurasAttachedToTriggering(controller = Player.Any)` — the Auras attached to the
+  triggering permanent, narrowed to those `controller` controlled. A dies/leaves trigger reads it from
+  last-known information — the Auras and their controllers as the creature last existed on the
+  battlefield, even though the unattached-Aura state-based action has already put them in their
+  owners' graveyards, and including an Aura destroyed at the same time as the creature. Hateful
+  Eidolon: `Triggers.a(Creature.enchanted()).dies()` + `DrawCards(aurasAttachedToTriggering(Player.You))`
+  ("draw a card for each Aura you controlled that was attached to it"); Dawn Evangel's intervening
+  "if an Aura you controlled was attached to it" is `CompareAmounts(aurasAttachedToTriggering(Player.You),
+  GTE, 1)`. Desugars to `EntityProperty(TriggeringEntity, AttachmentCount(AttachmentKind.AURA, controller))`.
+
+`AttachmentCount(kind, controller = Player.Any)` takes an `AttachmentKind` (`ANY` / `EQUIPMENT` /
+`AURA` / `CURSE`) and the player(s) whose attachments count; the evaluator counts the entity's
+`attachedIds` (a permanent's or a player's) whose projected subtypes include the kind and whose
+projected controller is among `controller`'s players (`Player.Any` skips the controller check). On a
+permanent that has left the battlefield it reads the exit snapshot's `attachments` (id, controller,
+subtypes per attachment) instead.
 
 "Other than enchanted player" on a player target is
 `TargetPlayer(restriction = Conditions.Not(Conditions.PlayerIs(Player.Candidate, Player.EnchantedPlayer)))`
@@ -16279,10 +17831,11 @@ solver picks if there's only one), and that color is added to the pool.
 - `ManaColorSet.Specific(colors)` — hand-authored fixed set (e.g., `{R, G}` for a Gruul producer).
 - `ManaColorSet.CommanderIdentity` — union of color identities of every commander the controller has registered. Empty (no mana produced) in non-Commander formats.
 - `ManaColorSet.AmongPermanents(filter)` — colors of permanents matching `filter`, read via projected state so type/color-changing effects are honored. Mox Amber shape.
-- `ManaColorSet.LandsCouldProduce(scope)` — colors any land in `scope` could produce; tapped state and activation costs are ignored (CR 106.7). `scope` is `LandControllerScope.{YOU, OPPONENTS, ANY}`. Fellwar Stone / Exotic Orchard shape. Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
+- `ManaColorSet.LandsCouldProduce(scope)` — colors any land in `scope` could produce; costs are ignored (CR 106.7), and so are tapped state and activation restrictions (Reflecting Pool / Fellwar Stone rulings). `scope` is `LandControllerScope.{YOU, OPPONENTS, ANY}`. Reflection excludes itself: a land whose own ability is `LandsCouldProduce` (Reflecting Pool, Exotic Orchard) reflects only the *other* lands on the inspection chain, so a lone Pool — or two Pools with no other lands — produces nothing, and two Orchards facing each other yield only the real lands behind them. Fellwar Stone / Exotic Orchard shape. Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
 - `ManaColorSet.SourceChosenColor` — the single color stored on the source's `ChosenColorComponent` (set via `EntersWithChoice(ChoiceType.COLOR)`). Uncharted Haven / Ashling Rekindled shape.
 - `ManaColorSet.ColorsOf(entity)` — the colors of one object, `entity` an `EffectTarget` resolved against the running effect: a pipeline-gathered card (`handle.asTarget(0)`), a target, `Self`. Battlefield permanents read projected colors; any other zone reads the card's own. A colorless or unresolvable object produces no mana. Outside an effect (the mana solver) only `Self` resolves. "Add three mana in any combination of its colors" is `Effects.Repeat(DynamicAmount.Fixed(3), Effects.AddManaOfChoice(ManaColorSet.ColorsOf(revealed.asTarget(0))))` — each unit picks its own colour (Omnath, Locus of All).
 - `ManaColorSet.Union(members)` — the union of two or more pools; the player picks one color from any of them. A fixed color *or* a looked-up one: the Thriving lands' "Add {R} or one mana of the chosen color" is `Union(listOf(Specific(setOf(RED)), SourceChosenColor))`, which still taps for {R} if no color was ever chosen. The resolver, the mana solver and `LandManaColorInspector` all recurse into the members.
+- `ManaColorSet.ExceptChosenColor(base = AnyColor)` — `base` minus the color chosen earlier in this resolution (`ChooseColorThen`'s chosen-color context): "any **other** color". Open the Omenpaths' "Add two mana of any one color and two mana of any other color" is `ChooseColorThen(AddManaOfChoice(AnyColor, 2) then AddManaOfChoice(ExceptChosenColor(), 2))` — the first add takes the chosen color, the second prompt offers only the other four. With no color chosen (outside a `ChooseColorThen`, or the mana solver asking) it is `base` unchanged.
 - `ManaColorSet.AmongLinkedExiledCards` — union of the base colors of the cards currently exiled *with* the source permanent — the ids in its `LinkedExileComponent` (set by `MoveToZoneEffect(linkToSource = true)`) that are still in the exile zone. A card that has since left exile drops out of the pool; colorless-only or empty piles produce no mana. Pit of Offerings shape ("any of the exiled cards' colors").
 
 ### `ManaRestriction`
@@ -16314,21 +17867,34 @@ restriction matches the spell context.
 - `ManaRestriction.ColorlessSpellsOnly` — only colorless spells (CR 105.2c: devoid, colorless artifacts,
   face-down spells). Ability activations never satisfy it. Sage of the Unknowable:
   `AnyOf(ColorlessSpellsOnly, AbilityActivationOnly)` ("to cast a colorless spell or to activate an ability").
+- `ManaRestriction.ColoredSpellsOnly(withoutXInCost = false)` — only spells with one or more colors (the
+  complement of `ColorlessSpellsOnly`, read off `SpellPaymentContext.colorCount`; a context that doesn't set it
+  refuses the mana). `withoutXInCost = true` adds "without {X} in its mana cost". Ability activations never
+  satisfy it. Titans' Nest (`AddColorlessMana(1, restriction = ColoredSpellsOnly(withoutXInCost = true))`).
 - `ManaRestriction.CostsContainingXOnly` — "Spend this mana only on costs that contain {X}": a spell
   whose mana cost has {X}, **or** an activated ability whose mana cost has {X} (read off the ability by
   `buildAbilityPaymentContext`). Not `SpellsWithManaValueAtLeast(orXInCost = true)`, which is spell-only
   and also admits high-MV spells without X. Only the {X} mana symbol counts — a loyalty −X or "remove X
   counters" cost doesn't. Rosheen, Roaring Prophet.
-- `ManaRestriction.LegendarySpellsOnly` — only legendary spells (matches `SpellPaymentContext.isLegendary`,
+- `ManaRestriction.LegendarySpellsOnly(creatureOnly = false)` — only legendary spells (matches `SpellPaymentContext.isLegendary`,
   populated from the cast card's `typeLine.isLegendary`). Great Hall of the Citadel
-  (`AddManaInAnyCombination(2, restriction = LegendarySpellsOnly)`); Delighted Halfling pairs it with
-  the `ManaSpellRider.MakesSpellUncounterable` rider on a one-mana any-color ability.
+  (`AddManaInAnyCombination(2, restriction = LegendarySpellsOnly())`); Delighted Halfling pairs it with
+  the `ManaSpellRider.MakesSpellUncounterable` rider on a one-mana any-color ability. `creatureOnly = true`
+  narrows it to legendary *creature* spells (The Ringhart Crest).
 - `ManaRestriction.SpellsWithExactColorCount(count)` — only spells with exactly `count` colors (1–5;
   matches `SpellPaymentContext.colorCount`, the cast card's color count; a hybrid pip counts both colors).
   Ability activations never satisfy it, and a context that doesn't set `colorCount` refuses it.
   Meeting of the Five (`AddMana(color, 2, restriction = SpellsWithExactColorCount(3))` ×5).
-- `ManaRestriction.SubtypeSpellsOrAbilitiesOnly(subtype, creatureOnly?)` — Cavern of Souls /
-  Unclaimed Territory: only spells of a baked subtype, optionally creature-only.
+- `ManaRestriction.SubtypeSpellsOrAbilitiesOnly(subtype, creatureOnly?)` — only spells (and, unless
+  `creatureOnly`, abilities of sources) of a baked subtype. Cards don't write it for "the chosen type" —
+  they write `OfChosenType`, which the engine binds to this.
+- `ManaRestriction.OfChosenType(creatureOnly = false)` — "Spend this mana only to cast a [creature] spell
+  of the chosen type": the unbound form, for a source that chose a creature type as it entered
+  (`EntersWithChoice(ChoiceType.CREATURE_TYPE)`). The engine binds it, also inside `AnyOf` / `AllOf`, to
+  `SubtypeSpellsOrAbilitiesOnly(<chosen type>, creatureOnly)` the moment the mana is made (any mana effect's
+  `restriction`, and the auto-pay solver's view of the source). With no type chosen it stays unbound and pays
+  for nothing. The Ringhart Crest: `AddMana(GREEN, restriction = AnyOf(listOf(OfChosenType(true),
+  LegendarySpellsOnly(true))))` — "a creature spell of the chosen type or a legendary creature spell".
 - `ManaRestriction.SubtypeSpellsOnly(subtypes)` — multi-subtype spend restriction: only spells
   whose type line carries **any** of the given subtypes (OR-joined). Spell-only (no ability
   variant). Maelstrom of the Spirit Dragon: `SubtypeSpellsOnly(setOf("Dragon", "Omen"))`
@@ -16373,6 +17939,13 @@ restriction matches the spell context.
   `AnyOf(SubtypeSpellsOnly(setOf("Equipment")), EquipAbilityActivationOnly)`, and Freya Crescent's
   identically-meant "…an Equipment spell or activate an equip ability" is the same expression — it
   shipped on the over-broad spelling before this atom existed and was converged onto it.
+- `ManaRestriction.ClassLevelUpOnly` — only a Class's **level-up** activations (CR 716.2c, the "[Cost]:
+  Level N" ability): the ability the engine builds with a `LevelUpClassEffect`. Satisfied by
+  `SpellPaymentContext.isClassLevelUpActivation`, set by `buildAbilityPaymentContext`. The level-up
+  sibling of `EquipAbilityActivationOnly`: a source type or subtype test (`"Class"`, enchantment)
+  would also pay the other activated abilities a Class's levels grant. Sorcerer Class's "Spend this
+  mana only to cast an instant or sorcery spell or to gain a Class level" is
+  `AnyOf(InstantOrSorceryOnly, ClassLevelUpOnly)`.
 - `ManaRestriction.TurnPermanentsFaceUpOnly` — only the turn-face-up special action (disguise/
   morph face-up). Satisfied by `SpellPaymentContext.isTurnFaceUpAction`; the turn-face-up handler/
   enumerator pass that context so restricted mana in the pool is consumed. Overgrown Zealot,
@@ -16380,6 +17953,17 @@ restriction matches the spell context.
 - `ManaRestriction.UnlockDoorOnly` — only the unlock-a-door special action (CR 709.5e).
   Satisfied by `SpellPaymentContext.isUnlockDoorAction`; the unlock-room handler/enumerator pass
   that context. Creeping Peeper (inside `AnyOf`).
+- `ManaRestriction.ForetellOnly` — only the foretell special action's {2} (CR 702.143a): "spend this
+  mana only to foretell a card from your hand". Satisfied by `SpellPaymentContext.isForetellAction`,
+  which the foretell handler and enumerator pass (`SpecialActionManaPayment`'s `spendContext`).
+  Casting the foretold card later is a spell cast, not this. Karfell Harbinger:
+  `AnyOf(ForetellOnly, InstantOrSorceryOnly)`.
+- `ManaRestriction.SpellsWithKeywordOnly(keyword)` — only spells whose card has `keyword` in its
+  definition (base keywords, which include those derived from parameterized keyword abilities like
+  foretell); a keyword granted to the spell by another effect isn't read yet.
+  Satisfied by `SpellPaymentContext.keywords`, filled by `spellPaymentContextFor`. Niko Defies
+  Destiny's "foretell cards or cast spells that have foretell":
+  `AnyOf(ForetellOnly, SpellsWithKeywordOnly(Keyword.FORETELL))`.
 - `ManaRestriction.FaceDownSpellsOnly` — only spells **cast face down** for a morph (CR 702.37a)
   or disguise (CR 702.168a) cost. Satisfied by `SpellPaymentContext.isFaceDownCast`, which every
   face-down cast path sets via `SpellPaymentContext.faceDownCast()` — the CR 708.2 shape (nameless
@@ -16404,6 +17988,15 @@ restriction matches the spell context.
   included), ability activations, and every non-cast payment are allowed. Not the same as
   `CastFromNonHandOnly`, which is a spell-cast whitelist and rejects ability activations. Backed by
   `SpellPaymentContext.isSpellCast` and `isFromHand`.
+- `ManaRestriction.CannotPayGenericCosts` — "This mana can't be spent to pay generic mana costs"
+  (Jegantha, the Wellspring). The family's only **symbol-level** restriction: it admits every
+  payment (spell, ability, special action, contextless cost) and instead refuses the generic
+  symbols of a cost — `{N}`, `{X}`, and the generic half of a monocolored hybrid `{2/W}` (CR 107.4b,
+  107.4e) — so the mana pays only colored, `{C}` and `{S}` symbols. Floating-pool payment spends it
+  on colored pips before other restricted mana, and the auto-tapper never taps its source for
+  generic (it retries giving the source's colors to colored pips when lands are needed for the
+  generic part). Compose with `AllOf` to add a payment whitelist. Engine predicate:
+  `ManaRestriction.paysGeneric`.
 - `ManaRestriction.AnyOf(restrictions)` — disjunction; the mana is spendable in any context that
   satisfies *any* listed restriction. Compose atomic restrictions for multi-option mana — e.g.
   Creeping Peeper's "cast an enchantment spell, unlock a door, or turn a permanent face up" is
@@ -16434,34 +18027,42 @@ the rider twice (Pyromancer's Goggles: "That many copies will be created").
 - `ManaSpellRider.ScryOnSharedTypeWithCommander(amount)` — Path of Ancestry: if the spell is
   a creature spell that shares a creature type with any of the controller's commanders,
   queues a `scry amount` triggered ability above the spell.
-- `ManaSpellRider.CopySpellWhenSpent(spellFilter)` — Pyromancer's Goggles
-  (`GameObjectFilter.InstantOrSorcery.withColor(Color.RED)`): if the cast spell matches
-  `spellFilter`, queues a `CopyTargetSpellEffect(TriggeringEntity)` triggered ability **above** the
-  spell, so the copy resolves first (CR 707.10) and its controller may choose new targets. Matching
-  happens at payment time against the spell's cast characteristics; a non-matching spell is a silent
-  no-op. Because the queued trigger's source is the *spell*, it still fires if the mana's producer
-  has already left the battlefield.
+- `ManaSpellRider.TriggersWhenSpent(spellFilter, effect)` — "When you spend this mana to cast a
+  [filter] spell, [effect]": the delayed triggered ability a mana ability sets up. If the cast spell
+  matches `spellFilter` (at payment time, against its cast characteristics), queues a triggered
+  ability running `effect` **above** the spell, so it resolves first; `EffectTarget.TriggeringEntity`
+  names the spell ("that spell", "it"); the trigger chooses no targets, so `effect` must be
+  untargeted (no `ContextTarget`). A non-matching spell is a silent no-op, and each rider-carrying
+  mana spent fires its own trigger. Because the queued trigger's source is the *spell*, it still fires
+  if the mana's producer has already left the battlefield, and it still resolves if the spell has left
+  the stack. Pyromancer's Goggles: `TriggersWhenSpent(GameObjectFilter.InstantOrSorcery.withColor(Color.RED),
+  Effects.CopyTargetSpell(EffectTarget.TriggeringEntity))` — the copy resolves before the original
+  (CR 707.10) and its controller may choose new targets. Scaled Nurturer:
+  `TriggersWhenSpent(GameObjectFilter.Creature.withSubtype("Dragon"), Effects.GainLife(2))`. Jade Orb
+  of Dragonkind ("it enters with an additional +1/+1 counter on it and gains hexproof until your next
+  turn"): `TriggersWhenSpent(GameObjectFilter.Creature.withSubtype("Dragon"),
+  Effects.AddCounters(PLUS_ONE_PLUS_ONE, 1, TriggeringEntity) then
+  Effects.GrantKeywordToSpell(Keyword.HEXPROOF, TriggeringEntity, Duration.UntilYourNextTurn))` — the
+  counter is owed to the spell and placed as it enters (see `AddCounters`).
 - `ManaSpellRider.GrantsKeywordWhenSpent(keyword, spellFilter, duration = Duration.EndOfTurn)` — Carnelian Orb of Dragonkind
   (`Keyword.HASTE`, `GameObjectFilter.Creature.withSubtype("Dragon")`): "If that mana is spent on a
   [filter] spell, it gains [keyword] until end of turn." The one rider that puts **nothing** on the
-  stack — the printed effect is continuous, so it floats a `Layer.ABILITY` `GrantKeyword`
-  `Duration.EndOfTurn` modification keyed to the spell's entity id instead of queuing a trigger. A
-  permanent spell keeps that id as it resolves, so the keyword is live the moment the permanent
-  exists (which is what haste needs); on a non-permanent spell the grant never finds a permanent to
-  apply to. Matching happens at payment time against the spell's cast characteristics, per the
+  stack — the printed effect is continuous, so instead of queuing a trigger it freezes the keyword
+  and its duration onto the spell's `SpellOnStackComponent.entryKeywordGrants`, which are granted as
+  the permanent enters — the keyword is live the moment the permanent exists (which is what haste
+  needs), a countered spell carries nothing into its next zone, and on a non-permanent spell the
+  grant never finds a permanent to apply to. Matching happens at payment time against the spell's cast characteristics, per the
   printed rulings: mana spent on a non-Dragon spell that *becomes* a Dragon later in the turn grants
   nothing, and an instant or sorcery that makes Dragon tokens is not a Dragon creature spell.
   `duration = Duration.Permanent` (the only other value accepted) drops the end date — Hall of the
-  Bandit Lord's "If that mana is spent on a creature spell, it gains haste." That grant is frozen
-  onto the spell's `SpellOnStackComponent.entryKeywordGrants` rather than floated on the stack
-  object, and granted as the permanent enters, so it lasts until the permanent leaves the
-  battlefield and a countered spell carries nothing into its next zone.
+  Bandit Lord's "If that mana is spent on a creature spell, it gains haste.", so the grant lasts
+  until the permanent leaves the battlefield.
 
 ### `ManaExpiry`<a id="manaexpiry"></a>
 
 The *duration* axis of mana — when it leaves the pool — orthogonal to `ManaRestriction` (where it
 may be spent) and `ManaSpellRider` (what happens to the spell). Passed via the `expiry` parameter
-of `AddMana` and `AddColorlessMana`. The engine empties pools as each step and phase ends (CR 500.5), so:
+of `AddMana`, `AddColorlessMana` and `AddDynamicMana` / `AddManaInAnyCombination` (Klauth). The engine empties pools as each step and phase ends (CR 500.5), so:
 
 - `ManaExpiry.END_OF_TURN` — the default; ordinary mana, lost at the next step/phase boundary
   (the name predates per-step emptying).
@@ -16504,6 +18105,12 @@ of `AddMana` and `AddColorlessMana`. The engine empties pools as each step and p
 - `OPPONENT_CREATURES_EXILED` — opponent creatures you exiled.
 - `OPPONENTS_WHO_LOST_LIFE` — count of opponents who lost life.
 - `DAMAGE_RECEIVED` — damage received by player.
+- `NONCOMBAT_DAMAGE_RECEIVED` — the noncombat slice of `DAMAGE_RECEIVED`: noncombat damage dealt to
+  the player this turn from any source (prevented damage doesn't count; life gained doesn't net
+  against it). Over `Player.EachOpponent` it sums every opponent, including ones who have since lost
+  the game. Facade `DynamicAmounts.noncombatDamageReceivedThisTurn(player = EachOpponent)` — Chandra's
+  Incinerator's "costs {X} less, where X is the total amount of noncombat damage dealt to your
+  opponents this turn" via `CostReductionSource.Dynamic`.
 - `DAMAGE_RECEIVED_FROM_ARTIFACTS` — damage dealt to the player this turn by artifact sources
   (a source that is an artifact when it deals the damage). Combat and non-combat both count;
   prevented damage does not. Powers Reverse Polarity ("twice the damage dealt to you so far this
@@ -16598,10 +18205,17 @@ this turn").
   and post-departure persistence as `NONLAND_PERMANENTS_ENTERED`. At a threshold of two it backs
   `Conditions.CreaturesEnteredThisTurn` — Spider-UK's "two or more creatures entered the
   battlefield under your control this turn."
+- `NONTOKEN_CREATURES_ENTERED_UNDER_CONTROL` — the nontoken slice of `CREATURES_ENTERED_UNDER_CONTROL`,
+  same counting. Backs `DynamicAmounts.nonTokenCreaturesEnteredThisTurn(player)` — Gyome, Master Chef's
+  "create a number of Food tokens equal to the number of nontoken creatures you had enter the
+  battlefield under your control this turn."
 - `TOKENS_CREATED` — the tokens the player created this turn: the token slice of the same entry log
   (the player who creates a token is its owner and it enters under their control, CR 111.2). A token
-  gained by a control change isn't counted; one given away after creation stays counted. Backs
-  `Conditions.CreatedTokenThisTurn`.
+  gained by a control change isn't counted; one given away after creation stays counted. A copy of a
+  permanent spell that resolves into a token (CR 707.10f, 608.3f) wasn't *created* and isn't counted. Backs
+  `Conditions.CreatedTokenThisTurn` and `DynamicAmounts.tokensCreatedThisTurn(player)` — Thalisse,
+  Reverent Medium's "create X 1/1 white Spirit tokens with flying, where X is the number of tokens
+  you created this turn."
 - `FOOD_SACRIFICED` — Food tokens sacrificed.
 - `SCRIED_OR_SURVEILED` — indicator (0 or 1) that the player scried or surveilled this turn. Marked by
   the executors that emit `ScriedEvent` / `SurveiledEvent`, so it is set exactly when a "whenever you
@@ -16625,6 +18239,8 @@ this turn").
 - `CARDS_PUT_INTO_GRAVEYARD_FROM_LIBRARY` — number of cards put into a player's graveyard from their
   library this turn (mill, surveil, …); recorded by the same `ZoneTransitionService` hook, keyed on the
   owner. Facade `DynamicAmounts.cardsPutIntoGraveyardFromLibraryThisTurn(player)` (Cruel Calculations).
+- `CARDS_PUT_INTO_GRAVEYARD_FROM_HAND` — the hand → graveyard sibling, same hook and component. Facade
+  `DynamicAmounts.cardsPutIntoGraveyardFromHandThisTurn(player)` (Welcome the Dead, summed with library).
 - `CARDS_PUT_INTO_GRAVEYARD` — number of cards put into a player's graveyard from any zone this turn,
   tokens excluded; the size of the owner's `CardsPutIntoGraveyardThisTurnComponent`. Facade
   `DynamicAmounts.cardsPutIntoGraveyardThisTurn(player)` (Fraying Sanity).
@@ -16645,6 +18261,8 @@ this turn").
   counter (which sums every player's sacrifices). Backs `Conditions.YouSacrificedPermanentsThisTurn(atLeast)`
   and `DynamicAmounts.permanentsSacrificedThisTurn(player)` — e.g. Sawblade Skinripper's "if you sacrificed
   one or more permanents this turn, ... deals that much damage".
+- `NONTOKEN_PERMANENTS_SACRIFICED` — the nontoken slice of `PERMANENTS_SACRIFICED`, kept on the same
+  component (`nontokenCount`) by the same hook. Backs `Conditions.YouSacrificedNontokenPermanentsThisTurn`.
 - `DAMAGE_SOURCES` — the number of distinct sources a player controlled that dealt damage this turn.
   Backed by the per-player `DamageSourcesThisTurnComponent`, a set of
   `DamageSourceIdentity(entityId, incarnation)` recorded on the source's controller *at damage time*
@@ -16694,9 +18312,9 @@ this turn").
   damage, and reset to 0 at end of turn. Backs `Conditions.YouDealtRedNoncombatDamageThisTurn(atLeast)` —
   Temple of Power's transform gate (back of Ojer Axonil, Deepest Might).
 
-`SubtypeEnteredUnderControlThisTurn(player, subtypes, excludeTriggeringEntity?)` /
-`DynamicAmounts.subtypeEnteredUnderControlThisTurn(subtype, player?, excludeTriggeringEntity?)` /
-`DynamicAmounts.subtypesEnteredUnderControlThisTurn(subtypes, player?, excludeTriggeringEntity?)` —
+`SubtypeEnteredUnderControlThisTurn(player, subtypes, excludeTriggeringEntity?, excludeSource?)` /
+`DynamicAmounts.subtypeEnteredUnderControlThisTurn(subtype, player?, excludeTriggeringEntity?, excludeSource?)` /
+`DynamicAmounts.subtypesEnteredUnderControlThisTurn(subtypes, player?, excludeTriggeringEntity?, excludeSource?)` —
 "the number of [other] [subtype]s that entered the battlefield under [player]'s control this turn"
 (Geralf, the Fleshwright — "each other Zombie that entered the battlefield under your control this
 turn"). It's a **turn-history** count: backed by `PermanentsEnteredUnderControlThisTurnComponent`,
@@ -16704,6 +18322,11 @@ which records each entrant's subtypes (from projected state) at entry, so a perm
 left the battlefield or lost the type still counts. `excludeTriggeringEntity = true` drops the
 permanent whose entry triggered the ability (giving "each *other*"); because every simultaneous
 entrant is recorded before the triggers resolve, each one sees the others (2024-04-12 ruling).
+`excludeSource = true` drops the ability's own source instead — "if *another* Human entered the
+battlefield under your control this turn" on a beginning-of-combat trigger (Éowyn, Shieldmaiden).
+Only the source's current object is dropped; an earlier entry of the same card before it left and
+returned was a different object (CR 400.7) and still counts. Feed it to `Conditions.CompareAmounts(…,
+GTE, 1)` as an `interveningIf`.
 `subtypes` is a **set with any-of semantics**, so the printed "Mounts and/or Vehicles" wording
 (Cloudspire Coordinator, via the plural facade) counts each qualifying entry exactly once — summing
 two single-subtype amounts would double-count a permanent carrying both. The singular facade is the
@@ -16723,7 +18346,7 @@ control this turn" is `CompareAmounts(cardTypeEnteredUnderControlThisTurn(ARTIFA
 `DynamicAmounts.creaturesWithSubtypeDiedThisTurn(subtype, player?)` — "the number of [subtype]s that
 died this turn" (the CHK Zubera cycle: "for each Zubera that died this turn"). Game-wide by default;
 pass a player to count only deaths under that player's control. Reads the same per-death record as the
-`CreatureWithSubtypeDiedThisTurn` condition (`CreatureSubtypesDiedThisTurnComponent`, each entry the
+`CreatureDiedThisTurnMatching` condition (`CreatureDeathsThisTurnComponent`, each entry the
 dying creature's last-known projected subtypes), so a dies trigger's own source is already counted when
 it resolves, and a creature that had the type only through a continuous effect counts.
 
@@ -16937,6 +18560,10 @@ Consequences for authoring and testing:
 - A `chooseUpToDynamic` cap is evaluated **once**, against the state the ability goes onto the stack
   in, and then can't drift between picks (CR 601.2c via 603.3d). A cap of `0` means no mode is
   chosen, so the ability never reaches the stack.
+- A mode's own **dynamic target count** ("return up to X target creature cards", `dynamicMaxCount`
+  on the mode's `targets(...)`) is snapshotted the same way when that mode's targets are chosen — the
+  decision offers X slots and the stack object keeps the locked requirement (Orcus, Prince of
+  Undeath reads `CastX`, the X paid for it). Owner-distributed counts are bound from the picks instead.
 - The per-source memory of `chooseOneNotYetChosen` / `chooseOneNotYetChosenThisTurn` is written when
   the ability goes onto the stack, not when it resolves. That is what makes two simultaneous triggers
   of the same source pick *different* modes (Breeches, Eager Pillager: both attack triggers announce
@@ -17044,7 +18671,12 @@ chosenSubtypeKey = "chosenPlaneswalkerType"))`,
 you control"; `permanentFilter` widens or narrows the pool (matched from the entering permanent's controller's
 view, never the entering object itself) and `mayChooseNothing = true` lets the chooser pick nothing ("you may choose" —
 the permanent then enters with no choice recorded). Scheming Fence: `EntersWithChoice(CREATURE_ON_BATTLEFIELD,
-permanentFilter = GameObjectFilter.NonlandPermanent, mayChooseNothing = true)`,
+permanentFilter = GameObjectFilter.NonlandPermanent, mayChooseNothing = true)`. Its `then` is the rest of the
+replacement — an effect run with the pick as `EffectTarget.ChosenCreature` once the permanent is on the battlefield,
+before state-based actions and trigger detection (so the entry's own enter abilities see the result), skipped when
+nothing was chosen. Deadpool, Trading Card: `EntersWithChoice(CREATURE_ON_BATTLEFIELD, permanentFilter =
+Creature.faceUp(), mayChooseNothing = true, then = Effects.ExchangeTextBoxes(EffectTarget.Self,
+EffectTarget.ChosenCreature))`,
 `ChoiceType.BASIC_LAND_TYPE` writes `ChosenLandTypeComponent` (read by
 `SetEnchantedLandTypeFromChosen` and `GrantLandwalkOfChosenType`), and
 `ChoiceType.OPPONENT` writes an entity-id choice into the `CastChoicesComponent` under
@@ -17073,7 +18705,10 @@ cardNamePool = CardNamePool.ANY, lookAtOpponentHand = true)` +
 by a CDA via `DynamicAmount.CastChoice(CHOSEN_NUMBER)`. This is the *as-enters replacement* (CR
 614.1c) form of a number choice — chosen before the permanent is on the battlefield, no priority
 window at the default — versus `Effects.ChooseNumberForSource` (on resolution, e.g. from an upkeep
-trigger) writing the same slot. Shapeshifter uses the replacement at entry and the effect each
+trigger) writing the same slot. `atRandom = true` ("choose 2, 3, or 4 at random", Haktos the Unscarred) asks no
+one: the engine draws the number uniformly from `[minValue, maxValue]` with the game RNG as the permanent enters, on
+every entry path (`EntersWithReplacements.applyFromDefinition`), and records it in the same slot; only
+`ChoiceType.NUMBER` accepts it. Shapeshifter uses the replacement at entry and the effect each
 upkeep: `replacementEffect(EntersWithChoice(ChoiceType.NUMBER, minValue = 0, maxValue = 7))` +
 `SetBasePowerToughnessDynamicStatic(power = CastChoice(CHOSEN_NUMBER), toughness = Subtract(Fixed(7),
 CastChoice(CHOSEN_NUMBER)))`. Example — Phantasmal Terrain
@@ -17112,6 +18747,18 @@ staticAbility { ability = GrantLandwalkOfChosenType() }
 - `Effects.NoteCreatureType(storeAs = "notedType", prompt?)` — "note a creature type that hasn't been noted for this <source>" (LTR — Long List of the Ents). Same decision shape as `ChooseOption(OptionType.CREATURE_TYPE)`, but the source's *current* `NotedCreatureTypesComponent.types` are excluded from the option list (so the player can't pick a duplicate), and on resolution the chosen type is appended to that component on the source AND stored in `chosenValues[storeAs]` for any downstream pipeline step. The component lives on the source permanent's container, so it disappears when the source leaves play (CR 400.7 — a permanent that changes zones becomes a new object with no memory of its previous existence). Use this whenever a card's text says "note … for this permanent"; use plain `ChooseOption(OptionType.CREATURE_TYPE)` when the choice is one-shot and doesn't need to accumulate.
 - `Effects.SecretlyChooseCreatureType(options = emptyList(), storeAs = "notedType", prompt?)` — "Then secretly choose Human, Merfolk, or Goblin." (MKM — A Killer Among Us). The hidden-information sibling of `NoteCreatureType`, and the same `NoteCreatureTypeEffect` under the hood with `secret = true`: the type is noted on the source permanent exactly as above, but `NotedCreatureTypesComponent.secretTo` records *who* chose it, and two things key off that — the client view shows the note only to that player (badged "Chosen (secret)"; spectators never see it), and only that player can pay `Costs.RevealNotedCreatureType` (§ costs). This is CR 702.106a-b's hidden agenda — the piece of paper kept with the object — applied to a permanent, so a change of control neither hands the new controller the answer nor lets them reveal it. Pass `options` to narrow the choice to a named handful; the source's already-noted types are excluded from whichever set that is. Leave `options` empty for "secretly choose a creature type".
 - `Effects.ChooseCardName(storeAs, prompt?, excludeBasicLandNames?, pool?, chooser?)` — name a card (`ChooseOptionEffect(OptionType.CARD_NAME)`); the chosen name is stored in `chosenValues[storeAs]`. `chooser` (a `Chooser`, default `Controller`) routes the naming to another player through `ChooserResolution` — `Chooser.TargetPlayer` for "target player chooses a card name" (Petra Sphinx); the name still lands in the resolving pipeline, so the controller's later steps read it. `ChooseOptionEffect` carries the same `chooser` for every option type. Options are every registry card name (searchable list, not free text); `excludeBasicLandNames` drops the five basics; `pool = CardNamePool.NONLAND` / `.LAND` narrows the list to nonland / land names at resolution ("choose a nonland card name" — Cranial Extraction), the same pools `EntersWithChoice` offers. Match cards by it with `GameObjectFilter.namedFromVariable(storeAs)`. (Desperate Research)
+  - `recordOnSource = true` (an axis on `ChooseOptionEffect`, so every option type has it) **also records the
+    choice durably on the source permanent** under the option type's slot (`OptionType.recordSlot`: `CARD_NAME`,
+    `COLOR` as a color choice, `CREATURE_TYPE`, `LAND_TYPE`, `CARD_TYPE`) — the slot `EntersWithChoice` writes as
+    a permanent enters, replacing any prior value. It's the *on-resolution* form for a choice a **later**
+    resolution reads back: "II — Choose a card name. III — When you cast a spell with the chosen name …"
+    (Medomai's Prophecy) reads it with `GameObjectFilter.namedFromChosenComponent()`. Nothing is recorded when
+    the source is no longer the permanent that resolved the ability; the pipeline variable is stored either way.
+    A delayed trigger whose filter holds `namedFromChosenComponent()` has the recorded name **frozen in** as it is
+    created (the source as it last existed, if it has left); with no name recorded a `castsNth` trigger never
+    matches (the predicate fails closed against cast records), while a plain `casts` trigger keeps reading the
+    source's bag live.
+- `ChooseOption(OptionType.CARD_TYPE)` (pipeline: `chooseOption(OptionType.CARD_TYPE)`) — "choose a card type" at resolution; offers `CardType.CHOOSABLE_TYPE_NAMES` (artifact, battle, creature, enchantment, instant, kindred, land, planeswalker, sorcery — CR 205.2a, the types a library card can have) and stores the display name in `chosenValues[storeAs]`. Match cards by it with `GameObjectFilter.ofChosenCardTypeFromVariable(slot)`. For a choice that must persist on the permanent (a static reads it later), pass `recordOnSource = true`; reach for `Effects.ChooseCardTypeForSource` only for its extra axes (`lookAtOpponentHand`, a non-default slot). (Alrund, God of the Cosmos)
 - `Effects.StoreCardName(from, storeAs)` — capture the name of the first card in collection `from` into `chosenValues[storeAs]`. The "choose a card, then act on cards of that name" counterpart to `ChooseCardName`. (Lobotomy)
 - `SelectTargetEffect(...)` *(SDK-internal step; cards use `Effects.Pipeline { selectTarget }` — §5.5.)* — pick from a valid target set.
 
@@ -17158,7 +18805,22 @@ The priority groups are (CR 616.1a–f):
   settle boundary for combat damage) — before SBAs and trigger detection, never on the stack. One run
   per application, with the amount that application prevented; `Self` is the replacement's host, "you"
   its controller, `TriggeringEntity` the permanent the damage would have been dealt to. Unpreventable
-  damage prevents nothing, so the rider doesn't run.
+  damage still runs the rider (CR 615.12: the prevention applies once, prevents nothing, and its
+  additional effect still happens) with `preventedDamage()` = 0 — so Purity gains nothing, while
+  **Nine Lives**' amount-free rider still lands: `PreventDamage(appliesTo = DamageEvent(recipient =
+  Recipient.You), onPrevented = Effects.AddCounters(CounterType.INCARNATION, 1, EffectTarget.Self))`,
+  one counter per source's damage event. A reflexive "when damage is prevented this way" rider must
+  gate itself on a nonzero amount (CR 615.13 — it triggers only when some damage was prevented):
+  Phyrexian Vindicator wraps its `ReflexiveTrigger` in `Effects.If(Conditions.CompareAmounts(
+  preventedDamage(), ComparisonOperator.GT, 0), …)`.
+  `half = true` prevents **half** the damage that reaches it instead of a fixed `amount` (which must
+  stay null), rounded up by default — `roundUp = false` for "rounded down". Gisela, Blade of
+  Goldnight: `PreventDamage(half = true, appliesTo = DamageEvent(recipient = Recipient.AnyOf(listOf(
+  Recipient.You, Recipient.PermanentYouControl))))`. Unlike `HalveDamage` it is a prevention effect, so
+  "damage can't be prevented" passes the damage through in full. Each host applies once (two hosts
+  take 3 to 1, then 0 rounded up), and halves go before any fixed-amount prevention (the order that
+  leaves the recipient least damage; CR 616.1 lets them choose). The engine runs every `DoubleDamage` / `HalveDamage` /
+  `ModifyDamageAmount` pass before prevention rather than letting the affected player order them.
 - `ReplacementEffect.ExileCounteredSpellInstead(then?, appliesTo = EventPattern.CounterSpellEvent(counterer = You))`
   — "If a spell or ability you control would counter a spell, instead exile that spell and you may
   play that card without paying its mana cost" (Guile). Applied inside every `StackResolver` counter
@@ -17507,8 +19169,10 @@ The priority groups are (CR 616.1a–f):
   also runs `additionalEffect` when the replacement fires. `riderTiming` says when:
   - `WITH_REPLACEMENT` (default) — the rider is part of the replacement ("instead exile it and you gain
     2 life"), applied inline through a small executor whitelist (not the full pipeline):
-    `TakeExtraTurnEffect` (Ugin's Nexus), `AddCountersEffect` on the redirected card (Darigaaz
-    Reincarnated), `GainLifeEffect` (fixed amount, gained by the replacement source's controller;
+    `TakeExtraTurnEffect` (Ugin's Nexus), `AddCountersEffect` on the redirected card (target
+    `EffectTarget.TriggeringEntity` for another card, as in Dauthi Voidwalker's "exile it with a void
+    counter on it", or `EffectTarget.Self` for a `selfOnly` replacement like Darigaaz Reincarnated),
+    `GainLifeEffect` (fixed amount, gained by the replacement source's controller;
     emits `LifeChangedEvent` so life-gain triggers fire), the card-scoped hand restrictions
     `CantPlayCardsFromHandEffect` / `RevealCardInHandEffect` on the redirected card (Firestorm Phoenix),
     and a `CompositeEffect` of whitelisted parts, run in order.
@@ -17526,7 +19190,10 @@ The priority groups are (CR 616.1a–f):
   linkToSource = true, appliesTo = ZoneChangeEvent(filter = GameObjectFilter.Creature.nontoken().opponentControls(),
   from = Zone.BATTLEFIELD, to = Zone.GRAVEYARD))` — the linked cards are then retrieved by a
   `Creature.exiledWithSource()` target (see §7 state predicates). Honored across the same graveyard
-  paths as `RedirectZoneChange`.
+  paths as `RedirectZoneChange`, the rider included — dying, discard, mill, and a spell that resolves,
+  is countered or fizzles. Dauthi Voidwalker is `RedirectZoneChangeWith(Zone.EXILE,
+  Effects.AddCounters(CounterType.VOID, 1, EffectTarget.TriggeringEntity),
+  appliesTo = ZoneChangeEvent(filter = GameObjectFilter.Any.nontoken().ownedByOpponent(), to = Zone.GRAVEYARD))`.
 - `ReplaceDestructionWith(replacementEffect, appliesTo = EventPattern.DestroyEvent(filter))` — "If <permanent>
   would be destroyed, instead <effect>" (CR 614.1a). The permanent isn't destroyed and `replacementEffect`
   runs in its place, as part of the same replacement: no stack, queued as a replacement rider that runs at
@@ -17550,6 +19217,31 @@ The priority groups are (CR 616.1a–f):
   a banked shield, which stays for later. `appliesTo` defaults to the permanent itself and is read
   relative to it. Clergy of the Holy Nimbus: `replacementEffect(RegenerateInsteadOfDestruction())`.
 - `ReplacementEffect.IfYouDoBranchEffect(...)` — branch on "if you do" replacement.
+- `EntersOnlyIfPaid(cost: PayCost)` — "If this would enter, you may [cost] instead. If you do, put it
+  onto the battlefield. If you don't, put it into its owner's graveyard." A self-replacement on the
+  card's own entry (an "instead" replacement, CR 614.1a), with the cost from the shared `Costs.pay`
+  vocabulary and always optional. **Mox Diamond**:
+  `replacementEffect(EntersOnlyIfPaid(Costs.pay.Discard(GameObjectFilter.Land)))`. Asked *before* the
+  card moves: a cost with objects to pick is a card selection where picking nothing declines, any
+  other cost a yes/no; with nothing to pay with, nothing is asked. Unpaid, the card **never enters**
+  — it goes to its owner's graveyard straight from where it was (the stack, a hand, exile), or stays
+  in the graveyard it was being returned from, so no enters/leaves trigger fires and a resolving
+  spell is not countered. Read off the card as it would exist on the battlefield (CR 614.12): a
+  Sculpting Steel or Phyrexian Metamorph entering as a copy of Mox Diamond is asked too, and goes to
+  the graveyard as its printed card when it declines.
+  **Paths that ask:** a permanent spell resolving (first as-enters question once any entry copy is
+  settled); an effect putting the card onto the battlefield — `MoveToZoneEffectExecutor`,
+  `MoveCollectionExecutor`, put-as-Aura / put-as-non-Aura, return-same-named, return-noted-exile and
+  put-attached-to-chosen, all prepare-then-replay like `EntersWithChoice`; and a duration return
+  ("until this leaves the battlefield", `ZoneReturnService`), which can't pause inside a zone
+  transition and so queues the return as a replacement rider that runs the single-card move at the
+  next boundary. **Open gaps:** a land being *played* (`PlayLandHandler` bypasses the zone transition
+  and doesn't ask); a Leyline-style opening-hand start; a meld or a "return it transformed" entry. A
+  card carrying this that arrives through one of those goes to its owner's graveyard unasked
+  (`ZoneTransitionService` treats it as unpaid) — no printed card with this replacement can reach
+  them today, and each needs its own ask before one can. Not `OnEnterRun` (runs after the permanent
+  is already on the battlefield, so "if you don't" could only make it leave) and not
+  `EntersTapped.payLifeCost` (pays to change *how* it enters, never *whether*).
 - `OnEnterRun(effect)` — generic "as ~ enters the battlefield, run [effect]". The wrapped effect
   executes via the normal effect-executor pipeline at entry time (so `EffectTarget.Self` resolves to
   the entering permanent) and may pause for player input. Compose with atomic pausable effects like
@@ -17599,7 +19291,9 @@ The priority groups are (CR 616.1a–f):
     **entering object**, not the replacement source — so an entering-object amount like
     `DistinctColorsManaSpent` reads the new creature's own cast (and a token / reanimated creature that
     wasn't cast spent no mana → 0). Player-scoped counts (`TurnTracking(Player.You)`, Gev) still read
-    the replacement source's controller. **Set `otherOnly` on any "each *other* …" wording** — the
+    the replacement source's controller. A count that names the replacement source itself
+    ("equal to **Arwen's** toughness", Arwen, Weaver of Hope) reads it through
+    `EffectTarget.GrantingSource`. **Set `otherOnly` on any "each *other* …" wording** — the
     entering permanent's own entry path applies its printed enters-with effects regardless of
     `appliesTo` (that's how plain self-counter cards work), so without the flag a group effect also
     counters its own source as it enters. Source-relative predicates in `appliesTo` (notably
@@ -17634,17 +19328,24 @@ The priority groups are (CR 616.1a–f):
   for each card that actually reached exile. `maxCards = DynamicAmount.XValue` models X-bounded entry
   choices; a zero maximum or no matching cards skips the prompt. **Mimeoplasm, Revered One** uses this
   with creature cards, three +1/+1 counters per card, and later targets the linked exile pile.
-- `ModifyCounterPlacement(modifier, appliesTo, placedByYou?)` / `DoubleCounterPlacement(placedByYou?, appliesTo, effectsOnly?)` —
+- `ModifyCounterPlacement(modifier, appliesTo, placer?)` / `ScaleCounterPlacement(scale?, placer?, appliesTo, effectsOnly?)` —
   **static** counter-placement modifiers living on a battlefield permanent for as long as it remains
-  (Hardened Scales `+1`, Winding Constrictor `+1`, Doubling Season doubles). `appliesTo` is an
+  (Hardened Scales `+1`, Winding Constrictor `+1`, Doubling Season doubles). `ScaleCounterPlacement`'s
+  **`scale`** is `CounterPlacementScale.DOUBLE` (default, "twice that many") or `HALF_ROUNDED_DOWN`
+  ("half that many … rounded down" — one counter becomes none, which ends the placement). `appliesTo` is an
   `EventPattern.CounterPlacementEvent(counterType, recipient)`; `recipient = CreatureYouControl` is
-  resolved relative to the *source permanent's* controller. **`placedByYou`** (both types, default
-  `false`) is the *placer* axis, and it is what separates the two printed wordings: leave it `false`
+  resolved relative to the *source permanent's* controller. **`placer`** (both types, default
+  `Player.Any`) is the *placer* axis, and it is what separates the printed wordings: leave it `Player.Any`
   for "**if counters would be put** on …" (Hardened Scales, Winding Constrictor, Doubling Season),
   where an opponent's proliferate feeds the effect too and the recipient filter is the only
-  "you control" gate; set it `true` for "**if you would put** one or more counters on …" (Doc
+  "you control" gate; `Player.You` for "**if you would put** one or more counters on …" (Doc
   Samson, Super Psychiatrist; Innkeeper's Talent), which applies only when the effect's own
-  controller is the one placing them. For the **activated/spell-granted,
+  controller is the one placing them; `Player.EachOpponent` for "**if an opponent would put** …".
+  **Vorinclex, Monstrous Raider** is both: `ScaleCounterPlacement(placer = Player.You, …)` and
+  `ScaleCounterPlacement(HALF_ROUNDED_DOWN, placer = Player.EachOpponent, …)` over
+  `CounterPlacementEvent(null, Recipient.Any)`. The placer of entry counters is the entering
+  object's controller (the Vorinclex ruling), of proliferate the proliferating player.
+  For the **activated/spell-granted,
   duration-scoped** version of this (Prairie Dog), use the effect
   `Effects.GrantCounterPlacementModifier(...)` (§4 Counters) instead — it records a controller-scoped
   modifier in a turn-scoped game-state store consulted from the same counter-placement chokepoint,
@@ -17658,14 +19359,16 @@ The priority groups are (CR 616.1a–f):
   **costs** (`Costs.PutCounterOnSelf`, `PutCountersOnPermanent` — including as a pay-or-suffer cost — blight, a [+N] loyalty cost) and the
   Saga's precombat-main **turn-based** lore counter. Counters put on a card in a non-battlefield zone
   (suspend's time counters, exile-with-counters) are not on a permanent, so these never touch them.
-  **`effectsOnly`** (`DoubleCounterPlacement`, default `false`) is Doubling Season's "if **an effect**
+  **`effectsOnly`** (`ScaleCounterPlacement`, default `false`) is Doubling Season's "if **an effect**
   would put": set it `true` and costs and the Saga turn-based lore counter pass through undoubled
   (Corpsejack Menace's "would be put" and Innkeeper's Talent's "if you would put" leave it `false`).
   **Ordering (CR 616.1):** when several apply to one placement, the affected object's controller (or
   affected player) picks the order; the engine applies the order they would pick, never battlefield
-  order — for a counter kind the recipient wants, positive additions, then doublings, then negative
-  additions (Winding Constrictor + Corpsejack Menace: 1 → (1 + 1) × 2 = 4); for a harmful kind (minus
-  stat counters such as -1/-1, poison, stun, rad) the reverse (1 → 1 × 2 + 1 = 3). A step that empties the
+  order — for a counter kind the recipient wants, the largest result (positive additions, then doublings,
+  then negative additions: Winding Constrictor + Corpsejack Menace: 1 → (1 + 1) × 2 = 4); for a harmful
+  kind (minus stat counters such as -1/-1, poison, stun, rad) the smallest (1 → 1 × 2 + 1 = 3). A halving's
+  best slot depends on parity (Hardened Scales after Vorinclex's halving: 4 → 2 + 1 = 3, before it 5 → 2),
+  so with a halving in play the engine searches the orders. A step that empties the
   placement ends it; caps (`CapCounterPlacementThisTurn`) apply last.
 - `CapCounterPlacementThisTurn(amount = 1, appliesTo = CounterPlacementEvent(POISON, Recipient.You))` —
   **static** cap-and-lock: "If you would get one or more poison counters, instead you get one poison
@@ -17718,7 +19421,8 @@ The priority groups are (CR 616.1a–f):
   also counts Quina's Frog and every token a Manufactor added. No source re-judges its own additions, so
   a Map added for an artifact-token event does not recursively trigger itself. Read only by
   `CreateTokenExecutor` and `CreatePredefinedTokenExecutor`; token *copies* (`CreateTokenCopyOfTarget`)
-  don't reach this rider yet, nor the count doublers. Used by Worldwalker Helm (`TokenCreationEvent(You, Artifact)`, add `Map`, `inheritTapped = true`)
+  don't reach this rider yet. The count replacements (`MultiplyTokenCreation`, `ModifyTokenCount`) do
+  reach `CreateTokenCopyOfTarget` and `CreateTokenCopyOfSelf`: a doubler doubles a token copy like any other token. Used by Worldwalker Helm (`TokenCreationEvent(You, Artifact)`, add `Map`, `inheritTapped = true`)
   and Peregrin Took (`additionalTokenType = "Food"`, "those tokens plus an additional Food token are created instead")
   and Quina, Qu Gourmet (`additionalTokenType = "Frog"`, default `appliesTo` = any token you create, adds a 1/1 green Frog).
   `restrictions` are extra `Condition` gates, evaluated by `TokenCreationReplacementHelper` with the
@@ -17769,7 +19473,7 @@ both frozen from the public face-down values; transforming it cannot reveal the 
 adds its upkeep ability to that otherwise anonymous identity. Turning the original face up does
 not update an existing copy.
 
-- `EntersAsCopy(optional, copyFilter, copyFromZone, filterByTotalManaSpent, additionalSubtypes, additionalColors, additionalKeywords, nameOverride, powerOverride, toughnessOverride, exileCopiedCard, tappedIfCopied, entersWithCounters, exceptions, duration)` —
+- `EntersAsCopy(optional, copyFilter, copyFromZone, filterByTotalManaSpent, additionalSubtypes, additionalColors, additionalKeywords, nameOverride, powerOverride, toughnessOverride, exileCopiedCard, tappedIfCopied, entersWithCounters, exceptions, duration, copyOf)` —
   "enter as a copy of …". As the permanent enters, the controller picks an object matching
   `copyFilter` and the permanent enters as a copy (Rule 707 copiable values), with any overrides
   applied. `copyFromZone` selects the candidate pool: `Zone.BATTLEFIELD` (default — Clone, Clever
@@ -17785,12 +19489,16 @@ not update an existing copy.
   (Echoing Deeps; Vesuva / Thespian's Stage copying a land on the battlefield); declining the copy
   enters it untapped as its printed self. `entersWithCounters: CopyEntryCounters?` is the sibling
   rider "except it enters with …": `CopyEntryCounters(count, counterType = PLUS_ONE_PLUS_ONE,
-  ifCopiedMatches = null)`. `CopyEntryCounters(DynamicAmounts.xValue())` is Altered Ego's "X
+  ifCopiedMatches = null, ifEntrantMatches = null)`. `CopyEntryCounters(DynamicAmounts.xValue())` is Altered Ego's "X
   additional +1/+1 counters"; `CopyEntryCounters(Fixed(1), CounterType.SHIELD,
   ifCopiedMatches = GameObjectFilter.Any.youControl())` is Undercover Operative's "a shield counter
   on it if you control that creature" — the filter is read against the copied object as the
   permanent enters, from the entrant's controller's point of view, so copying an opponent's
-  creature (or one that left the battlefield before the entry) places nothing. It lives on the copy effect rather than on a separate
+  creature (or one that left the battlefield before the entry) places nothing. `ifEntrantMatches`
+  reads the **entrant itself** as the copy made it instead — Moritte of the Frost's "if it's a
+  creature, it enters with two additional +1/+1 counters" (`ifEntrantMatches =
+  GameObjectFilter.Creature`): copying a land animated by a non-copy effect gives a noncreature
+  copy, so no counters (ruling). It lives on the copy effect rather than on a separate
   `EntersWithCounters`, because copying replaces the permanent's own copiable text: a self-targeted
   enters-with-counters replacement would be gone by the time the copy applies. It follows the same
   "only if a copy was actually made" rule as `tappedIfCopied`, which is the printed ruling
@@ -17815,6 +19523,36 @@ not update an existing copy.
   `filterByTotalManaSpent` uses zero on these non-cast entries. Existing entry-pipeline limits such
   as collection `OnEnterRun` choices remain separate; this does not expand those replacement types.
   A copied Aura's attachment choice is covered in the entry above.
+  **`copyOf: EffectTarget?`** (default null — the as-enters choice above) makes the entrant copy *one
+  bound object* instead, and makes the replacement apply to **other** objects entering: "the next
+  time one or more creatures or planeswalkers enter this turn, they enter as copies of the chosen
+  creature" (Mystic Reflection — `GrantReplacementEffect(EntersAsCopy(optional = false, copyOf =
+  chosen, appliesTo = EventPattern.ZoneChangeEvent(filter = GameObjectFilter.CreatureOrPlaneswalker,
+  to = Zone.BATTLEFIELD)), EffectTarget.Self, Duration.NextUse("one or more creatures or planeswalkers
+  enter"))`). It is granted, never printed as a permanent's own replacement: `GrantReplacementEffect`
+  binds the reference to the `EffectTarget.SpecificEntity` it resolved to and snapshots its copiable
+  values on the grant. `appliesTo` filters the entrants (any controller unless the filter says
+  otherwise); `copyFilter` / `copyFromZone` / `filterByTotalManaSpent` are unused. Every entry path
+  reads it through `GrantedEntryCopy` — a resolving permanent spell, zone-moving effects (blink,
+  reanimation), token creation and a land play — before the entrant's other as-enters replacements,
+  so the copied card's own enters-with counters, as-enters choices and enters triggers apply, and an
+  entrant's own `EntersAsCopy` choice isn't asked (either order ends as a copy of the bound object).
+  The entrant copies the object's copiable values as it enters, or as it last existed on the
+  battlefield once it has left (its departure snapshot, else the grant-time one). With `NextUse` the
+  first entry event it modifies spends it — every matching object entering in that event is copied —
+  and an entry it doesn't match (a noncreature) leaves it waiting. Every grant that applies to an
+  entry is applied and spent by it (CR 616.1f). When grants bound to different objects apply to one
+  entrant, its controller orders them (CR 616.1) and the copy applied last decides what it copies, so
+  the engine asks "Choose what <entrant> enters as a copy of" — picked on the battlefield among the
+  copied creatures (a `SelectCardsDecision`, like a Clone's choice), or from their names once one has
+  left (`GrantedEntryCopyOrderContinuation`). A permanent spell is asked as it resolves; every other
+  entrant — an effect move, each token, a played land creature, a token a resumed answer creates — is
+  asked before it enters by replay: the work that placed it is discarded, the question asked, and the
+  effect, answer or land play replayed with the answer waiting (`GameState.entryCopyOrders`). Several
+  tokens entering together are asked about one at a time. A face-down entrant is modified too,
+  copying under its face-down status (CR 708.10). The copy has no as-enters choice, so `optional` must be false, and `copyFromZone`,
+  `filterByTotalManaSpent` and `exileCopiedCard` are rejected. Only the granted form is read — a
+  printed `copyOf` (Essence of the Wild) isn't wired.
   **The copy is settled first, then the copied identity's own entry replacements run (CR 614.12).**
   On the cast path the spell takes on the copied identity and then walks the rest of the as-enters
   pipeline *as the copy*: the copied card's `EntersWithChoice` questions (chained in choice-type
@@ -17866,13 +19604,16 @@ not update an existing copy.
   order giving 7. Several applicable announcement effects are cumulative — two doublers quadruple
   the draw. `restrictions` is also the seam a "Max speed —" gate folds into — declare the replacement
   inside `maxSpeed { replacementEffect(…) }` and the builder fills the slot.
-- `ModifyKeywordActionAmount(appliesTo, modifier, restrictions)` — resize the count a **mill, scry or
-  surveil** announces by a fixed amount (the keyword-action twin of `ModifyDrawAmount`): a player who
-  would act on N cards instead acts on `N + modifier`, clamped to ≥ 0. One type across the three
+- `ModifyKeywordActionAmount(appliesTo, modifier = 0, multiplier = 1, restrictions)` — resize the count a **mill, scry or
+  surveil** announces, or the number of times a **spell is copied** (the keyword-action twin of `ModifyDrawAmount`): a player who
+  would act on N cards instead acts on `N * multiplier + modifier`, clamped to ≥ 0. `multiplier` must
+  be ≥ 1, and exactly 1 on `SpellCopiedEvent` (copy replacements stay additive, so they always
+  commute and the copy sites never need to ask for an order). One type across the three
   actions, like `ModifyKeywordAction`: `appliesTo` names the action and whose — an
   `EventPattern.KeywordActionCountEvent`: `EventPattern.MillEvent(player)` (CR 701.17, which also
   serves as the mill trigger — see **Mill** under the triggers; its `cardFilter`/`batch` don't apply here), `EventPattern.ScryEvent(player)` (CR 701.22) or
-  `EventPattern.SurveilEvent(player)` (CR 701.25), `player` (`Player.You` / `Player.EachOpponent` /
+  `EventPattern.SurveilEvent(player)` (CR 701.25), `EventPattern.SpellCopiedEvent(spellFilter, player)`
+  (CR 707.10, which also serves as the "whenever you copy a spell" trigger), `player` (`Player.You` / `Player.EachOpponent` /
   `Player.Each`) relative to the source's (projected) controller; any other pattern doesn't compile.
   "Whenever you scry / surveil" triggers stay on `ScriedEvent` / `SurveiledEvent`; scry and surveil
   patterns are replacement-only. `restrictions` (a
@@ -17882,11 +19623,31 @@ not update an existing copy.
   Applied **once** per instruction at the action's announcement — the flagged gather
   `CardSource.TopOfLibrary(isMill | isScry | isSurveil = true)` that only `Patterns.Library.mill` /
   `scry` / `surveil` (and `Effects.Scry` / `Effects.Surveil`, every surveil spelling) set, plus the
-  mill cost atom — so a paused-and-resumed pipeline never double-modifies, and exile-top / look-at-top
+  mill cost atom (activated-ability costs and `PayCost` mills), the pay-or-suffer mill (Deep Spawn)
+  and the damage-to-mill replacements (`ReplaceDamageWithMill`,
+  `ReplaceDamageWithCounters.damagedPlayerMills`) — so a paused-and-resumed pipeline never double-modifies, and exile-top / look-at-top
   gathers are never affected. The bigger look carries through: the scry top/bottom choice and the
   surveil graveyard choice select *any number* of the looked-at cards, so the extra cards are part of
   what is scried or surveiled (CR 701.25b), and the `ScriedEvent` / `SurveiledEvent` count includes
-  them. A count of 0 is no event (CR 701.22b / 701.25c) and is never modified. Multiple instances sum.
+  them. A count of 0 is no event (CR 701.22b / 701.25c) and is never modified.
+
+  **Several instances** each apply once (CR 616.1, the acting player chooses the order). When every
+  pair commutes — any stack of "+N"s (they sum), any stack of doublers (two Bruvacs quadruple) — the
+  result is applied with no question. When the order changes the count (a doubler next to a "+4":
+  mill 2 becomes 12 or 8), the player who mills / scries / surveils gets a `ChooseOptionDecision`
+  listing each distinct result with an order that gives it ("Mill 12 (The Water Crystal, then Bruvac
+  the Grandiloquent)"); several affected players are asked in APNAP order and the gather then runs
+  once. A player who has lost or left the game is never asked and their count is not resized. The
+  same question is asked at the mill effect, an activated ability's mill cost (before anything is
+  paid; a client may pre-fill `AdditionalCostPayment.millCount`, accepted only when some order
+  produces it), a `PayCost` mill such as a morph cost and the pay-or-suffer mill (after the payer
+  agrees), and the damage-to-mill replacements (`ReplaceDamageWithMill`,
+  `ReplaceDamageWithCounters.damagedPlayerMills`), which mill directly when no order matters and
+  otherwise run the mill as a replacement rider that asks. **Exception:** an as-enters payment
+  (`EntryPayment` — "enters only if you pay …") with a mill `PayCost` doesn't ask; when the order
+  would matter its payment fails and counts as declined. No card prints that shape today.
+  - Bruvac the Grandiloquent: "If an opponent would mill one or more cards, they mill twice that many
+    cards instead" → `ModifyKeywordActionAmount(EventPattern.MillEvent(Player.EachOpponent), multiplier = 2)`.
   - The Water Crystal: "If an opponent would mill one or more cards, they mill that many cards plus
     four instead" → `ModifyKeywordActionAmount(EventPattern.MillEvent(Player.EachOpponent), modifier = 4)`.
   - Kenessos, Priest of Thassa: "If you would scry a number of cards, scry that many cards plus one
@@ -17894,6 +19655,32 @@ not update an existing copy.
   - Enhanced Surveillance: "You may look at an additional two cards each time you surveil" →
     `ModifyKeywordActionAmount(EventPattern.SurveilEvent(), modifier = 2)` (the "may" is a superset
     choice — every extra card can go back on top — so it isn't modelled).
+  - Twinning Staff: "If you would copy a spell one or more times, instead copy it that many times plus
+    an additional time. You may choose new targets for the additional copy." →
+    `ModifyKeywordActionAmount(EventPattern.SpellCopiedEvent(), modifier = 1)`. `player` is the
+    **copier** (the copies' controller) and `spellFilter` is matched against the spell being copied.
+    Applied once per copy instruction, before any copy is put on the stack, at every spell-copy site:
+    `CopyTargetSpell` (and `CopyTargetSpellOrAbility`'s spell branch — Dualcaster Mage, Twincast, the
+    Staff's own ability), storm / conspire / casualty and the `CopyNextSpellCast` /
+    `CopyEachSpellCast` riders (one instruction each, so storm 3 becomes 4), `CopyEachTargetSpell`
+    (each targeted spell is its own instruction), `CopyForEachOtherPossibleTarget` (the added copies
+    are ordinary copies of the original, keeping its targets unless the copier picks new ones, CR
+    707.10c) and `ChainCopy` (each added copy picks its own target). Every added copy may be
+    retargeted. Zero copies ("copy it for each …" over nothing) is no copy and is never resized; a
+    card copied and then cast (CR 707.12, `CopyCardIntoCollection`) is not a spell copy and is
+    untouched; copies of abilities are untouched. Multiple instances sum (two Staffs: two extra).
+- `LimitLibrarySearch(appliesTo, topCount, restrictions)` — a library search sees only the top
+  `topCount` cards of each library it looks through (CR 701.23f). `appliesTo` is
+  `EventPattern.SearchLibraryEvent(player)`, whose `player` is the **searcher** relative to the source's
+  (projected) controller (`Player.You` / `Player.EachOpponent` / `Player.Each`); the limit covers every
+  library that player searches, theirs or another player's. Applied at the search's own gather (the
+  `search = true` gather every `Patterns.Library.search*` recipe emits), so the top N are fixed for the
+  whole search — finding a card doesn't bring the next one in. Only library cards shrink: the graveyard
+  and hand halves of a multi-zone search are untouched. It is still a search: its "then shuffle"
+  shuffles the whole library and `SearchLibraryEvent` triggers fire. A look at the top N is not a
+  search and is never limited. Several instances don't stack — the smallest `topCount` wins.
+  - Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards
+    of that library instead" → `LimitLibrarySearch(EventPattern.SearchLibraryEvent(Player.EachOpponent), topCount = 4)`.
 - `ModifyKeywordAction(prefixEffect, appliesTo)` — insert an extra effect *in front of* a keyword
   action (CR 614): replaces "[a matching permanent] <acts>" with "[prefixEffect], then that permanent
   <acts>". One type across keyword actions rather than one per action — `appliesTo` carries which
@@ -17935,6 +19722,23 @@ not update an existing copy.
   - Tekuthal, Inquiry Dominus:
     `RepeatKeywordAction(times = 2, appliesTo = EventPattern.ProliferatedEvent())`
     ("If you would proliferate, proliferate twice instead").
+- `ReplaceKeywordAction(replacementEffect, appliesTo, optional = false, activeZones = {BATTLEFIELD})`
+  — perform `replacementEffect` **instead of** a keyword action (CR 614.1a), so the action doesn't
+  happen; the third member of the family beside `ModifyKeywordAction` (prefix) and
+  `RepeatKeywordAction` (repeat). Supported pattern: `EventPattern.LearnEvent(player)` (CR 701.48),
+  `player` matched with the source's controller as "you" (`You` / `Each` / `Any` / `EachOpponent` /
+  `AnOpponent`). `activeZones` is where the source functions (CR 113.6): `{GRAVEYARD}` for "as long
+  as this card is in your graveyard" — a graveyard source's "you" is its owner, and it must be in the
+  graveyard as the action would happen. `LearnEffectExecutor` gathers matches through
+  `KeywordActionReplacements.collectInstead` and offers them one at a time, mandatory first: a
+  mandatory one applies at once; an `optional` one asks its controller yes/no
+  (`KeywordActionInsteadContinuation`); the first applied replaces the action and the rest have
+  nothing left to replace; declining all performs the action. `replacementEffect` runs rooted at the
+  replacement's own source, so `EffectTarget.Self` is the card that printed it.
+  - Retriever Phoenix: `ReplaceKeywordAction(Effects.PutOntoBattlefieldFromGraveyard(EffectTarget.Self),
+    EventPattern.LearnEvent(), optional = true, activeZones = setOf(Zone.GRAVEYARD))`
+    ("As long as this card is in your graveyard, if you would learn, you may instead return this
+    card to the battlefield").
 - `ReplaceLifeGainWith(replacementEffect, appliesTo = LifeGainEvent(You), restrictions = emptyList())`
   replaces a positive life-gain event with an arbitrary effect, immediately and without using the stack.
   The original gain emits no life-gain event or tracker update. Compose the amount with
@@ -17968,7 +19772,11 @@ not update an existing copy.
   (CR 120.3a); `LoseLifeExecutor` deliberately skips this step so pay-life costs and direct life-loss
   effects bypass the floor (matching the Ali from Cairo ruling "does not apply to effects which reduce
   your life without doing damage"). The damage event still fires at the original amount, so lifelink
-  and damage-dealt triggers see the full damage. Multiple instances pick the strictest floor. Used by
+  and damage-dealt triggers see the full damage. Multiple instances pick the strictest floor. A floor
+  never raises a total already under it — a player below `floor` who hasn't lost takes the damage as
+  normal — and under a shared team life total (Two-Headed Giant) a `Player.You` floor guards the team's
+  total whichever teammate is dealt the damage. An emblem can hold one (`CreatePermanentEmblem(
+  ownedReplacementEffects = …)`, Serra the Benevolent). Used by
   Ali from Cairo (`LifeLossFloor(floor = 1, appliesTo = LifeLossEvent(Player.You))`); Worship adds a
   `restrictions = listOf(YouControlACreature)` gate.
 - `ReplaceLifeReductionToZero(instead, restrictions, appliesTo)` — "If your life total would be reduced
@@ -18040,7 +19848,7 @@ not update an existing copy.
   Applied by `LifePaymentService`, the engine choke point every life payment funnels through — cost
   atoms, additional casting costs, ward and Phyrexian-style payments, pain-cost mana abilities and the
   `PayLife` / `PayDynamicLife` resolution effects alike.
-- `PreventLifeGain(appliesTo)` — life gain matching the event is fully prevented (Sulfuric Vortex, Erebos).
+- `PreventLifeGain(appliesTo, replacesOnly = false)` — life gain matching the event is fully prevented (Erebos, Gríma Wormtongue: "can't gain life"). Set `replacesOnly = true` for the "gains no life instead" replacement wording (Sulfuric Vortex): it stops every gain the same way, but a player under it may still be named to gain life to pay a cost (`Costs.additional.OthersGainLife`).
   The `LifeGainEvent.player` scope can be `You` / `EachOpponent` / `Each` (resolved relative to the
   source's controller) or `EnchantedPlayer` for an "enchant player" Aura whose locked player is its
   attachment target (Grievous Wound). For a *source-independent, rest-of-game* lock on a specific player
@@ -18064,11 +19872,26 @@ are their printed spellings (`CounterType.printed`). Text converts back only thr
 - `collection` (`CounterType.COLLECTION`): MH3 — Charitable Levy. Passive accumulate-then-threshold marker: its noncreature-cast trigger adds one, and `Conditions.SourceCounterCountAtLeast(COLLECTION, 3)` gates the sacrifice. No inherent rule; the passive-counter badge displays its count.
 - `corpse` (`CounterType.CORPSE`): LEA — Scavenging Ghoul. Passive spendable store with no inherent rule: its each-end-step trigger adds one per creature that died this turn (`DynamicAmounts.creaturesDiedThisTurn(Player.Each)`) and `Costs.RemoveCounterFromSelf(CounterType.CORPSE, 1)` pays for its regeneration. The passive-counter badge displays its count.
 - `vitality` (`CounterType.VITALITY`): LEA — Living Artifact. Passive spendable store with no inherent rule: its `Triggers.you.isDealtDamage()` trigger adds `DynamicAmounts.triggerDamageAmount()` of them, and its upkeep trigger may remove one to gain 1 life. The passive-counter badge displays its count.
+- `void` (`CounterType.VOID`): AFR — Sphere of Annihilation. Passive tally with no inherent rule: `EntersWithDynamicCounters(VOID, xValue())` sets it, and the upkeep trigger snapshots it with `storeNumber(countersOnSelf(VOID))` before exiling everything whose mana value is at most that number (`CardPredicate.ManaValueAtMostDynamic(slot.amount)`). The passive-counter badge displays its count.
+- `harmony` (`CounterType.HARMONY`): AFR — Instrument of the Bards. Passive tally with no inherent rule: its optional upkeep trigger adds one, and its search ability finds a creature card with `CardPredicate.ManaValueEqualsDynamic(DynamicAmounts.countersOnSelf(HARMONY))`. The passive-counter badge displays its count.
+- `enlightened` (`CounterType.ENLIGHTENED`): AFR — The Book of Exalted Deeds. A pure marker nothing reads: the Book's sorcery-speed ability puts one on target Angel alongside two permanent `Effects.GrantStaticAbility` grants (`GrantCantLoseGame`, `GrantOpponentsCantWinGame`). The passive-counter badge displays its count.
 - `phyresis` (`CounterType.PHYRESIS`): DMU — Weatherlight Compleated. Passive tally with no inherent rule; `Conditions.SourceCounterCountAtLeast(PHYRESIS, 4)` gates its conditional Phyrexian-creature type change and `…AtLeast(PHYRESIS, 7)` its draw-or-scry branch. The passive-counter badge displays its count.
 - `muster` (`CounterType.MUSTER`): GTC — Assemble the Legion. Passive tally with no inherent rule: its upkeep trigger adds one, then creates a Soldier token for each (`DynamicAmounts.countersOnSelf(MUSTER)`). The passive-counter badge displays its count.
 - `hatching` (`CounterType.HATCHING`): NEO — The Dragon-Kami Reborn. A pure marker on a face-down card in exile: chapters I–II exile one of the top three with `move(..., faceDown = FaceDownMode.HIDDEN, lookableInExile = true, addCounterType = CounterType.HATCHING)`, and Dragon-Kami's Egg gathers `CardSource.FromZone(Zone.EXILE, Player.You, GameObjectFilter.Creature.withCounter(CounterType.HATCHING))` to cast one for free. The exile browser badges its count.
 - `bounty` (`CounterType.BOUNTY`): J22 — Termination Facilitator. Passive marker with no inherent rule: the card's own observer trigger (`Triggers.a(CreatureOrPlaneswalker.opponentControls().withCounter(BOUNTY)).isDealtDamage()`) destroys a marked permanent when it is dealt damage. The passive-counter badge displays its count.
 - `valor` (`CounterType.VALOR`): MID — Intrepid Adversary. Passive tally with no inherent rule: its enters trigger puts `DynamicAmounts.timesPaid()` of them on itself after a `PayRepeatedly` reflexive payment, and its `GrantDynamicStats` anthem reads `DynamicAmounts.countersOnSelf(VALOR)` live.
+- `ritual` (`CounterType.RITUAL`): MID — Heirloom Mirror. Passive countdown with no inherent rule: its sorcery-speed ability adds one, then `Effects.If(Conditions.SourceCounterCountAtLeast(RITUAL, 3), Effects.RemoveAllCountersOfType(RITUAL, Self) then Effects.Transform(Self))`. The passive-counter badge displays its count.
+- `flame` (`CounterType.FLAME`): MID — Embodiment of Flame (Flame Channeler's back face). Passive fuel with no inherent rule: `Triggers.a(GameObjectFilter.InstantOrSorcery.youControl()).dealsDamage()` adds one, and its impulse-draw ability pays `Costs.RemoveCounterFromSelf(FLAME)`. The passive-counter badge displays its count.
+- `ember` (`CounterType.EMBER`): MID — Smoldering Egg. Passive countdown with no inherent rule: each instant or sorcery you cast adds `DynamicAmounts.manaSpentOnTriggeringSpell()` of them, then `Effects.If(Conditions.SourceCounterCountAtLeast(EMBER, 7), Effects.RemoveAllCountersOfType(EMBER, Self) then Effects.Transform(Self))`. The passive-counter badge displays its count.
+- `book` (`CounterType.BOOK`): STX — Spell Satchel. Passive store with no inherent rule: its magecraft trigger adds one, `{T}, Costs.RemoveCounterFromSelf(BOOK)` adds {C}, and `{3}, {T}, Costs.RemoveCounterFromSelf(BOOK, 3)` draws a card. The passive-counter badge displays its count.
+- `study` (`CounterType.STUDY`): STX — Kianne, Dean of Substance // Imbraham, Dean of Theory. A mark on **cards in exile** with no inherent rule: placed by `move(…, ToZone(EXILE), addCounterType = STUDY)` or `run(Effects.AddCountersToCollection(slot, STUDY))` after the exile, read by `GameObjectFilter.Any.withCounter(STUDY)` over `CardSource.FromZone(EXILE, Player.You)` and `DynamicAmounts.zone(Player.You, Zone.EXILE, …).distinctValues(MANA_VALUE)` — cards you *own* in exile, whichever permanent marked them. The counters fall off when the card leaves exile, like any counter on a zone change.
+- `refine` (`CounterType.REFINE`): STX — Uvilda, Dean of Perfection. A countdown on **a card in exile**: Uvilda's `{T}` exiles an instant or sorcery from hand, puts three on it, and grants the card two triggered abilities (`Effects.GrantTriggeredAbility(…, PipelineTarget, Duration.Permanent)` — see *abilities granted to a card in exile*): an `activeZones = EXILE` upkeep trigger that removes one, and a `CountersRemovedEvent(REFINE, lastRemoved = true)` trigger that casts it with `CastFromCollectionWithoutPayingCost(payManaCost = true, costReduction = 4)`. The counters (and the granted abilities) fall off when the card leaves exile.
+- `voyage` (`CounterType.VOYAGE`): KHM — Cosima, God of the Voyage. A tally on **a card in exile** with no inherent rule: Cosima exiles herself at upkeep and gains (in exile, `Duration.Permanent` — see *abilities granted to a card in exile*) a landfall trigger that may add one; declining returns her with that many +1/+1 counters (`EntryCounter.count`) and draws that many. The counters fall off when she leaves exile.
+- `ghostform` (`CounterType.GHOSTFORM`): KHM — Kaya the Inexorable. A pure reminder with no inherent rule: Kaya's +1 puts one on a creature alongside a `Duration.Permanent` granted dies / leaves-to-exile trigger, and that trigger keeps working if the counter is removed.
+- `night` (`CounterType.NIGHT`): KHM — Replicating Ring. Passive countdown with no inherent rule (unrelated to the day/night designation): its upkeep trigger adds one, then `Effects.If(Conditions.SourceCounterCountAtLeast(NIGHT, 8), Effects.RemoveAllCountersOfType(NIGHT, Self) then Effects.CreatePredefinedToken("Replicated Ring", 8))`. The passive-counter badge displays its count.
+- `task` (`CounterType.TASK`): THB — Heliod's Punishment. Passive countdown with no inherent rule: the Aura enters with four (`EntersWithCounters(TASK, 4, selfOnly = true)`) and grants the enchanted creature "{T}: remove one" — `Effects.RemoveCounters(TASK, 1, EffectTarget.GrantingSource) then Effects.If(Conditions.Not(Conditions.TargetHasCounter(TASK, EffectTarget.GrantingSource)), Effects.Destroy(EffectTarget.GrantingSource))`. The passive-counter badge displays its count.
+- `hour` (`CounterType.HOUR`): ELD — Midnight Clock. Passive tally with no inherent rule: one each upkeep and from `{2}{U}`, and `Triggers.self.getsCounters(HOUR, nth = 12)` fires the reset. The passive-counter badge displays its count.
+- `knowledge` (`CounterType.KNOWLEDGE`): ELD — The Magic Mirror. Passive tally with no inherent rule: the upkeep trigger adds one, then draws `DynamicAmounts.countersOnSelf(KNOWLEDGE)`. The passive-counter badge displays its count.
 - `charge`, `time`, `level`, `quest`, `fade`, `vanishing`, `experience`, `age`, `velocity`, `awakening`,
   `blood`, `cage`, `doom`, `storage`, `divinity` (`CounterType.DIVINITY`, a passive counter used by the Myojin
   cycle), `charm`, `music`, `crumble`, `corpse`, `germ`, `ink`, `growth`,
@@ -18349,7 +20172,11 @@ Counter effects live in §4 (`AddCounters`, `RemoveCounters`, `Proliferate`, `Mo
   its own snapshot can't-attack floating effect (Fight or Flight / Stand or Fall; creatures entering after the
   split are unaffected).
 - `SelectFromCollectionEffect(from, into, selectCount?, allowZero?, alwaysPrompt?, restrictions?)` *(SDK-internal step; cards use `Effects.Pipeline { chooseExactly/chooseUpTo/chooseAnyNumber/chooseRandom/chooseSpell/selectAll }` — §5.5.)* — let a player pick
-  from a collection. `restrictions` (`List<SelectionRestriction>`) cap and trim the picks server-side: `OnePerCardType` ("for each card type": each pick
+  from a collection. Over cards some player can't see — a pool a filter built from a hand or library (a search), or a
+  filter reading looked-at library cards — the engine asks as if `alwaysPrompt` were set, never skipping the
+  question or picking for the player: nothing eligible is offered as a forced empty pick ("Fail to find" for a search,
+  CR 701.23b) and exactly-enough as a forced pick-all, both of which auto-answer. Whether a question is asked never
+  depends on hidden cards (#3340). `restrictions` (`List<SelectionRestriction>`) cap and trim the picks server-side: `OnePerCardType` ("for each card type": each pick
   claims *one* of its card types — a bipartite matching, so an artifact creature kept as the artifact still leaves the
   creature slot open, per Atraxa, Grand Unifier's ruling; the cap is the largest such matching — Portent of Calamity),
   `OnePerColor(matchControllerPermanentColors?)`, `OnePerCardName` (surfaces `onePerCardName` on `SelectCardsDecision`;
@@ -18526,6 +20353,15 @@ Card authors rarely reference these directly; they are created/updated by the ma
   is `CastSpellEnumerator` — it now enumerates the Adventure spell face for a land-primary card (the land itself is
   played via `PlayLandEnumerator`). First land users: Ishgard, the Holy See; Jidoor, Aristocratic Capital; Lindblum,
   Industrial Regency; Midgar, City of Mako; Zanarkand, Ancient Metropolis.
+  **On the stack an Adventure has only the Adventure's characteristics** (CR 715.3b): `SplitSpellCasts.announce`
+  swaps the stack object's mana cost, type line, colors and keywords for the face's — exactly as for a split half —
+  and restores the card when it leaves the stack (CR 715.4). So the `SpellCastEvent` mana value
+  (`DynamicAmounts.triggeringSpellManaValue()`), cast-trigger filters ("an instant spell", "a creature spell",
+  `withSubtype("Adventure")`) and "spell with mana value N" checks all read the Adventure, never the creature. The
+  stack object still keeps the *card's* name — an engine simplification (CR 715.3b gives the spell the Adventure's
+  name too) that name-keyed trackers rely on; no card here names an Adventure spell yet. Omens (CR 720.3b) and modal DFC spell backs cast with `faceIndex` (CR 712.8f) get the same
+  swap. "an Adventure or Dragon spell" is therefore one filter, `GameObjectFilter.Any.withAnySubtype("Adventure",
+  "Dragon")` (Lozhan, Dragons' Legacy).
 - **Omen (Tarkir: Dragonstorm)** — `layout = OMEN` + `cardFaces[0]` Omen spell; DSL:
   `card { omen("Name") { spell { … } } }`. Reuses the Adventure cast/enumeration path (`enumerateSecondaryFace`,
   cast via `CastSpell.faceIndex = 0`), but `StackResolver` routes the resolving Omen to `Zone.LIBRARY` and shuffles
@@ -19091,16 +20927,37 @@ turn doesn't change the answer. A permanent that entered this turn (or left and 
 matches; phased-out permanents don't count; control changes don't matter. An imported board treats
 permanents marked as entered this turn as new.
 
-### Continuous control during the current turn
+### Entered the battlefield this turn — and under whose control
 
-`StatePredicate.ControlledSinceTurnBegan` and the fluent `.controlledSinceTurnBegan()` filter
-match a battlefield object whose current controller has controlled it without interruption since
-the current turn began. Haste does not change this fact. Compose with
+`StatePredicate.EnteredThisTurn()` and the fluent `.enteredThisTurn()` filter match a permanent
+that entered the battlefield this turn (the summoning-sickness marker; a permanent that has left
+answers from its last-known snapshot). `EnteredThisTurn(underYourControl = true)`, fluent
+`.enteredThisTurnUnderYourControl()`, narrows it to "entered the battlefield **under your control**
+this turn" — Shaile, Dean of Radiance's
+`Effects.ForEachInGroup(GroupFilter(GameObjectFilter.Creature.enteredThisTurnUnderYourControl()), …)`.
+"You" is the effect source's controller. It reads that player's per-turn entry log
+(`PermanentsEnteredUnderControlThisTurnComponent`, the same log behind Celebration) and matches the
+entry by its entry timestamp, so a permanent that left and came back counts only for its later
+entry (CR 400.7). Current control doesn't matter: a creature that entered under your control and was
+then stolen still matches; one an opponent cast that you then gained control of doesn't. Battlefield
+only — the narrowed form has no last-known answer. It needs a recorded entry, so on an imported board
+(or a game saved before entries carried a timestamp) nothing matches it until something enters.
+
+### Continuous control since the turn began, or since your last upkeep
+
+`StatePredicate.ControlledContinuouslySince(since: ControlMark)` matches a battlefield object whose
+current controller has controlled it without interruption since `since`. `ControlMark.TURN_BEGAN`
+(fluent `.controlledSinceTurnBegan()`) is "since the current turn began"; `ControlMark.YOUR_LAST_UPKEEP`
+(fluent `.controlledSinceYourLastUpkeep()`) is "since the beginning of its controller's last upkeep" —
+during that player's own upkeep, the upkeep before this one — and its negation is echo's "came under
+your control since the beginning of your last upkeep". Haste does not change either fact. Compose with
 `.controlledByActivePlayer()` for Nettling Imp's target, or with a player-scoped filter for a
 delayed destruction sweep. It applies to any permanent, even one that only later becomes a creature.
 
 The engine captures projected control and object identity at turn start, independently of the untap
-step. Entry, blink, and any control interruption invalidate continuity; regaining control does not
+step, and per player at the beginning of each of their upkeeps (additional upkeep steps included),
+keeping the previous upkeep's snapshot for reads during the current one. A player who has had no
+upkeep yet — a fresh imported board — has controlled nothing since one. Entry, blink, and any control interruption invalidate continuity; regaining control does not
 restore it. Each effect instruction and the settle boundary record projected changes, including
 control effects that expire or lose their source. Phasing preserves the battlefield visit.
 `AttackedThisTurn` reads declarations by every player, so a subsequent control change does not erase
@@ -19375,23 +21232,79 @@ registered definition when copying or flipping; already-frozen values are preser
 Existing characteristic-change markers and state projection expose recopy/expiry to the client; flipping
 uses its existing flip event and rotation. No additional player decision or client rule calculation is needed.
 
+### Voting
+
+`Effects.Vote(choices, voteCounts = emptyMap())` (`VoteEffect`) is "Starting with you, each player
+votes for wild or free" (CR 701.38). On resolution each player still in the game, starting with the
+controller and proceeding in turn order (CR 701.38a), picks exactly one choice — no abstaining. Each
+ballot is a `ChooseOptionDecision` whose prompt lists the votes cast so far, and each vote is
+announced as it is cast (the ballot's game-log line, plus an engine `VoteCastEvent`), so a later
+voter knows the earlier votes. `voteCounts` maps numeric pipeline keys to the choice each one
+tallies; every key is written once everyone has voted, 0 for a choice nobody picked. In a pipeline,
+`val (wild, free) = vote("wild", "free")` returns one fresh `NumberSlot` per choice in input order.
+
+Council's dilemma spends every tally — **Selvala's Stampede**: `vote("wild", "free")`, then
+`gatherUntilMatch(Creature, count = wild.amount)` onto the battlefield and a shuffle, then
+`chooseUpTo(free.amount, gather(hand, Permanent))` onto the battlefield. Will of the council
+("if X gets more votes …") compares the tallies with `Conditions.CompareAmounts`. Not modelled:
+voting for objects or players (Council's Judgment), per-voter effects (Expropriate's "for each
+player who voted …"), extra votes (CR 701.38d), and "whenever players finish voting" triggers. A
+secret ballot (Vault 11: Voter's Dilemma) is the other vote shape, `SecretChoiceEffect`; a future
+vote trigger or extra-vote effect has to cover both.
+
 ### Numerical dice
 
 `Effects.RollDice(count: DynamicAmount = Fixed(1), sides = 6, player = Controller,
-resultCounts = emptyMap())` rolls equally likely outcomes from 1 through `sides`, advancing the
-immutable game RNG. Count is evaluated once at resolution. `resultCounts` maps numeric pipeline
+resultCounts = emptyMap(), modifier = Fixed(0), storeTotalAs = null)` rolls equally likely outcomes
+from 1 through `sides`, advancing the immutable game RNG. Count is evaluated once at resolution. `resultCounts` maps numeric pipeline
 keys to sets of matching results; every key is written (including zero), scoped to this batch.
 Cards use `Effects.Pipeline { val (evens, sixes) = rollDice(count, sides = 6,
 resultSets = listOf(setOf(2, 4, 6), setOf(6))); ... }`: `rollDice` returns fresh `NumberSlot`s
 in result-set order. Luck Bobblehead creates tapped Treasures from `evens.amount` and tests
 `sixes.amount == 7`, without spelling pipeline keys.
 
+**Modified results.** `modifier` is the instruction's own adjustment, evaluated once at resolution
+and added to each kept die's natural result (CR 706.2): "roll a d20 and subtract the number of cards
+in your hand" is `modifier = -DynamicAmounts.cardsInYourHand()`.
+The sum is the die's *result* and may be zero or negative; `resultCounts`, die observers
+(`TRIGGER_DIE_RESULT`, `TRIGGER_HIGHEST_DIE_RESULT`, the `minimumResult`/`maximumResult` bounds) and
+the `DiceRolledEvent` all read results. `DieRolledEvent.natural` keeps the face that came up for a
+future "natural 20" reader, and the log shows both when they differ. `storeTotalAs` writes the sum of
+the instruction's kept results, over every roller when `player` names several. In a pipeline, `rollDiceResult(count, sides, player, modifier)`
+returns that sum as a `NumberSlot`, and a results table (CR 706.3a) is a run of
+`ifThen(condition) { … }` branches comparing it with `Conditions.CompareAmounts` — rows such as
+"0 or less" have no finite result set (The Deck of Many Things). `ifThen` is the pipeline's
+`Effects.If` whose branch shares the surrounding handles.
+
 `Triggers.you.rollsDie(minimumResult = null, maximumResult = null)` (also `anOpponent` and
 `anyPlayer`) observes each individual numerical roll with inclusive result bounds. The roller is
 `TriggeringPlayer`; `ContextProperty(TRIGGER_DIE_RESULT)` reads its captured result. The engine
 emits public `DieRolledEvent`s and detects observers at the settle boundary, after resolution.
-No new die decision is needed; server results appear in the game log. Roll replacements, extra
-ignored dice, rerolls and result modifiers are not part of this primitive's current surface.
+`rollsDie(naturalResult = 20)` is "whenever you roll a natural 20" (Critical Hit): it matches the
+face the die displays (`DieRolledEvent.natural`, CR 706.2) instead of the modified result, so a
+modifier can neither make nor break it. Pair it with `triggerZone = Zone.GRAVEYARD` for "return this
+card from your graveyard to your hand".
+
+`Triggers.you.rollsDice()` (same subjects) is "whenever you roll one or more dice"
+(`DieRolledEvent(batch = true)`): it fires **once per roll instruction** for each matching roller,
+however many dice that instruction rolled — Feywild Trickster, Brazen Dwarf. The engine emits one
+`DiceRolledEvent` per player after that player's per-die events; it carries every result, and
+`DynamicAmounts.triggerHighestDieResult()` (`ContextProperty(TRIGGER_HIGHEST_DIE_RESULT)`) reads the
+highest, so "if any of those results was 10 or higher" is
+`Conditions.CompareAmounts(DynamicAmounts.triggerHighestDieResult(), ComparisonOperator.GTE, 10)`
+(Farideh, Devil's Chosen). A batch trigger takes no result interval.
+No new die decision is needed; server results appear in the game log.
+
+`RollAdditionalDice(extraDice = 1)` is the static die-roll replacement (CR 614.1a): whenever its
+controller would roll one or more dice, they roll that many plus `extraDice` and ignore that many of
+the lowest — Pixie Guide and Barbarian Class, "If you would roll one or more dice, instead roll that
+many dice plus one and ignore the lowest roll". It replaces the *instruction*, not each die, and
+instances **add** (`DiceRollModifiers.extraDice` sums them over the roller's permanents). An ignored
+roll never happened (CR 706.6): its `DieRolledEvent` carries `ignored = true` so the log shows it, but
+no die observer, `resultCounts` tally or `DiceRolledEvent` result sees it. Which roll is lowest is
+decided on natural results; an instruction's `modifier` is uniform across its dice, so it never
+changes that order. Rerolls and result modifiers coming from other permanents are not part of this
+primitive's current surface.
 
 ### Radiation player counters
 
