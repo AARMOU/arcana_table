@@ -51,7 +51,7 @@ class TheSwarmlordScenarioTest {
     }
 
     @Test fun partnerHistoryCountsForItsOwnerButNotAnOpponentsCommander() {
-        val d = customScenario(TheSwarmlord, "Island")
+        val d = customScenario(TheSwarmlord, "Island", "Grizzly Bears", "Craw Wurm")
         val p = d.player1
         val opponent = d.player2
         val card = d.putCardInCommandZone(p, "The Swarmlord")
@@ -69,7 +69,7 @@ class TheSwarmlordScenarioTest {
     }
 
     @Test fun onlyAnotherCounteredCreatureYouControlDraws() {
-        val d = customScenario(TheSwarmlord, "Island", "Island", "Island")
+        val d = customScenario(TheSwarmlord, "Island", "Island", "Island", "Grizzly Bears", "Craw Wurm", "Murder")
         val p = d.player1
         val opponent = d.player2
         val swarmlord = d.putCreatureOnBattlefield(p, "The Swarmlord")
