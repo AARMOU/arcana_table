@@ -490,7 +490,17 @@ class LocalArgentumHost(
         )
         val result = initializer.initializeGame(config)
         ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it, seatOf(it).difficulty) }
-        state = result.state
+        // Arcana opening hands grant one free redraw (including two-player Commander
+        // and offline-versus-AI). Set the engine's actual mulligan rule state before
+        // either the AI or the person chooses a hand; changing only the UI would
+        // still force the player to bottom a card after their first redraw.
+        state = allSeats.fold(result.state) { current, seat ->
+            current.updateEntity(seat) { player ->
+                val mulligan = player.get<MulliganStateComponent>()
+                if (mulligan == null || mulligan.freeMulligan) player
+                else player.with(mulligan.copy(freeMulligan = true))
+            }
+        }
         gameLogs.clear()
         logSnapshots.clear()
         legalCache.clear()

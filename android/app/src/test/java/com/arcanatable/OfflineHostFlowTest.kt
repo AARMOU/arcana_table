@@ -43,23 +43,52 @@ class OfflineHostFlowTest {
     private fun action(host: LocalArgentumHost, action: JSONObject) =
         host.receive(JSONObject().put("type", "submitAction").put("action", action).put("interactionEpoch", "offline"))
 
-    @Test fun londonMulliganDownToSix() {
+    @Test fun firstMulliganIsFreeAndKeepsSeven() {
         val host = host()
-        val first = next("mulliganDecision")
-        assertEquals(0, first.getInt("mulliganCount"))
-        assertEquals(7, first.getJSONArray("hand").length())
-        assertNotNull(first.getJSONObject("cards").optJSONObject(first.getJSONArray("hand").getString(0))?.optString("name"))
-        host.receive(JSONObject().put("type", "mulligan"))
-        val second = next("mulliganDecision")
-        assertEquals(1, second.getInt("mulliganCount"))
-        assertEquals(1, second.getInt("cardsToPutOnBottom"))
-        host.receive(JSONObject().put("type", "keepHand"))
-        val bottom = next("chooseBottomCards")
-        assertEquals(1, bottom.getInt("cardsToPutOnBottom"))
-        host.receive(JSONObject().put("type", "chooseBottomCards").put("cardIds", JSONArray().put(bottom.getJSONArray("hand").getString(0))))
-        assertEquals(6, next("mulliganComplete").getInt("finalHandSize"))
-        next("stateUpdate")
-        host.shutdown()
+        try {
+            val first = next("mulliganDecision")
+            assertEquals(0, first.getInt("mulliganCount"))
+            assertEquals(7, first.getJSONArray("hand").length())
+            assertNotNull(first.getJSONObject("cards").optJSONObject(first.getJSONArray("hand").getString(0))?.optString("name"))
+
+            host.receive(JSONObject().put("type", "mulligan"))
+            val second = next("mulliganDecision")
+            assertEquals(1, second.getInt("mulliganCount"))
+            assertEquals(7, second.getJSONArray("hand").length())
+            assertEquals("First mulligan must not require bottoming a card", 0, second.getInt("cardsToPutOnBottom"))
+
+            host.receive(JSONObject().put("type", "keepHand"))
+            assertEquals(7, next("mulliganComplete").getInt("finalHandSize"))
+            next("stateUpdate")
+        } finally {
+            host.shutdown()
+        }
+    }
+
+    @Test fun secondMulliganCostsOneAndKeepsSix() {
+        val host = host()
+        try {
+            next("mulliganDecision")
+            host.receive(JSONObject().put("type", "mulligan"))
+            val free = next("mulliganDecision")
+            assertEquals(0, free.getInt("cardsToPutOnBottom"))
+
+            host.receive(JSONObject().put("type", "mulligan"))
+            val paid = next("mulliganDecision")
+            assertEquals(2, paid.getInt("mulliganCount"))
+            assertEquals(7, paid.getJSONArray("hand").length())
+            assertEquals(1, paid.getInt("cardsToPutOnBottom"))
+
+            host.receive(JSONObject().put("type", "keepHand"))
+            val bottom = next("chooseBottomCards")
+            assertEquals(1, bottom.getInt("cardsToPutOnBottom"))
+            host.receive(JSONObject().put("type", "chooseBottomCards")
+                .put("cardIds", JSONArray().put(bottom.getJSONArray("hand").getString(0))))
+            assertEquals(6, next("mulliganComplete").getInt("finalHandSize"))
+            next("stateUpdate")
+        } finally {
+            host.shutdown()
+        }
     }
 
     @Test fun playingALandCanBeUndone() {
