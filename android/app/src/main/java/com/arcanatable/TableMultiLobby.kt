@@ -92,6 +92,72 @@ internal fun lobbyStatusLine(state: JSONObject?, isHost: Boolean): String {
     }
 }
 
+/** Shareable room locator only. Never the host invitation, password, seat token, or OAuth session. */
+internal fun activeGameRoomCode(role: String?, hostCode: String?, guestCode: String?): String? {
+    val code = when (role) {
+        "online-host" -> hostCode
+        "online-guest" -> guestCode
+        else -> null
+    }?.trim()?.uppercase()
+    return code?.takeIf { it.matches(Regex("[A-Z0-9]{6,8}")) }
+}
+
+/**
+ * Mid-game Lobby viewer. The original pre-game lobby cannot safely be reopened:
+ * the engine has started, the room is already seated, and its waiting-state
+ * controls would be misleading. This is read-only except for copying the
+ * non-secret room code; dismissing it never leaves or resets the game.
+ */
+@Composable
+internal fun TableController.ActiveGameLobbyDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val code = activeGameRoomCode(
+        wifiRole, (wifiServer as? ArgentumCloudMultiHost)?.code, onlineCodeInput
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("LOBBY", color = SoftWhite, fontWeight = FontWeight.Black) },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Game in progress · view only. Your match stays connected.",
+                    color = Muted, fontSize = 12.sp)
+                Text("ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                if (code != null) {
+                    Text(code, color = Mint, fontSize = 26.sp, fontWeight = FontWeight.Black,
+                        letterSpacing = 3.sp,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Room code ${code.toList().joinToString(" ")}"
+                        })
+                    OutlinedButton(onClick = { copyText(context, "Arcana Table room code", code) }) {
+                        Text("COPY ROOM CODE", color = Mint, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Text("Room code unavailable for this connection.", color = Muted)
+                }
+                Text("PLAYERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                players.forEachIndexed { index, seat ->
+                    val roleLabel = when {
+                        index == localSeat -> " · YOU"
+                        seat.isComputer -> " · AI"
+                        else -> ""
+                    }
+                    Text("P${index + 1} · ${seat.name}$roleLabel",
+                        color = SoftWhite, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("RETURN TO GAME", color = Mint, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted,
+    )
+}
+
 /** Shows the multiplayer lobby when this phone is hosting or waiting in a 2–4 player room. */
 @Composable
 internal fun TableController.MultiplayerLobbyScreen() {

@@ -352,6 +352,8 @@ internal class TableController(
     var chatOpen by run { mutableStateOf(false) }
     var topMenuExpanded by run { mutableStateOf(false) }
     var topMenuSection by run { mutableStateOf<String?>(null) }
+    /** Non-destructive live-lobby viewer; never reopens the pre-game room or mutates seats. */
+    var activeGameLobbyOpen by run { mutableStateOf(false) }
     var resetConfirmOpen by run { mutableStateOf(false) }
     var chatDraft by run { mutableStateOf("") }
     var chatMessages by run { mutableStateOf(emptyList<ChatMessage>()) }

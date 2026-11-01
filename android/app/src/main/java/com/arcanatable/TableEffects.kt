@@ -143,6 +143,14 @@ import kotlinx.coroutines.CoroutineScope
 internal fun shouldFollowActivePlayerToBoard(followEnabled: Boolean, showingTable: Boolean, active: Int, playerCount: Int): Boolean =
     followEnabled && !showingTable && active in 0 until playerCount
 
+/** Only a suspended remote game is eligible for automatic app-switch recovery (#700). */
+internal fun shouldResumePausedArgentumOnForeground(
+    foreground: Boolean,
+    gameEnabled: Boolean,
+    offline: Boolean,
+    status: ArgentumConnectionStatus,
+): Boolean = foreground && gameEnabled && !offline && status == ArgentumConnectionStatus.PAUSED
+
 /**
  * A 2–4 seat lobby is already a live connection, even before Argentum starts a game.
  * The legacy room fields are null for both ArgentumLanMultiServer and ArgentumCloudMultiHost.
@@ -243,15 +251,24 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         selectedPlayer = active
     }
 
+    // The connection guard follows the *presence* of any live game or lobby (#303, #700), not
+    // individual socket identities: replacing a room client must not cycle the service off.
     // New multiplayer lobbies use wifiServer (LAN or directed cloud), not the legacy roomHost.
-    // Observe it as a key so the connection guard starts before a game is launched.
-    LaunchedEffect(roomHost, roomClient, cloudRoomClient, wifiServer, argentumEnabled) {
-        if (shouldKeepMultiplayerConnectionGuard(
-                roomHost != null, roomClient != null, cloudRoomClient != null,
-                wifiServer != null, argentumEnabled
-            )
-        ) LanConnectionService.start(context)
+    val keepGameConnectionActive = shouldKeepMultiplayerConnectionGuard(
+        legacyHost = roomHost != null,
+        legacyClient = roomClient != null,
+        cloudClient = cloudRoomClient != null,
+        multiTransport = wifiServer != null,
+        argentumEnabled = argentumEnabled,
+    )
+    LaunchedEffect(keepGameConnectionActive) {
+        if (keepGameConnectionActive) LanConnectionService.start(context)
         else LanConnectionService.stop(context)
+    }
+    // Only a real screen teardown may stop the guard. A room/client key change is not a
+    // teardown: its keyed DisposableEffect below must close old sockets, never the service.
+    DisposableEffect(context) {
+        onDispose { LanConnectionService.stop(context) }
     }
     LaunchedEffect(argentumEnabled) {
         if (argentumEnabled && argentumStatus == ArgentumConnectionStatus.DISCONNECTED) argentumSocket.connect(lobbyPlayerName)
@@ -259,6 +276,15 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     }
     LaunchedEffect(argentumStatus, argentumEnabled) {
         if (argentumEnabled) recordDiagnostic("Argentum connection status: ${argentumStatus.name.lowercase()}")
+    }
+    // Argentum deliberately pauses retries when Android backgrounds the app. Returning (for
+    // example from Arcana Control) resumes a PAUSED remote session with its saved token via
+    // retryNow(); it never starts a new match, changes seats or retries a replaced session (#700).
+    LaunchedEffect(appInForeground, argentumStatus, argentumEnabled, argentumOffline) {
+        if (shouldResumePausedArgentumOnForeground(appInForeground, argentumEnabled, argentumOffline, argentumStatus)) {
+            recordDiagnostic("Returning to Arcana: reconnecting paused Argentum session", DiagnosticCategory.CONNECTION)
+            argentumSocket.retryNow()
+        }
     }
     LaunchedEffect(argentumQueue) {
         for (incoming in argentumQueue) {
@@ -379,7 +405,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             hostOwnedByEffect?.close()
             clientOwnedByEffect?.close()
             cloudClientOwnedByEffect?.close()
-            LanConnectionService.stop(context)
+            // Never stop LanConnectionService here: this runs whenever a room socket or
+            // host instance is replaced, including successful joins and reconnections.
         }
     }
     LaunchedEffect(players) { nextId = maxOf(nextId, (players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }.maxOfOrNull { it.id } ?: 0) + 1) }
