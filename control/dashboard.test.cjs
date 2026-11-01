@@ -83,8 +83,20 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
   assert.match(script,/Feed unavailable · last recorded status/);
 });
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
-  // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
-  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
+  // The only extra module is the owner's Web Push opt-in; the inline dashboard stays read-only.
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./card-ready-notifications.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
+test('card-ready notifications are opt-in, same-origin, and carry the exact honk in the PWA',()=>{
+  const client=fs.readFileSync(path.join(__dirname,'card-ready-notifications.js'),'utf8');
+  const worker=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+  assert.match(client,/Notification\.requestPermission\(\)/);
+  assert.match(client,/pushManager\.subscribe/);
+  assert.match(client,/arcana-review-session-v1/);
+  assert.match(client,/method, cache: 'no-store'/);
+  assert.match(worker,/push',event/);
+  assert.match(worker,/notificationclick',event/);
+  assert.match(worker,/🪿🪿🪿CARD READY FOR APPROVAL HONK🪿🪿🪿/);
+  assert.doesNotThrow(()=>new vm.Script(client));
+});
 test('all-hands check-in is a separate owner-authenticated module, not a dashboard dispatch',()=>{
   assert.match(html,/id="allHandsCheckIn"/);
   assert.match(html,/id="allHandsStatus"/);
