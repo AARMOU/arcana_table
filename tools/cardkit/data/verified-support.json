@@ -548,6 +548,40 @@
       "baseSha": "ac7221f343ccdfa1532cd620ee7d1cadd8b0028d",
       "oracleHash": "d0d22fa8102670b67b82e29dd5fa15e87e96865d2e8ea901f7873b00054a891c",
       "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Aspiring Champion": {
+      "summary": "Combat-damage trigger (Aberrant) -> IfYouDo(SacrificeSelfEffect, PermanentsSacrificed) (Marit Lage's Slumber) -> Pipeline gatherUntilMatch(Creature)/reveal/move to battlefield/ShuffleLibrary (Riptide Shapeshifter, Hei Bai, Selvala's Stampede) -> Effects.If(CollectionContainsMatch(found, Creature.withSubtype Demon)) with DealDamage(powerOf(found.asTarget), each opponent, damageSource = found.asTarget) (powerOf/damageSource shape per Spinning Wheel Kick; CollectionSlot.asTarget in sdk language reference). Source review only; candidate implementation must prove the Demon power damage with a scenario test.",
+      "verifiedBy": "Copilot, source inspection 2026-11-01 (argentum-engine@c1c04ca)",
+      "references": [
+        "upstream mtg-sets/2017-2022/.../mh1/cards/MaritLagesSlumber.kt",
+        "upstream mtg-sets/2000-2002/.../ons/cards/RiptideShapeshifter.kt",
+        "upstream mtg-sets/2025/.../tle/cards/HeiBaiForestGuardian.kt",
+        "upstream mtg-sets/2008-2016/.../cn2/cards/SelvalasStampede.kt",
+        "android/custom-cards/.../cards/Aberrant.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Ruinous Ascension — When this creature deals combat damage to a player, sacrifice it. If you do, reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield, then shuffle the rest into your library. If that creature is a Demon, it deals damage equal to its power to each opponent.",
+          "primitives": [
+            "Triggers.self.dealsCombatDamage(Recipient.AnyPlayer)",
+            "Effects.IfYouDo(SacrificeSelfEffect",
+            "then",
+            "successCriterion = SuccessCriterion.PermanentsSacrificed)",
+            "Effects.Pipeline{gatherUntilMatch(GameObjectFilter.Creature)",
+            "reveal",
+            "move(ToZone(BATTLEFIELD))",
+            "Effects.ShuffleLibrary()}",
+            "Effects.If(Conditions.CollectionContainsMatch(found",
+            "Creature.withSubtype(\"Demon\")))",
+            "Effects.DealDamage(DynamicAmounts.powerOf(found.asTarget)",
+            "PlayerRef(Player.EachOpponent)",
+            "damageSource = found.asTarget)"
+          ]
+        }
+      ],
+      "baseSha": "759c35233bae183e4f061ee2e89be65e7c8a98b7",
+      "oracleHash": "cac1f05df7aefc0a7cb3166c5f3dbfee9fc370b36d4e3f74329ce69965164e9b",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
