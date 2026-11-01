@@ -272,7 +272,7 @@ export default {
           publicKey: env.CARD_PUSH && env.VAPID_PRIVATE_JWK ? String(env.VAPID_PUBLIC_KEY || "") : "" }, 200, origin);
       }
       const session = await openSession(env.SESSION_SECRET,
-        (request.headers.get("Authorization") || "").replace(/^Bearer\\s+/i, ""));
+        (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
       if (!session) return json({ error: "sign-in-required" }, 401, origin);
       const [status, result] = await handleCardPush(request.method, request, env);
       return json(result, status, origin);
