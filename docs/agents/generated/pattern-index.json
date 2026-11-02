@@ -358,7 +358,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -455,7 +455,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 42,
+   "count": 43,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -645,7 +645,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 45,
+   "count": 46,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1290,7 +1290,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1466,6 +1466,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
      "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.AddManaOfColorInCommanderColorIdentity": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Opal Palace",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OpalPalace.kt",
+     "lines": 75,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OpalPalaceScenarioTest.kt"
     }
    ]
   },
@@ -5036,7 +5047,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 65,
+   "count": 66,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5689,7 +5700,7 @@
    ]
   },
   "manaAbility": {
-   "count": 31,
+   "count": 32,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5823,7 +5834,7 @@
    ]
   },
   "timing": {
-   "count": 36,
+   "count": 37,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6397,7 +6408,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Desert of the Glorified",

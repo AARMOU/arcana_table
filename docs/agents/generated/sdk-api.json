@@ -3217,7 +3217,7 @@
     "AddManaOfColorAmongLinkedExile(ManaRestriction): Effect"
    ],
    "AddManaOfColorInCommanderColorIdentity": [
-    "AddManaOfColorInCommanderColorIdentity(ManaRestriction): Effect"
+    "AddManaOfColorInCommanderColorIdentity(ManaRestriction, Set<? extends ManaSpellRider>): Effect"
    ],
    "AddManaOfColorLandsCouldProduce": [
     "AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction): Effect"

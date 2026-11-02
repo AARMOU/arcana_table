@@ -35,10 +35,11 @@ class EldraziIncursionPlayableTest {
     private val commander = entries.single { it.commander }.name
     private val names = entries.flatMap { e -> List(e.count) { e.name } }
 
-    /** Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. */
-    private val expectedMissing = setOf(
-        "Opal Palace",
-    )
+    /**
+     * Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. Empty
+     * since Opal Palace (engine patch 0034): every original slot is indexed.
+     */
+    private val expectedMissing = emptySet<String>()
 
     @Test fun originalSlotIndexInventoryMatchesTheExplicitMissingList() {
         assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
@@ -62,13 +63,14 @@ class EldraziIncursionPlayableTest {
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
             "Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge", "Angelic Aberration",
-            "Mutated Cultist", "Hideous Taskmaster", "Twins of Discord", "Benthic Anomaly",
+            "Mutated Cultist", "Hideous Taskmaster", "Twins of Discord", "Benthic Anomaly", "Opal Palace",
         ).forEach { name ->
             assertNotNull("registered: $name", registry.getCard(name))
             assertTrue("in the deck: $name", name in setup.you.deck)
         }
-        val leftOut = setup.notes.first { "Left out" in it }
-        assertTrue(leftOut, "${expectedMissing.size} card" in leftOut)
+        val leftOut = setup.notes.filter { "Left out" in it }
+        if (expectedMissing.isEmpty()) assertEquals("nothing left out of the precon", emptyList<String>(), leftOut)
+        else assertTrue(leftOut.toString(), leftOut.single().let { "${expectedMissing.size} card" in it })
     }
 
     private fun mirrorRegistry() = CardRegistry().apply { register(lib.load(names.toSet())) }
@@ -111,6 +113,25 @@ class EldraziIncursionPlayableTest {
         assertNotEquals(first.state.rng, other.state.rng)
     }
 
+    /** Life, library and battlefield sizes per player: tells a long game from a stalled one. */
+    private fun progress(state: GameState): String = state.turnOrder.joinToString(prefix = "[", postfix = "]") { p ->
+        val life = state.getEntity(p)?.get<com.wingedsheep.engine.state.components.identity.LifeTotalComponent>()?.life
+        fun names(z: com.wingedsheep.sdk.core.Zone) = state.getZone(p, z)
+            .mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
+        "life=$life lib=${state.getZone(p, com.wingedsheep.sdk.core.Zone.LIBRARY).size} " +
+            "bf=${names(com.wingedsheep.sdk.core.Zone.BATTLEFIELD)} hand=${names(com.wingedsheep.sdk.core.Zone.HAND)} " +
+            "gy=${names(com.wingedsheep.sdk.core.Zone.GRAVEYARD)} exile=${names(com.wingedsheep.sdk.core.Zone.EXILE)} " +
+            "cz=${names(com.wingedsheep.sdk.core.Zone.COMMAND)}"
+    } + " step=${state.step} stack=${state.stack.size} decision=${state.pendingDecision?.let { it::class.simpleName }}"
+
+    /** An AI action with the names of the cards it mentions. */
+    private fun describe(state: GameState, action: GameAction): String {
+        val text = action.toString()
+        val names = state.entities.keys.filter { Regex("""\b${Regex.escape(it.toString())}\b""").containsMatchIn(text) }
+            .mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
+        return "${action::class.simpleName}$names"
+    }
+
     private data class AiStep(val before: GameState, val action: GameAction, val after: GameState)
 
     /** Direct processing exposes rejections that playPriorityWindow can replace with a pass. */
@@ -141,7 +162,9 @@ class EldraziIncursionPlayableTest {
             trace += AiStep(state, action, result.state)
             state = result.state
         }
-        assertTrue("Strict AI mirror must finish: seed=$seed turn=${state.turnNumber} actions=${trace.size}", state.gameOver)
+        assertTrue("Strict AI mirror must finish: seed=$seed turn=${state.turnNumber} actions=${trace.size} " +
+            "${progress(state)} kinds=${trace.groupingBy { "${if (it.action.playerId == state.turnOrder[0]) "A" else "B"}:${it.action::class.simpleName}" }.eachCount()} " +
+            "plays=${trace.filter { it.action !is com.wingedsheep.engine.core.PassPriority && it.action !is SubmitDecision }.takeLast(40).joinToString(" | ") { "t${it.before.turnNumber}:" + describe(it.before, it.action) }}", state.gameOver)
         if (expected != null) assertEquals("Replay ended at a different action; seed=$seed", expected.size, trace.size)
         println("[eldrazi-incursion-strict] seed=$seed replay=${expected != null} " +
             "turn=${state.turnNumber} actions=${trace.size} winner=${state.winnerId} rejections=0")
@@ -180,7 +203,7 @@ class EldraziIncursionPlayableTest {
             }
             println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
-            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions", state.gameOver)
+            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions ${progress(state)}", state.gameOver)
         }
     }
 }

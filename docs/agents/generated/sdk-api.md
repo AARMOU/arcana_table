@@ -1212,7 +1212,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `AddManaOfColorAmong(GameObjectFilter, ManaRestriction): Effect`*
 - `AddManaOfColorAmongGraveyard(GameObjectFilter, ManaRestriction): Effect`*
 - `AddManaOfColorAmongLinkedExile(ManaRestriction): Effect`*
-- `AddManaOfColorInCommanderColorIdentity(ManaRestriction): Effect`*
+- `AddManaOfColorInCommanderColorIdentity(ManaRestriction, Set<? extends ManaSpellRider>): Effect`*
 - `AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction): Effect`*
 - `AddOneManaOfEachColorAmong(GameObjectFilter, ManaRestriction): Effect`*
 - `AddOneManaOfEachCraftedMaterialColor(ManaRestriction): Effect`*

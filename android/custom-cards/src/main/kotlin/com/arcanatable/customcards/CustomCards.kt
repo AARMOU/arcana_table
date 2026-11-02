@@ -353,6 +353,8 @@ object CustomCards {
         Entry(TwinsOfDiscord, "M3C", "Eldrazi Incursion"),
         // Eldrazi Incursion. Needs engine patch 0033 (total projected power/toughness of a chosen collection).
         Entry(BenthicAnomaly, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Incursion. Needs engine patch 0034 (commander-cast-count counters rider on spent mana).
+        Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
