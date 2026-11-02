@@ -52,6 +52,9 @@ class BenthicAnomalyScenarioTest {
         }
     }
 
+    /** Projected types include subtypes; the card types and supertypes are the rest. */
+    private fun cardTypes(d: GameTestDriver, id: EntityId) = d.projected.getTypes(id) - d.projected.getSubtypes(id)
+
     private fun tokens(d: GameTestDriver, p: EntityId) =
         d.getCreatures(p).filter { d.state.getEntity(it)?.has<TokenComponent>() == true }
 
@@ -68,7 +71,7 @@ class BenthicAnomalyScenarioTest {
         assertEquals("Hill Giant", d.getCardName(token))
         assertEquals(3, d.projected.getPower(token)); assertEquals(3, d.projected.getToughness(token))
         assertTrue(d.projected.getColors(token).isEmpty())
-        assertEquals(setOf("CREATURE"), d.projected.getTypes(token))
+        assertEquals(setOf("CREATURE"), cardTypes(d, token))
         assertEquals(setOf("Eldrazi"), d.projected.getSubtypes(token))
         assertFalse(d.projected.hasSubtype(token, "Giant"))
         assertEquals("the original is untouched", ps[1], d.projected.getController(giant))
@@ -151,7 +154,7 @@ class BenthicAnomalyScenarioTest {
         d.resolveTop()
         val token = tokens(d, ps[0]).single()
         assertTrue(d.projected.isLegendary(token))
-        assertEquals(setOf("LEGENDARY", "CREATURE"), d.projected.getTypes(token))
+        assertEquals(setOf("LEGENDARY", "CREATURE"), cardTypes(d, token))
         assertEquals(setOf("Eldrazi"), d.projected.getSubtypes(token))
         assertFalse(d.projected.hasSubtype(token, "Dog"))
         d.resolveAll()
