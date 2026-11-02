@@ -133,8 +133,12 @@ jobs:
         if: always()
         run: |
           echo "engine: ${{ steps.enginetests.outcome }}/${{ steps.enginesummary.outcome }} custom: ${{ steps.custom.outcome }} app: ${{ steps.app.outcome }}"
-          test "${{ steps.enginetests.outcome }}" = success && test "${{ steps.enginesummary.outcome }}" = success
-          test "${{ steps.custom.outcome }}" = success && test "${{ steps.app.outcome }}" = success
+          # Every suite must pass. Each line exits on failure: under bash -e a failing command inside an
+          # `a && b` list does not stop the script, so an engine failure used to be ignored (GSD, #81).
+          test "${{ steps.enginetests.outcome }}" = success || exit 1
+          test "${{ steps.enginesummary.outcome }}" = success || exit 1
+          test "${{ steps.custom.outcome }}" = success || exit 1
+          test "${{ steps.app.outcome }}" = success || exit 1
       - name: Stage the validated engine, data and agent docs on this B141 branch
         if: success() && inputs.stage
         run: |
