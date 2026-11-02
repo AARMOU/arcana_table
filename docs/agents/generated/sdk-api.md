@@ -2822,10 +2822,16 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `attackingYouOrYourPlaneswalkers(): Any`
 - `basePower(Int): GameObjectFilter`
 - `basePower(Int): Any`
+- `basePowerAtMost(Int): GameObjectFilter`
+- `basePowerAtMost(Int): Any`
 - `basePowerOrToughness(Int): GameObjectFilter`
 - `basePowerOrToughness(Int): Any`
+- `basePowerOrToughnessAtMost(Int): GameObjectFilter`
+- `basePowerOrToughnessAtMost(Int): Any`
 - `baseToughness(Int): GameObjectFilter`
 - `baseToughness(Int): Any`
+- `baseToughnessAtMost(Int): GameObjectFilter`
+- `baseToughnessAtMost(Int): Any`
 - `becameTappedOnlyOnceThisTurn(): GameObjectFilter`
 - `becameTappedOnlyOnceThisTurn(): Any`
 - `blocked(): GameObjectFilter`
