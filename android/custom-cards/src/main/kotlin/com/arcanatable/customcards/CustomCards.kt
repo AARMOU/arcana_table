@@ -339,6 +339,8 @@ object CustomCards {
         Entry(CorruptedCrossroads, "M3C", "Eldrazi Incursion"),
         // Eldrazi Unbound. Needs engine patch 0026 (once-each-turn free cast on any turn).
         Entry(DarksteelMonolith, "CMM", "Eldrazi Unbound"),
+        // The Ruinous Powers. Needs engine patch 0027 (opponents must attack with at least one creature).
+        Entry(SeekerOfSlaanesh, "40K", "The Ruinous Powers"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
