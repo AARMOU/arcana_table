@@ -176,3 +176,14 @@ test('reaching the daily credit limit pauses new assignments with a plain reason
  const none=await m.collect({token:'x',budget:'1500',now:nov,fetchImpl:f(530),pace:null});
  assert.notEqual(none.status.reason,'daily-credit-limit','no pace file: monthly thresholds only');
 });
+test('paused alert names WHICH limit, and a daily-to-monthly switch is a new alert', async () => {
+ const m = require('./billing-monitor.cjs');
+ const posted = [];
+ const gh = prior => ({ paginate: async () => prior, rest: { issues: { listComments() {}, createComment: async ({ body }) => { posted.push(body); } } } });
+ assert.equal(await m.alertChange({ github: gh([]), level: 'paused', period: '2026-11', reason: 'daily-credit-limit' }), 'posted');
+ assert.match(posted[0], /limit:daily/); assert.match(posted[0], /TODAY's credit limit/); assert.doesNotMatch(posted[0], /MONTHLY/);
+ const prior = [{ user: { login: 'github-actions[bot]', type: 'Bot' }, body: posted[0] }];
+ assert.equal(await m.alertChange({ github: gh(prior), level: 'paused', period: '2026-11', reason: 'daily-credit-limit' }), 'unchanged');
+ assert.equal(await m.alertChange({ github: gh(prior), level: 'paused', period: '2026-11', reason: null }), 'posted');
+ assert.match(posted[1], /limit:monthly/); assert.match(posted[1], /MONTHLY budget is 90% used/);
+});

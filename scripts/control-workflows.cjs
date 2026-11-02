@@ -11,7 +11,7 @@ async function billingWatch({ github, context, core, env, readBudget = defaultRe
   core.info('Arcana AI credit usage state: ' + result.status.level + (result.error ? ' (' + result.error + ')' : ''));
   const period = now().toISOString().slice(0, 7);
   let alert;
-  try { alert = await alertChange({ github, level: result.status.level, period, reason: result.error, env }); }
+  try { alert = await alertChange({ github, level: result.status.level, period, reason: result.error || result.status?.reason || null, env }); }
   catch (e) { alert = 'failed:' + (e?.status || 'error'); core.warning('Billing alert could not be posted: ' + alert); }
   core.info('Alert state: ' + alert);
   const previous = await S.previousStatus({ github, owner, repo, kind: 'billing' });
