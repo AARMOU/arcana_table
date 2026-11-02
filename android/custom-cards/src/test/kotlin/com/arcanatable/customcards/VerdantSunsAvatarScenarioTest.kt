@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.VerdantSunsAvatar
 import com.arcanatable.customcards.support.GameTestDriver
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.*
 import org.junit.Test
@@ -16,7 +17,9 @@ class VerdantSunsAvatarScenarioTest {
         castAvatar(d, p)
         assertEquals(25, d.getLifeTotal(p))
 
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val bear = d.putCardInHand(p, "Grizzly Bears")
+        d.giveMana(p, Color.GREEN)
+        assertNull(d.castSpell(p, bear).error)
         d.resolveAll()
 
         assertEquals(27, d.getLifeTotal(p))
@@ -29,7 +32,11 @@ class VerdantSunsAvatarScenarioTest {
         castAvatar(d, p)
         assertEquals(25, d.getLifeTotal(p))
 
-        d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        val opponent = d.player2
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        val bear = d.putCardInHand(opponent, "Grizzly Bears")
+        d.giveMana(opponent, Color.GREEN)
+        assertNull(d.castSpell(opponent, bear).error)
         d.resolveAll()
 
         assertEquals(25, d.getLifeTotal(p))
