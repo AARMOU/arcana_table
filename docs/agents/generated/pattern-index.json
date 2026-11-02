@@ -1921,7 +1921,7 @@
    ]
   },
   "Effects.CreateTokenCopyOfTarget": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -1946,6 +1946,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SliverGravemother.kt",
      "lines": 74,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SliverGravemotherScenarioTest.kt"
+    },
+    {
+     "card": "Benthic Anomaly",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BenthicAnomaly.kt",
+     "lines": 88,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BenthicAnomalyScenarioTest.kt"
     }
    ]
   },
@@ -2931,7 +2937,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3512,7 +3518,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -4776,7 +4782,7 @@
    ]
   },
   "Triggers.self.isCast": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Noise Marine",
@@ -5160,7 +5166,7 @@
    ]
   },
   "keywords()": {
-   "count": 108,
+   "count": 109,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5473,7 +5479,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 162,
+   "count": 163,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7557,7 +7563,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 116,
+   "count": 117,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -8027,7 +8033,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Silence",
@@ -8143,7 +8149,7 @@
    ]
   },
   "Player.You": {
-   "count": 43,
+   "count": 44,
    "examples": [
     {
      "card": "Defile",
