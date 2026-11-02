@@ -1,7 +1,7 @@
 {
   "key": "monstrous-onslaught",
   "name": "Monstrous Onslaught",
-  "issue": 687,
+  "issue": 866,
   "source": "certification/MonstrousOnslaughtIndependentCertificationTest.kt",
   "testClass": "com.arcanatable.customcards.MonstrousOnslaughtIndependentCertificationTest",
   "tests": 11
