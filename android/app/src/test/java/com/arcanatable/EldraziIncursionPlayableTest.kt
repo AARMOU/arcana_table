@@ -111,6 +111,33 @@ class EldraziIncursionPlayableTest {
         assertNotEquals(first.state.rng, other.state.rng)
     }
 
+
+    // ---- DIAGNOSTIC ONLY (GSD branch twins-diag, never merged): find where the mirror hangs. ----
+    @Volatile private var progress = "start"
+
+    /** Runs [body] on a daemon thread; if it is still running after [minutes], fails with the stuck
+     *  thread's frames as a cause chain (Gradle's short format prints one "at File:line" per cause). */
+    private fun <T> hangDump(label: String, minutes: Long = 6, body: () -> T): T {
+        var result: Result<T>? = null
+        val t = Thread({ result = runCatching(body) }, "mirror-$label").apply { isDaemon = true; start() }
+        t.join(minutes * 60_000)
+        if (t.isAlive) {
+            val frames = t.stackTrace.filter {
+                !it.className.startsWith("java.") && !it.className.startsWith("jdk.") && !it.className.startsWith("kotlin.")
+            }.take(45)
+            var cause: Throwable? = null
+            for (fr in frames.reversed()) {
+                val shortCls = fr.className.substringAfterLast('.')
+                cause = IllegalStateException(fr.toString(), cause).also {
+                    it.stackTrace = arrayOf(StackTraceElement(fr.className, fr.methodName, "${shortCls}.${fr.methodName}(${fr.fileName}", fr.lineNumber))
+                }
+            }
+            val where = StackTraceElement("Hang", "at", "HANG-${label}-${progress}".replace(Regex("[^A-Za-z0-9=_-]"), "_"), 0)
+            throw AssertionError("HANG $label $progress", cause).also { it.stackTrace = arrayOf(where) }
+        }
+        return result!!.getOrThrow()
+    }
+
     private data class AiStep(val before: GameState, val action: GameAction, val after: GameState)
 
     /** Direct processing exposes rejections that playPriorityWindow can replace with a pass. */
@@ -122,6 +149,7 @@ class EldraziIncursionPlayableTest {
         val trace = mutableListOf<AiStep>()
         while (!state.gameOver && state.turnNumber <= 30 && trace.size < 8_000) {
             val label = "seed=$seed action=${trace.size} turn=${state.turnNumber} step=${state.step}"
+            progress = "strict-s${seed}-a${trace.size}-t${state.turnNumber}-${state.step}-${state.pendingDecision?.javaClass?.simpleName}"
             val prior = expected?.getOrNull(trace.size)
             if (expected != null) {
                 assertNotNull("First divergence: replay has an extra action; $label", prior)
@@ -151,8 +179,8 @@ class EldraziIncursionPlayableTest {
     @Test fun seededAiActionsAreLegalAndReplayIdentically() {
         val registry = mirrorRegistry()
         for (seed in listOf(1, 2, 3)) {
-            val trace = strictMirror(seed, registry)
-            strictMirror(seed, registry, trace)
+            val trace = hangDump("strict$seed") { strictMirror(seed, registry) }
+            hangDump("replay$seed") { strictMirror(seed, registry, trace) }
         }
     }
 
@@ -169,14 +197,17 @@ class EldraziIncursionPlayableTest {
             var state: GameState = init.state
             var actions = 0
             val started = System.nanoTime()
+            hangDump("mirror$seed") {
             while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000) {
                 val decision = state.pendingDecision
+                progress = "mirror-s${seed}-a${actions}-t${state.turnNumber}-${state.step}-${decision?.javaClass?.simpleName}"
                 val next = if (decision != null) {
                     val r = processor.process(state, SubmitDecision(decision.playerId, ais.getValue(decision.playerId).respondToDecision(state, decision))).result
                     if (r.error != null) null else r.state
                 } else state.priorityPlayerId?.let { ais.getValue(it).playPriorityWindow(state, processor) }
                 actions++
                 state = next ?: break
+            }
             }
             println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
