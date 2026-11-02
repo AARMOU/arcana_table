@@ -616,3 +616,18 @@ test('Pages stages every approved Control script including Goosegeta',()=>{
   for(const match of html.matchAll(/<script\s+src="\.\/([^"/]+\.js)"/g))
     assert.ok(pages.includes('cp control/'+match[1]+' _site/control/'+match[1]),'Missing staged script '+match[1]);
 });
+test('engine status reads in plain words, flags problems and an overdue daily check',()=>{
+  const src=script.split('// ENGINE_PURE_START')[1].split('// ENGINE_PURE_END')[0];
+  const ctx=vm.createContext({});vm.runInContext(src,ctx);const view=vm.runInContext('engineView',ctx);
+  const now=Date.parse('2026-11-03T12:00:00Z');
+  const base={kind:'engine',schema:1,checkedAt:'2026-11-03T11:40:00Z',mode:'daily',run:'https://github.com/AARMOU/arcana_table/actions/runs/1'};
+  const ok=view({...base,result:'ok',message:"Checked the makers' latest engine today: it would upgrade cleanly."},now);
+  assert.equal(ok.tag,'green');assert.match(ok.title,/ready to upgrade/);assert.match(ok.detail,/upgrade cleanly/);
+  const held=view({...base,result:'blocked',message:'clash in 0011-stack-object-copying.patch. Nothing changed in the app.'},now);
+  assert.equal(held.tag,'amber');assert.match(held.title,/nothing needed from you/);assert.match(held.detail,/0011/);
+  const old=view({...base,result:'ok',checkedAt:'2026-11-01T11:40:00Z'},now);
+  assert.equal(old.tag,'amber');assert.match(old.detail,/overdue/);
+  assert.match(view({...base,result:'ok',mode:'weekly'},now).title,/upgraded and checked/);
+  assert.equal(view(null,now).tag,'gray');assert.equal(view({kind:'billing'},now).tag,'gray');
+  assert.equal(view({...base,result:'weird'},now).title,'Engine status unknown');
+});
