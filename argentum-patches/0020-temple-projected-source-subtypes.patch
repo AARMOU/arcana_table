@@ -27,7 +27,7 @@ index befb346ca1..28aaf5e308 100644
          isClassLevelUpActivation = ability?.effect is com.wingedsheep.sdk.scripting.effects.LevelUpClassEffect,
          hasXInCost = ability?.cost?.extractManaCost()?.hasX == true,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index 155a9aa783..ce5a25da06 100644
+index a672dd909d..bd802fb49e 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -155,6 +155,13 @@ data class SpellPaymentContext(

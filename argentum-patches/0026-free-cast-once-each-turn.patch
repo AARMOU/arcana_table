@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0026-free-cast-once-each-turn
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 4edf7aaaf7..681b0f4bc5 100644
+index 6314ad2b1a..9ded13865e 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -13321,7 +13321,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13559,7 +13559,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `GrantAlternativeCastingCost("{0}", listOf(Costs.additional.PayPlayerCounters(CounterType.ENERGY, 1)),
    spellFilter = GameObjectFilter.Creature.manaValueAtMost(3), asThoughFlash = true)`. Like every
    granted alternative cost it is offered for casts from hand only.
@@ -26,7 +26,7 @@ index 4edf7aaaf7..681b0f4bc5 100644
    battlefield permission to cast a spell without paying its mana cost (CR 118.9). Like every
    "without paying its mana cost" cast (cascade, discover, `PlayWithoutPayingCostComponent`
    permissions), it is priced as a {0} base through the full cost-modifier pipeline
-@@ -13333,7 +13333,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13571,7 +13571,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    zero spells this turn; `oncePerTurn = true` allows one free cast during each of the caster's own
    turns (active player only) regardless of how many spells were cast first — unlike
    `firstSpellOfTurnOnly`, the caster may cast other spells before using it; each source tracks its
@@ -42,10 +42,10 @@ index 4edf7aaaf7..681b0f4bc5 100644
    `GameObjectFilter.Any` = every spell). `fromZones` restricts the permission to spells cast **from** the listed zones (the zone the
    spell left, CR 601.2a; `null` = any zone): the free cast is offered on each listed zone's cast path
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 54ccb4fcf1..26c7990713 100644
+index 06a03d4dd6..cdf3b7f836 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1962,7 +1962,7 @@ Families:
+@@ -1974,7 +1974,7 @@ Families:
  - `MaxCounters(counterType: CounterType, max: Int)` — "This permanent can't have more than max counterType counters on it" (Rasputin Dreamweaver).
  - `MayCastFromGraveyard(filter: GameObjectFilter, lifeCost: Int, duringYourTurnOnly: Boolean, entersWithCounter: CounterType?, addedSubtypeOnEntry: String?, oncePerTurn: Boolean, exileCastThisWay: CastThisWayExile, fromAnyGraveyard: Boolean, additionalCost: AdditionalCost?, playsLands: Boolean, grantedAbilityOnEntry: TriggeredAbility?)` — You may cast spells matching filter from your graveyard, optionally by paying lifeCost life in addition to their other costs.
  - `MayCastSelfFromZones(zones: List<Zone>, condition: Condition?, additionalCost: AdditionalCost?, castUsing: Keyword?, alternativeManaCost: ManaCost?, exileCastThisWay: CastThisWayExile)` — You may cast this card from specified zones (e.g., graveyard, exile).

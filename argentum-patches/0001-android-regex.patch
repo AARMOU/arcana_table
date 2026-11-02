@@ -13,7 +13,7 @@ Subject: [PATCH] arcana: 0001-android-regex
  5 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
-index bcbdc6e350..924d3d8389 100644
+index f139cb32cd..312d8ced80 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
 @@ -14,7 +14,7 @@ internal object DraftsimMana {

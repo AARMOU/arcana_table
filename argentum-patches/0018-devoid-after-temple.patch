@@ -29,7 +29,7 @@ index 06055b8c38..5a09d2570f 100644
       * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
       * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index 49fbcf4c46..155a9aa783 100644
+index c931b0aa39..a672dd909d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -43,6 +43,8 @@ data class SpellPaymentContext(

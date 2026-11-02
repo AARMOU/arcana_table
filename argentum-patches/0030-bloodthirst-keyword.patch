@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0030-bloodthirst-keyword
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 5ff6e246ee..c87e52c2d5 100644
+index e028969d40..8162703bc6 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -14788,6 +14788,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+@@ -15026,6 +15026,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
    abilities (as suspend's countdown and cast do): a vanishing permanent sits where instant-speed
    counter removal can reach it, and it is sacrificed whenever the last counter leaves, not only on
    an upkeep.
@@ -166,7 +166,7 @@ index f0166edc20..6fd9445db4 100644
          fun fabricate(n: Int): KeywordAbility = Numeric(Keyword.FABRICATE, n)
          fun tribute(n: Int): KeywordAbility = Numeric(Keyword.TRIBUTE, n)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
-index a9004297de..133d389bbf 100644
+index 7b8cab2cfe..1c2f2ca5ce 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 @@ -33,6 +33,7 @@ import com.wingedsheep.sdk.scripting.EntersWithChoice
@@ -177,7 +177,7 @@ index a9004297de..133d389bbf 100644
  import com.wingedsheep.sdk.scripting.Vanishing
  import com.wingedsheep.sdk.scripting.conditions.SourceChosenModeIs
  
-@@ -466,6 +467,24 @@ object EntersWithReplacements {
+@@ -487,6 +488,24 @@ object EntersWithReplacements {
          val events = mutableListOf<GameEvent>()
          val entityName = newState.getEntity(enteringEntityId)?.get<CardComponent>()?.name ?: ""
  
@@ -202,7 +202,7 @@ index a9004297de..133d389bbf 100644
          val sources = mutableListOf<GlobalReplacementSource>()
          val sourceState = replacementSourceState ?: newState
          for (sourceId in sourceState.getBattlefield()) {
-@@ -623,6 +642,47 @@ object EntersWithReplacements {
+@@ -644,6 +663,47 @@ object EntersWithReplacements {
       * applying to the objects entering simultaneously with this one and is purged at the next
       * event boundary ([com.wingedsheep.engine.replacement.ActiveReplacements.purgeSpent]).
       */
@@ -461,7 +461,7 @@ index 0000000000..98083ec76b
 +    }
 +})
 diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
-index 66a5f40889..56641ec74b 100644
+index f9ac137d9c..99692da479 100644
 --- a/web-client/src/types/enums.ts
 +++ b/web-client/src/types/enums.ts
 @@ -311,6 +311,7 @@ export enum Keyword {
