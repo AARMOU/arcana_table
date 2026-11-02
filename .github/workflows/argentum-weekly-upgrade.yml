@@ -89,7 +89,7 @@ jobs:
           python3 -m pip install --quiet pyyaml
           set +e
           python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
-            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py engine-upgrade/tests/test_weekly_retired.py \
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py engine-upgrade/tests/test_weekly_retired.py engine-upgrade/tests/test_weekly_imports.py \
             tools/tests/test_check_android_engine.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
