@@ -2,7 +2,12 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.OpalPalace
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.ai.engine.AIPlayer
 import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PassPriority
+import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.core.SubmitDecision
 import com.wingedsheep.engine.core.ChooseColorDecision
 import com.wingedsheep.engine.core.ColorChosenResponse
 import com.wingedsheep.engine.core.ExecutionResult
@@ -285,5 +290,79 @@ class OpalPalaceScenarioTest {
         val onField = d.findPermanent(p, thrasios)!!
         assertEquals(1, d.castsFromCommandZone(onField))
         assertEquals(1, d.plusOnes(onField))
+    }
+
+    // --- Auto-pay and the AI with Opal Palace among ordinary lands --------------------------------
+
+    private fun GameTestDriver.emptyHand(p: EntityId) {
+        var s = state
+        for (id in s.getZone(p, Zone.HAND)) s = s.removeFromZone(com.wingedsheep.engine.state.ZoneKey(p, Zone.HAND), id)
+        replaceState(s)
+    }
+
+    /** Lets the AI act for [p] until it passes priority (at most [max] actions); every action must be legal. */
+    private fun GameTestDriver.aiActsUntilPass(p: EntityId, max: Int = 12): List<String> {
+        val ai = AIPlayer.create(cardRegistry, p)
+        val taken = mutableListOf<String>()
+        repeat(max) {
+            val decision = state.pendingDecision
+            val action = if (decision != null) SubmitDecision(decision.playerId, ai.respondToDecision(state, decision))
+                else ai.chooseAction(state)
+            taken += action::class.simpleName ?: "?"
+            assertNull("AI action $action rejected", submit(action).error)
+            if (decision == null && action is PassPriority) return taken
+        }
+        return taken
+    }
+
+    @Test
+    fun autoPayCastsANormalSpellWithPalaceColorlessAndABasic() {
+        val (d, p) = game()
+        d.emptyHand(p)
+        d.putLandOnBattlefield(p, "Opal Palace")
+        d.putLandOnBattlefield(p, "Forest")
+        val bears = d.putCardInHand(p, "Grizzly Bears")
+        assertTrue("Grizzly Bears offered", d.legalActions(p).any { (it.action as? CastSpell)?.cardId == bears })
+        assertNull(d.submit(CastSpell(p, bears, paymentStrategy = PaymentStrategy.AutoPay)).error)
+        d.resolveAll()
+        assertEquals(0, d.plusOnes(d.findPermanent(p, "Grizzly Bears")!!))
+    }
+
+    @Test
+    fun aiCastsANormalSpellWithPalaceAndABasic() {
+        val (d, p) = game()
+        d.emptyHand(p)
+        d.putLandOnBattlefield(p, "Opal Palace")
+        d.putLandOnBattlefield(p, "Forest")
+        d.putCardInHand(p, "Grizzly Bears")
+        val taken = d.aiActsUntilPass(p)
+        d.resolveAll()
+        assertNotNull("AI cast Grizzly Bears with Palace {C} + Forest; actions=$taken", d.findPermanent(p, "Grizzly Bears"))
+    }
+
+    @Test
+    fun autoPayUsesPalaceColoredManaForTheCommanderAndItGetsItsCounter() {
+        val (d, p) = game()
+        d.emptyHand(p)
+        d.putLandOnBattlefield(p, "Opal Palace")
+        d.putLandOnBattlefield(p, "Forest")
+        d.putLandOnBattlefield(p, "Forest")
+        val id = d.inCommandZone(p, thrasios)
+        assertTrue("Thrasios offered", d.legalActions(p).any { (it.action as? CastSpell)?.cardId == id })
+        assertNull(d.submit(CastSpell(p, id, paymentStrategy = PaymentStrategy.AutoPay)).error)
+        d.resolveAll()
+        assertEquals("{U} came from the Palace (paid by a Forest)", 1, d.plusOnes(d.findPermanent(p, thrasios)!!))
+    }
+
+    @Test
+    fun aiCastsItsCommanderWithPalaceColoredMana() {
+        val (d, p) = game()
+        d.emptyHand(p)
+        d.putLandOnBattlefield(p, "Opal Palace")
+        d.putLandOnBattlefield(p, "Forest")
+        d.putLandOnBattlefield(p, "Forest")
+        val taken = d.aiActsUntilPass(p)
+        d.resolveAll()
+        assertNotNull("AI cast Thrasios using Palace {U}; actions=$taken", d.findPermanent(p, thrasios))
     }
 }

@@ -116,8 +116,12 @@ class EldraziIncursionPlayableTest {
     /** Life, library and battlefield sizes per player: tells a long game from a stalled one. */
     private fun progress(state: GameState): String = state.turnOrder.joinToString(prefix = "[", postfix = "]") { p ->
         val life = state.getEntity(p)?.get<com.wingedsheep.engine.state.components.identity.LifeTotalComponent>()?.life
+        fun names(z: com.wingedsheep.sdk.core.Zone) = state.getZone(p, z)
+            .mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
         "life=$life lib=${state.getZone(p, com.wingedsheep.sdk.core.Zone.LIBRARY).size} " +
-            "bf=${state.getZone(p, com.wingedsheep.sdk.core.Zone.BATTLEFIELD).size}"
+            "bf=${names(com.wingedsheep.sdk.core.Zone.BATTLEFIELD)} hand=${names(com.wingedsheep.sdk.core.Zone.HAND)} " +
+            "gy=${names(com.wingedsheep.sdk.core.Zone.GRAVEYARD)} exile=${names(com.wingedsheep.sdk.core.Zone.EXILE).size} " +
+            "cz=${names(com.wingedsheep.sdk.core.Zone.COMMAND)}"
     } + " step=${state.step} stack=${state.stack.size} decision=${state.pendingDecision?.let { it::class.simpleName }}"
 
     /** An AI action with the names of the cards it mentions. */
@@ -159,7 +163,8 @@ class EldraziIncursionPlayableTest {
             state = result.state
         }
         assertTrue("Strict AI mirror must finish: seed=$seed turn=${state.turnNumber} actions=${trace.size} " +
-            "${progress(state)} last=${trace.takeLast(12).joinToString(" | ") { describe(it.before, it.action) }}", state.gameOver)
+            "${progress(state)} kinds=${trace.groupingBy { "${if (it.action.playerId == state.turnOrder[0]) "A" else "B"}:${it.action::class.simpleName}" }.eachCount()} " +
+            "plays=${trace.filter { it.action !is com.wingedsheep.engine.core.PassPriority && it.action !is SubmitDecision }.takeLast(40).joinToString(" | ") { "t${it.before.turnNumber}:" + describe(it.before, it.action) }}", state.gameOver)
         if (expected != null) assertEquals("Replay ended at a different action; seed=$seed", expected.size, trace.size)
         println("[eldrazi-incursion-strict] seed=$seed replay=${expected != null} " +
             "turn=${state.turnNumber} actions=${trace.size} winner=${state.winnerId} rejections=0")
