@@ -421,6 +421,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `getCount-impl(String): DynamicAmount`
 - `hashCode-impl(String): Int`
 - `key: String`
+- `sumOf-impl(String, CardNumericProperty): DynamicAmount`
 - `toString-impl(String): String`
 - `unbox-impl(): String`
 
@@ -1076,6 +1077,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `powerOf(EffectTarget.SingleEntity): DynamicAmount`
 - `preventedDamage(): DynamicAmount`
 - `propertyOf(EffectTarget.SingleEntity, EntityNumericProperty): DynamicAmount`
+- `propertySumOf(String, CardNumericProperty): DynamicAmount`
 - `replacementLifeGainAmount(): DynamicAmount`
 - `sacrificedManaValue(Int): DynamicAmount`*
 - `sacrificedPower(Int): DynamicAmount`*
