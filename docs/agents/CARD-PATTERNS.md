@@ -456,3 +456,25 @@ another player's turn only instants and flash spells can use it. Additional cost
 Test: [`DarksteelMonolithScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DarksteelMonolithScenarioTest.kt)
 (opponent-turn instant, once-per-turn on both turns, timing, filter, zone, controller, two sources, additional costs).
 Unlocks among missing six-deck cards: Darksteel Monolith.
+
+### "Each opponent must attack with at least one creature each combat if able" (patch 0027)
+
+Use for a requirement on each opponent as the attacking player that names no defender. Any one attacking creature
+satisfies it (at any player, planeswalker or battle); it lapses when none of their creatures could attack without
+paying a cost (CR 508.1d); no creature becomes individually mandatory. The AI turns an empty attack into a one-creature
+attack. For "… must attack **you** or a planeswalker you control …" use `OpponentsMustAttackYou` (Trove of Temptation)
+instead.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SeekerOfSlaanesh.kt -->
+```kotlin
+    keywords(Keyword.HASTE)
+
+    staticAbility {
+        ability = OpponentsMustAttack
+    }
+```
+
+Test: [`SeekerOfSlaaneshScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SeekerOfSlaaneshScenarioTest.kt)
+(empty attack rejected, one attacker enough, no mandatory creature, controller unbound, lapses with no able creature,
+any defender in multiplayer, AI attacks with one).
+Unlocks among missing six-deck cards: Seeker of Slaanesh.

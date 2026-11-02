@@ -43,6 +43,7 @@ MANDATORY = [
     "0024-commander-cast-history-amount.patch",
     "0025-akromas-will-modal-combat-trick.patch",
     "0026-free-cast-once-each-turn.patch",
+    "0027-opponents-must-attack-anyone.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

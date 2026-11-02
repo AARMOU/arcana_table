@@ -1,0 +1,461 @@
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
+index 028d2e3c..38c3d7b7 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
+@@ -1,6 +1,7 @@
+ package com.wingedsheep.ai.engine
+ 
+ import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.mechanics.combat.CombatDefenders
+ import com.wingedsheep.engine.mechanics.combat.OpponentsMustAttackYouRequirement
+ import com.wingedsheep.engine.registry.CardRegistry
+ import com.wingedsheep.engine.state.GameState
+@@ -14,6 +15,10 @@ import com.wingedsheep.sdk.model.EntityId
+  * from the combat heuristics (or the empty "don't attack" plan) is rejected by the engine. For each
+  * required player the plan doesn't already attack, this sends the cheapest spare attacker at them —
+  * or, with no spare, redirects the cheapest planned one — keeping the rest of the plan.
++ *
++ * "Each opponent must attack with at least one creature" ([com.wingedsheep.sdk.scripting.OpponentsMustAttack],
++ * Seeker of Slaanesh) names no defender: an empty plan gets the cheapest attacker, sent at the first
++ * opponent it may attack.
+  */
+ object AttackRequirementRepair {
+ 
+@@ -42,7 +47,9 @@ object AttackRequirementRepair {
+         canAttack: (EntityId, EntityId) -> Boolean = { _, _ -> true },
+     ): Map<EntityId, EntityId> {
+         val required = requiredPlayers(state, cardRegistry, playerId)
+-        if (required.isEmpty()) return plan
++        val mustAttackWithOne = cardRegistry != null && plan.isEmpty() &&
++            OpponentsMustAttackYouRequirement.mustAttackWithOne(state, cardRegistry, PredicateEvaluator(cardRegistry), playerId)
++        if (required.isEmpty() && !mustAttackWithOne) return plan
+         val projected = state.projectedState
+         val repaired = plan.toMutableMap()
+         for (player in required) {
+@@ -58,6 +65,15 @@ object AttackRequirementRepair {
+             val pick = spare.firstOrNull() ?: redirectable.firstOrNull() ?: continue
+             repaired[pick] = player
+         }
++        if (mustAttackWithOne && repaired.isEmpty()) {
++            val defenders = CombatDefenders.legalDefendingPlayers(state, playerId)
++            val opponents = state.turnOrder.filter { it in defenders }
++            for (attacker in candidateOrder(state, validAttackers)) {
++                val defender = opponents.firstOrNull { canAttack(attacker, it) } ?: continue
++                repaired[attacker] = defender
++                break
++            }
++        }
+         return repaired
+     }
+ }
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/OpponentsMustAttackAiTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/OpponentsMustAttackAiTest.kt
+new file mode 100644
+index 00000000..d9d2b59c
+--- /dev/null
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/OpponentsMustAttackAiTest.kt
+@@ -0,0 +1,53 @@
++package com.wingedsheep.ai.engine
++
++import com.wingedsheep.engine.core.DeclareAttackers
++import com.wingedsheep.engine.legalactions.LegalActionEnumerator
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.scripting.OpponentsMustAttack
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/**
++ * The AI under "each opponent must attack with at least one creature each combat if able"
++ * ([OpponentsMustAttack], Seeker of Slaanesh). Facing an 8/8 the combat plan is "stay home", which
++ * the engine rejects; [AttackRequirementRepair] sends exactly one cheap creature instead.
++ */
++class OpponentsMustAttackAiTest : FunSpec({
++
++    val allure = card("Test AI Allure") {
++        manaCost = "{3}{R}"
++        typeLine = "Enchantment"
++        oracleText = "Each opponent must attack with at least one creature each combat if able."
++        staticAbility { ability = OpponentsMustAttack }
++    }
++
++    test("attacks with one creature even when attacking is a bad trade") {
++        val driver = GameTestDriver().apply {
++            registerCards(TestCards.all + listOf(allure))
++            initMirrorMatch(Deck.of("Forest" to 40))
++        }
++        val p1 = driver.player1
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        val lions = driver.putCreatureOnBattlefield(p1, "Savannah Lions")
++        val courser = driver.putCreatureOnBattlefield(p1, "Centaur Courser")
++        driver.removeSummoningSickness(lions)
++        driver.removeSummoningSickness(courser)
++        driver.putCreatureOnBattlefield(driver.player2, "Force of Nature")
++        driver.putPermanentOnBattlefield(driver.player2, "Test AI Allure")
++        val turn = driver.state.turnNumber
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        driver.state.turnNumber shouldBe turn
++
++        val attackAction = LegalActionEnumerator.create(driver.cardRegistry).enumerate(driver.state, p1)
++            .single { it.actionType == "DeclareAttackers" }
++        val ai = AIPlayer.create(driver.cardRegistry, p1)
++        val chosen = ai.chooseFrom(driver.state, listOf(attackAction)).action as DeclareAttackers
++
++        chosen.attackers.size shouldBe 1
++        driver.submit(chosen).error shouldBe null
++    }
++})
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 681b0f4b..34f1a058 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -11571,6 +11571,14 @@ in the declare-blockers step, even before the turn-based block action has comple
+   `mechanics/combat`) is the shared reader — `AttackPhaseManager` validates with it and the AI
+   repairs its planned attack with it. Honors face-down, lost abilities, Room faces and
+   `ConditionalStaticAbility` wrappers. `staticAbility { ability = OpponentsMustAttackYou }`.
++- `OpponentsMustAttack` — "Each opponent must attack with at least one creature each combat if able"
++  (Seeker of Slaanesh). The same player-level requirement with no named defender: an opponent of the
++  controller may not declare zero attackers while some creature could attack anything it may legally
++  attack (player, planeswalker or battle) without paying an attack tax or sacrifice cost (CR 508.1d);
++  a "can't attack unless another creature also attacks" creature counts only with a co-attacker
++  available. Any one attacker satisfies it. `OpponentsMustAttackYouRequirement.mustAttackWithOne` is
++  the shared reader: `AttackPhaseManager` validates with it, and the AI's `AttackRequirementRepair`
++  turns an empty plan into a one-creature attack. `staticAbility { ability = OpponentsMustAttack }`.
+ - `ChangeTargetEffect(newTargetMustBePlayer = false, onlyIfCurrentTargetIsController = false)` —
+   "change the target of target spell or ability with a single target" (Willbender). The two knobs
+   are Reflecting Mirror's printed restrictions: fire only when the spell's single target is *you*,
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 26c79907..f1ccac8a 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1980,6 +1980,7 @@ Families:
+ - `NoMaximumHandSize(player: Player)` — Removes the maximum hand size limit for a scoped set of players, by default the controller.
+ - `NoncombatDamageBonus(bonusAmount: Int)` — If a source you control would deal noncombat damage to an opponent or a permanent an opponent controls, it deals that much damage plus the bonus amount instead.
+ - `OpponentsCantMakeYouSacrifice` — Spells and abilities your opponents control can't cause you to sacrifice permanents (Sigarda, Host of Herons).
++- `OpponentsMustAttack` — "Each opponent must attack with at least one creature each combat if able" (Seeker of Slaanesh).
+ - `OpponentsMustAttackYou` — "Each opponent must attack you or a planeswalker you control with at least one creature each combat if able" (Trove of Temptation) — a requirement on the attacking *player*, not on any one creature…
+ - `OpponentsPlayWithHandsRevealed` — Your opponents play with their hands revealed.
+ - `OverrideEnchantedLandManaColor(color: Color?)` — Replaces the mana produced by the enchanted land's own mana abilities with mana of a specific color.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
+index d4daf467..8fde1196 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
+@@ -797,6 +797,22 @@ data object OpponentsMustAttackYou : StaticAbility {
+         "Each opponent must attack you or a planeswalker you control with at least one creature each combat if able"
+ }
+ 
++/**
++ * "Each opponent must attack with at least one creature each combat if able" (Seeker of Slaanesh).
++ *
++ * The [OpponentsMustAttackYou] requirement without a named defender (CR 508.1d): whenever an
++ * opponent of this permanent's controller declares attackers, the declaration must include at least
++ * one attacking creature — aimed at any player, planeswalker or battle that creature may attack —
++ * as long as some creature could attack without its controller paying a cost. It never makes a
++ * specific creature mandatory, and never says whom to attack.
++ */
++@SerialName("OpponentsMustAttack")
++@Serializable
++data object OpponentsMustAttack : StaticAbility {
++    override val description: String =
++        "Each opponent must attack with at least one creature each combat if able"
++}
++
+ /**
+  * Sentence-subject rendering of an attacker filter: "creature with flying" → "Creatures with
+  * flying". This string is user-visible — it is the attack-rejection message and the label of a
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index ed9ac5f0..d05f5d2e 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1532,6 +1532,7 @@ MustBlockEachAttacker — StaticAbility
+ NoMaximumHandSize — StaticAbility
+ NoncombatDamageBonus — StaticAbility
+ OpponentsCantMakeYouSacrifice — StaticAbility
++OpponentsMustAttack — StaticAbility
+ OpponentsMustAttackYou — StaticAbility
+ OpponentsPlayWithHandsRevealed — StaticAbility
+ OverrideEnchantedLandManaColor — StaticAbility
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
+index ef1f727c..f70b5751 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
+@@ -194,6 +194,12 @@ internal class AttackPhaseManager(
+             return ExecutionResult.error(state, attackYouValidation)
+         }
+ 
++        // Check "each opponent must attack with at least one creature" (Seeker of Slaanesh)
++        val attackAnyoneValidation = validateOpponentsMustAttack(state, attackingPlayer, attackers, projected)
++        if (attackAnyoneValidation != null) {
++            return ExecutionResult.error(state, attackAnyoneValidation)
++        }
++
+         // Declaration taps precede optional attack costs. Keep an immutable checkpoint so a
+         // cancelled attack-tax question can roll back the declaration without leaving tap triggers.
+         var tappedState = state
+@@ -1196,6 +1202,34 @@ internal class AttackPhaseManager(
+         return null
+     }
+ 
++    /**
++     * Validate [com.wingedsheep.sdk.scripting.OpponentsMustAttack] (Seeker of Slaanesh): an empty
++     * declaration is illegal while [OpponentsMustAttackYouRequirement.mustAttackWithOne] holds and
++     * some creature could attack anything it may legally attack — a player, planeswalker or battle —
++     * without its controller paying a cost (CR 508.1d), counting a "can't attack unless another
++     * creature also attacks" creature only when a co-attacker is available. Any non-empty declaration
++     * obeys it; the other requirements (goad, Taunt, Trove) are validated on their own.
++     */
++    private fun validateOpponentsMustAttack(
++        state: GameState,
++        attackingPlayer: EntityId,
++        attackers: Map<EntityId, EntityId>,
++        projected: ProjectedState
++    ): String? {
++        if (attackers.isNotEmpty()) return null
++        if (!OpponentsMustAttackYouRequirement.mustAttackWithOne(state, cardRegistry, predicateEvaluator, attackingPlayer)) {
++            return null
++        }
++        val validAttackers = getValidAttackers(state, attackingPlayer)
++        val targets = CombatDefenders.attackTargets(state, projected, attackingPlayer)
++        val able = validAttackers.any { attackerId ->
++            coAttackerRestrictions(state, attackerId).none {
++                !coAttackerAvailable(state, projected, attackerId, it, validAttackers)
++            } && targets.any { attacksFreely(state, projected, attackingPlayer, attackerId, it) }
++        }
++        return if (able) "At least one creature must attack this combat" else null
++    }
++
+     /**
+      * Whether [attackerId] could attack one of [defenders] (all belonging to [player]) at no cost
+      * and without breaking its goad (or other "a player other than X") requirement — the "if able" of
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackYouRequirement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackYouRequirement.kt
+index c06d4d53..6013ff7c 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackYouRequirement.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackYouRequirement.kt
+@@ -12,6 +12,7 @@ import com.wingedsheep.engine.state.components.identity.RoomFaceStatics
+ import com.wingedsheep.sdk.model.EntityId
+ import com.wingedsheep.sdk.scripting.CompositeStaticAbility
+ import com.wingedsheep.sdk.scripting.ConditionalStaticAbility
++import com.wingedsheep.sdk.scripting.OpponentsMustAttack
+ import com.wingedsheep.sdk.scripting.OpponentsMustAttackYou
+ import com.wingedsheep.sdk.scripting.StaticAbility
+ 
+@@ -45,7 +46,33 @@ object OpponentsMustAttackYouRequirement {
+                 val cardDef = container.get<CardComponent>()
+                     ?.let { cardRegistry.getCard(it.cardDefinitionId) } ?: return@any false
+                 RoomFaceStatics.activeStaticAbilities(container, cardDef).any {
+-                    imposes(state, predicateEvaluator, it, permId, player)
++                    imposes(state, predicateEvaluator, it, permId, player) { a -> a is OpponentsMustAttackYou }
++                }
++            }
++        }
++    }
++
++    /**
++     * Whether [attackingPlayer] must attack with at least one creature this combat
++     * ([OpponentsMustAttack], Seeker of Slaanesh): one of their opponents controls a permanent with
++     * an active [OpponentsMustAttack]. Unlike [requiringPlayers] the requirement names no defender,
++     * so any attack satisfies it. Face-down and ability-stripped permanents impose nothing.
++     */
++    fun mustAttackWithOne(
++        state: GameState,
++        cardRegistry: CardRegistry,
++        predicateEvaluator: PredicateEvaluator,
++        attackingPlayer: EntityId,
++    ): Boolean {
++        val projected = state.projectedState
++        return state.getOpponents(attackingPlayer).any { player ->
++            projected.getBattlefieldControlledBy(player).any { permId ->
++                val container = state.getEntity(permId) ?: return@any false
++                if (container.has<FaceDownComponent>() || projected.hasLostAllAbilities(permId)) return@any false
++                val cardDef = container.get<CardComponent>()
++                    ?.let { cardRegistry.getCard(it.cardDefinitionId) } ?: return@any false
++                RoomFaceStatics.activeStaticAbilities(container, cardDef).any {
++                    imposes(state, predicateEvaluator, it, permId, player) { a -> a is OpponentsMustAttack }
+                 }
+             }
+         }
+@@ -71,14 +98,15 @@ object OpponentsMustAttackYouRequirement {
+         ability: StaticAbility,
+         sourceId: EntityId,
+         controllerId: EntityId,
+-    ): Boolean = when (ability) {
+-        is OpponentsMustAttackYou -> true
+-        is ConditionalStaticAbility ->
++        isRequirement: (StaticAbility) -> Boolean,
++    ): Boolean = when {
++        isRequirement(ability) -> true
++        ability is ConditionalStaticAbility ->
+             predicateEvaluator.conditions.evaluate(
+                 state, ability.condition, EffectContext(sourceId = sourceId, controllerId = controllerId)
+-            ) && imposes(state, predicateEvaluator, ability.ability, sourceId, controllerId)
+-        is CompositeStaticAbility ->
+-            ability.abilities.any { imposes(state, predicateEvaluator, it, sourceId, controllerId) }
++            ) && imposes(state, predicateEvaluator, ability.ability, sourceId, controllerId, isRequirement)
++        ability is CompositeStaticAbility ->
++            ability.abilities.any { imposes(state, predicateEvaluator, it, sourceId, controllerId, isRequirement) }
+         else -> false
+     }
+ }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
+index 0df3f474..082f4ebb 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
+@@ -1287,6 +1287,7 @@ class StaticAbilityHandler(
+             is com.wingedsheep.sdk.scripting.Goaded,
+             is CantBeAttackedWhileAttached,
+             is com.wingedsheep.sdk.scripting.OpponentsMustAttackYou,
++            is com.wingedsheep.sdk.scripting.OpponentsMustAttack,
+             is CantBeBlockedBy,
+             is CantBeBlockedByCreaturesWithLessPower,
+             is CantBeBlockedByMoreThan,
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackTest.kt
+new file mode 100644
+index 00000000..76342abc
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackTest.kt
+@@ -0,0 +1,143 @@
++package com.wingedsheep.engine.mechanics.combat
++
++import com.wingedsheep.engine.legalactions.LegalActionEnumerator
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.CounterType
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.scripting.AttackTax
++import com.wingedsheep.sdk.scripting.CantAttackUnlessCoAttacker
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.OpponentsMustAttack
++import com.wingedsheep.sdk.scripting.values.DynamicAmount
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * [OpponentsMustAttack] — "each opponent must attack with at least one creature each combat if able"
++ * (Seeker of Slaanesh). A player-level requirement with no named defender (CR 508.1d): any one
++ * attack satisfies it, and it lapses when no creature can attack anything for free.
++ */
++class OpponentsMustAttackTest : FunSpec({
++
++    val allure = card("Test Allure") {
++        manaCost = "{3}{R}"
++        typeLine = "Enchantment"
++        oracleText = "Each opponent must attack with at least one creature each combat if able."
++        staticAbility { ability = OpponentsMustAttack }
++    }
++
++    val prison = card("Test Allure Prison") {
++        manaCost = "{2}{W}"
++        typeLine = "Enchantment"
++        oracleText = "Creatures can't attack you unless their controller pays {2} for each creature they control that's attacking you."
++        staticAbility { ability = AttackTax(DynamicAmount.Fixed(2)) }
++    }
++
++    val walker = card("Test Allure Walker") {
++        manaCost = "{3}"
++        typeLine = "Legendary Planeswalker — Test"
++        startingLoyalty = 3
++        oracleText = ""
++    }
++
++    val loner = card("Test Allure Loner") {
++        manaCost = "{1}{R}"
++        typeLine = "Creature — Cat"
++        power = 2
++        toughness = 2
++        oracleText = "This creature can't attack unless another creature also attacks."
++        staticAbility { ability = CantAttackUnlessCoAttacker(GameObjectFilter.Creature) }
++    }
++
++    fun newDriver(): GameTestDriver {
++        val driver = GameTestDriver()
++        driver.registerCards(TestCards.all)
++        driver.registerCards(listOf(allure, prison, walker, loner))
++        driver.initMirrorMatch(deck = Deck.of("Forest" to 40), skipMulligans = true, startingPlayer = 0)
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return driver
++    }
++
++    test("declaring no attackers is rejected while a creature can attack") {
++        val driver = newDriver()
++        val bears = driver.putCreatureOnBattlefield(driver.player1, "Centaur Courser")
++        driver.removeSummoningSickness(bears)
++        driver.putPermanentOnBattlefield(driver.player2, "Test Allure")
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++
++        driver.declareAttackers(driver.player1, emptyMap()).error shouldNotBe null
++        driver.declareAttackers(driver.player1, mapOf(bears to driver.player2)).error shouldBe null
++    }
++
++    test("one attacker is enough and no creature is individually mandatory") {
++        val driver = newDriver()
++        val a = driver.putCreatureOnBattlefield(driver.player1, "Centaur Courser")
++        val b = driver.putCreatureOnBattlefield(driver.player1, "Savannah Lions")
++        driver.removeSummoningSickness(a)
++        driver.removeSummoningSickness(b)
++        driver.putPermanentOnBattlefield(driver.player2, "Test Allure")
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++
++        LegalActionEnumerator.create(driver.cardRegistry).enumerate(driver.state, driver.player1)
++            .single { it.actionType == "DeclareAttackers" }.mandatoryAttackers shouldBe null
++        driver.declareAttackers(driver.player1, mapOf(b to driver.player2)).error shouldBe null
++    }
++
++    test("attacking a planeswalker satisfies it — no defender is named") {
++        val driver = newDriver()
++        val bears = driver.putCreatureOnBattlefield(driver.player1, "Centaur Courser")
++        driver.removeSummoningSickness(bears)
++        driver.putPermanentOnBattlefield(driver.player2, "Test Allure")
++        val pw = driver.putPermanentOnBattlefield(driver.player2, "Test Allure Walker")
++        driver.replaceState(
++            driver.state.updateEntity(pw) { it.with(CountersComponent().withAdded(CounterType.LOYALTY, 3)) }
++        )
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++
++        driver.declareAttackers(driver.player1, mapOf(bears to pw)).error shouldBe null
++    }
++
++    test("an attack tax lifts the requirement — nobody has to pay to obey it (CR 508.1d)") {
++        val driver = newDriver()
++        val bears = driver.putCreatureOnBattlefield(driver.player1, "Centaur Courser")
++        driver.removeSummoningSickness(bears)
++        driver.putPermanentOnBattlefield(driver.player2, "Test Allure")
++        driver.putPermanentOnBattlefield(driver.player2, "Test Allure Prison")
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++
++        driver.declareAttackers(driver.player1, emptyMap()).error shouldBe null
++    }
++
++    test("the controller is under no requirement on their own turn") {
++        val driver = newDriver()
++        val bears = driver.putCreatureOnBattlefield(driver.player1, "Centaur Courser")
++        driver.removeSummoningSickness(bears)
++        driver.putPermanentOnBattlefield(driver.player1, "Test Allure")
++        driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
++
++        driver.declareAttackers(driver.player1, emptyMap()).error shouldBe null
++    }
++
++    test("a lone creature that can't attack alone isn't able; with a co-attacker it is") {
++        val alone = newDriver()
++        val cat = alone.putCreatureOnBattlefield(alone.player1, "Test Allure Loner")
++        alone.removeSummoningSickness(cat)
++        alone.putPermanentOnBattlefield(alone.player2, "Test Allure")
++        alone.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        alone.declareAttackers(alone.player1, emptyMap()).error shouldBe null
++
++        val paired = newDriver()
++        val cat2 = paired.putCreatureOnBattlefield(paired.player1, "Test Allure Loner")
++        val lions = paired.putCreatureOnBattlefield(paired.player1, "Savannah Lions")
++        paired.removeSummoningSickness(cat2)
++        paired.removeSummoningSickness(lions)
++        paired.putPermanentOnBattlefield(paired.player2, "Test Allure")
++        paired.passPriorityUntil(Step.DECLARE_ATTACKERS)
++        paired.declareAttackers(paired.player1, emptyMap()).error shouldNotBe null
++    }
++})

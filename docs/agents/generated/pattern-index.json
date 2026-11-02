@@ -3598,7 +3598,7 @@
    ]
   },
   "Keyword.HASTE": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -5019,7 +5019,7 @@
    ]
   },
   "keywords()": {
-   "count": 104,
+   "count": 105,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5291,7 +5291,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 64,
+   "count": 65,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -6815,6 +6815,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DragonsRageChanneler.kt",
      "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DragonsRageChannelerScenarioTest.kt"
+    }
+   ]
+  },
+  "OpponentsMustAttack": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Seeker of Slaanesh",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SeekerOfSlaanesh.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SeekerOfSlaaneshScenarioTest.kt"
     }
    ]
   },
