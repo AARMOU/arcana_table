@@ -5,18 +5,17 @@ name: Arcana Queue Feeder
 # Only the separate guarded dispatcher can authorize a paid Copilot assignment.
 on:
   schedule:
-    - cron: '*/15 * * * *'
-  # Wake on Copilot's completion if GitHub emits a workflow_run for its dynamic workflow.
-  workflow_run:
-    workflows: ['Running Copilot cloud agent']
-    types: [completed]
+    # Bounded backstop; Copilot completion and PR state changes wake it sooner.
+    - cron: '7,37 * * * *'
   # Copilot PR activity wakes the feeder promptly when scheduled workflows are delayed.
   # Run only trusted main code, and only for Copilot PRs targeting our integration base.
   # Never check out or execute the PR head in a workflow with write permissions.
   # review_requested is what Copilot emits when its session finishes (copilot_work_finished), i.e. the
-  # moment its dispatcher slot frees; the last synchronize happens while the slot is still held.
+  # moment its dispatcher slot frees; code-only synchronize events are redundant while it is held.
   pull_request_target:
-    types: [opened, synchronize, ready_for_review, review_requested]
+    # synchronize fires repeatedly while a session is still working and does not free a slot.
+    # review_requested is Copilot's completion signal; the bounded schedule is the fallback.
+    types: [opened, ready_for_review, review_requested]
   workflow_dispatch:
     inputs:
       max:

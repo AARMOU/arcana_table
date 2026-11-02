@@ -167,7 +167,7 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   const fs = require('node:fs');
   const path = require('node:path');
   const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-queue-feeder.yml'), 'utf8');
-  assert.ok(workflow.includes('  pull_request_target:\n    types: [opened, synchronize, ready_for_review, review_requested]'));
+  assert.ok(workflow.includes('  pull_request_target:\n    # synchronize fires repeatedly while a session is still working and does not free a slot.\n    # review_requested is Copilot\'s completion signal; the bounded schedule is the fallback.\n    types: [opened, ready_for_review, review_requested]'));
   // These checks must be present on BOTH read-only classification and write-enabled publishing.
   for (const gate of [
     "github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main'",
@@ -185,8 +185,10 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
     'new work must still go through the guarded dispatcher, not a browser or Copilot direct call');
   assert.ok(workflow.includes("if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch("),
     'a waiting unit re-wakes the dispatcher on every feeder pass');
-  assert.ok(workflow.includes('types: [opened, synchronize, ready_for_review, review_requested]'),
-    'Copilot finishing (review_requested) wakes the feeder when its slot frees');
+  assert.ok(workflow.includes('types: [opened, ready_for_review, review_requested]'),
+    'Copilot completion and ready-state changes wake the feeder without code-only synchronize events');
+  assert.ok(!workflow.includes('  workflow_run:'),
+    'review_requested is the single Copilot completion wake; the 30-minute timer is the fallback');
 });
 
 test('a card already on the destination build is never re-queued; an unreadable destination index fails closed', async () => {

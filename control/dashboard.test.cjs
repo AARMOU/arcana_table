@@ -433,7 +433,7 @@ test('independent review refresh requires no Copilot worker, dispatcher or paid 
   const flow=fs.readFileSync(path.join(__dirname,'../.github/workflows/arcana-card-review-inbox-refresh.yml'),'utf8');
   assert.match(flow,/workflow_run:/);
   assert.match(flow,/Arcana Independent Card Certification/);
-  assert.match(flow,/cron: '\*\/15 \* \* \* \*'/);
+  assert.match(flow,/cron: '7,37 \* \* \* \*'/);
   assert.match(flow,/workflow_dispatch:/);
   assert.match(flow,/github\.ref == 'refs\/heads\/main'/);
   assert.match(flow,/R\.buildReviewInbox/);
