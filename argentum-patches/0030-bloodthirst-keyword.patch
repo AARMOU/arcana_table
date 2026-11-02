@@ -266,10 +266,10 @@ index 1187cfdf..aec44b89 100644
 +private val BLOODTHIRST_PREFIX = "${com.wingedsheep.sdk.core.Keyword.BLOODTHIRST.name}_"
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 new file mode 100644
-index 00000000..1ad42dd5
+index 00000000..48a787a3
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,168 @@
 +package com.wingedsheep.engine.scenarios
 +
 +import com.wingedsheep.engine.state.components.battlefield.CountersComponent
@@ -421,12 +421,21 @@ index 00000000..1ad42dd5
 +
 +    test("losing all abilities removes printed and granted bloodthirst") {
 +        val (d, me) = newDriver()
-+        d.putPermanentOnBattlefield(me, "Test Thirst Totem")
-+        d.putPermanentOnBattlefield(me, "Test Ability Drain")
++        // Cast, not driver-placed, so the two statics get real timestamps: the drain is the later one.
++        d.giveColorlessMana(me, 3)
++        d.castSpell(me, d.putCardInHand(me, "Test Thirst Totem")).error shouldBe null
++        d.settle()
++        d.giveMana(me, Color.WHITE, 2)
++        d.giveColorlessMana(me, 2)
++        d.castSpell(me, d.putCardInHand(me, "Test Ability Drain")).error shouldBe null
++        d.settle()
 +        d.bolt(me, d.getOpponent(me))
 +        val brute = d.cast(me, "Test Colorless Brute")
-+        d.plusCounters(brute) shouldBe 0
-+        d.state.projectedState.getKeywords(brute).any { it.startsWith(Keyword.BLOODTHIRST.name) } shouldBe false
++        val keywords = d.state.projectedState.getKeywords(brute)
++        withClue("projected keywords $keywords") {
++            keywords.any { it.startsWith(Keyword.BLOODTHIRST.name) } shouldBe false
++            d.plusCounters(brute) shouldBe 0
++        }
 +    }
 +})
 diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
