@@ -976,6 +976,17 @@
     }
    ]
   },
+  "DynamicAmounts.permanentsSacrificedThisWay": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Angelic Aberration",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AngelicAberration.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.playerCount": {
    "count": 4,
    "examples": [
@@ -1830,7 +1841,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 36,
+   "count": 37,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3094,6 +3105,17 @@
     }
    ]
   },
+  "Effects.SacrificeAnyNumber": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Angelic Aberration",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AngelicAberration.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.SacrificeTarget": {
    "count": 5,
    "examples": [
@@ -3410,7 +3432,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -3590,7 +3612,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3928,7 +3950,7 @@
    ]
   },
   "Keyword.VIGILANCE": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Wilson, Refined Grizzly",
@@ -4616,7 +4638,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 50,
+   "count": 51,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -5052,7 +5074,7 @@
    ]
   },
   "keywords()": {
-   "count": 105,
+   "count": 106,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5365,7 +5387,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 159,
+   "count": 160,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7449,7 +7471,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 115,
+   "count": 116,
    "examples": [
     {
      "card": "Their Name Is Death",

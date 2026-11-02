@@ -44,6 +44,7 @@ MANDATORY = [
     "0025-akromas-will-modal-combat-trick.patch",
     "0026-free-cast-once-each-turn.patch",
     "0027-opponents-must-attack-anyone.patch",
+    "0028-base-power-toughness-at-most.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
