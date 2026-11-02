@@ -1,0 +1,393 @@
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+index 8907dda6..7ece26e2 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+@@ -77,6 +77,7 @@ internal enum class AmountSign {
+             }
+             is DynamicAmount.AggregateBattlefield -> ofCardProperty(amount.property)
+             is DynamicAmount.AggregateZone -> ofCardProperty(amount.property)
++            is DynamicAmount.PropertySumOfCollection -> ofCardProperty(amount.property)
+             is DynamicAmount.YourLifeTotal, is DynamicAmount.LifeTotal -> UNKNOWN
+             // Opaque at analysis time: a pipeline variable or a trigger-context value could be anything.
+             is DynamicAmount.VariableReference, is DynamicAmount.ContextProperty -> UNKNOWN
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index c87e52c2..1a7fb85d 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -17412,7 +17412,7 @@ read is available to other snapshot-backed entity references once their captured
+   **Pipeline-scoped counts get the same treatment, board-state counts deliberately do not.** A
+   `CreateTokenEffect` scheduled into a delayed trigger has its `count` frozen at scheduling time *only
+   if* the amount reads the pipeline that produced it — `DistinctEntitiesInCollections`,
+-  `DistinctCardTypesInCollections`, `ManaValueSumOfCollection`, `StoredCardManaValue`,
++  `DistinctCardTypesInCollections`, `ManaValueSumOfCollection`, `PropertySumOfCollection`, `StoredCardManaValue`,
+   `VariableReference`, or any arithmetic tree containing one. Those live in the resolving
+   `EffectContext` and would silently read 0 an upkeep later. A *board-state* count
+   (`AggregateBattlefield`, …) is left lazy, because "at the beginning of your end step, create a token
+@@ -17871,6 +17871,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
+   graveyard). For "you mill X cards … that player loses life equal to the total mana value of those
+   cards" — Palantír of Orthanc mills into the default `"milled"` collection
+   (`Patterns.Library.mill(X)`), then `Effects.LoseLife(DynamicAmounts.manaValueSumOf("milled"), opponent)`.
++- `PropertySumOfCollection(collectionName, property: CardNumericProperty)` — **total** of a numeric
++  property (`POWER`, `TOUGHNESS`, `MANA_VALUE`, …) over *exactly* the entities in a named pipeline
++  collection. Facades: `DynamicAmounts.propertySumOf(collectionName, property)` or, inside
++  `Effects.Pipeline { }`, `slot.sumOf(CardNumericProperty.POWER)`. A permanent on the battlefield
++  contributes its **projected** value (counters and pumps count, negative power subtracts); anything
++  else its printed value. Use it where `AggregateBattlefield(SUM)` would be wrong because the set is a
++  *choice*, not a filter — Benthic Anomaly's "for each opponent, choose a creature that player
++  controls. Create a token that's a copy of one of those creatures, except its power is equal to the
++  total power of those creatures …": `forEachPlayerCollecting(Player.EachOpponent) { chooseExactly(1, …,
++  chooser = Chooser.SourceController) }` collects the choices, and
++  `CreateTokenCopyOfTarget(basePower = chosen.sumOf(POWER), baseToughness = chosen.sumOf(TOUGHNESS))`
++  reads them. Counted as pipeline-scoped (frozen into a delayed trigger like `ManaValueSumOfCollection`).
+ 
+ ### `ManaColorSet`<a id="manacolorset"></a>
+ 
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index ce6415ff..05d874c0 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -684,6 +684,7 @@ Families:
+ - `DynamicAmount.PlayerCount(scope: Player)` — How many players are in scope — "for each opponent", "for each other player", "the number of players in the game".
+ - `DynamicAmount.PlayerCounterCount(counterType: CounterType?, player: Player)` — How many counters of counterType a player currently has — the player-scoped sibling of EntityProperty's com.wingedsheep.sdk.scripting.values.EntityNumericProperty.CounterCount (which reads one obje…
+ - `DynamicAmount.Power(base: Int, exponent: DynamicAmount)` — Raise a fixed base to the power of a dynamic exponent (`base^exponent`).
++- `DynamicAmount.PropertySumOfCollection(collectionName: String, property: CardNumericProperty)` — Sum of property over *every* entity in a named pipeline collection — "the total power of those creatures".
+ - `DynamicAmount.SnowManaSpent` — The amount of mana from snow sources spent to cast the current spell — the "{S} spent" of CR 107.4h, which counts snow mana spent on *any* part of the cost, not only on `{S}` pips.
+ - `DynamicAmount.Speed(player: Player)` — A player's **speed** (Aetherdrift, CR 702.179) — the 0–4 designation that "Start your engines!" begins and the inherent speed trigger raises.
+ - `DynamicAmount.SpellsCastLastTurn` — The total number of spells cast during the immediately preceding turn.
+diff --git a/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt b/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
+index 83e311e8..ed6dbb2a 100644
+--- a/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
++++ b/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
+@@ -779,6 +779,7 @@ object CardLinter {
+         put("ControllerOfPipelineTarget" to "collectionName", read(Space.COLLECTION))
+         put("StoredCardManaValue" to "collectionName", read(Space.COLLECTION))
+         put("ManaValueSumOfCollection" to "collectionName", read(Space.COLLECTION))
++        put("PropertySumOfCollection" to "collectionName", read(Space.COLLECTION))
+         put("RetargetChooser.OwnerOfStored" to "collectionName", read(Space.COLLECTION))
+         put("TapUntapCollection" to "collectionName", read(Space.COLLECTION))
+         put("AddCountersToCollection" to "collectionName", read(Space.COLLECTION))
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+index 9e0d4807..bf2dda74 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+@@ -670,6 +670,13 @@ object DynamicAmounts {
+     fun manaValueSumOf(collectionName: String): DynamicAmount =
+         DynamicAmount.ManaValueSumOfCollection(collectionName)
+ 
++    /**
++     * Total [property] (projected on the battlefield) of every entity in a named pipeline
++     * collection — "the total power of those creatures". See [DynamicAmount.PropertySumOfCollection].
++     */
++    fun propertySumOf(collectionName: String, property: CardNumericProperty): DynamicAmount =
++        DynamicAmount.PropertySumOfCollection(collectionName, property)
++
+     // =========================================================================
+     // Graveyard counting
+     // =========================================================================
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
+index fd1bf8a9..fe1037be 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
+@@ -79,6 +79,14 @@ value class CollectionSlot(val key: String) {
+      */
+     val count: DynamicAmount get() = DynamicAmount.VariableReference("${key}_count")
+ 
++    /**
++     * The total [property] of the entities in this collection — projected on the battlefield —
++     * as a [DynamicAmount] ([DynamicAmount.PropertySumOfCollection]): "the total power of those
++     * creatures".
++     */
++    fun sumOf(property: com.wingedsheep.sdk.scripting.values.CardNumericProperty): DynamicAmount =
++        DynamicAmount.PropertySumOfCollection(key, property)
++
+     /** The first entity in this collection as an [EffectTarget] ([EffectTarget.PipelineTarget]). */
+     val asTarget: EffectTarget.PipelineTarget get() = EffectTarget.PipelineTarget(key)
+ 
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+index 89e9afbc..64d29a06 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+@@ -1291,6 +1291,26 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
+         override val description: String = "the total mana value of the $collectionName cards"
+     }
+ 
++    /**
++     * Sum of [property] over *every* entity in a named pipeline collection — "the total power of
++     * those creatures".
++     *
++     * Each entity is read by id when the amount is evaluated: a permanent on the battlefield
++     * contributes its **projected** value (counters, pumps and other continuous effects count, and
++     * negative power subtracts), anything else its printed value. Unlike
++     * [AggregateBattlefield] with [Aggregation.SUM], the set is exactly the stored collection —
++     * the creatures *chosen* earlier in the resolution (Benthic Anomaly: one creature chosen per
++     * opponent), not every permanent matching a filter. An absent or empty collection is 0.
++     */
++    @SerialName("PropertySumOfCollection")
++    @Serializable
++    data class PropertySumOfCollection(
++        val collectionName: String,
++        val property: CardNumericProperty,
++    ) : DynamicAmount {
++        override val description: String = "the total ${property.description} of the $collectionName cards"
++    }
++
+     // =========================================================================
+     // Math Operations - Composable arithmetic on DynamicAmounts
+     // =========================================================================
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
+index 0b549b46..cbe4fb4d 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
+@@ -38,7 +38,7 @@ import kotlinx.serialization.json.encodeToJsonElement
+ private val CONTEXT_SCOPED_SERIAL_NAMES: Set<String> = setOf(
+     // DynamicAmount
+     "XValue", "CastX", "CastChoice", "ContextProperty", "VariableReference", "StoredCardManaValue",
+-    "DistinctEntitiesInCollections", "DistinctCardTypesInCollections", "ManaValueSumOfCollection",
++    "DistinctEntitiesInCollections", "DistinctCardTypesInCollections", "ManaValueSumOfCollection", "PropertySumOfCollection",
+     "TotalManaSpent", "ManaSpentOnX", "PermanentsSacrificedThisWay",
+     "TotalPowerSacrificedThisWay", "CountersRemovedAsCost", "StationCharge",
+     "LastKnownSourceCounters", "LastKnownDamageDealtToSource",
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 425b22e2..74d7991a 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -494,6 +494,7 @@ DynamicAmount.PermanentsSacrificedThisWay — DynamicAmount
+ DynamicAmount.PlayerCount — DynamicAmount
+ DynamicAmount.PlayerCounterCount — DynamicAmount
+ DynamicAmount.Power — DynamicAmount
++DynamicAmount.PropertySumOfCollection — DynamicAmount
+ DynamicAmount.SnowManaSpent — DynamicAmount
+ DynamicAmount.Speed — DynamicAmount
+ DynamicAmount.SpellsCastLastTurn — DynamicAmount
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+index 498cbc53..01172b21 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+@@ -222,6 +222,7 @@ class DynamicAmountEvaluator(
+         DynamicAmount.SnowManaSpent,
+         is DynamicAmount.ManaSpentOnX,
+         is DynamicAmount.ManaValueSumOfCollection,
++        is DynamicAmount.PropertySumOfCollection,
+         DynamicAmount.PermanentsSacrificedThisWay,
+         DynamicAmount.CountersRemovedAsCost,
+         is DynamicAmount.PlayerCount,
+@@ -539,6 +540,21 @@ class DynamicAmountEvaluator(
+                 }
+             }
+ 
++            // "the total power of those creatures": every entity of exactly that collection, each
++            // read by id — projected on the battlefield, printed elsewhere (Benthic Anomaly).
++            is DynamicAmount.PropertySumOfCollection -> {
++                val ids = context.pipeline.storedCollections[amount.collectionName] ?: return 0
++                val projected = projectedState ?: state.projectedState
++                val battlefield = state.getBattlefield()
++                ids.fold(0) { total, id ->
++                    if (state.getEntity(id) == null) total
++                    else GameLimits.addClamped(
++                        total,
++                        resolveCardNumericProperty(state, projected.takeIf { id in battlefield }, id, amount.property)
++                    )
++                }
++            }
++
+             // Math operations — propagate [projectedState] so a mid-projection caller's
+             // intermediate snapshot survives nested aggregates. Arithmetic is saturating
+             // (GameLimits.*Clamped): a "twice the number of X" / doubling chain must clamp at
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+index 314449b5..1c83d868 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+@@ -391,6 +391,7 @@ class CreateDelayedTriggerExecutor(
+         is DynamicAmount.DistinctEntitiesInCollections -> amount.collections.any { it in stored }
+         is DynamicAmount.DistinctCardTypesInCollections -> amount.collections.any { it in stored }
+         is DynamicAmount.ManaValueSumOfCollection -> amount.collectionName in stored
++        is DynamicAmount.PropertySumOfCollection -> amount.collectionName in stored
+         // "<collection>_count" is a collection read like the ones above; a plain name is a stored number.
+         is DynamicAmount.VariableReference ->
+             !amount.variableName.endsWith("_count") || amount.variableName.removeSuffix("_count") in stored
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt
+new file mode 100644
+index 00000000..33595c30
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt
+@@ -0,0 +1,180 @@
++package com.wingedsheep.engine.handlers
++
++import com.wingedsheep.engine.core.SelectCardsDecision
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.CounterType
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.DynamicAmounts
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.effects.Chooser
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.values.CardNumericProperty
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.nulls.shouldBeNull
++import io.kotest.matchers.shouldBe
++
++/**
++ * `DynamicAmount.PropertySumOfCollection`: the total projected power / toughness of exactly the
++ * creatures in a pipeline collection — here one creature *chosen* (not targeted) per opponent,
++ * the shape of Benthic Anomaly. Loop-collected collections survive the loop, so the sum sees every
++ * opponent's choice (a `StoreNumber` accumulator inside a for-each loop does not).
++ */
++class PropertySumOfCollectionTest : FunSpec({
++
++    val bear = card("Sum Test Bear") {
++        manaCost = "{1}{G}"
++        typeLine = "Creature — Bear"
++        power = 2
++        toughness = 2
++    }
++    val giant = card("Sum Test Giant") {
++        manaCost = "{3}{R}"
++        typeLine = "Creature — Giant"
++        power = 3
++        toughness = 4
++    }
++
++    /** "For each opponent, choose a creature that player controls. You gain life equal to their total power." */
++    val tally = card("Sum Test Tally") {
++        manaCost = "{U}"
++        typeLine = "Sorcery"
++        spell {
++            effect = Effects.Pipeline {
++                val chosen = forEachPlayerCollecting(Player.EachOpponent) {
++                    val theirs = gather(GameObjectFilter.Creature, player = Player.You)
++                    listOf(chooseExactly(1, from = theirs, chooser = Chooser.SourceController))
++                }.single()
++                run(Effects.GainLife(chosen.sumOf(CardNumericProperty.POWER)))
++            }
++        }
++    }
++
++    /** "… Create a token that's a copy of one of those creatures, except its P/T are their totals." */
++    val merge = card("Sum Test Merge") {
++        manaCost = "{U}"
++        typeLine = "Sorcery"
++        spell {
++            effect = Effects.Pipeline {
++                val chosen = forEachPlayerCollecting(Player.EachOpponent) {
++                    val theirs = gather(GameObjectFilter.Creature, player = Player.You)
++                    listOf(chooseExactly(1, from = theirs, chooser = Chooser.SourceController))
++                }.single()
++                val copied = chooseExactly(1, from = chosen, chooser = Chooser.Controller)
++                run(
++                    Effects.CreateTokenCopyOfTarget(
++                        target = copied.asTarget,
++                        basePower = chosen.sumOf(CardNumericProperty.POWER),
++                        baseToughness = DynamicAmounts.propertySumOf(chosen.key, CardNumericProperty.TOUGHNESS),
++                    )
++                )
++            }
++        }
++    }
++
++    fun driver(players: Int): Pair<GameTestDriver, List<EntityId>> {
++        val d = GameTestDriver()
++        d.registerCards(TestCards.all + listOf(bear, giant, tally, merge))
++        val ids = if (players == 2) {
++            d.initMirrorMatch(Deck.of("Forest" to 40))
++            listOf(d.player1, d.player2)
++        } else {
++            d.initMultiplayer(decks = List(players) { Deck.of("Forest" to 40) }).toList()
++        }
++        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = ids[0])
++        return d to ids
++    }
++
++    fun GameTestDriver.cast(you: EntityId, name: String) {
++        val spell = putCardInHand(you, name)
++        giveMana(you, Color.BLUE)
++        castSpell(you, spell).error.shouldBeNull()
++        passPriority(you)
++    }
++
++    fun GameTestDriver.drain(you: EntityId) {
++        var guard = 0
++        while (state.stack.isNotEmpty() && guard++ < 10) {
++            if (pendingDecision != null) return
++            passPriority(state.priorityPlayerId!!)
++        }
++    }
++
++    fun GameTestDriver.choose(you: EntityId, pick: EntityId) {
++        val decision = pendingDecision as? SelectCardsDecision
++        withClue("expected a selection prompt") { (decision != null) shouldBe true }
++        submitCardSelection(you, listOf(pick)).error.shouldBeNull()
++    }
++
++    test("three players: totals read both opponents' chosen creatures, projected (counters count)") {
++        val (d, ids) = driver(3)
++        val (you, foe1, foe2) = ids
++        val bear = d.putCreatureOnBattlefield(foe1, "Sum Test Bear")
++        d.putCreatureOnBattlefield(foe1, "Sum Test Giant")
++        val giant = d.putCreatureOnBattlefield(foe2, "Sum Test Giant")
++        d.replaceState(d.state.updateEntity(bear) { it.with(CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 1))) })
++        val before = d.getLifeTotal(you)
++        d.cast(you, "Sum Test Tally")
++        d.drain(you)
++        d.choose(you, bear) // foe1 has two creatures; foe2's only creature is chosen for it
++        d.drain(you)
++        d.getLifeTotal(you) shouldBe before + 3 + 3 // bear 2 (+1 counter) + giant 3
++        d.state.projectedState.getPower(giant) shouldBe 3
++    }
++
++    test("an opponent with no creatures adds nothing") {
++        val (d, ids) = driver(3)
++        val (you, foe1, _) = ids
++        d.putCreatureOnBattlefield(foe1, "Sum Test Giant")
++        val before = d.getLifeTotal(you)
++        d.cast(you, "Sum Test Tally")
++        d.drain(you)
++        d.getLifeTotal(you) shouldBe before + 3
++    }
++
++    test("token copy: chosen original, P/T set to the totals; counters on the original are not copied") {
++        val (d, ids) = driver(3)
++        val (you, foe1, foe2) = ids
++        val bear = d.putCreatureOnBattlefield(foe1, "Sum Test Bear")
++        val giant = d.putCreatureOnBattlefield(foe2, "Sum Test Giant")
++        d.replaceState(d.state.updateEntity(giant) { it.with(CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 2))) })
++        d.cast(you, "Sum Test Merge")
++        d.drain(you)
++        d.choose(you, bear) // which of the two chosen creatures to copy
++        d.drain(you)
++        val token = d.getCreatures(you).single()
++        d.state.projectedState.getPower(token) shouldBe 2 + 5
++        d.state.projectedState.getToughness(token) shouldBe 2 + 6
++        d.state.projectedState.hasSubtype(token, "Bear") shouldBe true
++    }
++
++    test("two players: the single chosen creature is copied with its own totals") {
++        val (d, ids) = driver(2)
++        val (you, foe) = ids
++        d.putCreatureOnBattlefield(foe, "Sum Test Giant")
++        d.cast(you, "Sum Test Merge")
++        d.drain(you)
++        val token = d.getCreatures(you).single()
++        d.state.projectedState.getPower(token) shouldBe 3
++        d.state.projectedState.getToughness(token) shouldBe 4
++    }
++
++    test("no opponent controls a creature: no token, sum is 0") {
++        val (d, ids) = driver(2)
++        val (you, _) = ids
++        val before = d.getLifeTotal(you)
++        d.cast(you, "Sum Test Tally")
++        d.drain(you)
++        d.getLifeTotal(you) shouldBe before
++        d.cast(you, "Sum Test Merge")
++        d.drain(you)
++        d.getCreatures(you).size shouldBe 0
++    }
++})

@@ -1078,6 +1078,9 @@
    "key": [
     "key: String"
    ],
+   "sumOf-impl": [
+    "sumOf-impl(String, CardNumericProperty): DynamicAmount"
+   ],
    "toString-impl": [
     "toString-impl(String): String"
    ],
@@ -2862,6 +2865,9 @@
    ],
    "propertyOf": [
     "propertyOf(EffectTarget.SingleEntity, EntityNumericProperty): DynamicAmount"
+   ],
+   "propertySumOf": [
+    "propertySumOf(String, CardNumericProperty): DynamicAmount"
    ],
    "replacementLifeGainAmount": [
     "replacementLifeGainAmount(): DynamicAmount"
