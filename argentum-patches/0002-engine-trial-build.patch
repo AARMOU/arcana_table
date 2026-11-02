@@ -7,11 +7,13 @@ Subject: [PATCH] arcana: 0002-engine-trial-build
 ---
  arcana-export/build.gradle.kts                | 20 ++++++++++++++
  .../com/arcanatable/export/ArcanaExport.kt    | 26 +++++++++++++++++++
- .../src/main/kotlin/kotlin-jvm.gradle.kts     |  7 +++++
+ .../kotlin/arcana-android-target.gradle.kts   | 24 +++++++++++++++++
+ .../src/main/kotlin/kotlin-jvm.gradle.kts     |  2 ++
  settings.gradle.kts                           |  2 ++
- 4 files changed, 55 insertions(+)
+ 5 files changed, 74 insertions(+)
  create mode 100644 arcana-export/build.gradle.kts
  create mode 100644 arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+ create mode 100644 buildSrc/src/main/kotlin/arcana-android-target.gradle.kts
 
 diff --git a/arcana-export/build.gradle.kts b/arcana-export/build.gradle.kts
 new file mode 100644
@@ -71,26 +73,49 @@ index 0000000000..3b9b6fa91d
 +    println("ARCANA-EXPORT cards=${cards.size} bytes=${out.length()} roundTripFailures=$failures file=${out.absolutePath}")
 +    if (failures > 0) kotlin.system.exitProcess(2)
 +}
-diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-index f1241bd8bb..3374cddf82 100644
---- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-+++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-@@ -17,8 +17,15 @@ plugins {
- kotlin {
-     // Use a specific Java version to make it easier to work in different environments.
-     jvmToolchain(21)
-+    // Arcana: compile against the Java 17 API so the jars run on Android (no Java 21-only calls).
-+    compilerOptions {
-+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-+        freeCompilerArgs.add("-Xjdk-release=17")
+diff --git a/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts b/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts
+new file mode 100644
+index 0000000000..b07af250d5
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts
+@@ -0,0 +1,24 @@
++// Arcana Table: the jars this build produces run inside an Android app, so every main source set is
++// compiled for Java 17 bytecode against the Java 17 API (no newer-JDK calls), whatever JDK the build
++// itself runs on. JVM-only test sources keep the toolchain's API: some use newer JDK calls such as
++// Thread.threadId(), and they never ship to Android.
++//
++// This lives in its own file, applied by one line in kotlin-jvm.gradle.kts's plugins block, so that
++// upstream edits to that convention plugin (toolchain bumps, test properties) cannot conflict with it.
++package buildsrc.convention
++
++import org.jetbrains.kotlin.gradle.dsl.JvmTarget
++import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
++import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
++
++pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
++    extensions.configure<KotlinJvmProjectExtension> {
++        compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 +    }
- }
- 
++}
++
 +tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
 +
- // Bound concurrent Kotlin compilations build-wide — they all share one compile-daemon heap, so
- // without this the peak is workers.max × the largest source set. See KotlinCompileThrottle.
- val kotlinCompileThrottle =
++tasks.withType<KotlinCompile>().configureEach {
++    if (!name.contains("Test")) compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
++}
+diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+index f1241bd8bb..9d81743759 100644
+--- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
++++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+@@ -12,6 +12,8 @@ plugins {
+     // chronological chain, and `:mtg-sets` re-exports the whole chain, so consumers still see the
+     // full corpus through a single `project(":mtg-sets")` dependency.
+     `java-library`
++    // Arcana (Android): Java 17 output; see arcana-android-target.gradle.kts.
++    id("buildsrc.convention.arcana-android-target")
+ }
+ 
+ kotlin {
 diff --git a/settings.gradle.kts b/settings.gradle.kts
 index 2c0b79f053..5c26424105 100644
 --- a/settings.gradle.kts

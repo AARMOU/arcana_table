@@ -1,0 +1,2214 @@
+package com.wingedsheep.engine.handlers
+
+import com.wingedsheep.engine.core.GameLimits
+import com.wingedsheep.engine.handlers.effects.LkiPolicy
+import com.wingedsheep.engine.handlers.effects.TargetResolutionUtils
+import com.wingedsheep.engine.handlers.effects.lkiPolicyFor
+import com.wingedsheep.engine.handlers.effects.lkiSnapshotFor
+import com.wingedsheep.engine.mechanics.ControllerGrants
+import com.wingedsheep.engine.mechanics.ManaValues
+import com.wingedsheep.engine.mechanics.layers.ProjectedState
+import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.ZoneKey
+import com.wingedsheep.engine.state.components.battlefield.AttachmentsComponent
+import com.wingedsheep.engine.state.components.battlefield.CastChoicesComponent
+import com.wingedsheep.engine.state.components.battlefield.blightAmountChoice
+import com.wingedsheep.engine.state.components.battlefield.numberChoice
+import com.wingedsheep.engine.state.components.battlefield.entitiesChoice
+import com.wingedsheep.engine.state.components.battlefield.chosenOpponent
+import com.wingedsheep.engine.state.components.battlefield.CountersComponent
+import com.wingedsheep.engine.state.components.battlefield.GrantsStationUsingToughnessComponent
+import com.wingedsheep.engine.state.components.battlefield.IncreasesDevotionComponent
+import com.wingedsheep.engine.state.components.battlefield.LastKnownPermanentComponent
+import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.identity.ControllerComponent
+import com.wingedsheep.engine.state.components.identity.FaceDownComponent
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
+import com.wingedsheep.engine.state.components.identity.NumericKeywordValuesComponent
+import com.wingedsheep.engine.state.components.identity.PlayerComponent
+import com.wingedsheep.engine.state.components.identity.CommanderComponent
+import com.wingedsheep.engine.state.components.player.ManaPoolComponent
+import com.wingedsheep.engine.state.components.player.PlayerCountersRemovedThisTurnComponent
+import com.wingedsheep.engine.state.components.identity.RoomComponent
+import com.wingedsheep.engine.state.components.identity.ToxicComponent
+import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
+import com.wingedsheep.sdk.core.ManaSymbol
+import com.wingedsheep.sdk.core.CounterType
+import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.Subtype
+import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.CharacteristicValue
+import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.scripting.values.Aggregation
+import com.wingedsheep.sdk.scripting.values.AttachmentKind
+import com.wingedsheep.sdk.scripting.values.CardNumericProperty
+import com.wingedsheep.sdk.scripting.values.ContextPropertyKey
+import com.wingedsheep.sdk.scripting.values.DynamicAmount
+import com.wingedsheep.sdk.scripting.values.EntityNumericProperty
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
+import com.wingedsheep.sdk.scripting.values.TurnTracker
+import com.wingedsheep.sdk.scripting.GameObjectFilter
+import com.wingedsheep.sdk.scripting.references.Player
+import kotlin.math.max
+import kotlin.math.min
+import com.wingedsheep.engine.state.components.battlefield.BattlefieldEntryTimestampComponent
+
+private val BASIC_LAND_SUBTYPES: Set<String> = setOf("Plains", "Island", "Swamp", "Mountain", "Forest")
+
+/**
+ * The names of every true card type (CR 205.2a). Used to count "card types" via
+ * [Aggregation.DISTINCT_TYPES] without including supertypes/subtypes, which
+ * [ProjectedState.getTypes] folds into the same set.
+ */
+private val CARD_TYPE_NAMES: Set<String> =
+    com.wingedsheep.sdk.core.CardType.entries.mapTo(mutableSetOf()) { it.name }
+
+/**
+ * The names of every permanent card type (CR 110.4: artifact, battle, creature, enchantment, land,
+ * planeswalker). Used to count "permanent types" via [Aggregation.DISTINCT_PERMANENT_TYPES]. Derived
+ * from [com.wingedsheep.sdk.core.CardType.isPermanent], so kindred/instant/sorcery are excluded — a
+ * kindred permanent (e.g. a kindred enchantment) contributes only its permanent type(s), never
+ * "kindred" itself.
+ */
+private val PERMANENT_TYPE_NAMES: Set<String> =
+    com.wingedsheep.sdk.core.CardType.entries.filter { it.isPermanent }.mapTo(mutableSetOf()) { it.name }
+
+/**
+ * Every official creature type (CR 205.3m), proper-cased to match the subtype strings carried in
+ * [ProjectedState.getSubtypes]. Used by [DynamicAmount.LargestSharedCreatureTypeCount] to keep
+ * non-creature subtypes (Equipment, Vehicle, basic land types, …) from polluting the tribe tally.
+ */
+private val CREATURE_TYPE_NAMES: Set<String> = Subtype.ALL_CREATURE_TYPES.toSet()
+
+/** An entity's printed creature types — every one for a changeling (CR 702.73a). */
+private fun baseCreatureTypes(state: GameState, entityId: EntityId): Set<String> {
+    val card = state.getEntity(entityId)?.get<CardComponent>() ?: return emptySet()
+    if (Keyword.CHANGELING in card.baseKeywords) return CREATURE_TYPE_NAMES
+    return card.typeLine.subtypes.mapNotNullTo(mutableSetOf()) { it.value.takeIf { v -> v in CREATURE_TYPE_NAMES } }
+}
+
+/** The four creature types a party draws from (CR 700.8), in bit order for [largestParty]. */
+private val PARTY_ROLES: List<String> = listOf("Cleric", "Rogue", "Warrior", "Wizard")
+
+/**
+ * The most party roles from [role] onward that can be filled, one creature per role, given how many
+ * creatures carry each role bitmask. Exhaustive over a 4-role, 15-class space, so it is exact.
+ */
+private fun largestParty(role: Int, creaturesPerMask: IntArray): Int {
+    if (role == PARTY_ROLES.size) return 0
+    var best = largestParty(role + 1, creaturesPerMask)
+    val bit = 1 shl role
+    for (mask in 1 until creaturesPerMask.size) {
+        if (mask and bit == 0 || creaturesPerMask[mask] == 0) continue
+        creaturesPerMask[mask]--
+        best = maxOf(best, 1 + largestParty(role + 1, creaturesPerMask))
+        creaturesPerMask[mask]++
+        if (best == PARTY_ROLES.size - role) break
+    }
+    return best
+}
+
+/**
+ * Evaluates DynamicAmount values against the current game state.
+ *
+ * DynamicAmount represents values that depend on game state, like
+ * "the number of creatures you control" or "your life total".
+ */
+class DynamicAmountEvaluator(
+    /** The condition evaluator that owns this one — see [ConditionEvaluator.amounts]. */
+    val conditions: ConditionEvaluator,
+    /**
+     * Projection used for battlefield reads when the caller doesn't pass one. Default reads
+     * the canonical [GameState.projectedState]; the [com.wingedsheep.engine.mechanics.layers.StateProjector]
+     * swaps in an empty projection so its internal evaluator never re-enters its own lazy
+     * initializer. Only invoked from branches that actually need projection — never eagerly
+     * at function entry, otherwise resolution-time `Compare` conditions evaluated mid-layer
+     * would recurse.
+     */
+    private val defaultProjection: (GameState) -> ProjectedState = { it.projectedState }
+) {
+
+    /**
+     * Resolve the projection for branches that need battlefield reads. Lazy by design:
+     * called only inside aggregate / entity-property branches, never at evaluator entry.
+     */
+    private fun resolveProjection(state: GameState, explicit: ProjectedState?): ProjectedState =
+        explicit ?: defaultProjection(state)
+
+    /**
+     * Evaluate [amount] for *display*, reporting `null` when [context] cannot determine it yet.
+     *
+     * [evaluate] answers `0` for a reference that doesn't resolve, which is the right answer when an
+     * effect is actually being applied but the wrong one when text is being rendered: a caller can't
+     * tell that `0` apart from an amount that genuinely resolved to zero. The gap that matters is the
+     * targeting banner — it renders an ability's text *before* the player picks a target, so an
+     * amount reading "target's power" cannot resolve by construction, and printing `0` claims a
+     * concrete "+0/+0". Description renderers take `null` as "fall back to the amount's own wording".
+     *
+     * Only entity-reference reads can be undeterminable; every other amount reads state that already
+     * exists. Composite amounts are undeterminable if any operand is.
+     */
+    fun evaluateForDisplay(
+        state: GameState,
+        amount: DynamicAmount,
+        context: EffectContext,
+        projectedState: ProjectedState? = null
+    ): Int? = if (isDeterminable(state, amount, context)) {
+        evaluate(state, amount, context, projectedState)
+    } else {
+        null
+    }
+
+    /**
+     * Whether every entity reference inside [amount] binds in [context]. Mirrors the operand
+     * structure of [evaluate]; a reference the evaluator would silently read as `0` is the thing
+     * being detected, so this walks the same composites [evaluate] recurses through.
+     */
+    private fun isDeterminable(
+        state: GameState,
+        amount: DynamicAmount,
+        context: EffectContext
+    ): Boolean = when (amount) {
+        is DynamicAmount.GraveyardRelativeCount ->
+            TargetResolutionUtils.resolveTarget(amount.entity, context, state) != null
+
+        is DynamicAmount.EntityProperty ->
+            // The enchanted-creature branch of [evaluate] has its own last-known-information
+            // fallback and stays determinable even once the aura has detached.
+            amount.entity is EffectTarget.EnchantedCreature ||
+                TargetResolutionUtils.resolveEntity(amount.entity, context, state) != null
+
+        is DynamicAmount.Add -> isDeterminable(state, amount.left, context) &&
+            isDeterminable(state, amount.right, context)
+        is DynamicAmount.Subtract -> isDeterminable(state, amount.left, context) &&
+            isDeterminable(state, amount.right, context)
+        is DynamicAmount.Max -> isDeterminable(state, amount.left, context) &&
+            isDeterminable(state, amount.right, context)
+        is DynamicAmount.Min -> isDeterminable(state, amount.left, context) &&
+            isDeterminable(state, amount.right, context)
+        is DynamicAmount.Multiply -> isDeterminable(state, amount.amount, context)
+        is DynamicAmount.Power -> isDeterminable(state, amount.exponent, context)
+        is DynamicAmount.IfPositive -> isDeterminable(state, amount.amount, context)
+        is DynamicAmount.Divide -> isDeterminable(state, amount.numerator, context) &&
+            isDeterminable(state, amount.denominator, context)
+        // Both arms, not just the one the condition selects: the text renders before resolution,
+        // and the condition itself may not be evaluable in a display-only context either.
+        is DynamicAmount.Conditional -> isDeterminable(state, amount.ifTrue, context) &&
+            isDeterminable(state, amount.ifFalse, context)
+        is DynamicAmount.GreatestAmongPlayers -> isDeterminable(state, amount.inner, context)
+        is DynamicAmount.LeastAmongPlayers -> isDeterminable(state, amount.inner, context)
+
+        // Leaves with no entity reference to bind: they read game state, the resolution context
+        // or a pipeline slot, each of which [evaluate] answers without a missing referent. A new
+        // leaf that names an entity needs a branch of its own, like [DynamicAmount.EntityProperty].
+        is DynamicAmount.AggregateBattlefield,
+        is DynamicAmount.AggregateZone,
+        is DynamicAmount.CastChoice,
+        is DynamicAmount.CapturedAtCast,
+        DynamicAmount.CastX,
+        is DynamicAmount.ContextProperty,
+        is DynamicAmount.Count,
+        is DynamicAmount.CountPlayersWith,
+        DynamicAmount.CraftedMaterialsColorCount,
+        DynamicAmount.CraftedMaterialsTotalManaValue,
+        DynamicAmount.CraftedMaterialsTotalPower,
+        DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn,
+        is DynamicAmount.CommanderColorIdentityCount,
+        is DynamicAmount.DevotionTo,
+        is DynamicAmount.DistinctCardTypesInCollections,
+        is DynamicAmount.DistinctColorsManaSpent,
+        is DynamicAmount.DistinctEntitiesInCollections,
+        is DynamicAmount.Fixed,
+        is DynamicAmount.LargestSharedCreatureTypeCount,
+        is DynamicAmount.PartySize,
+        is DynamicAmount.LastKnownDamageDealtToSource,
+        is DynamicAmount.LastKnownSourceCounters,
+        is DynamicAmount.LifeTotal,
+        is DynamicAmount.ManaOfColorSpent,
+        is DynamicAmount.ManaSpentFromSubtype,
+        DynamicAmount.SnowManaSpent,
+        is DynamicAmount.ManaSpentOnX,
+        is DynamicAmount.ManaValueSumOfCollection,
+        DynamicAmount.PermanentsSacrificedThisWay,
+        DynamicAmount.CountersRemovedAsCost,
+        is DynamicAmount.PlayerCount,
+        is DynamicAmount.PlayerCounterCount,
+        is DynamicAmount.CardsCycledThisGame,
+        is DynamicAmount.SpellsCastThisGame,
+        is DynamicAmount.ExtraTurnsBegunThisGame,
+        is DynamicAmount.CommanderCastsFromCommandZone,
+        is DynamicAmount.Speed,
+        is DynamicAmount.DungeonsCompleted,
+        DynamicAmount.SpellsCastLastTurn,
+        is DynamicAmount.SpellsCastThisTurn,
+        is DynamicAmount.StartingLifeTotal,
+        DynamicAmount.StationCharge,
+        is DynamicAmount.StoredCardManaValue,
+        is DynamicAmount.SubtypeEnteredUnderControlThisTurn,
+        is DynamicAmount.CardTypeEnteredUnderControlThisTurn,
+        is DynamicAmount.CreaturesWithSubtypeDiedThisTurn,
+        DynamicAmount.TotalManaSpent,
+        DynamicAmount.TotalPowerSacrificedThisWay,
+        is DynamicAmount.TurnTracking,
+        is DynamicAmount.UnlockedDoors,
+        is DynamicAmount.UnspentMana,
+        DynamicAmount.XValue,
+        DynamicAmount.YourLifeTotal -> true
+
+        // A pipeline number a step writes during resolution isn't there while the spell or
+        // ability waits on the stack; [evaluate] would read the missing slot as 0, so the text
+        // keeps "that much" until the slot is bound (Backdraft, Galvanic Discharge).
+        is DynamicAmount.VariableReference -> amount.variableName.let { name ->
+            if (name.endsWith("_count")) name.removeSuffix("_count") in context.pipeline.storedCollections
+            else name in context.pipeline.storedNumbers
+        }
+    }
+
+    /**
+     * Evaluate a DynamicAmount to get an actual integer value.
+     *
+     * @param projectedState Optional pre-computed projected state for battlefield reads.
+     *   When provided, takes priority over [defaultProjection]. Mid-projection callers
+     *   ([com.wingedsheep.engine.mechanics.layers.EffectApplicator]) pass their intermediate
+     *   snapshot so layer-by-layer changes are visible to nested aggregates.
+     */
+    fun evaluate(
+        state: GameState,
+        amount: DynamicAmount,
+        context: EffectContext,
+        projectedState: ProjectedState? = null
+    ): Int {
+        return when (amount) {
+            is DynamicAmount.Fixed -> amount.amount
+
+            is DynamicAmount.XValue -> context.xValue ?: 0
+
+            // Counters the source had as it last existed on the battlefield (CR 113.7a / 608.2h).
+            // Two snapshots feed this, and they never both apply to one resolution: the cost-payment
+            // one, taken when a self-exile / self-sacrifice cost wiped the counters (Lost Isle
+            // Calling), and the leaves-the-battlefield one carried on a dies/leaves trigger
+            // (Nine-Lives Familiar's "if it had a revival counter on it"). Prefer the cost snapshot
+            // and fall back to the trigger's, so either path reads the pre-departure count rather
+            // than zero.
+            is DynamicAmount.LastKnownSourceCounters -> {
+                val snapshot = context.lastKnownSourceCounters
+                    .ifEmpty { context.triggerContext?.lastKnownCounters ?: emptyMap() }
+                amount.counterType?.let { snapshot[it] ?: 0 } ?: snapshot.values.sum()
+            }
+
+            // Damage dealt to the source this turn, summed over the per-source record captured
+            // onto the ZoneChangeEvent when the permanent left the battlefield, so a dies trigger
+            // still reads it after the entity is gone. Each source is judged as it stood when it
+            // dealt the damage; "you" in the filter is the ability's controller.
+            is DynamicAmount.LastKnownDamageDealtToSource -> {
+                val sourceFilter = amount.sourceFilter
+                context.triggerContext?.lastKnownDamageSources.orEmpty().sumOf { source ->
+                    val counted = !(amount.excludeSelf && source.sourceId == context.sourceId) &&
+                        (sourceFilter == null || source.matches(sourceFilter, context.controllerId))
+                    if (counted) source.amount else 0
+                }
+            }
+
+            // The {X} this object was cast with, read off the current object regardless of zone.
+            // Reads, in order: the durable CastChoicesComponent on the battlefield permanent (and
+            // for a later activated ability); the SpellOnStackComponent while the object is still
+            // on the stack (its own resolution and a "when you cast this spell" trigger, since the
+            // trigger source is the spell entity); then the resolution context's xValue, which
+            // carries the cast X as last-known information into dies/leaves triggers (from the
+            // leave ZoneChangeEvent).
+            is DynamicAmount.CastX -> {
+                val source = context.sourceId?.let { state.getEntity(it) }
+                source?.get<CastChoicesComponent>()?.x
+                    ?: source?.get<SpellOnStackComponent>()?.xValue
+                    ?: context.xValue
+                    ?: 0
+            }
+
+            // A number frozen as the source spell was cast (CR 601.2i), read off the spell on the
+            // stack — the spell entity keeps its id across the hand→stack boundary, so the
+            // resolving effect's sourceId locates it.
+            is DynamicAmount.CapturedAtCast ->
+                context.sourceId?.let { state.getEntity(it) }
+                    ?.get<SpellOnStackComponent>()?.castTimeValues?.get(amount.captureName) ?: 0
+
+            // A numeric value locked in for a ChoiceSlot, read off the durable cast-choices bag on
+            // the source, falling back to the resolution context so an instant/sorcery that never
+            // becomes a permanent still resolves it from what was paid at cast.
+            is DynamicAmount.CastChoice -> {
+                val source = context.sourceId?.let { state.getEntity(it) }
+                val branchSnapshot = context.triggerContext
+                    ?.takeIf { it.triggeringEntityId == context.sourceId }?.selfCastAdditionalCostChoices
+                val branch = branchSnapshot?.get(amount.slot)
+                    ?: source?.get<SpellOnStackComponent>()?.additionalCostChoices?.get(amount.slot)
+                if (branchSnapshot != null && amount.slot == com.wingedsheep.sdk.scripting.ChoiceSlot.ADDITIONAL_COST_BRANCH) {
+                    branchSnapshot[amount.slot] ?: 0
+                } else if (branch != null) {
+                    branch
+                } else when (amount.slot) {
+                    com.wingedsheep.sdk.scripting.ChoiceSlot.BLIGHT_AMOUNT ->
+                        source?.blightAmountChoice() ?: context.additionalCostBlightAmount
+                    // "The number of creatures that convoked it" (CR 702.51c) — every creature
+                    // that tapped, even one that has since left; the spell's own record while it
+                    // is still on the stack.
+                    com.wingedsheep.sdk.scripting.ChoiceSlot.CONVOKED_CREATURES ->
+                        source?.entitiesChoice(amount.slot)?.entityIds?.size
+                            ?: source?.get<SpellOnStackComponent>()?.convokedCreatures?.size
+                            ?: 0
+                    // Any other numeric slot (e.g. CHOSEN_NUMBER for Shapeshifter) is read
+                    // generically off the durable cast-choices bag as a NumberChoice — or, once an
+                    // ability's source has left the battlefield, off its last-known snapshot
+                    // (CR 113.7a), never off a new object that has since returned.
+                    else -> context.lastKnownSourceSnapshot?.let { it.numberChoices[amount.slot] ?: 0 }
+                        ?: source?.numberChoice(amount.slot) ?: 0
+                }
+            }
+
+            // A resolving spell carries its own total; any other reader (the permanent's own
+            // enters trigger, a cast trigger) falls back to the source's recorded payment, the
+            // same snapshot-then-entity read as ManaOfColorSpent below. Covers generic/colorless.
+            is DynamicAmount.TotalManaSpent -> context.totalManaSpent.takeIf { it > 0 }
+                ?: context.sourceId?.let { sourceId ->
+                    context.triggerContext?.takeIf { it.triggeringEntityId == sourceId }?.selfCastManaSpent
+                        ?.let { ManaSpentReader.totalSpent(it) }
+                        ?: ManaSpentReader.totalSpent(state, sourceId)
+                } ?: 0
+
+            // Distinct colors of mana spent to cast the source (Converge / Sunburst). Read off
+            // the source entity's recorded payment via the shared reader so it resolves at ETB
+            // (EntersWithDynamicCounters) as well as mid-resolution; falls through to the context
+            // total being irrelevant — color breakdown only lives on the entity's components.
+            // ACTIVATION reads the resolving ability's own saved payment instead.
+            is DynamicAmount.DistinctColorsManaSpent -> when (amount.payment) {
+                com.wingedsheep.sdk.scripting.values.ManaPayment.CAST ->
+                    context.sourceId?.let { ManaSpentReader.distinctColorsSpent(state, it) } ?: 0
+                com.wingedsheep.sdk.scripting.values.ManaPayment.ACTIVATION ->
+                    context.manaSpent?.distinctColors ?: 0
+            }
+
+            is DynamicAmount.ManaSpentFromSubtype -> when (amount.payment) {
+                com.wingedsheep.sdk.scripting.values.ManaPayment.CAST ->
+                    context.sourceId?.let { ManaSpentReader.subtypeSpent(state, it, amount.subtype) } ?: 0
+                com.wingedsheep.sdk.scripting.values.ManaPayment.ACTIVATION ->
+                    context.manaSpent?.provenance?.bySubtype?.get(amount.subtype) ?: 0
+            }
+
+            // Same snapshot-then-entity read as SnowManaSpent: a cast trigger outlives the spell.
+            is DynamicAmount.ManaOfColorSpent -> context.sourceId?.let { sourceId ->
+                context.triggerContext?.takeIf { it.triggeringEntityId == sourceId }?.selfCastManaSpent
+                    ?.let { ManaSpentReader.colorSpent(it, amount.color) }
+                    ?: ManaSpentReader.colorSpent(state, sourceId, amount.color)
+            } ?: 0
+
+            // A cast trigger carries its own payment snapshot (it outlives the spell object);
+            // otherwise the source's stack component or cast record holds it.
+            DynamicAmount.SnowManaSpent -> context.sourceId?.let { sourceId ->
+                context.triggerContext?.takeIf { it.triggeringEntityId == sourceId }?.selfCastManaSpent?.snowSpent
+                    ?: ManaSpentReader.snowSpent(state, sourceId)
+            } ?: 0
+
+            is DynamicAmount.ManaSpentOnX -> context.manaSpentOnXByColor[amount.color] ?: 0
+
+            is DynamicAmount.YourLifeTotal -> {
+                // CR 810.9a — an individual player's life total reads the team's shared total.
+                state.lifeTotal(context.controllerId)
+            }
+
+            is DynamicAmount.LifeTotal -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val playerId = playerIds.firstOrNull() ?: return 0
+                state.lifeTotal(playerId)
+            }
+
+            is DynamicAmount.StartingLifeTotal -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val playerId = playerIds.firstOrNull() ?: return 0
+                state.getEntity(playerId)?.get<PlayerComponent>()?.startingLifeTotal ?: 20
+            }
+
+            // A player's speed, 0–4 (CR 702.179). "No speed" reads as 0 per CR 702.179f, which
+            // GameState.speed already returns, so there is no has-speed branch here. Speed is not
+            // pooled in team games, unlike life and poison.
+            is DynamicAmount.Speed -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val playerId = playerIds.firstOrNull() ?: return 0
+                state.speed(playerId)
+            }
+
+            // Dungeons completed this game (CR 309.7), optionally of one dungeon by name or once per name.
+            is DynamicAmount.DungeonsCompleted -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val playerId = playerIds.firstOrNull() ?: return 0
+                com.wingedsheep.engine.mechanics.dungeon.DungeonService.completedCount(state, playerId, amount.dungeon, amount.distinctNames)
+            }
+
+            // Total unspent mana in the player's pool (Ozai, the Phoenix King's "six or more
+            // unspent mana"). Reads the base-state ManaPoolComponent.total, which is unaffected by
+            // continuous projection.
+            is DynamicAmount.UnspentMana -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val playerId = playerIds.firstOrNull() ?: return 0
+                state.getEntity(playerId)?.get<ManaPoolComponent>()?.total ?: 0
+            }
+
+            // How many counters of a given kind a player has (poison, energy — CR 122.1, 107.14).
+            // Reads the same CountersComponent as any battlefield permanent, just keyed to the
+            // player entity, so this shares counterCountOf with EntityNumericProperty.CounterCount.
+            // A multi-player scope (EachOpponent) sums, like every other player-keyed count; it
+            // used to read only the first opponent, silently ignoring the rest in multiplayer.
+            // "An opponent has N or more" is a per-player test: GreatestAmongPlayers over You.
+            is DynamicAmount.PlayerCounterCount ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                    .sumOf { counterCountOf(state, it, amount.counterType) }
+
+            is DynamicAmount.CardsCycledThisGame ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.CardsCycledThisGameComponent>()
+                        ?.count(amount.cardName) ?: 0
+                }
+
+            is DynamicAmount.SpellsCastThisGame ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.SpellsCastThisGameComponent>()
+                        ?.count ?: 0
+                }
+
+            is DynamicAmount.ExtraTurnsBegunThisGame ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.ExtraTurnsComponent>()
+                        ?.begun ?: 0
+                }
+
+            is DynamicAmount.CommanderCastsFromCommandZone ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.findEntitiesWith<CommanderComponent>()
+                        .sumOf { (_, commander) -> if (commander.ownerId == playerId) commander.castsFromCommandZone else 0 }
+                }
+
+            // Unlocked doors among Rooms the player controls (CR 709.5). Reads per-face door
+            // state off each Room's RoomComponent — a single Room entity can contribute two
+            // doors, so this can't go through the entity-level AggregateBattlefield. Controller
+            // is read from projection so control-changing effects move a Room's doors with it.
+            is DynamicAmount.UnlockedDoors -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).toSet()
+                val projection = resolveProjection(state, projectedState)
+                val rooms = state.getBattlefield().mapNotNull { entityId ->
+                    val room = state.getEntity(entityId)?.get<RoomComponent>() ?: return@mapNotNull null
+                    if (controllerOf(state, projection, entityId) in playerIds) room else null
+                }
+                if (amount.distinctNames) {
+                    rooms.flatMapTo(mutableSetOf()) { room ->
+                        room.faces.filter { it.id in room.unlocked }.map { it.name }
+                    }.size
+                } else {
+                    rooms.sumOf { it.unlocked.size }
+                }
+            }
+
+            is DynamicAmount.VariableReference -> {
+                val name = amount.variableName
+                if (name.endsWith("_count")) {
+                    val collectionName = name.removeSuffix("_count")
+                    context.pipeline.storedCollections[collectionName]?.size ?: 0
+                } else {
+                    context.pipeline.storedNumbers[name] ?: 0
+                }
+            }
+
+            is DynamicAmount.StoredCardManaValue -> {
+                val cards = context.pipeline.storedCollections[amount.collectionName] ?: return 0
+                val cardId = cards.firstOrNull() ?: return 0
+                if (cardId in context.pipeline.storedCollections[com.wingedsheep.engine.handlers.effects.EffectDiscardDestinations.UNDEFINED + ":" + amount.collectionName].orEmpty()) return 0
+                state.getEntity(cardId)?.get<CardComponent>()?.manaValue ?: 0
+            }
+
+            is DynamicAmount.DistinctEntitiesInCollections -> {
+                amount.collections
+                    .flatMap { context.pipeline.storedCollections[it].orEmpty() }
+                    .distinct()
+                    .size
+            }
+
+            is DynamicAmount.DistinctCardTypesInCollections -> {
+                // Union the card types across every card in the named collections (read by entity
+                // id, so still correct after the cards moved to a graveyard). Mirrors the
+                // LINKED_EXILE_DISTINCT_CARD_TYPE_COUNT counting logic.
+                val cardTypes = mutableSetOf<com.wingedsheep.sdk.core.CardType>()
+                for (collectionName in amount.collections) {
+                    for (cardId in context.pipeline.storedCollections[collectionName].orEmpty()) {
+                        if (cardId in context.pipeline.storedCollections[com.wingedsheep.engine.handlers.effects.EffectDiscardDestinations.UNDEFINED + ":" + collectionName].orEmpty()) continue
+                        val card = state.getEntity(cardId)?.get<CardComponent>() ?: continue
+                        cardTypes.addAll(card.typeLine.cardTypes)
+                    }
+                }
+                cardTypes.size
+            }
+
+            is DynamicAmount.ManaValueSumOfCollection -> {
+                val cards = context.pipeline.storedCollections[amount.collectionName] ?: return 0
+                cards.sumOf { cardId ->
+                    if (cardId in context.pipeline.storedCollections[com.wingedsheep.engine.handlers.effects.EffectDiscardDestinations.UNDEFINED + ":" + amount.collectionName].orEmpty()) 0
+                    else state.getEntity(cardId)?.get<CardComponent>()?.manaValue ?: 0
+                }
+            }
+
+            // Math operations — propagate [projectedState] so a mid-projection caller's
+            // intermediate snapshot survives nested aggregates. Arithmetic is saturating
+            // (GameLimits.*Clamped): a "twice the number of X" / doubling chain must clamp at
+            // MAX_QUANTITY, never silently overflow `Int` to a negative value.
+            is DynamicAmount.Add ->
+                GameLimits.addClamped(
+                    evaluate(state, amount.left, context, projectedState),
+                    evaluate(state, amount.right, context, projectedState)
+                )
+
+            is DynamicAmount.Subtract ->
+                GameLimits.subClamped(
+                    evaluate(state, amount.left, context, projectedState),
+                    evaluate(state, amount.right, context, projectedState)
+                )
+
+            is DynamicAmount.Multiply ->
+                GameLimits.mulClamped(
+                    evaluate(state, amount.amount, context, projectedState),
+                    amount.multiplier
+                )
+
+            is DynamicAmount.Power ->
+                GameLimits.powClamped(
+                    amount.base,
+                    evaluate(state, amount.exponent, context, projectedState)
+                )
+
+            is DynamicAmount.IfPositive ->
+                max(0, evaluate(state, amount.amount, context, projectedState))
+
+            is DynamicAmount.Max ->
+                max(evaluate(state, amount.left, context, projectedState), evaluate(state, amount.right, context, projectedState))
+
+            is DynamicAmount.Min ->
+                min(evaluate(state, amount.left, context, projectedState), evaluate(state, amount.right, context, projectedState))
+
+            is DynamicAmount.ContextProperty -> evaluateContextProperty(state, amount.key, context)
+
+            // Battlefield / zone aggregates — propagate the explicit snapshot (may be null);
+            // each helper decides whether it actually needs to reach for [defaultProjection].
+            // Doing this eagerly here would touch [state.projectedState] for non-battlefield
+            // zones (e.g., GRAVEYARD `Count`), which infinitely recurses if a mid-projection
+            // caller (a `ConditionalStaticAbility` condition evaluated inside [EffectApplicator])
+            // reaches this branch through a default-constructed [ConditionEvaluator].
+            is DynamicAmount.GraveyardRelativeCount -> {
+                val id = TargetResolutionUtils.resolveTarget(amount.entity, context, state)
+                val zone = id?.let { state.logicalZone(it) }
+                if (zone?.zoneType != Zone.GRAVEYARD) 0 else {
+                    val cards = state.getZone(zone)
+                    val index = cards.indexOf(id)
+                    if (index < 0) 0 else {
+                        val predicateContext = PredicateContext.fromEffectContext(context)
+                        // Reuse the caller's intermediate projection during layer evaluation.
+                        val projection = resolveProjection(state, projectedState)
+                        cards.indices.count { i ->
+                            (if (amount.above) i > index else i < index) &&
+                                conditions.predicates.matches(state, projection, cards[i], amount.filter, predicateContext)
+                        }
+                    }
+                }
+            }
+
+            is DynamicAmount.Count ->
+                evaluateUnifiedCount(state, amount.player, amount.zone, amount.filter, context, projectedState)
+
+            is DynamicAmount.AggregateBattlefield ->
+                evaluateBattlefieldAggregate(state, amount, context, projectedState)
+
+            is DynamicAmount.AggregateZone ->
+                evaluateZoneAggregate(state, amount, context, projectedState)
+
+            // "the greatest <inner> a player controls / has" — the one aggregation whose boundary is
+            // the *player* rather than the object, so it cannot be an `Aggregation` on the two
+            // primitives above: those flatten every player's objects into one list before
+            // aggregating. Each iteration rebinds the controller so `Player.You` inside [inner]
+            // means the player being measured, exactly as `ForEachPlayerEffect` does.
+            is DynamicAmount.GreatestAmongPlayers ->
+                resolveUnifiedPlayerIds(state, amount.players, context, projectedState).maxOfOrNull { playerId ->
+                    evaluate(state, amount.inner, context.copy(controllerId = playerId), projectedState)
+                } ?: 0
+
+            // The minimum twin: "the player who controls the fewest" (Balance).
+            is DynamicAmount.LeastAmongPlayers ->
+                resolveUnifiedPlayerIds(state, amount.players, context, projectedState).minOfOrNull { playerId ->
+                    evaluate(state, amount.inner, context.copy(controllerId = playerId), projectedState)
+                } ?: 0
+
+            // The number of colors in a player's commanders' color identity (CR 903.4) — the union
+            // across a Partner / Background pair. No commander (or a registry-free evaluator, with no
+            // definitions to read identity off) reads 0: CR 903.4f's "won't do anything". A *cost*
+            // priced from it is unpayable instead — see CostAtomAmounts.
+            is DynamicAmount.CommanderColorIdentityCount -> {
+                val playerId = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).firstOrNull()
+                    ?: return 0
+                predicates.commanderColorIdentity(state, playerId)?.size ?: 0
+            }
+
+            // Devotion (CR 700.5): the number of mana symbols of the named colors among the mana
+            // costs of permanents the player controls. Hybrid ({W/U}), monocolored hybrid ({2/B}),
+            // and Phyrexian ({B/P}) symbols each count toward their color(s); a symbol matching more
+            // than one of the requested colors is still counted once. Controller is read from
+            // projection so control-changing effects are honored (700.5a). Face-down permanents have
+            // no mana cost (CR 708.2a) and contribute nothing. A permanent with ModifyDevotion
+            // (Altar of the Pantheon) adds its amount to every devotion count of its controller's —
+            // even after it loses its abilities, per the Altar's ruling.
+            is DynamicAmount.DevotionTo -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).toSet()
+                if (playerIds.isEmpty()) return 0
+                val projection = resolveProjection(state, projectedState)
+                val wanted = if (amount.ofChosenColor) amount.colors.toSet() + listOfNotNull(context.chosenColor)
+                    else amount.colors.toSet()
+                if (wanted.isEmpty()) return 0
+                state.getBattlefield().sumOf { entityId ->
+                    if (controllerOf(state, projection, entityId) !in playerIds) return@sumOf 0
+                    val entity = state.getEntity(entityId) ?: return@sumOf 0
+                    if (entity.has<FaceDownComponent>()) return@sumOf 0
+                    val bonus = entity.get<IncreasesDevotionComponent>()?.amount ?: 0
+                    val cost = entity.get<CardComponent>()?.manaCost ?: return@sumOf bonus
+                    cost.coloredSymbolCount(wanted) + bonus
+                }
+            }
+
+            is DynamicAmount.Conditional -> {
+                // Thread the caller's projection: a CDA ("*/*") is evaluated mid-projection, and a
+                // condition that reads the source's characteristics (Gaea's Liege's "is attacking")
+                // would otherwise re-enter GameState.projectedState and recurse.
+                val met = conditions.evaluate(state, amount.condition, context, projectedState)
+                if (met) evaluate(state, amount.ifTrue, context, projectedState)
+                else evaluate(state, amount.ifFalse, context, projectedState)
+            }
+
+            // "For each opponent" / "for each other player" — how many players the scope names.
+            // resolveUnifiedPlayerIds already yields only players still in the game, so a pod that
+            // has lost a player reports the live number (CR 800.4a).
+            is DynamicAmount.PlayerCount -> resolveUnifiedPlayerIds(state, amount.scope, context, projectedState).size
+
+            is DynamicAmount.CountPlayersWith -> {
+                val eval = conditions
+                val playerIds = resolveUnifiedPlayerIds(state, amount.scope, context, projectedState)
+                playerIds.count { playerId ->
+                    eval.evaluate(state, amount.condition, context.copy(controllerId = playerId))
+                }
+            }
+
+            // Composable entity property — replaces SourcePower, TargetPower, CountersOnSelf, etc.
+            is DynamicAmount.EntityProperty -> {
+                val entityId = TargetResolutionUtils.resolveEntity(amount.entity, context, state)
+                if (amount.numericProperty == EntityNumericProperty.EnlistmentsThisCombat) {
+                    val reference = when (amount.entity) {
+                        EffectTarget.Self -> if (context.objectReferences.captured) context.objectReferences.origin
+                            else entityId?.let(state::objectRef)
+                        EffectTarget.TriggeringEntity -> if (context.objectReferences.captured) context.objectReferences.triggering
+                            else context.triggerContext?.triggeringObject ?: entityId?.let(state::objectRef)
+                        EffectTarget.IterationEntity -> context.objectReferences.iteration?.let { it.objectRef }
+                            ?: if (context.objectReferences.iteration != null) null else entityId?.let(state::objectRef)
+                        else -> entityId?.let { context.lkiSnapshotFor(amount.entity, it)?.objectRef ?: state.objectRef(it) }
+                    }
+                    return if (reference == null) 0 else state.enlistmentsThisCombat.count { it == reference }
+                }
+                // Enchanted-creature power reads use last-known information when the source aura
+                // has detached: the enchanted creature (and the aura) can leave the battlefield
+                // before the ability resolves — e.g. removed in response to the aura's ETB
+                // trigger — and "deals damage equal to its power" must use the power as it last
+                // existed on the battlefield (CR 608.2h). Captured at trigger time.
+                if (amount.entity is EffectTarget.EnchantedCreature &&
+                    amount.numericProperty is EntityNumericProperty.Power &&
+                    (entityId == null || entityId !in state.getBattlefield())
+                ) {
+                    return context.triggerContext?.enchantedCreatureLastKnownPower ?: 0
+                }
+                if (entityId == null) return 0
+                val pipelineTarget = amount.entity as? EffectTarget.PipelineTarget
+                if (pipelineTarget != null && entityId in context.pipeline.storedCollections[
+                        com.wingedsheep.engine.handlers.effects.EffectDiscardDestinations.UNDEFINED + ":" + pipelineTarget.collectionName
+                    ].orEmpty()) return 0
+                // Last-known-information fallback (CR 113.7a / 603.10 / 608.2h): one rule for every
+                // reference that reads a permanent after it has left the battlefield — a
+                // self-sacrificing source, or a sacrificed / tapped / chosen cost permanent. When
+                // such a reference resolves off the battlefield, read its captured characteristics
+                // before falling through to base characteristics. [LkiPolicy.LIVE_ONLY] references
+                // (targets, Amass, …) skip this and read the live board; a loop's object
+                // ([LkiPolicy.LIVE_THEN_OWN_MOVE_LKI]) reads only the capture of this resolution's
+                // own move off the battlefield. Off the battlefield the
+                // projected P/T is null, so the final resolveNumericProperty yields base
+                // characteristics anyway — this replaces the former per-reference
+                // `useProjected = false` branches (Ghitu Fire-Eater, Heart-Piercer Manticore, …).
+                val staleSource = amount.entity == EffectTarget.Self &&
+                    if (context.objectReferences.captured) {
+                        !context.objectReferences.isCurrent(context.objectReferences.source, state)
+                    } else {
+                        context.sourceBattlefieldTimestamp != null && context.sourceBattlefieldTimestamp !=
+                            state.getEntity(entityId)?.get<BattlefieldEntryTimestampComponent>()?.timestamp
+                    }
+                val capturedSnapshot = context.lkiSnapshotFor(amount.entity, entityId)
+                val capturedObjectLeft = capturedSnapshot?.objectRef?.let { !state.isCurrentObject(it) } == true
+                val lkiPolicy = lkiPolicyFor(amount.entity)
+                // A loop's object back on the battlefield is the new object the loop is visiting
+                // (it was returned by this resolution) — read it live, never its old capture.
+                // A triggered ability that functions only off the battlefield (CR 113.6b — one an
+                // exiled card gained there, Cosima, God of the Voyage) reads its source where it
+                // is: the card's battlefield-exit snapshot describes an earlier object.
+                val sourceLiveOffBattlefield = amount.entity == EffectTarget.Self && !staleSource &&
+                    context.resolvingTriggeredAbility?.activeZones?.let { Zone.BATTLEFIELD !in it } == true
+                val readsLastKnown = when (lkiPolicy) {
+                    LkiPolicy.LIVE_ONLY -> false
+                    LkiPolicy.LIVE_THEN_LKI -> !sourceLiveOffBattlefield &&
+                        (entityId !in state.getBattlefield() || staleSource || capturedObjectLeft)
+                    LkiPolicy.LIVE_THEN_OWN_MOVE_LKI -> entityId !in state.getBattlefield()
+                }
+                if (readsLastKnown) {
+                    // A reference-specific capture (the cost-paid snapshot) wins; otherwise the
+                    // departed object's own battlefield-exit snapshot, which the entity carries until
+                    // its next zone change — Archfiend of the Dross killed with its upkeep trigger on
+                    // the stack counts the oil counters it left with (ruling 2023-02-04). A loop's
+                    // object (LIVE_THEN_OWN_MOVE_LKI) takes only the capture of this resolution's
+                    // own move: a card that left the battlefield some other time is a new object.
+                    val snapshot = capturedSnapshot
+                        ?: state.getEntity(entityId)?.get<LastKnownPermanentComponent>()?.snapshot
+                            ?.takeIf { lkiPolicy == LkiPolicy.LIVE_THEN_LKI }
+                    when (val property = amount.numericProperty) {
+                        is EntityNumericProperty.Power -> {
+                            if (snapshot?.typeLine?.isCreature == false) return 0
+                            snapshot?.power?.let { return it }
+                        }
+                        is EntityNumericProperty.Toughness -> {
+                            if (snapshot?.typeLine?.isCreature == false) return 0
+                            snapshot?.toughness?.let { return it }
+                        }
+                        is EntityNumericProperty.BasePower -> {
+                            if (snapshot?.typeLine?.isCreature == false) return 0
+                            snapshot?.basePower?.let { return it }
+                        }
+                        is EntityNumericProperty.BaseToughness -> {
+                            if (snapshot?.typeLine?.isCreature == false) return 0
+                            snapshot?.baseToughness?.let { return it }
+                        }
+                        is EntityNumericProperty.ManaValue -> snapshot?.manaValue?.let { return it }
+                        is EntityNumericProperty.TimesMutated -> snapshot?.timesMutated?.let { return it }
+                        is EntityNumericProperty.ColorCount -> snapshot?.colors?.let { return it.size }
+                        is EntityNumericProperty.CounterCount -> snapshot?.let {
+                            return property.counterType?.let { type -> it.counters[type] ?: 0 } ?: it.totalCounters
+                        }
+                        // The attachments and their controllers as the permanent last existed —
+                        // the unattached-Aura SBA has usually swept the Auras off by now (Hateful Eidolon).
+                        is EntityNumericProperty.AttachmentCount -> snapshot?.let { lki ->
+                            val controllers = attachmentControllers(state, property, context, projectedState)
+                            val subtype = attachmentKindSubtype(property.kind)
+                            return lki.attachments.count { attachment ->
+                                (controllers == null || attachment.controllerId in controllers) &&
+                                    (subtype == null || attachment.hasSubtype(subtype))
+                            }
+                        }
+                        else -> { /* fall through to base characteristics */ }
+                    }
+                }
+                resolveNumericProperty(state, entityId, amount.numericProperty, context, useProjected = true, explicitProjected = projectedState)
+            }
+
+            // Station charge amount (CR 702.184a): charge counters equal to the power of the
+            // creature tapped to pay the station cost. CR 702.184c lets a static ability change
+            // which characteristic is counted; Tapestry Warden's [GrantsStationUsingToughnessComponent]
+            // substitutes toughness when toughness > power. Reads with last-known information if the
+            // tapped creature has left the battlefield (CR 113.7a). Keeping this on its own node
+            // confines the substitution to station abilities.
+            is DynamicAmount.StationCharge -> {
+                val entityId = context.tappedPermanents.firstOrNull() ?: return 0
+                val snapshot = context.tappedEntitySnapshots.firstOrNull { it.entityId == entityId }
+                val useSnapshot = snapshot != null && entityId !in state.getBattlefield()
+                val power = if (useSnapshot) snapshot.power ?: 0
+                    else resolveNumericProperty(state, entityId, EntityNumericProperty.Power, context, useProjected = true, explicitProjected = projectedState)
+                val toughness = if (useSnapshot) snapshot.toughness ?: 0
+                    else resolveNumericProperty(state, entityId, EntityNumericProperty.Toughness, context, useProjected = true, explicitProjected = projectedState)
+                if (toughness > power &&
+                    controllerHasStationUsingToughness(state, entityId, snapshot?.controllerId)
+                ) toughness else power
+            }
+
+            is DynamicAmount.Divide -> {
+                val num = evaluate(state, amount.numerator, context, projectedState)
+                val den = evaluate(state, amount.denominator, context, projectedState)
+                if (den == 0) return 0
+                if (amount.roundUp) {
+                    (num + den - 1) / den
+                } else {
+                    num / den
+                }
+            }
+
+            is DynamicAmount.TurnTracking -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                when (amount.tracker) {
+                    TurnTracker.CREATURES_DIED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CreaturesDiedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    // Player.Each sums every seat, which is the game-wide "artifacts that were put
+                    // into graveyards from the battlefield this turn" (Anzrag's Rampage).
+                    TurnTracker.ARTIFACTS_DIED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.ArtifactsDiedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.PERMANENTS_PUT_INTO_GRAVEYARD_FROM_BATTLEFIELD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsPutIntoGraveyardFromBattlefieldThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.NONTOKEN_CREATURES_DIED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.NonTokenCreaturesDiedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.CREATURES_LEFT_BATTLEFIELD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CreatureLeftBattlefieldThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.OPPONENT_CREATURES_EXILED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.OpponentCreaturesExiledThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.OPPONENTS_WHO_LOST_LIFE -> {
+                        val controllerId = context.controllerId
+                        state.turnOrder
+                            .filter { it != controllerId }
+                            .count { opponentId ->
+                                state.getEntity(opponentId)
+                                    ?.get<com.wingedsheep.engine.state.components.player.LifeLostThisTurnComponent>() != null
+                            }
+                    }
+                    TurnTracker.DAMAGE_RECEIVED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.DamageReceivedThisTurnComponent>()
+                            ?.amount ?: 0
+                    }
+                    // Opponents who have since lost the game still count (Chandra's Incinerator
+                    // ruling): their damage history stays on their entity, so widen EachOpponent
+                    // back past the active-player filter.
+                    TurnTracker.NONCOMBAT_DAMAGE_RECEIVED -> {
+                        val players = if (amount.player is Player.EachOpponent) {
+                            val ownTeam = state.teamOf(context.controllerId).toHashSet()
+                            state.turnOrder.filter { it !in ownTeam }
+                        } else playerIds
+                        players.sumOf { playerId ->
+                            state.getEntity(playerId)
+                                ?.get<com.wingedsheep.engine.state.components.player.DamageReceivedThisTurnComponent>()
+                                ?.noncombatAmount ?: 0
+                        }
+                    }
+                    TurnTracker.DAMAGE_RECEIVED_FROM_ARTIFACTS -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.DamageReceivedFromArtifactsThisTurnComponent>()
+                            ?.amount ?: 0
+                    }
+                    // Read off the source's own damage memory, which survives its move off the
+                    // battlefield as last-known information (CR 113.7a).
+                    TurnTracker.DAMAGE_RECEIVED_FROM_SOURCE -> {
+                        val memory = context.sourceId?.let { state.getEntity(it) }
+                            ?.get<com.wingedsheep.engine.state.components.battlefield.DealtDamageToThisGameComponent>()
+                        playerIds.sumOf { playerId -> memory?.damageDealtToOnTurn(playerId, state.turnNumber) ?: 0 }
+                    }
+                    TurnTracker.LIFE_GAINED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LifeGainedAmountThisTurnComponent>()
+                            ?.amount ?: 0
+                    }
+                    TurnTracker.LIFE_LOST -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.LifeLostThisTurnComponent>() == true
+                    }
+                    TurnTracker.LIFE_LOST_AMOUNT -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LifeLostAmountThisTurnComponent>()
+                            ?.amount ?: 0
+                    }
+                    TurnTracker.LIFE_LOST_LAST_TURN -> playerIds.count { it in state.playersWhoLostLifeLastTurn }
+                    TurnTracker.PLAYER_ATTACKED -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.combat.PlayerAttackedThisTurnComponent>() == true
+                    }
+                    TurnTracker.OPPONENTS_ATTACKED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.combat.PlayerAttackedPlayersThisTurnComponent>()
+                            ?.defendingPlayerIds?.size ?: 0
+                    }
+                    TurnTracker.DEALT_COMBAT_DAMAGE -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.WasDealtCombatDamageThisTurnComponent>() == true
+                    }
+                    TurnTracker.DEALT_NONCOMBAT_DAMAGE -> playerIds.count { it in state.playersDealtNoncombatDamageThisTurn }
+                    TurnTracker.DEALT_NONCOMBAT_DAMAGE_LAST_TURN -> playerIds.count { it in state.playersDealtNoncombatDamageLastTurn }
+                    TurnTracker.PERMANENT_DEALT_EXCESS_DAMAGE ->
+                        playerIds.count { it in state.playersWithPermanentDealtExcessDamageThisTurn }
+                    TurnTracker.DEALT_COMBAT_DAMAGE_SINCE_YOUR_LAST_TURN ->
+                        playerIds.count { it in state.playersDealtCombatDamageSinceTheirLastTurn }
+                    TurnTracker.SPELLS_CAST_DURING_THEIR_LAST_TURN -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LastTurnActivityComponent>()
+                            ?.spellsCast ?: 0
+                    }
+                    TurnTracker.NONTOKEN_PERMANENTS_PUT_DURING_THEIR_LAST_TURN -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LastTurnActivityComponent>()
+                            ?.nontokenPermanentsPutOntoBattlefield ?: 0
+                    }
+                    TurnTracker.DEALT_COMBAT_DAMAGE_BY_LEGENDARY_CREATURE -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.WasDealtCombatDamageByLegendaryCreatureThisTurnComponent>() == true
+                    }
+                    TurnTracker.COUNTERS_PUT_ON_CREATURE -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.PutCounterOnCreatureThisTurnComponent>() == true
+                    }
+                    TurnTracker.LANDS_PLAYED -> playerIds.sumOf { playerId ->
+                        val landDrops = state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LandDropsComponent>()
+                            ?: return@sumOf 0
+                        landDrops.playedThisTurn
+                    }
+                    TurnTracker.LANDS_ENTERED_UNDER_CONTROL -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                            ?.countOfType(com.wingedsheep.sdk.core.CardType.LAND) ?: 0
+                    }
+                    TurnTracker.NONLAND_PERMANENTS_ENTERED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                            ?.countNonland() ?: 0
+                    }
+                    TurnTracker.CREATURES_ENTERED_UNDER_CONTROL -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                            ?.countOfType(com.wingedsheep.sdk.core.CardType.CREATURE) ?: 0
+                    }
+                    TurnTracker.NONTOKEN_CREATURES_ENTERED_UNDER_CONTROL -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                            ?.entries?.count { !it.isToken && com.wingedsheep.sdk.core.CardType.CREATURE in it.cardTypes } ?: 0
+                    }
+                    TurnTracker.TOKENS_CREATED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                            ?.countTokens() ?: 0
+                    }
+                    TurnTracker.FOOD_SACRIFICED -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.SacrificedFoodThisTurnComponent>() == true
+                    }
+                    TurnTracker.SCRIED_OR_SURVEILED -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.ScriedOrSurveiledThisTurnComponent>() == true
+                    }
+                    TurnTracker.SURVEILED -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.SurveiledThisTurnComponent>() == true
+                    }
+                    TurnTracker.ARTIFACT_SACRIFICED -> playerIds.count { playerId ->
+                        state.getEntity(playerId)
+                            ?.has<com.wingedsheep.engine.state.components.player.SacrificedArtifactThisTurnComponent>() == true
+                    }
+                    TurnTracker.CARDS_LEFT_GRAVEYARD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsLeftGraveyardThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.PERMANENTS_PUT_INTO_HAND_FROM_BATTLEFIELD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsPutIntoHandFromBattlefieldThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.DESCENDED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PlayerDescendedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.CREATURE_CARDS_PUT_INTO_GRAVEYARD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CreatureCardsPutIntoGraveyardThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.CARDS_PUT_INTO_GRAVEYARD_FROM_LIBRARY -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsPutIntoGraveyardByOriginThisTurnComponent>()
+                            ?.count(Zone.LIBRARY) ?: 0
+                    }
+                    TurnTracker.CARDS_PUT_INTO_GRAVEYARD_FROM_HAND -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsPutIntoGraveyardByOriginThisTurnComponent>()
+                            ?.count(Zone.HAND) ?: 0
+                    }
+                    TurnTracker.CARDS_PUT_INTO_GRAVEYARD -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsPutIntoGraveyardThisTurnComponent>()
+                            ?.cardIds?.size ?: 0
+                    }
+                    TurnTracker.CARDS_DRAWN -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsDrawnThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    // A snapshot, written for every player in the untap step. Missing only before
+                    // the game's first untap step has run, where a live hand read is the same
+                    // answer — no card can have moved yet.
+                    TurnTracker.CARDS_IN_HAND_AT_TURN_START -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsInHandAtTurnStartComponent>()
+                            ?.count
+                            ?: state.getZone(
+                                com.wingedsheep.engine.state.ZoneKey(playerId, Zone.HAND)
+                            ).size
+                    }
+                    // Same untap-step snapshot. Before the first untap step every land is still
+                    // untapped where it entered, so a live count is the same answer.
+                    TurnTracker.UNTAPPED_LANDS_AT_TURN_START -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.UntappedLandsAtTurnStartComponent>()
+                            ?.count
+                            ?: state.controlledBattlefield(playerId).count { id ->
+                                state.projectedState.hasType(id, "LAND") &&
+                                    state.getEntity(id)?.has<com.wingedsheep.engine.state.components.battlefield.TappedComponent>() != true
+                            }
+                    }
+                    TurnTracker.CARDS_DISCARDED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsDiscardedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.CARDS_PUT_INTO_EXILE -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.CardsPutIntoExileThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.PERMANENTS_SACRIFICED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsSacrificedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.NONTOKEN_PERMANENTS_SACRIFICED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PermanentsSacrificedThisTurnComponent>()
+                            ?.nontokenCount ?: 0
+                    }
+                    TurnTracker.RED_NONCOMBAT_DAMAGE_DEALT -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.RedNoncombatDamageDealtThisTurnComponent>()
+                            ?.amount ?: 0
+                    }
+                    // Distinct source objects, so a multi-player scope unions rather than sums —
+                    // the same object can't be controlled by two players at once, but summing set
+                    // sizes across players is the same number either way.
+                    TurnTracker.DAMAGE_SOURCES -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.DamageSourcesThisTurnComponent>()
+                            ?.sources?.size ?: 0
+                    }
+                    TurnTracker.DISTINCT_BENDS -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.BendsThisTurnComponent>()
+                            ?.types?.size ?: 0
+                    }
+                    TurnTracker.LOYALTY_ABILITIES_ACTIVATED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.LoyaltyAbilitiesActivatedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.DILEMMAS_FACED -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.DilemmasFacedThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                    TurnTracker.ENERGY_PAID_OR_LOST -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<PlayerCountersRemovedThisTurnComponent>()
+                            ?.count(CounterType.ENERGY) ?: 0
+                    }
+                    TurnTracker.PLUS_ONE_COUNTERS_PUT_ON_YOUR_CREATURES -> playerIds.sumOf { playerId ->
+                        state.getEntity(playerId)
+                            ?.get<com.wingedsheep.engine.state.components.player.PlusOneCountersPutOnYourCreaturesThisTurnComponent>()
+                            ?.count ?: 0
+                    }
+                }
+            }
+
+            is DynamicAmount.SpellsCastThisTurn -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                // excludeSelf drops the resolving spell's own record, matched by the spell's
+                // stack entity id (CastSpellRecord.sourceEntityId == context.sourceId).
+                val selfId = if (amount.excludeSelf) context.sourceId else null
+                // Same reason as the condition form: a cast-history filter may name a value
+                // captured into the pipeline earlier in this resolution.
+                val predicateContext = PredicateContext.fromEffectContext(context)
+                fun matches(record: com.wingedsheep.engine.state.CastSpellRecord) =
+                    (selfId == null || record.sourceEntityId != selfId) &&
+                        // Zone qualifier is checked independently of the filter (see condition note).
+                        (amount.fromZone == null || record.castFromZone == amount.fromZone) &&
+                        predicateEvaluator.matchesFilter(record, amount.filter, predicateContext)
+                // beforeTriggeringSpell truncates each player's history at the triggering spell's own
+                // cast record ("each other spell you've cast BEFORE IT this turn"), so neither the
+                // triggering spell nor anything cast in response to the trigger is counted. A history
+                // with no record for the triggering spell contributes nothing.
+                fun history(playerId: EntityId): List<com.wingedsheep.engine.state.CastSpellRecord> {
+                    val records = state.spellsCastThisTurnByPlayer[playerId] ?: emptyList()
+                    if (!amount.beforeTriggeringSpell) return records
+                    val boundary = records.indexOfFirst { it.sourceEntityId == context.triggeringEntityId }
+                    return if (boundary < 0) emptyList() else records.subList(0, boundary)
+                }
+                if (amount.countDistinctCardTypes) {
+                    // "for each card type among spells you've cast this turn" — union the card types
+                    // across every matching record (an artifact creature spell counts for both).
+                    playerIds
+                        .flatMap { history(it) }
+                        .filter { matches(it) }
+                        .flatMap { it.typeLine.cardTypes }
+                        .toSet()
+                        .size
+                } else {
+                    playerIds.sumOf { playerId -> history(playerId).count { matches(it) } }
+                }
+            }
+
+            DynamicAmount.SpellsCastLastTurn ->
+                state.previousTurnActiveTeamSpellCounts.values.sum()
+
+            is DynamicAmount.CraftedMaterialsTotalPower -> {
+                val sourceId = context.sourceId
+                if (sourceId == null) 0 else {
+                    val materials = state.getEntity(sourceId)
+                        ?.get<com.wingedsheep.engine.state.components.battlefield.CraftedFromExiledComponent>()
+                    if (materials == null) 0 else {
+                        var total = 0
+                        for (exiledId in materials.exiledIds) {
+                            total += offBattlefieldStat(state, exiledId, isPower = true, projectedState) ?: 0
+                        }
+                        total
+                    }
+                }
+            }
+
+            is DynamicAmount.CraftedMaterialsTotalManaValue -> {
+                val sourceId = context.sourceId
+                if (sourceId == null) 0 else {
+                    state.getEntity(sourceId)
+                        ?.get<com.wingedsheep.engine.state.components.battlefield.CraftedFromExiledComponent>()
+                        ?.exiledIds
+                        ?.sumOf { exiledId -> state.getEntity(exiledId)?.get<CardComponent>()?.manaValue ?: 0 }
+                        ?: 0
+                }
+            }
+
+            is DynamicAmount.CraftedMaterialsColorCount -> {
+                val sourceId = context.sourceId
+                if (sourceId == null) 0 else {
+                    state.getEntity(sourceId)
+                        ?.get<com.wingedsheep.engine.state.components.battlefield.CraftedFromExiledComponent>()
+                        ?.exiledIds
+                        ?.flatMap { exiledId -> resolveProjection(state, projectedState).colorSetOf(exiledId) }
+                        ?.toSet()?.size
+                        ?: 0
+                }
+            }
+
+            is DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn -> {
+                val sourceId = context.sourceId
+                if (sourceId == null) 0 else {
+                    state.getEntity(sourceId)
+                        ?.get<com.wingedsheep.engine.state.components.battlefield.CrewSaddleContributorsComponent>()
+                        ?.creatureIds?.size ?: 0
+                }
+            }
+
+            is DynamicAmount.CardTypeEnteredUnderControlThisTurn ->
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                        ?.countOfType(amount.cardType) ?: 0
+                }
+
+            is DynamicAmount.SubtypeEnteredUnderControlThisTurn -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState)
+                val wanted = amount.subtypes.map { it.value }
+                val excludeId = if (amount.excludeTriggeringEntity) context.triggeringEntityId else null
+                // "Another" drops only the source's current object: an earlier entry under the
+                // same id, before it left and returned, was a different object (CR 400.7). A
+                // source that has since left keeps no timestamp, so all of its entries drop.
+                val sourceId = if (amount.excludeSource) context.sourceId else null
+                val sourceTimestamp = sourceId?.let {
+                    state.getEntity(it)?.get<BattlefieldEntryTimestampComponent>()?.timestamp
+                }
+                fun isSource(rec: com.wingedsheep.engine.state.components.player.EnteredPermanentRecord) =
+                    rec.entityId == sourceId &&
+                        (sourceTimestamp == null || rec.entryTimestamp == null || rec.entryTimestamp == sourceTimestamp)
+                playerIds.sumOf { playerId ->
+                    val entries = state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.PermanentsEnteredUnderControlThisTurnComponent>()
+                        ?.entries
+                        ?: emptyList()
+                    // Any-of over the wanted subtypes, counted per *entry* — an entry carrying two
+                    // of them ("Mounts and/or Vehicles") still contributes 1.
+                    entries.count { rec ->
+                        rec.entityId != excludeId && !isSource(rec) &&
+                            rec.subtypes.any { have -> wanted.any { have.equals(it, ignoreCase = true) } }
+                    }
+                }
+            }
+
+            // One record per death, holding that creature's last-known (projected) subtypes — so a
+            // creature that was a Zubera only through a continuous effect still counts.
+            is DynamicAmount.CreaturesWithSubtypeDiedThisTurn -> {
+                val wanted = amount.subtype.value
+                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
+                    state.getEntity(playerId)
+                        ?.get<com.wingedsheep.engine.state.components.player.CreatureDeathsThisTurnComponent>()
+                        ?.deaths
+                        ?.count { died -> died.subtypes.any { it.equals(wanted, ignoreCase = true) } }
+                        ?: 0
+                }
+            }
+
+            is DynamicAmount.PermanentsSacrificedThisWay -> context.sacrificedPermanents.size
+            is DynamicAmount.CountersRemovedAsCost -> context.countersRemovedAsCost
+
+            // "Their total power" over the same snapshots — last-known power as each permanent was
+            // sacrificed (Rule 608.2h), because they are all in the graveyard by the time a later
+            // sibling effect asks. A snapshot with no power at all (a sacrificed noncreature) adds
+            // nothing rather than being an error: "sacrifice any number of other creatures" is the
+            // only shape that reaches here today, but the amount is defined over permanents.
+            is DynamicAmount.TotalPowerSacrificedThisWay ->
+                context.sacrificedPermanents.sumOf { it.power ?: 0 }
+
+            // "The greatest number of creatures you control that have a creature type in common"
+            // (White Lotus Tile). For every creature type present among the player's creatures,
+            // tally how many of those creatures have it, then take the max. A creature with several
+            // creature types feeds each of its tribes (a Bird Soldier adds to both the Bird and the
+            // Soldier tally); a Changeling — projected to ALL_CREATURE_TYPES (StateProjector) — feeds
+            // every tribe. Reads projected subtypes so type-changing effects and Changeling are
+            // honored (CLAUDE.md battlefield-projection rule), restricting to actual creature types so
+            // artifact/land subtypes can't inflate the count. Zero when no creature shares a type.
+            is DynamicAmount.LargestSharedCreatureTypeCount -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).toSet()
+                if (playerIds.isEmpty()) return 0
+                val projection = resolveProjection(state, projectedState)
+                val tally = HashMap<String, Int>()
+                for (entityId in state.getBattlefield()) {
+                    if (controllerOf(state, projection, entityId) !in playerIds) continue
+                    if (!projection.isCreature(entityId)) continue
+                    val subtypes = projection.getSubtypes(entityId).ifEmpty {
+                        state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.subtypes
+                            ?.map { it.value }?.toSet() ?: emptySet()
+                    }
+                    for (subtype in subtypes) {
+                        if (subtype in CREATURE_TYPE_NAMES) {
+                            tally[subtype] = (tally[subtype] ?: 0) + 1
+                        }
+                    }
+                }
+                tally.values.maxOrNull() ?: 0
+            }
+
+            // CR 700.8: one Cleric, one Rogue, one Warrior and one Wizard at most. Each creature is
+            // reduced to the bitmask of party roles it can fill (projected subtypes, so Changeling
+            // and type-changing effects count); CR 700.8b's "count it the way that gives the highest
+            // result" is then a maximum matching of roles to creatures, found by trying each role
+            // against each mask class still available — at most 4 roles over 15 classes.
+            is DynamicAmount.PartySize -> {
+                val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).toSet()
+                if (playerIds.isEmpty()) return 0
+                val projection = resolveProjection(state, projectedState)
+                val creaturesPerMask = IntArray(16)
+                for (entityId in state.getBattlefield()) {
+                    if (controllerOf(state, projection, entityId) !in playerIds) continue
+                    if (!projection.isCreature(entityId)) continue
+                    val subtypes = projection.getSubtypes(entityId).ifEmpty {
+                        state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.subtypes
+                            ?.map { it.value }?.toSet() ?: emptySet()
+                    }
+                    var mask = 0
+                    PARTY_ROLES.forEachIndexed { bit, role -> if (role in subtypes) mask = mask or (1 shl bit) }
+                    if (mask != 0 && creaturesPerMask[mask] < PARTY_ROLES.size) creaturesPerMask[mask]++
+                }
+                largestParty(0, creaturesPerMask)
+            }
+
+        }
+    }
+
+    // =========================================================================
+    // Context Property Evaluation
+    // =========================================================================
+
+    /**
+     * Resolve a [ContextPropertyKey] against the current resolution [context].
+     *
+     * The trigger amount keys (damage / life-gained / life-lost) all read the same
+     * `TriggerContext.damageAmount` field — `LifeChangedEvent` populates it with the absolute
+     * amount of life moved, regardless of direction.
+     */
+    private fun evaluateContextProperty(
+        state: GameState,
+        key: ContextPropertyKey,
+        context: EffectContext
+    ): Int = when (key) {
+        ContextPropertyKey.TRIGGER_DAMAGE_AMOUNT,
+        ContextPropertyKey.PREVENTED_DAMAGE_AMOUNT,
+        ContextPropertyKey.TRIGGER_LIFE_GAINED,
+        ContextPropertyKey.TRIGGER_LIFE_LOST -> context.triggerContext?.damageAmount ?: 0
+
+        ContextPropertyKey.LAST_KNOWN_PLUS_ONE_COUNTER_COUNT,
+        ContextPropertyKey.TRIGGER_COUNTERS_PLACED_AMOUNT -> context.triggerContext?.counterCount ?: 0
+        ContextPropertyKey.TRIGGER_COUNTERS_REMOVED_AMOUNT -> context.triggerContext?.counterCount ?: 0
+        ContextPropertyKey.LAST_KNOWN_TOTAL_COUNTER_COUNT -> context.triggerContext?.totalCounterCount ?: 0
+
+        ContextPropertyKey.ADDITIONAL_COST_EXILED_COUNT -> context.exiledCardCount
+
+        ContextPropertyKey.TARGET_COUNT -> context.targets.size
+
+        // The summing sibling of TARGET_COUNT, over the same list. A cost carrying this key is
+        // priced before resolution by CostAtomAmounts instead — both read the announced targets,
+        // so the two paths agree by construction.
+        ContextPropertyKey.TARGETS_TOTAL_MANA_VALUE ->
+            com.wingedsheep.engine.handlers.costs.CostAtomAmounts
+                .totalManaValueOf(state, context.targets)
+
+        ContextPropertyKey.MODES_CHOSEN_ON_TRIGGERING_SPELL -> context.triggerContext?.modesChosenCount ?: 0
+
+        ContextPropertyKey.MANA_SPENT_ON_TRIGGERING_SPELL -> context.triggerContext?.manaSpentOnTriggeringSpell ?: 0
+
+        ContextPropertyKey.COLORS_SPENT_ON_TRIGGERING_SPELL -> context.triggerContext?.colorsSpentOnTriggeringSpell ?: 0
+
+        ContextPropertyKey.TRIGGERING_SPELL_MANA_VALUE -> context.triggerContext?.manaValueOfTriggeringSpell ?: 0
+
+        ContextPropertyKey.X_VALUE_OF_TRIGGERING_SPELL -> context.triggerContext?.xValueOfTriggeringSpell ?: 0
+
+        ContextPropertyKey.TRIGGER_DIE_RESULT -> context.triggerContext?.dieResult ?: 0
+        ContextPropertyKey.TRIGGER_HIGHEST_DIE_RESULT -> context.triggerContext?.dieResults?.maxOrNull() ?: 0
+        ContextPropertyKey.TRIGGER_SCRY_COUNT -> context.triggerContext?.scryCount ?: 0
+
+        ContextPropertyKey.TRIGGER_SCRY_BOTTOM_COUNT -> context.triggerContext?.scryBottomCount ?: 0
+
+        ContextPropertyKey.TRIGGER_DISCARD_COUNT -> context.triggerContext?.discardedCardCount ?: 0
+
+        ContextPropertyKey.TRIGGER_DISCOVER_VALUE -> context.triggerContext?.discoverValue ?: 0
+
+        ContextPropertyKey.TRIGGER_MANA_PRODUCED -> context.triggerContext?.manaProduced ?: 0
+
+        ContextPropertyKey.TRIGGER_EXCESS_DAMAGE_AMOUNT -> context.triggerContext?.excessDamageAmount ?: 0
+
+        ContextPropertyKey.TRIGGER_RECIPIENT_TOUGHNESS -> context.triggerContext?.recipientToughnessAtDamage ?: 0
+
+        ContextPropertyKey.DIED_BATCH_TOTAL_POWER -> context.triggerContext?.diedBatchTotalPower ?: 0
+
+        ContextPropertyKey.LINKED_EXILE_CARD_COUNT -> {
+            val sourceId = context.sourceId
+            if (sourceId == null) 0 else state.getEntity(sourceId)
+                ?.get<com.wingedsheep.engine.state.components.battlefield.LinkedExileComponent>()
+                ?.exiledIds?.size ?: 0
+        }
+
+        ContextPropertyKey.LINKED_EXILE_DISTINCT_CARD_TYPE_COUNT -> {
+            val sourceId = context.sourceId
+            if (sourceId == null) 0 else {
+                val linkedExile = state.getEntity(sourceId)
+                    ?.get<com.wingedsheep.engine.state.components.battlefield.LinkedExileComponent>()
+                if (linkedExile == null) 0 else {
+                    val cardTypes = mutableSetOf<com.wingedsheep.sdk.core.CardType>()
+                    for (exiledId in linkedExile.exiledIds) {
+                        val card = state.getEntity(exiledId)?.get<CardComponent>() ?: continue
+                        cardTypes.addAll(card.typeLine.cardTypes)
+                    }
+                    cardTypes.size
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Unified Filter Evaluation
+    // =========================================================================
+
+    /** The predicate evaluator [conditions] is built over. */
+    val predicates: PredicateEvaluator get() = conditions.predicates
+    private val predicateEvaluator get() = predicates
+
+    private fun controllerOf(state: GameState, projection: ProjectedState, entityId: EntityId): EntityId? =
+        projection.getController(entityId)
+            ?: state.getEntity(entityId)?.get<ControllerComponent>()?.playerId
+
+    private fun evaluateUnifiedCount(
+        state: GameState,
+        player: Player,
+        zone: Zone,
+        filter: GameObjectFilter,
+        context: EffectContext,
+        explicitProjection: ProjectedState?
+    ): Int {
+        val playerIds = resolveUnifiedPlayerIds(state, player, context, explicitProjection)
+        val zoneType = resolveUnifiedZone(zone)
+        val predicateContext = PredicateContext.fromEffectContext(context)
+
+        // Projection only matters for battlefield reads (type/subtype/color/keyword/P/T mutated
+        // by continuous effects). Non-battlefield zones use base CardComponent via an empty
+        // projection — and crucially do *not* reach for [defaultProjection], which during a
+        // mid-projection caller would re-enter the lazy `state.projectedState` initializer.
+        val projection: ProjectedState = if (zoneType == Zone.BATTLEFIELD) {
+            resolveProjection(state, explicitProjection)
+        } else {
+            explicitProjection ?: ProjectedState(state, emptyMap())
+        }
+
+        return playerIds.sumOf { playerId ->
+            val entities = if (zoneType == Zone.BATTLEFIELD) {
+                state.getBattlefield().filter { controllerOf(state, projection, it) == playerId }
+            } else {
+                state.getZone(ZoneKey(playerId, zoneType))
+            }
+            entities.count { predicateEvaluator.matches(state, projection, it, filter, predicateContext) }
+        }
+    }
+
+    /**
+     * Evaluate an AggregateBattlefield: collect → filter → map → aggregate.
+     */
+    private fun evaluateBattlefieldAggregate(
+        state: GameState,
+        amount: DynamicAmount.AggregateBattlefield,
+        context: EffectContext,
+        explicitProjection: ProjectedState?
+    ): Int {
+        val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, explicitProjection)
+        val predicateContext = PredicateContext.fromEffectContext(context)
+        val projection = resolveProjection(state, explicitProjection)
+
+        // "Self" is the affected entity when this aggregate is evaluated for a granted effect
+        // (e.g. an Aura's "for each OTHER creature that shares a type with the enchanted creature":
+        // self is the enchanted creature, not the Aura source). For a creature's own CDA there is
+        // no affected entity, so it falls back to the source — the creature itself.
+        val selfId = context.affectedEntityId ?: context.sourceId
+        // "…if you control at least five other Forests" after "Whenever a Forest you control
+        // enters" — "other" is relative to the permanent that triggered the ability.
+        val triggeringId = if (amount.excludeTriggeringEntity) context.triggeringEntityId else null
+
+        val matchingEntities = playerIds.flatMap { playerId ->
+            state.getBattlefield()
+                .filter { entityId ->
+                    // Exclude self if requested (e.g., "other creatures you control")
+                    if (amount.excludeSelf && entityId == selfId) return@filter false
+                    if (triggeringId != null && entityId == triggeringId) return@filter false
+                    controllerOf(state, projection, entityId) == playerId
+                }
+                .filter { entityId ->
+                    predicateEvaluator.matches(state, projection, entityId, amount.filter, predicateContext)
+                }
+        }
+
+        // When a counter kind is named, the per-entity value is its count of that counter
+        // (physically stored on the permanent, layer-independent), enabling "the total <kind>
+        // counters among <filter> you control" (Tom Bombadil).
+        val counterFilter = amount.counterType
+        return when (amount.aggregation) {
+            Aggregation.COUNT -> matchingEntities.size
+            Aggregation.MAX -> {
+                if (counterFilter != null) return matchingEntities.maxOfOrNull { counterCountOf(state, it, counterFilter) } ?: 0
+                val prop = amount.property ?: return 0
+                matchingEntities.maxOfOrNull { resolveCardNumericProperty(state, projection, it, prop) } ?: 0
+            }
+            Aggregation.MIN -> {
+                if (counterFilter != null) return matchingEntities.minOfOrNull { counterCountOf(state, it, counterFilter) } ?: 0
+                val prop = amount.property ?: return 0
+                matchingEntities.minOfOrNull { resolveCardNumericProperty(state, projection, it, prop) } ?: 0
+            }
+            Aggregation.SUM -> {
+                if (counterFilter != null) return matchingEntities.sumOf { counterCountOf(state, it, counterFilter) }
+                val prop = amount.property ?: return 0
+                matchingEntities.sumOf { resolveCardNumericProperty(state, projection, it, prop) }
+            }
+            // "Number of card types" (CR 205.2a) — count only true card types
+            // (Artifact, Creature, Enchantment, …), never supertypes or subtypes.
+            // [ProjectedState.getTypes] folds supertypes + subtypes into one set, so intersect
+            // with the known [CardType] names; this still respects projection-changed types
+            // (e.g. an animated land that became a Creature).
+            Aggregation.DISTINCT_TYPES -> matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                projection.getTypes(entityId).filterTo(mutableSetOf()) { it in CARD_TYPE_NAMES }.ifEmpty {
+                    state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.cardTypes?.map { it.name }?.toSet()
+                        ?: emptySet()
+                }
+            }.size
+            // Like DISTINCT_TYPES but restricted to permanent card types (CR 110.4), so a projection-
+            // changed type still counts (an animated land that became a Creature).
+            Aggregation.DISTINCT_PERMANENT_TYPES -> matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                projection.getTypes(entityId).filterTo(mutableSetOf()) { it in PERMANENT_TYPE_NAMES }.ifEmpty {
+                    state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.cardTypes
+                        ?.filter { it.isPermanent }?.map { it.name }?.toSet()
+                        ?: emptySet()
+                }
+            }.size
+            Aggregation.DISTINCT_COLORS -> matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                projectedOrPrintedColors(state, projection, entityId)
+            }.size
+            // "Different color pairs among <group> that are exactly two colors" (Niv-Mizzet,
+            // Guildpact). Only an entity whose *projected* colour set is exactly two contributes,
+            // and it contributes one unordered pair; the same pair on several permanents counts
+            // once. Bounded by the ten pairs of CR 105.2c.
+            Aggregation.DISTINCT_COLOR_PAIRS -> matchingEntities.mapNotNullTo(mutableSetOf()) { entityId ->
+                val colors = projectedOrPrintedColors(state, projection, entityId)
+                if (colors.size == 2) colors.sorted().joinToString("/") else null
+            }.size
+            Aggregation.DISTINCT_NAMES -> matchingEntities.mapNotNullTo(mutableSetOf()) { entityId ->
+                state.getEntity(entityId)?.get<CardComponent>()?.name
+            }.size
+            // A projected entry with no subtypes means an effect erased them (Ultima, Origin of Oblivion's
+            // blight), so it counts nothing; only an unprojected entity reads base.
+            Aggregation.DISTINCT_BASIC_LAND_SUBTYPES -> matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                (projection.getProjectedValues(entityId)?.subtypes
+                    ?: state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.subtypes?.map { it.value }?.toSet()
+                    ?: emptySet()
+                ).intersect(BASIC_LAND_SUBTYPES)
+            }.size
+            // CR 205.3j — only a planeswalker contributes, and a planeswalker that is also a
+            // creature carries creature types too (CR 205.3d), which are not planeswalker types.
+            Aggregation.DISTINCT_PLANESWALKER_SUBTYPES -> matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                val card = state.getEntity(entityId)?.get<CardComponent>()
+                val isPlaneswalker = projection.getTypes(entityId).takeIf { it.isNotEmpty() }
+                    ?.contains("PLANESWALKER")
+                    ?: (card?.typeLine?.cardTypes?.contains(com.wingedsheep.sdk.core.CardType.PLANESWALKER) == true)
+                if (!isPlaneswalker) return@flatMapTo emptySet()
+                (projection.getProjectedValues(entityId)?.subtypes
+                    ?: card?.typeLine?.subtypes?.map { it.value }?.toSet()
+                    ?: emptySet()
+                ).filterNotTo(mutableSetOf()) { it in CREATURE_TYPE_NAMES }
+            }.size
+            // CR 205.3m — creature types only. Projected subtypes already carry a changeling's
+            // every creature type and any layer-4 change; a projected entry with no subtypes means an
+            // effect erased them, so only an unprojected entity reads base.
+            Aggregation.DISTINCT_CREATURE_TYPES -> matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                (projection.getProjectedValues(entityId)?.subtypes
+                    ?: baseCreatureTypes(state, entityId)
+                ).filterTo(mutableSetOf()) { it in CREATURE_TYPE_NAMES }
+            }.size
+            // Counters are physically stored on the permanent (base state, not layered), so read
+            // CountersComponent directly. The map only holds kinds with a positive count
+            // (CountersComponent.withRemoved drops the key at zero), so every key is a present kind.
+            Aggregation.DISTINCT_COUNTER_TYPES -> matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                state.getEntity(entityId)?.get<CountersComponent>()?.counters?.keys ?: emptySet()
+            }.size
+            Aggregation.DISTINCT_VALUES -> {
+                val prop = amount.property ?: return 0
+                matchingEntities.mapTo(mutableSetOf()) {
+                    resolveCardNumericProperty(state, projection, it, prop)
+                }.size
+            }
+            Aggregation.DISTINCT_MANA_COSTS -> distinctManaCostCount(state, matchingEntities)
+            // "<N> or more <group> with the same name as one another" (Mechanized Production):
+            // bucket by name and take the biggest bucket. The projected name wins where a
+            // name-changing effect set one, as in the Yenna name predicate. A face-down permanent
+            // has no name (CR 708.2a), so it shares one with nothing.
+            Aggregation.LARGEST_SAME_NAME_GROUP -> matchingEntities.mapNotNull { entityId ->
+                if (state.getEntity(entityId)?.has<FaceDownComponent>() == true) return@mapNotNull null
+                projection.getName(entityId) ?: state.getEntity(entityId)?.get<CardComponent>()?.name
+            }.groupingBy { it }.eachCount().values.maxOrNull() ?: 0
+        }
+    }
+
+    /**
+     * Evaluate an AggregateZone: collect cards from a non-battlefield zone → filter → map → aggregate.
+     */
+    private fun evaluateZoneAggregate(
+        state: GameState,
+        amount: DynamicAmount.AggregateZone,
+        context: EffectContext,
+        explicitProjection: ProjectedState?
+    ): Int {
+        val playerIds = resolveUnifiedPlayerIds(state, amount.player, context, explicitProjection)
+        val predicateContext = PredicateContext.fromEffectContext(context)
+
+        // Non-battlefield zone: avoid reaching for [defaultProjection] entirely. The predicate
+        // evaluator falls back to base CardComponent for entries missing from the projection.
+        val projection: ProjectedState = explicitProjection ?: ProjectedState(state, emptyMap())
+        val matchingEntities = playerIds.flatMap { playerId ->
+            state.getZone(ZoneKey(playerId, amount.zone))
+                .filter { entityId ->
+                    predicateEvaluator.matches(state, projection, entityId, amount.filter, predicateContext)
+                }
+        }
+
+        // Aggregate
+        return when (amount.aggregation) {
+            Aggregation.COUNT -> matchingEntities.size
+            Aggregation.MAX -> {
+                val prop = amount.property ?: return 0
+                matchingEntities.maxOfOrNull { resolveCardNumericProperty(state, null, it, prop) } ?: 0
+            }
+            Aggregation.MIN -> {
+                val prop = amount.property ?: return 0
+                matchingEntities.minOfOrNull { resolveCardNumericProperty(state, null, it, prop) } ?: 0
+            }
+            Aggregation.SUM -> {
+                val prop = amount.property ?: return 0
+                matchingEntities.sumOf { resolveCardNumericProperty(state, null, it, prop) }
+            }
+            Aggregation.DISTINCT_TYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                    state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.cardTypes?.map { it.name }?.toSet()
+                        ?: emptySet()
+                }.size
+            }
+            // Permanent card types only (CR 110.4) — kindred/instant/sorcery never count. This is
+            // Matzalantli, the Great Door's "N or more permanent types among cards in your graveyard".
+            Aggregation.DISTINCT_PERMANENT_TYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                    state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.cardTypes
+                        ?.filter { it.isPermanent }?.map { it.name }?.toSet()
+                        ?: emptySet()
+                }.size
+            }
+            Aggregation.DISTINCT_COLORS -> {
+                // Through [resolveProjection], never `state.projectedState` directly: a CDA reading
+                // this mid-projection must not re-enter the projection's own lazy initializer.
+                val colors = resolveProjection(state, explicitProjection)
+                matchingEntities.flatMapTo(mutableSetOf()) { entityId -> colors.colorsOf(entityId) }.size
+            }
+            // Zone counterpart of the battlefield branch: cards outside the battlefield have no
+            // projection entry, so their printed colours (or an off-battlefield SetColors') count.
+            Aggregation.DISTINCT_COLOR_PAIRS -> {
+                val projected = resolveProjection(state, explicitProjection)
+                matchingEntities.mapNotNullTo(mutableSetOf()) { entityId ->
+                    val colors = projected.colorsOf(entityId)
+                    if (colors.size == 2) colors.sorted().joinToString("/") else null
+                }.size
+            }
+            Aggregation.DISTINCT_NAMES -> {
+                matchingEntities.mapNotNullTo(mutableSetOf()) { entityId ->
+                    state.getEntity(entityId)?.get<CardComponent>()?.name
+                }.size
+            }
+            Aggregation.DISTINCT_BASIC_LAND_SUBTYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                    val subtypes: Set<String> = state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.subtypes?.map { it.value }?.toSet()
+                        ?: emptySet()
+                    subtypes.intersect(BASIC_LAND_SUBTYPES)
+                }.size
+            }
+            Aggregation.DISTINCT_PLANESWALKER_SUBTYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                    val typeLine = state.getEntity(entityId)?.get<CardComponent>()?.typeLine
+                    if (typeLine == null || com.wingedsheep.sdk.core.CardType.PLANESWALKER !in typeLine.cardTypes) {
+                        emptySet()
+                    } else {
+                        typeLine.subtypes.map { it.value }.filterNotTo(mutableSetOf()) { it in CREATURE_TYPE_NAMES }
+                    }
+                }.size
+            }
+            // Off the battlefield there is no projection: printed subtypes, and a changeling card
+            // has every creature type in every zone (CR 702.73a).
+            Aggregation.DISTINCT_CREATURE_TYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf<String>()) { entityId ->
+                    baseCreatureTypes(state, entityId)
+                }.size
+            }
+            Aggregation.DISTINCT_COUNTER_TYPES -> {
+                matchingEntities.flatMapTo(mutableSetOf()) { entityId ->
+                    state.getEntity(entityId)?.get<CountersComponent>()?.counters?.keys ?: emptySet()
+                }.size
+            }
+            Aggregation.DISTINCT_VALUES -> {
+                val prop = amount.property ?: return 0
+                matchingEntities.mapTo(mutableSetOf()) {
+                    resolveCardNumericProperty(state, null, it, prop)
+                }.size
+            }
+            Aggregation.DISTINCT_MANA_COSTS -> distinctManaCostCount(state, matchingEntities)
+            // Off the battlefield there is no projection, so the printed name is the only one.
+            Aggregation.LARGEST_SAME_NAME_GROUP -> matchingEntities.mapNotNull { entityId ->
+                state.getEntity(entityId)?.get<CardComponent>()?.name
+            }.groupingBy { it }.eachCount().values.maxOrNull() ?: 0
+        }
+    }
+
+    private fun resolveUnifiedPlayerIds(
+        state: GameState,
+        player: Player,
+        context: EffectContext,
+        projectedState: ProjectedState?
+    ): List<EntityId> {
+        return when (player) {
+            is Player.You -> listOf(context.controllerId)
+            // "its controller" for the permanent a continuous effect is modifying — read from the
+            // caller's projection, which mid-projection is the intermediate one (control changes
+            // are layer 2, so they are already applied by the time a layer-7 amount asks).
+            is Player.ControllerOfAffectedEntity -> listOfNotNull(
+                context.affectedEntityId?.let { controllerOf(state, resolveProjection(state, projectedState), it) }
+            )
+            // "its controller" / "its owner" inside a ForEach over entities — a single player, or
+            // none outside such a loop.
+            is Player.ControllerOfIterationEntity, is Player.OwnerOfIterationEntity ->
+                listOfNotNull(TargetResolutionUtils.resolvePlayerRef(player, context, state))
+            is Player.EachOpponent -> state.getOpponents(context.controllerId)
+            is Player.EachOtherPlayer -> state.getOtherPlayers(context.controllerId)
+            is Player.TargetOpponent, is Player.TargetPlayer -> listOfNotNull(
+                TargetResolutionUtils.resolvePlayerRef(player, context, state)
+            )
+            // "those players" — every player among the chosen targets, so counting primitives sum
+            // across all of them ("the total number of creatures those players control"). Targets
+            // that became illegal are already absent from `context.targets`, so they drop out.
+            is Player.EachTargetedPlayer -> context.targets
+                .filterIsInstance<com.wingedsheep.engine.state.components.stack.ChosenTarget.Player>()
+                .map { it.playerId }
+                .distinct()
+            is Player.EachDefendingPlayer -> com.wingedsheep.engine.mechanics.combat.CombatDefenders.allDefendingPlayersInApnapOrder(state)
+            is Player.EachAttackedPlayer -> com.wingedsheep.engine.mechanics.combat.CombatDefenders.attackedPlayersInApnapOrder(state)
+            is Player.Each -> state.activePlayers
+            is Player.Any -> state.activePlayers
+            // "those players" recorded by a `StorePlayer` step earlier in this resolution.
+            is Player.InCollection ->
+                TargetResolutionUtils.playersInCollection(state, context, player.collection)
+            is Player.ContextPlayer, is Player.BoundVariable -> {
+                val target = (
+                    if (player is Player.ContextPlayer) context.positionalTarget(player.index)
+                    else context.pipeline.namedTargets[(player as Player.BoundVariable).name]
+                    ) ?: return emptyList()
+                when (target) {
+                    is com.wingedsheep.engine.state.components.stack.ChosenTarget.Player -> listOf(target.playerId)
+                    else -> emptyList()
+                }
+            }
+            // Controller/owner of the effect's chosen target — resolved via the shared single-player
+            // resolver (parity with resolvePlayerRef), so aggregates like "creatures that target's
+            // controller controls" work (Skulking Killer's "if that opponent controls no other
+            // creatures" = AggregateBattlefield(ControllerOf("target"), Creature) == 1).
+            is Player.ControllerOf, is Player.OwnerOf, is Player.OwnerOfSource,
+            is Player.ControllerOfSource, is Player.ControllerOfCause,
+            is Player.ControllerOfTriggeringEntity, is Player.OwnerOfTriggeringEntity,
+            is Player.ControllerOfGrantingSource -> listOfNotNull(
+                TargetResolutionUtils.resolvePlayerRef(player, context, state)
+            )
+            is Player.TriggeringPlayer -> {
+                // The player associated with the trigger event (e.g. the caster for a
+                // SpellCastEvent, whose triggeringEntityId is the spell, not the player).
+                // Fall back to the triggering entity for legacy events that only stamp it
+                // when the entity itself is the player — mirrors TargetResolutionUtils.
+                listOfNotNull(context.triggeringPlayerId ?: context.triggeringEntityId)
+            }
+            is Player.ActivePlayerFirst -> state.apnapOrder
+            is Player.EachStartingWithYou -> state.turnOrderStartingWith(context.controllerId)
+            is Player.EachStartingWithNextOpponent -> state.turnOrderStartingWithNextOpponent(context.controllerId)
+            is Player.Candidate -> listOfNotNull(context.candidatePlayerId)
+            is Player.ChosenOpponent -> listOfNotNull(
+                context.chosenOpponent(state)
+            )
+            is Player.ChosenPlayer -> listOfNotNull(context.chosenPlayer(state))
+            is Player.AnOpponent, is Player.DefendingPlayer, is Player.EnchantedPlayer, is Player.ActivePlayer -> listOfNotNull(
+                TargetResolutionUtils.resolvePlayerRef(player, context, state)
+            )
+            is Player.OwnersOfLinkedExile -> TargetResolutionUtils.linkedExileOwners(state, context)
+        }
+    }
+
+    private fun resolveUnifiedZone(zone: Zone): Zone = zone
+
+    /**
+     * How many different mana costs (CR 202.1) the [entities] have — see
+     * [Aggregation.DISTINCT_MANA_COSTS]. Two costs are the same when they hold the same symbols:
+     * the generic part is compared as one total and every other symbol as a multiset, so symbol
+     * order doesn't matter while {X} stays apart from {0} and {B/R} apart from {B} and {R}.
+     */
+    private fun distinctManaCostCount(state: GameState, entities: List<EntityId>): Int =
+        entities.mapNotNullTo(mutableSetOf()) { entityId ->
+            predicates.manaCostOf(state, entityId)?.let { cost ->
+                val generic = cost.symbols.filterIsInstance<ManaSymbol.Generic>().sumOf { it.amount }
+                generic to cost.symbols.filterNot { it is ManaSymbol.Generic }.map { it.toString() }.sorted()
+            }
+        }.size
+
+    private fun resolveCardNumericProperty(
+        state: GameState,
+        projected: ProjectedState?,
+        entityId: EntityId,
+        property: CardNumericProperty
+    ): Int {
+        return when (property) {
+            CardNumericProperty.MANA_VALUE -> {
+                val entity = state.getEntity(entityId)
+                // Rule 202.3b: face-down permanents have mana value 0
+                if (entity?.has<FaceDownComponent>() == true) 0
+                else ManaValues.of(state, entityId)
+            }
+            CardNumericProperty.POWER -> {
+                projected?.getPower(entityId)
+                    ?: state.getEntity(entityId)?.get<CardComponent>()?.baseStats?.basePower
+                    ?: 0
+            }
+            CardNumericProperty.TOUGHNESS -> {
+                projected?.getToughness(entityId)
+                    ?: state.getEntity(entityId)?.get<CardComponent>()?.baseStats?.baseToughness
+                    ?: 0
+            }
+            CardNumericProperty.COUNTERS -> counterCountOf(state, entityId, counterType = null)
+            CardNumericProperty.COLOR_COUNT ->
+                resolveColorCount(state, entityId, useProjected = projected != null, explicitProjected = projected)
+        }
+    }
+
+    // =========================================================================
+    // Station Toughness Override
+    // =========================================================================
+
+    /**
+     * Returns true if any permanent controlled by [entityId]'s controller has the
+     * [GrantsStationUsingToughnessComponent], enabling the creature to station using
+     * toughness instead of power. Reads projected controllers (Rule 613) so the
+     * effect survives control-changing continuous effects on either permanent.
+     *
+     * [fallbackControllerId] is consulted when [entityId] is no longer on the battlefield
+     * (projection has no controller) — typically the snapshot's last-known controller
+     * captured at cost-payment time (Rule 113.7a).
+     */
+    private fun controllerHasStationUsingToughness(
+        state: GameState,
+        entityId: EntityId,
+        fallbackControllerId: EntityId? = null
+    ): Boolean {
+        val controller = state.projectedState.getController(entityId)
+            ?: fallbackControllerId
+            ?: return false
+        return ControllerGrants.grantedTo<GrantsStationUsingToughnessComponent>(state, controller, predicateEvaluator = predicateEvaluator)
+    }
+
+    // =========================================================================
+    // Entity Numeric Property Resolution
+    // =========================================================================
+
+    /** The subtype an [AttachmentKind] narrows to, or null for [AttachmentKind.ANY]. */
+    private fun attachmentKindSubtype(kind: AttachmentKind): Subtype? = when (kind) {
+        AttachmentKind.ANY -> null
+        AttachmentKind.EQUIPMENT -> Subtype.EQUIPMENT
+        AttachmentKind.AURA -> Subtype.AURA
+        AttachmentKind.CURSE -> Subtype.CURSE
+    }
+
+    /** The players whose attachments [property] counts, or null when it counts every controller's. */
+    private fun attachmentControllers(
+        state: GameState,
+        property: EntityNumericProperty.AttachmentCount,
+        context: EffectContext,
+        projectedState: ProjectedState?
+    ): Set<EntityId>? =
+        if (property.controller == Player.Any) null
+        else resolveUnifiedPlayerIds(state, property.controller, context, projectedState).toSet()
+
+    /**
+     * Resolve a numeric property from an entity. Unified handler for [DynamicAmount.EntityProperty].
+     */
+    private fun resolveNumericProperty(
+        state: GameState,
+        entityId: EntityId,
+        property: EntityNumericProperty,
+        context: EffectContext,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState? = null
+    ): Int {
+        return when (property) {
+            is EntityNumericProperty.EnlistmentsThisCombat ->
+                state.objectRef(entityId)?.let { ref -> state.enlistmentsThisCombat.count { it == ref } } ?: 0
+
+            is EntityNumericProperty.Power ->
+                resolvePowerOrToughness(state, entityId, isPower = true, context, useProjected, explicitProjected)
+
+            is EntityNumericProperty.Toughness ->
+                resolvePowerOrToughness(state, entityId, isPower = false, context, useProjected, explicitProjected)
+
+            // Effective base power/toughness — the layer-7b snapshot, the same reading the
+            // CardPredicate.PowerGreaterThanBase filter uses, so "difference = power − base power"
+            // stays consistent (Sovereign Okinec Ahau).
+            is EntityNumericProperty.BasePower ->
+                resolveBaseStat(state, entityId, isPower = true, useProjected, explicitProjected)
+
+            is EntityNumericProperty.BaseToughness ->
+                resolveBaseStat(state, entityId, isPower = false, useProjected, explicitProjected)
+
+            // A spell on the stack counts its chosen X (CR 202.3e) — see [ManaValues].
+            is EntityNumericProperty.ManaValue -> ManaValues.of(state, entityId)
+
+            is EntityNumericProperty.ManaSpent -> {
+                val spell = state.getEntity(entityId)?.get<SpellOnStackComponent>() ?: return 0
+                spell.manaSpentWhite + spell.manaSpentBlue + spell.manaSpentBlack +
+                    spell.manaSpentRed + spell.manaSpentGreen + spell.manaSpentColorless
+            }
+
+            is EntityNumericProperty.PermanentsSacrificedToCast ->
+                state.getEntity(entityId)?.get<SpellOnStackComponent>()?.sacrificedPermanents?.size ?: 0
+
+            is EntityNumericProperty.CounterCount ->
+                counterCountOf(state, entityId, property.counterType)
+
+            // The number chosen as the permanent entered (Nameless Race). Plain per-entity state
+            // with no projection dependency, so a CDA reading it resolves the same during layer
+            // projection as at resolution time.
+            is EntityNumericProperty.ValueChosenAsEntered ->
+                state.getEntity(entityId)
+                    ?.get<com.wingedsheep.engine.state.components.battlefield.EnteredWithValueComponent>()
+                    ?.value ?: 0
+
+            is EntityNumericProperty.AttachmentCount -> {
+                val attachedIds = state.getEntity(entityId)?.get<AttachmentsComponent>()?.attachedIds ?: emptyList()
+                // Attachments live on the battlefield, so narrow by *projected* subtype (a continuous
+                // effect can turn a permanent into/out of an Equipment or Aura), falling back to the
+                // printed subtypes when projection is empty.
+                val projection = resolveProjection(state, explicitProjected)
+                fun hasAttachmentSubtype(id: EntityId, subtype: Subtype): Boolean {
+                    val projected = projection.getSubtypes(id)
+                    if (projected.isNotEmpty()) return projected.any { it.equals(subtype.value, ignoreCase = true) }
+                    return state.getEntity(id)?.get<CardComponent>()?.typeLine?.hasSubtype(subtype) == true
+                }
+                val controllers = attachmentControllers(state, property, context, projection)
+                attachedIds.count { id ->
+                    (controllers == null || projection.getController(id) in controllers) &&
+                        attachmentKindSubtype(property.kind).let { it == null || hasAttachmentSubtype(id, it) }
+                }
+            }
+
+            is EntityNumericProperty.BlockerCount ->
+                state.getEntity(entityId)
+                    ?.get<com.wingedsheep.engine.state.components.combat.BlockedComponent>()
+                    ?.blockerIds?.size ?: 0
+
+            // Read from projected state when available so layer-4 type-changing effects
+            // (including Changeling) are honored. Falls back to base subtypes off the battlefield.
+            is EntityNumericProperty.SubtypeCount ->
+                resolveSubtypeCount(state, entityId, useProjected, explicitProjected)
+
+            // Read from projected state when available so layer-5 color-changing effects are
+            // honored. Falls back to the printed colors off the battlefield.
+            is EntityNumericProperty.ColorCount ->
+                resolveColorCount(state, entityId, useProjected, explicitProjected)
+
+            // Pips of the named colors in *this* object's printed mana cost — the per-object twin
+            // of DevotionTo, sharing its counting rule via ManaCost.coloredSymbolCount (hybrid and
+            // Phyrexian pips count for their colors, CR 107.4e/f). Never projected: a card's mana
+            // cost is the symbols printed on it (CR 202.1/202.1a), and cost increases/reductions
+            // only build the spell's total cost (CR 601.2f), so they never change this count.
+            // A face-down object has no mana cost (CR 708.2a) and counts 0.
+            is EntityNumericProperty.ColoredManaSymbolCount -> {
+                val entity = state.getEntity(entityId) ?: return 0
+                if (entity.has<FaceDownComponent>()) return 0
+                entity.get<CardComponent>()?.manaCost?.coloredSymbolCount(property.colors.toSet()) ?: 0
+            }
+
+            // Per-permanent tally the counted ability bumps as it resolves; cleared at cleanup
+            // and on a zone change, so a returned permanent starts a new count.
+            is EntityNumericProperty.AbilityResolutionsThisTurn -> state.getEntity(entityId)
+                ?.get<com.wingedsheep.engine.state.components.battlefield.AbilityResolutionCountThisTurnComponent>()
+                ?.count ?: 0
+
+            // Stamped once per attacker declaration and scoped to this turn and this object, so a
+            // permanent that changed zones is a new object that hasn't attacked (CR 400.7).
+            is EntityNumericProperty.TimesAttackedThisTurn -> state.getEntity(entityId)
+                ?.get<com.wingedsheep.engine.state.components.combat.TimesAttackedThisTurnComponent>()
+                ?.countFor(state.turnNumber, state.objectRef(entityId)) ?: 0
+
+            // The merge record is dropped as the permanent leaves, so a new object starts at zero
+            // (CR 400.7); a departed source is read from its snapshot above.
+            is EntityNumericProperty.TimesMutated ->
+                com.wingedsheep.engine.state.components.stack.timesMutatedOf(state, entityId)
+
+            is EntityNumericProperty.DamageDealtThisTurn -> state.getEntity(entityId)
+                ?.get<com.wingedsheep.engine.state.components.battlefield.DamageDealtThisTurnComponent>()
+                ?.takeIf { it.turnNumber == state.turnNumber && it.sourceObject == state.objectRef(entityId) }
+                ?.amount ?: 0
+
+            // Excess damage (CR 120.4a) marked on the creature: max(0, marked − toughness).
+            // Amount-valued twin of the TargetMarkedDamageExceedsToughness condition — read it after
+            // a deal-damage step in the same composite (Hell to Pay's "excess damage dealt this
+            // way"). Off the battlefield / non-creature → 0.
+            is EntityNumericProperty.ExcessMarkedDamage -> {
+                if (entityId !in state.getBattlefield()) return 0
+                val projection = resolveProjection(state, explicitProjected)
+                if (!projection.isCreature(entityId)) return 0
+                val marked = state.getEntity(entityId)
+                    ?.get<com.wingedsheep.engine.state.components.battlefield.DamageComponent>()
+                    ?.amount ?: 0
+                // Past lethal: toughness, or power under a lethal-damage-by-power rule (Zilortha).
+                (marked - projection.lethalDamageThreshold(entityId)).coerceAtLeast(0)
+            }
+
+            is EntityNumericProperty.KeywordValue ->
+                resolveKeywordValue(state, entityId, property.keyword, useProjected, explicitProjected)
+        }
+    }
+
+    /**
+     * Total N of a numeric keyword (bushido N). The printed values come from
+     * [NumericKeywordValuesComponent]; on the
+     * battlefield they count only while the projected keyword survives (layer 6 ability loss, face
+     * down), and any `<KEYWORD>_<n>` projected grant (granted toxic) adds its N.
+     */
+    private fun resolveKeywordValue(
+        state: GameState,
+        entityId: EntityId,
+        keyword: Keyword,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState?
+    ): Int {
+        val entity = state.getEntity(entityId) ?: return 0
+        val printed = entity.get<NumericKeywordValuesComponent>()?.values?.get(keyword) ?: 0
+        if (!useProjected || entityId !in state.getBattlefield()) {
+            if (entity.has<FaceDownComponent>()) return 0
+            // Printed toxic lives on ToxicComponent, not in the numeric-values map.
+            val printedToxic = if (keyword == Keyword.TOXIC) entity.get<ToxicComponent>()?.amount ?: 0 else 0
+            return printed + printedToxic
+        }
+        val projection = resolveProjection(state, explicitProjected)
+        val prefix = "${keyword.name}_"
+        val granted = projection.getKeywords(entityId).sumOf {
+            if (it.startsWith(prefix)) it.removePrefix(prefix).toIntOrNull() ?: 0 else 0
+        }
+        return granted + if (projection.hasKeyword(entityId, keyword)) printed else 0
+    }
+
+    private fun resolveSubtypeCount(
+        state: GameState,
+        entityId: EntityId,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState?
+    ): Int {
+        if (useProjected) {
+            val projectedSubtypes = resolveProjection(state, explicitProjected).getSubtypes(entityId)
+            if (projectedSubtypes.isNotEmpty()) return projectedSubtypes.size
+        }
+        return state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.subtypes?.size ?: 0
+    }
+
+    private fun resolveColorCount(
+        state: GameState,
+        entityId: EntityId,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState?
+    ): Int {
+        // For battlefield permanents the projected color set is authoritative even when empty —
+        // a creature turned colorless by a layer-5 effect must count 0, not fall back to its
+        // printed colors. Off the battlefield read the card's colors through the projection, which
+        // honours an off-battlefield SetColors (Mycosynth Lattice).
+        if (useProjected && entityId in state.getBattlefield()) {
+            return resolveProjection(state, explicitProjected).getColors(entityId).size
+        }
+        if (state.getEntity(entityId)?.get<CardComponent>() == null) return 0
+        return resolveProjection(state, explicitProjected).offBattlefieldColors(entityId)?.size
+            ?: state.getEntity(entityId)?.get<CardComponent>()?.colors?.size ?: 0
+    }
+
+    /**
+     * Resolve power or toughness for an entity, using projected state when available
+     * and falling back to base characteristic values.
+     */
+    private fun resolvePowerOrToughness(
+        state: GameState,
+        entityId: EntityId,
+        isPower: Boolean,
+        context: EffectContext,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState? = null
+    ): Int {
+        val staleTrigger = entityId == context.triggeringEntityId && context.objectReferences.captured &&
+            !context.objectReferences.isCurrent(context.objectReferences.triggering, state)
+        val staleSource = entityId == context.sourceId && context.objectReferences.captured &&
+            !context.objectReferences.isCurrent(context.objectReferences.source, state)
+        if (staleTrigger || staleSource) {
+            val lastKnown = if (isPower) context.triggerContext?.lastKnownPower else context.triggerContext?.lastKnownToughness
+            if (lastKnown != null) return lastKnown
+        }
+        if (useProjected) {
+            val projection = resolveProjection(state, explicitProjected)
+            if (entityId in state.getBattlefield() && !projection.isCreature(entityId)) return 0
+            val projectedValue = if (isPower) projection.getPower(entityId) else projection.getToughness(entityId)
+            if (projectedValue != null) return projectedValue
+        }
+        // Last-known-info fallback for dies/leaves-the-battlefield triggers: when the
+        // triggering entity is no longer on the battlefield, its projected P/T is gone,
+        // so consult the value captured on the ZoneChangeEvent (Rule 603.10, 113.7a).
+        if (entityId == context.triggeringEntityId || entityId == context.sourceId) {
+            val lastKnown = if (isPower) context.triggerContext?.lastKnownPower else context.triggerContext?.lastKnownToughness
+            if (lastKnown != null) return lastKnown
+        }
+        // Fall back to base stats (entity not on battlefield or projection disabled)
+        return offBattlefieldStat(state, entityId, isPower, explicitProjected) ?: 0
+    }
+
+    /**
+     * An object's base power or toughness: its value after copy effects, characteristic-defining
+     * abilities and "base power is N" effects, before modifications and counters. On the battlefield
+     * that's the projection's layer-7b snapshot; elsewhere it's the printed (or CDA-evaluated) stat,
+     * since nothing else applies there.
+     */
+    private fun resolveBaseStat(
+        state: GameState,
+        entityId: EntityId,
+        isPower: Boolean,
+        useProjected: Boolean,
+        explicitProjected: ProjectedState?
+    ): Int {
+        if (useProjected) {
+            val projection = resolveProjection(state, explicitProjected)
+            val base = if (isPower) projection.getBasePower(entityId) else projection.getBaseToughness(entityId)
+            if (base != null) return base
+        }
+        return offBattlefieldStat(state, entityId, isPower, explicitProjected) ?: 0
+    }
+
+    /**
+     * An object's power or toughness where it has no projection entry — a card in a library, hand,
+     * graveyard or exile, or a spell on the stack. A characteristic-defining ability functions in
+     * every zone (CR 604.3), so a `*` stat is evaluated here rather than read as its printed `0`:
+     * Keldon Warlord in a library has power equal to the non-Wall creatures its owner controls.
+     * The CDA is read from the object's own perspective — "you" is its controller, or its owner
+     * when it has none (CR 108.4a) — never from whichever effect is asking. Null when the object
+     * has no power/toughness box. A mid-projection caller passes its intermediate [projectedState]
+     * so the CDA's battlefield reads don't re-enter [GameState.projectedState].
+     */
+    fun offBattlefieldStat(
+        state: GameState,
+        entityId: EntityId,
+        isPower: Boolean,
+        projectedState: ProjectedState? = null
+    ): Int? {
+        val container = state.getEntity(entityId) ?: return null
+        val card = container.get<CardComponent>() ?: return null
+        val value = (if (isPower) card.baseStats?.power else card.baseStats?.toughness) ?: return null
+        if (value is CharacteristicValue.Fixed) return value.value
+        val controllerId = container.get<ControllerComponent>()?.playerId ?: card.ownerId ?: return null
+        val context = EffectContext(sourceId = entityId, controllerId = controllerId)
+        return when (value) {
+            is CharacteristicValue.Fixed -> value.value
+            is CharacteristicValue.Dynamic -> evaluate(state, value.source, context, projectedState)
+            is CharacteristicValue.DynamicWithOffset -> evaluate(state, value.source, context, projectedState) + value.offset
+        }
+    }
+
+    /**
+     * Count of [counterType] counters on [entityId]. Counters are physically stored on the permanent
+     * (base state, layer-independent), so this reads [CountersComponent] directly. A `null`
+     * [counterType] sums every kind present.
+     */
+    /**
+     * The colours [entityId] has: its projected colours when it has a projection entry, its printed
+     * ones otherwise. An empty projected set is an answer, not a gap — a face-down permanent
+     * (CR 708.2a) or one an effect made colourless has no colour, whatever its card says.
+     */
+    private fun projectedOrPrintedColors(state: GameState, projection: ProjectedState, entityId: EntityId): Set<String> =
+        projection.getProjectedValues(entityId)?.colors
+            ?: projection.offBattlefieldColors(entityId)
+            ?: state.getEntity(entityId)?.get<CardComponent>()?.colors?.mapTo(mutableSetOf()) { it.name }
+            ?: emptySet()
+
+    private fun counterCountOf(state: GameState, entityId: EntityId, counterType: CounterType?): Int {
+        val counters = state.getEntity(entityId)?.get<CountersComponent>() ?: return 0
+        return counterType?.let(counters::getCount) ?: counters.counters.values.sum()
+    }
+}

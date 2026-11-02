@@ -1,0 +1,6 @@
+# Java API calls the engine jars may make even though the app's minSdk android.jar does not list them.
+# tools/check_android_engine.py blocks any NEW such call (one the shipped jars did not already make)
+# unless it is listed here. Only list a call the Android dexer (D8) rewrites for old phones itself (a
+# "backported method"), or one on a code path that provably never runs in the app. One per line, exactly
+# as the check prints it, then the reason:
+#   java.util.Objects.requireNonNullElse(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;  D8 backport

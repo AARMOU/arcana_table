@@ -11,7 +11,7 @@ It reads the staged index (git's own view, so quoted paths, renames and mode cha
 it) and fails unless every change is one the upgrade itself makes:
   * argentum-patches/<name>.patch            added, modified or deleted
   * engine-upgrade/forward-ports/<name>      deleted only (folded into the refreshed patch)
-  * engine-upgrade/audit_patches.py          only its TARGET pin and MANDATORY list may change
+  * engine-upgrade/audit_patches.py          only its TARGET pin, MANDATORY list and RETIRED record may change
   * engine-upgrade/preview-config.json       modified
   * android/app/libs/argentum-<module>.jar   modified
   * android/app/src/main/assets/argentum/... added, modified or deleted
@@ -22,6 +22,9 @@ it) and fails unless every change is one the upgrade itself makes:
   * tools/cardkit/data/verified-support.json only `cardkit restamp`: the same cards, each either unchanged or
                                              with a new runtimeHash plus exactly one appended `restamps`
                                              record {fromRuntimeHash: old, toRuntimeHash: new, check}; nothing else
+  * android/build.gradle.kts, android/app/build.gradle.kts, android/custom-cards/build.gradle.kts
+                                             only the kotlin / kotlinx version strings the engine is built
+                                             with (tools/check_android_engine.py align), and only upward
 Every resulting file must be a regular, non-executable file (no symlinks, submodules or +x).
 Exit 0 when the candidate is in scope, 1 otherwise. Tests: engine-upgrade/tests/test_candidate_scope.py
 """
@@ -48,6 +51,42 @@ PIN_ONLY = ("AGENTS.md", "docs/agents/CARD-WORKFLOW.md", "docs/agents/argentum-u
 RULES += [(re.compile(re.escape(path)), "M") for path in PIN_ONLY]
 RESTAMP_FILE = "tools/cardkit/data/verified-support.json"
 RULES += [(re.compile(re.escape(RESTAMP_FILE)), "M")]
+# The app ships the engine's kotlin / kotlinx libraries; `align` raises their versions. Kept in step with
+# LIBRARIES in tools/check_android_engine.py (this file runs standalone, from a trusted copy).
+VERSION_FILES = ("android/build.gradle.kts", "android/app/build.gradle.kts", "android/custom-cards/build.gradle.kts")
+VERSION_PATTERNS = [re.compile(p) for p in (
+    r'(id\("org\.jetbrains\.kotlin\.[a-z.]+"\) version ")([0-9][0-9A-Za-z.+-]*)(")',
+    r'("org\.jetbrains\.kotlinx:kotlinx-serialization-json:)([0-9][0-9A-Za-z.+-]*)(")',
+    r'("org\.jetbrains\.kotlinx:kotlinx-coroutines-[a-z]+:)([0-9][0-9A-Za-z.+-]*)(")',
+    r'("org\.jetbrains\.kotlinx:kotlinx-datetime:)([0-9][0-9A-Za-z.+-]*)(")',
+)]
+RULES += [(re.compile(re.escape(path)), "M") for path in VERSION_FILES]
+
+
+def _version_key(v: str):
+    main, _, pre = v.partition("-")
+    nums = [int(x) if x.isdigit() else 0 for x in re.split(r"[.+]", main)]
+    return nums + [0] * (4 - len(nums)), (1, "") if not pre else (0, pre)
+
+
+def version_only_problems(path: str, before: str, after: str) -> list[str]:
+    """An app build file may only raise the library versions the engine pins; nothing else may change."""
+    if _blank(before) != _blank(after):
+        return [f"{path}: changes beyond the engine's library versions"]
+    found = []
+    for pattern in VERSION_PATTERNS:
+        old = [m.group(2) for m in pattern.finditer(before)]
+        new = [m.group(2) for m in pattern.finditer(after)]
+        for a, b in zip(old, new):
+            if _version_key(b) < _version_key(a):
+                found.append(f"{path}: version lowered ({a} -> {b})")
+    return found
+
+
+def _blank(s: str) -> str:
+    for pattern in VERSION_PATTERNS:
+        s = pattern.sub(lambda m: m.group(1) + "<version>" + m.group(3), s)
+    return s
 
 
 def restamp_problems(before: str, after: str) -> list[str]:
@@ -104,7 +143,8 @@ def staged() -> list[tuple[str, str, str]]:
 
 def strip_pins(source: str) -> str:
     source = re.sub(r'^TARGET = "[0-9a-f]{40}"$', "TARGET = <pin>", source, flags=re.M)
-    return re.sub(r"^MANDATORY = \[\n.*?^\]$", "MANDATORY = <list>", source, flags=re.M | re.S)
+    source = re.sub(r"^MANDATORY = \[\n.*?^\]$", "MANDATORY = <list>", source, flags=re.M | re.S)
+    return re.sub(r"^RETIRED = \{\n.*?^\}\n?", "", source, flags=re.M | re.S)  # present or not
 
 
 def problems() -> list[str]:
@@ -129,6 +169,9 @@ def problems() -> list[str]:
             found.append("engine-upgrade/audit_patches.py: changes beyond the TARGET pin and MANDATORY list")
     if any(path == RESTAMP_FILE and status == "M" for _, status, path in changes):
         found += restamp_problems(git("show", f"HEAD:{RESTAMP_FILE}"), git("show", f":{RESTAMP_FILE}"))
+    for _, status, path in changes:
+        if path in VERSION_FILES and status == "M":
+            found += version_only_problems(path, git("show", f"HEAD:{path}"), git("show", f":{path}"))
     pin_changes = [path for _, _, path in changes if path in PIN_ONLY]
     if pin_changes:
         try:

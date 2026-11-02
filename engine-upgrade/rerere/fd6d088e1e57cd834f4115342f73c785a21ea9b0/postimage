@@ -1,0 +1,909 @@
+package com.wingedsheep.engine.core
+
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
+import com.wingedsheep.sdk.core.CounterType
+import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.scripting.effects.Effect
+import com.wingedsheep.sdk.scripting.targets.TargetRequirement
+import kotlinx.serialization.Serializable
+
+/**
+ * Resume after putting a card from hand onto the battlefield after card selection.
+ *
+ * @property playerId The player selecting a card from their hand
+ * @property entersTapped Whether the card enters the battlefield tapped
+ * @property sourceId The source entity that triggered this effect
+ * @property sourceName Name of the source for display
+ */
+@Serializable
+data class PutFromHandContinuation(
+    val playerId: EntityId,
+    val entersTapped: Boolean,
+    val sourceId: EntityId?,
+    val sourceName: String?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Which step of the [OpenLifeBidContinuation] the pending decision belongs to.
+ */
+@Serializable
+enum class OpenLifeBidStage {
+    /** A yes/no: does [OpenLifeBidContinuation.bidderToAsk] want to top the high bid? */
+    AWAITING_TOP_DECISION,
+
+    /** A number choice: how much does [OpenLifeBidContinuation.bidderToAsk] bid? */
+    AWAITING_BID_AMOUNT
+}
+
+/**
+ * Resume an open life-bidding auction (Mages' Contest).
+ *
+ * The two bidders — [casterId] and the resolved participant — alternate topping the high bid.
+ * The player currently deciding is [bidderToAsk]; [highBidder] holds the current [highBid].
+ * When [bidderToAsk] declines to top, the auction ends, the high bidder loses [highBid] life,
+ * and (only if the caster won) [onWin] runs against [targets].
+ *
+ * @property casterId The player who cast the auction spell (the "you" who wins to apply [onWin])
+ * @property highBidder The player currently holding the high bid
+ * @property highBid The current high bid in life
+ * @property bidderToAsk The player whose decision we are waiting for
+ * @property stage Whether we await a top yes/no or a bid amount
+ * @property onWin Effect run if the caster is the high bidder
+ * @property targets Original targets, propagated so [onWin] can reference the spell
+ * @property sourceId The auction spell entity (for prompt context)
+ * @property sourceName Name of the auction spell (for prompts)
+ */
+@Serializable
+data class OpenLifeBidContinuation(
+    val casterId: EntityId,
+    val highBidder: EntityId,
+    val highBid: Int,
+    val bidderToAsk: EntityId,
+    val stage: OpenLifeBidStage,
+    val onWin: Effect,
+    val targets: List<ChosenTarget>,
+    val sourceId: EntityId?,
+    val sourceName: String?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+    val effectContext: com.wingedsheep.engine.handlers.EffectContext? = null
+) : AnswerContinuation
+
+/**
+ * Resume a chosen player's optional retargeting of the triggering spell/ability (Psychic Battle's
+ * reveal winner, or any "[chooser] may change its targets" effect). Targets are reselected one slot
+ * at a time; this carries the state needed to apply the choice for [currentSlot] and continue with
+ * the remaining slots.
+ *
+ * @property stackObjectId The triggering spell/ability whose targets are being changed
+ * @property chooserId The player choosing the new targets
+ * @property ownerControllerId The triggering object's controller (legality is judged from here)
+ * @property perSlotRequirements One target requirement per target slot
+ * @property originalTargets The triggering object's targets at trigger-resolution time
+ * @property newTargets Targets chosen/kept for slots before [currentSlot]
+ * @property currentSlot The slot the pending decision is choosing a target for
+ * @property sourceId The retargeting effect's source (for prompt context)
+ */
+@Serializable
+data class ContestedRetargetContinuation(
+    val stackObjectId: EntityId,
+    val chooserId: EntityId,
+    val ownerControllerId: EntityId,
+    val perSlotRequirements: List<TargetRequirement>,
+    val originalTargets: List<ChosenTarget>,
+    val newTargets: List<ChosenTarget>,
+    val currentSlot: Int,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after player has distributed counters from a source creature to other creatures.
+ *
+ * Used for effects like Forgotten Ancient where the player moves counters from
+ * the source creature onto other creatures. The response contains the counter distribution.
+ *
+ * @property sourceId The creature the counters are being moved from
+ * @property controllerId The player who controls the effect
+ * @property counterType The type of counter being moved
+ */
+@Serializable
+data class DistributeCountersContinuation(
+    val sourceId: EntityId,
+    val controllerId: EntityId,
+    val counterType: CounterType,
+    /**
+     * When true (the "move counters from this creature onto others" shape, e.g. Forgotten Ancient),
+     * the distributed counters are first removed from [sourceId]. When false, the counters are newly
+     * created on the chosen recipients with nothing removed from the source — the "distribute N
+     * counters among …" shape (e.g. Crashing Wave's three stun counters).
+     */
+    val removeFromSource: Boolean = true,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks how many counters of one kind to remove
+ * from a target permanent. The executor for [RemoveAnyNumberOfCountersEffect]
+ * issues one decision per counter kind currently on the target; on resume,
+ * the response is applied and the next kind (if any) is prompted.
+ *
+ * When [remainingBudget] is non-null, a *total* cap is in force (`maxTotal` on the effect —
+ * Heartless Act's "remove up to N counters"): each prompt is capped at `min(kindCount, budget)`,
+ * the budget is decremented on resume, and prompting stops once it hits zero. Null means no cap
+ * ("remove any number"). [remainingFloor] is the mirror image — the `minTotal` still owed, which
+ * raises a later prompt's minimum once the kinds after it can no longer cover it.
+ *
+ * @property targetId The permanent whose counters are being removed
+ * @property controllerId The player making the choices
+ * @property currentCounterType The counter kind the active decision is for
+ * @property currentMinAmount Floor shown to the player, and enforced on resume
+ * @property currentMaxAmount Cap shown to the player (currentMinAmount..currentMaxAmount)
+ * @property remainingBudget Counters still removable in total after the active decision, or null for no cap
+ * @property remainingFloor Counters still owed toward the effect's `minTotal`
+ * @property remainingCounterTypes Counter kinds still to be walked, in prompt order
+ * @property targetName Display name for follow-up prompts
+ * @property sourceId Source emitting the effect (for prompt context)
+ * @property sourceName Source name for prompt context
+ */
+@Serializable
+data class RemoveAnyNumberOfCountersContinuation(
+    val targetId: EntityId,
+    val controllerId: EntityId,
+    val currentCounterType: CounterType,
+    val currentMaxAmount: Int,
+    val remainingCounterTypes: List<CounterType>,
+    val targetName: String,
+    val sourceId: EntityId?,
+    val sourceName: String?,
+    val remainingBudget: Int? = null,
+    val currentMinAmount: Int = 0,
+    val remainingFloor: Int = 0,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks which kind of counter on [recipientId] to add [count] more of,
+ * for `AddCountersOfChosenKindEffect` (Ichormoon Gauntlet). `OptionChosenResponse.optionIndex`
+ * indexes [counterKinds], the kinds shown in the decision. Placement goes through the standard
+ * `AddCountersEffect` path.
+ */
+@Serializable
+data class AddCountersOfChosenKindContinuation(
+    val recipientId: EntityId,
+    val controllerId: EntityId,
+    val counterKinds: List<CounterType>,
+    val count: Int,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks how many counters (0..max) to put on a target, for
+ * `AddCountersUpToEffect` ("Put up to N [counterType] counters on target" — Esper Terra's lore
+ * chapters). The chosen count is placed through the standard `AddCountersEffect` path so
+ * counter-placement replacements and downstream (Saga chapter) triggers fire. Choosing 0 is a no-op.
+ *
+ * @property targetId The permanent to put counters on
+ * @property controllerId The player who made the choice
+ * @property counterType The counter kind to place
+ * @property sourceId Source emitting the effect (for the placement context)
+ */
+/**
+ * Resume after the controller picks how much life to pay as a permanent enters
+ * ([com.wingedsheep.sdk.scripting.effects.PayAnyAmountOfLifeAsEntersEffect], Nameless Race). The
+ * chosen amount is paid and recorded on [permanentId] as its `EnteredWithValueComponent`, which is
+ * what the permanent's characteristic-defining P/T reads back.
+ *
+ * @property permanentId The permanent that is entering, and that carries the recorded amount
+ * @property controllerId The player paying the life and making the choice
+ */
+@Serializable
+data class PayAnyAmountOfLifeAsEntersContinuation(
+    val permanentId: EntityId,
+    val controllerId: EntityId
+) : AnswerContinuation
+
+@Serializable
+data class AddCountersUpToContinuation(
+    val targetId: EntityId,
+    val controllerId: EntityId,
+    val counterType: CounterType,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks how many [counterType] counters to pay (0..their current total),
+ * for `PayCountersEffect` (CR 107.14's "pay {E}" generalized to a chosen amount — "you may pay
+ * any amount of {E}", Galvanic Discharge). The chosen amount is removed from [playerId] through
+ * the standard `RemoveCountersEffect` path and stored in the next frame's pipeline under
+ * [storeAmountAs] so a composed follow-up effect (e.g. `DealDamage(VariableReference(...))`) can
+ * read it. Choosing 0 removes nothing but still stores 0.
+ *
+ * @property playerId The player paying (and whose counters are removed)
+ * @property counterType The counter kind being paid
+ * @property storeAmountAs Pipeline variable name the paid amount is stored under
+ * @property sourceId Source emitting the effect (for the decision prompt context)
+ */
+@Serializable
+data class PayCountersContinuation(
+    val playerId: EntityId,
+    val counterType: CounterType,
+    val storeAmountAs: String,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller chose how many [counterType] counters to remove from each permanent
+ * offered by [com.wingedsheep.sdk.scripting.effects.RemoveCountersFromAmongEffect]. The response is a
+ * distribution (permanent -> count); the resumer removes them and stores the total under
+ * [storeAmountAs] in the pipeline frame beneath.
+ */
+@Serializable
+data class RemoveCountersFromAmongContinuation(
+    val controllerId: EntityId,
+    val counterType: CounterType,
+    val storeAmountAs: String,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks one of a player's spells cast this turn for
+ * `ChooseSpellCastThisTurnEffect` (Backdraft). [damageByOption] is aligned with the decision's
+ * options; the picked spell's damage is stored in the next frame's pipeline under [storeAs].
+ */
+@Serializable
+data class ChooseSpellCastThisTurnContinuation(
+    val playerId: EntityId,
+    val storeAs: String,
+    val damageByOption: List<Int>,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks how many counters of one kind to move from a
+ * [sourceId] permanent onto a [destinationId] permanent. The executor for
+ * `MoveChosenCountersToTargetEffect` issues one decision per counter kind on the source;
+ * on resume, the chosen amount is removed from the source and added to the destination, and
+ * the walk carries on in `MoveChosenCountersFlow` (budget and floor decremented). After the last kind, if [drawCardOnMove] is set and at
+ * least one counter was moved overall, the controller draws a card. (Goldberry — ability B.)
+ *
+ * @property sourceId The permanent counters are moved from
+ * @property destinationId The permanent counters are moved onto
+ * @property controllerId The player making the choices (and who draws)
+ * @property currentCounterType The counter kind the active decision is for
+ * @property currentMaxAmount Cap shown to the player (0..currentMaxAmount)
+ * @property remainingCounterTypes Pending (counterType, maxAmount) prompts
+ * @property sourceName Display name of the source for follow-up prompts
+ * @property destinationName Display name of the destination for follow-up prompts
+ * @property drawCardOnMove Whether to draw a card at the end if any counter was moved
+ * @property anyMovedSoFar Whether any counter has been moved across prior prompts
+ * @property currentMinAmount Floor for the active decision (the share later kinds can't cover)
+ * @property remainingBudget Counters still movable in total after the active kind, or null for no cap
+ * @property remainingFloor Counters that must still be moved in total, including the active kind
+ */
+@Serializable
+data class MoveChosenCountersToTargetContinuation(
+    val sourceId: EntityId,
+    val destinationId: EntityId,
+    val controllerId: EntityId,
+    val currentCounterType: CounterType,
+    val currentMaxAmount: Int,
+    val remainingCounterTypes: List<Pair<CounterType, Int>>,
+    val sourceName: String,
+    val destinationName: String,
+    val drawCardOnMove: Boolean,
+    val anyMovedSoFar: Boolean = false,
+    val currentMinAmount: Int = 0,
+    val remainingBudget: Int? = null,
+    val remainingFloor: Int = 0,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks the permanents and/or players that should
+ * each receive another counter of each kind already on them (Proliferate).
+ *
+ * @property controllerId The player resolving the proliferate
+ * @property eligibleEntities The permanents/players that had at least one counter
+ *                            when the decision was offered. Used to discard stale
+ *                            selections and to defend against the response naming
+ *                            an entity that had no counters at decision time.
+ * @property sourceName Display name carried onto the [ProliferatedEvent] emitted on resume
+ * @property sourceId The proliferating source, for the next decision's context
+ * @property proliferatesRemaining Proliferates still owed after this one — non-zero only under a
+ *   "proliferate twice instead" replacement (Tekuthal, Inquiry Dominus)
+ * @property storeAs The effect's `storeAs` — the pipeline collection the permanents given a counter
+ *   are published to once the last proliferate completes; null when the effect doesn't store them
+ * @property countered Permanents given a counter by earlier proliferates of the same run
+ */
+@Serializable
+data class ProliferateContinuation(
+    val controllerId: EntityId,
+    val eligibleEntities: List<EntityId>,
+    val sourceName: String = "Proliferate",
+    val sourceId: EntityId? = null,
+    val proliferatesRemaining: Int = 0,
+    val storeAs: String? = null,
+    val countered: List<EntityId> = emptyList()
+) : AnswerContinuation
+
+/**
+ * Resume after a tempted player chooses which creature becomes their Ring-bearer (CR 701.54a).
+ *
+ * The emblem and tempt-count increment are applied before the decision; this continuation only
+ * moves the Ring-bearer designation to the chosen creature and announces the temptation.
+ *
+ * @property temptedPlayerId The player being tempted.
+ * @property temptCount That player's tempt count after this temptation (for the announcement).
+ * @property sourceName The card/ability that tempted (for display).
+ * @property candidates The creatures offered at decision time, used to validate the response.
+ */
+@Serializable
+data class RingTemptContinuation(
+    val temptedPlayerId: EntityId,
+    val temptCount: Int,
+    val sourceName: String,
+    val candidates: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume "amass [subtype] N" after the controller chooses which Army to put the counters on
+ * (CR 701.47a). Only reached when the controller has more than one Army; the chosen Army receives
+ * [amount] +1/+1 counters and becomes [subtype] if it isn't already.
+ *
+ * @property controllerId The player amassing (also the chooser).
+ * @property subtype The Army subtype being amassed (e.g., "Orc").
+ * @property amount Number of +1/+1 counters to place.
+ * @property sourceId The amassing source (for context/display).
+ * @property candidates The Armies offered at decision time, used to validate the response.
+ */
+@Serializable
+data class AmassContinuation(
+    val controllerId: EntityId,
+    val subtype: String,
+    val amount: Int,
+    val sourceId: EntityId?,
+    val candidates: List<EntityId>,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume creating a copy of a triggered ability after the player selects new targets.
+ *
+ * Used by Kirol-style effects ("Copy target triggered ability you control. You may choose
+ * new targets for the copy."). The controller re-chooses targets, then the copy is cloned
+ * from the source ability's TriggeredAbilityOnStackComponent and pushed onto the stack.
+ *
+ * @property abilityEntityId The triggered ability being copied (on the stack)
+ * @property controllerId The player controlling the copy (also the target-chooser)
+ * @property targetRequirements Target requirements inherited from the source ability
+ */
+@Serializable
+data class CopyTriggeredAbilityTargetContinuation(
+    val abilityEntityId: EntityId,
+    val controllerId: EntityId,
+    val targetRequirements: List<TargetRequirement>
+) : AnswerContinuation
+
+/**
+ * Resume creating a copy of an *activated* ability after the copier selects new targets
+ * (CR 707.10c). The mirror of [CopyTriggeredAbilityTargetContinuation] for the activated-ability
+ * branch of "copy target spell or ability" (Return the Favor). The copy is cloned from the source
+ * ability's ActivatedAbilityOnStackComponent and pushed onto the stack under [controllerId].
+ *
+ * @property abilityEntityId The activated ability being copied (on the stack)
+ * @property controllerId The player controlling the copy (also the target-chooser)
+ * @property targetRequirements Target requirements inherited from the source ability
+ */
+@Serializable
+data class CopyActivatedAbilityTargetContinuation(
+    val abilityEntityId: EntityId,
+    val controllerId: EntityId,
+    val targetRequirements: List<TargetRequirement>
+) : AnswerContinuation
+
+/**
+ * Resume the "copy target activated or triggered ability [N] times" loop after the copier chooses
+ * new targets for one copy (CR 707.10 / 707.10c). Backs [Effects.CopyTargetSpellOrAbility] with
+ * `copies > 1` — Gogo, Master of Mimicry ("Copy target activated or triggered ability you control X
+ * times. You may choose new targets for the copies."). Each pause handles a single copy; after its
+ * copy is pushed, [remainingCopies] drives whether the loop prompts again for the next copy.
+ * Handles both the activated and triggered branches — the resumer reads the kind off the source
+ * ability entity.
+ *
+ * @property abilityEntityId The ability being copied (still on the stack)
+ * @property controllerId The player controlling the copies (also the target-chooser)
+ * @property targetRequirements Target requirements inherited from the source ability
+ * @property remainingCopies Copies still to create, including the one whose targets were just chosen
+ * @property totalCopies Total copies requested (for the "copy i of N" prompt label)
+ */
+@Serializable
+data class CopyAbilityTargetContinuation(
+    val abilityEntityId: EntityId,
+    val controllerId: EntityId,
+    /** The copier's source (e.g. Gogo) — used to validate the new targets for each copy. */
+    val copierSourceId: EntityId?,
+    val targetRequirements: List<TargetRequirement>,
+    val remainingCopies: Int,
+    val totalCopies: Int
+) : AnswerContinuation
+
+/**
+ * Resume creating Storm copies after the player selects targets for a copy.
+ *
+ * When a Storm spell has targets, we pause to ask for target selection for each copy.
+ * After the player chooses targets, we create the copy and (if more copies remain)
+ * prompt for the next copy's targets.
+ *
+ * @property remainingCopies Number of copies still to create (including the one being targeted)
+ * @property spellEffect The effect of the original spell to copy. Null when copying a
+ *   permanent spell (creatures, artifacts, etc.) — those resolve into permanents via
+ *   the spell's CardComponent rather than a stack effect.
+ * @property spellTargetRequirements Target requirements for each copy
+ * @property spellName Name of the original spell
+ * @property controllerId The player who controls the copies
+ * @property sourceId The source spell entity ID
+ * @property removeLegendary If true, the Legendary supertype is stripped from each copy's
+ *   CardComponent (CR 707.10f token-copy that "isn't legendary", e.g., Jackal).
+ */
+@Serializable
+data class StormCopyTargetContinuation(
+    val remainingCopies: Int,
+    val spellEffect: Effect?,
+    val spellTargetRequirements: List<TargetRequirement>,
+    val spellName: String,
+    val controllerId: EntityId,
+    val sourceId: EntityId,
+    val totalCopies: Int = remainingCopies,  // Original total copies (defaults to remainingCopies for backward compat)
+    /** Keyword enum names (e.g., "WITHER") to grant to each copy while it's on the stack. */
+    val keywordsForCopy: Set<String> = emptySet(),
+    val removeLegendary: Boolean = false,
+    val tokenRiders: com.wingedsheep.engine.state.components.stack.SpellCopyTokenRidersComponent? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val exceptions: com.wingedsheep.sdk.scripting.effects.CopyExceptions = com.wingedsheep.sdk.scripting.effects.CopyExceptions.None,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume a [com.wingedsheep.sdk.scripting.effects.CopyForOtherPossibleTargetsEffect] with
+ * `selection = ONE_CHOSEN` (Beamsplitter Mage) once the copier has picked which of [candidates] the
+ * single copy of [originalId] targets.
+ */
+@Serializable
+data class CopyForChosenPossibleTargetContinuation(
+    val effect: com.wingedsheep.sdk.scripting.effects.CopyForOtherPossibleTargetsEffect,
+    val effectContext: com.wingedsheep.engine.handlers.EffectContext,
+    val originalId: EntityId,
+    val copierId: EntityId,
+    val candidates: List<EntityId>
+) : AnswerContinuation
+
+/** Frozen batch of originals awaiting their controller's copy-order choice. */
+@Serializable
+data class CopyStackObjectsOrderContinuation(
+    val objects: List<EntityId>,
+    val effect: com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect,
+    val effectContext: com.wingedsheep.engine.handlers.EffectContext
+) : AnswerContinuation
+
+/**
+ * Resume Storm modal target selection (rule 702.40a + 707.10).
+ *
+ * Modal Storm spells keep their chosen modes on every copy (700.2g — modes are
+ * decided once by the caster), but the copy controller may re-choose targets
+ * for each mode per 702.40a. This continuation iterates through chosen modes
+ * for a single copy, pausing once per mode that has target requirements and
+ * advancing without prompt for no-target modes. When all modes are collected
+ * for a copy, the copy is pushed on the stack and the loop restarts for the
+ * next copy.
+ *
+ * @property remainingCopies Copies still to create (including the one being built)
+ * @property totalCopies Original copy count (for copyIndex labeling)
+ * @property spellName Display name of the original spell
+ * @property controllerId Player who controls the copies and picks targets
+ * @property sourceId Original spell's entity ID on the stack
+ * @property chosenModes Inherited chosen mode indices — fixed for every copy
+ * @property modeTargetRequirements Inherited per-mode target requirements
+ * @property accumulatedOrdinalTargets Targets chosen so far for the current copy,
+ *   aligned 1:1 with [chosenModes] positions 0..[currentOrdinal]-1
+ * @property currentOrdinal Index into [chosenModes] whose targets we are collecting
+ */
+@Serializable
+data class StormCopyModalTargetContinuation(
+    val remainingCopies: Int,
+    val totalCopies: Int,
+    val spellName: String,
+    val controllerId: EntityId,
+    val sourceId: EntityId,
+    val chosenModes: List<Int>,
+    val modeTargetRequirements: Map<Int, List<TargetRequirement>>,
+    val accumulatedOrdinalTargets: List<List<ChosenTarget>>,
+    /** Flat target positions kept across earlier mode questions, including their old object identity. */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val retainedTargetIndices: Set<Int> = emptySet(),
+    val currentOrdinal: Int,
+    /** Keyword enum names (e.g., "WITHER") to grant to each copy while it's on the stack. */
+    val keywordsForCopy: Set<String> = emptySet(),
+    /** If true, strip the Legendary supertype from each resulting copy. */
+    val removeLegendary: Boolean = false,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val exceptions: com.wingedsheep.sdk.scripting.effects.CopyExceptions = com.wingedsheep.sdk.scripting.effects.CopyExceptions.None,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+) : AnswerContinuation
+
+/**
+ * Resume after Meddle's controller chooses a new creature target for a spell — or, when
+ * [fixedNewTarget] is set, after Spellskite's controller chooses *which* of a multi-target spell's
+ * targets changes to that fixed object.
+ *
+ * @property spellEntityId The spell whose target is being changed
+ * @property sourceId The source of the change-target effect (Meddle)
+ * @property fixedNewTarget The object every candidate slot would change to; the answer then names
+ *   the current target being replaced, not the new one
+ * @property candidateSlots Target slots that may legally change to [fixedNewTarget]
+ */
+@Serializable
+data class ChangeSpellTargetContinuation(
+    val spellEntityId: EntityId,
+    val sourceId: EntityId?,
+    val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val fixedNewTarget: EntityId? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val candidateSlots: List<Int> = emptyList(),
+) : AnswerContinuation
+
+/**
+ * Resume after player selects which legendary permanent to keep (legend rule 704.5j).
+ *
+ * The player chose one permanent to keep; all others with the same name are put into the graveyard.
+ *
+ * @property playerId The player who controls the duplicates
+ * @property allDuplicates All entity IDs of the legendary permanents with the same name
+ */
+@Serializable
+data class LegendRuleContinuation(
+    val playerId: EntityId,
+    val allDuplicates: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after the commander's owner answers the CR 903.9a state-based action prompt.
+ *
+ * Yes → the commander moves from [currentZone] to the command zone. No → mark the commander
+ * as asked-this-stay so the SBA stops re-prompting; the marker is cleared automatically by
+ * the next zone transition (see [com.wingedsheep.engine.state.components.identity.
+ * CommanderZoneChoiceAskedComponent]).
+ *
+ * @property commanderId The commander entity awaiting the choice.
+ * @property ownerId The owner answering the prompt (i.e. the player whose decision this is).
+ * @property currentZone The non-command zone the commander is sitting in while the prompt
+ *   is open. Captured so the resumer can issue the correct from-zone on the move and so the
+ *   prompt remains traceable in logs even after the commander moves.
+ */
+@Serializable
+data class CommanderZoneChoiceContinuation(
+    val commanderId: EntityId,
+    val ownerId: EntityId,
+    val currentZone: com.wingedsheep.sdk.core.Zone
+) : AnswerContinuation
+
+/**
+ * Resume after a battle's controller picks its protector for the CR 704.5x/y state-based action
+ * (see [com.wingedsheep.engine.mechanics.sba.permanent.BattleProtectorCheck]). Only raised when
+ * two or more players are eligible — a forced choice is applied without a prompt.
+ *
+ * @property battleId The battle awaiting a protector.
+ * @property candidateIds The eligible players, positionally aligned with the decision's options,
+ *   captured at prompt time so the resumer maps the chosen index back to a player even if the
+ *   board changes while the prompt is open.
+ */
+@Serializable
+data class BattleProtectorChoiceContinuation(
+    val battleId: EntityId,
+    val candidateIds: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a permanent's controller chooses the player its
+ * [com.wingedsheep.sdk.scripting.AttachToPlayerAsTransforms] face is attached to as it transforms
+ * (Curse of Leeches). Raised at the end of the untap step or by the state-based action pass; the
+ * resumer attaches the Aura, then settles any other pending transform attachment before carrying on.
+ *
+ * @property auraId The transformed permanent awaiting its player.
+ * @property candidateIds The players it could enchant, positionally aligned with the decision's
+ *   options, captured at prompt time.
+ */
+@Serializable
+data class TransformAttachToPlayerContinuation(
+    val auraId: EntityId,
+    val candidateIds: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a permanent's controller chooses the card its
+ * [com.wingedsheep.sdk.scripting.BecomesCopyAsTransforms] face becomes a copy of as it transforms
+ * (Olag, Ludevic's Hubris). Raised by the state-based action pass; the resumer makes the copy, then
+ * settles any other pending transform copy before carrying on.
+ *
+ * @property permanentId The transformed permanent awaiting its copy.
+ * @property candidateIds The cards it could copy, captured at prompt time.
+ */
+@Serializable
+data class TransformCopyContinuation(
+    val permanentId: EntityId,
+    val candidateIds: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks X for an activated ability with an X-variable cost
+ * (currently [com.wingedsheep.sdk.scripting.AbilityCost.TapXPermanents]).
+ *
+ * The legal-actions path surfaces such activations with `hasXCost=true` and no
+ * pre-filled `xValue`/`tappedPermanents`. When [com.wingedsheep.engine.handlers.actions.ability.ActivateAbilityHandler]
+ * sees that shape, it raises a [ChooseNumberDecision] and pushes this frame so the
+ * resumer can chain into a follow-up tap-target [SelectCardsDecision] sized to the
+ * chosen X (or skip straight to re-executing when X = 0).
+ *
+ * @property action The original [ActivateAbility] (xValue/costPayment still null), so the resumer
+ *   can re-enter the handler with the chosen X and selected tap targets filled in.
+ * @property tapTargets The untapped permanents matching the cost's filter at announcement time —
+ *   captured here so the follow-up [SelectCardsDecision] has a stable option list even if the
+ *   board changes between decisions.
+ */
+@Serializable
+data class ActivateAbilityChooseXContinuation(
+    val action: ActivateAbility,
+    val tapTargets: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a player chooses X for an activated ability whose cost contains `{X}` **mana**
+ * (e.g. Wizard's Rockets: "{X}, {T}, Sacrifice this artifact: Add X mana..."). The legal-actions
+ * submission path sends a bare [ActivateAbility] with `xValue == null`; the handler raises a
+ * ChooseNumberDecision and stores this frame. On resume the handler is re-entered with `xValue`
+ * bound to the chosen number, and the `{X}` mana cost is paid for that amount.
+ *
+ * Unlike [ActivateAbilityChooseXContinuation] (a tap-X cost, which has a follow-up tap-target
+ * selection), a mana-X cost has no second decision — paying the mana is automatic.
+ */
+@Serializable
+data class ActivateAbilityChooseManaXContinuation(
+    val action: ActivateAbility
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks which permanents to tap to satisfy a TapXPermanents cost,
+ * once X has already been chosen via [ActivateAbilityChooseXContinuation].
+ *
+ * @property action The original [ActivateAbility] (xValue/costPayment still null on the stored copy).
+ * @property chosenX The X value the player picked in the preceding [ChooseNumberDecision].
+ * @property tapTargets Permanents that were offered as options in the [SelectCardsDecision]; used
+ *   to validate the response is a subset of the originally legal targets.
+ */
+@Serializable
+data class ActivateAbilityTapXTargetsContinuation(
+    val action: ActivateAbility,
+    val chosenX: Int,
+    val tapTargets: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks which graveyard cards to exile to satisfy an
+ * [com.wingedsheep.sdk.scripting.AbilityCost.ExileFromGraveyard] cost on an activated ability.
+ *
+ * Surfaces the cost-choice the original engine path silently auto-paid: when an activation's
+ * `ExileFromGraveyard(count, filter)` cost has more matching graveyard cards than `count`, the
+ * handler raises a [SelectCardsDecision] and pushes this frame so the resumer can re-enter the
+ * handler with the player's chosen cards filled into `costPayment.exiledCards`.
+ *
+ * Skipped (no pause) when `exiledCards` is already pre-filled (engine-direct path / resumed
+ * replay) or when candidate count ≤ required count (no real choice). Rust Harvester
+ * ({2}, {T}, Exile an artifact card from your graveyard: …) is the canonical trigger case.
+ *
+ * @property action The original [ActivateAbility] (`costPayment.exiledCards` still empty), so the
+ *   resumer can re-enter the handler with the chosen exile victims filled in.
+ * @property exileCandidates The matching graveyard cards offered to the player as options; used
+ *   to validate the response is a subset of the originally legal candidates.
+ * @property exileCount Exact number of cards the player must pick (`count` from the cost).
+ */
+@Serializable
+data class ActivateAbilityExileFromGraveyardContinuation(
+    val action: ActivateAbility,
+    val exileCandidates: List<EntityId>,
+    val exileCount: Int
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks the graveyard cards for an
+ * [com.wingedsheep.sdk.scripting.AbilityCost.ExileXFromGraveyard] cost.
+ *
+ * X *is* the size of that selection, so this is a single decision rather than a number picker
+ * followed by a selection: the resumer re-enters the handler with the chosen cards in
+ * `costPayment.exiledCards` **and** `xValue` set to how many were chosen.
+ *
+ * @property action The original [ActivateAbility] (`costPayment.exiledCards` still empty).
+ * @property exileCandidates The graveyard cards matching the cost's filter, offered as options;
+ *   used to validate the response is a subset of the originally legal candidates.
+ * @property fixedCount Non-null when a `{X}` mana symbol already fixed X (Necropolis Fiend:
+ *   "{X}, {T}, Exile X cards from your graveyard"), in which case the selection must be exactly
+ *   this many. Null when the cost has no mana X (Winter, Cursed Rider), in which case any number
+ *   of candidates may be chosen and the count becomes X.
+ */
+@Serializable
+data class ActivateAbilityExileXFromGraveyardContinuation(
+    val action: ActivateAbility,
+    val exileCandidates: List<EntityId>,
+    val fixedCount: Int? = null
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks the hand cards for an
+ * [com.wingedsheep.sdk.scripting.AbilityCost.DiscardX] cost — the hand-side twin of
+ * [ActivateAbilityExileXFromGraveyardContinuation]. The resumer re-enters the handler with the
+ * chosen cards in `costPayment.discardedCards` and `xValue` bound to how many were chosen.
+ *
+ * @property action The original [ActivateAbility] (`costPayment.discardedCards` still empty).
+ * @property discardCandidates The hand cards matching the cost's filter, offered as options.
+ * @property fixedCount Non-null when a `{X}` mana symbol already fixed X; the selection must then
+ *   be exactly this many. Null when X is defined by the discard alone (Gix, Yawgmoth Praetor).
+ */
+@Serializable
+data class ActivateAbilityDiscardXContinuation(
+    val action: ActivateAbility,
+    val discardCandidates: List<EntityId>,
+    val fixedCount: Int? = null
+) : AnswerContinuation
+
+/**
+ * Resume after an opponent picks the target(s) for an activated ability's "… of an opponent's
+ * choice" requirement (Cuombajj Witches: "{T}: This creature deals 1 damage to any target and 1
+ * damage to any target of an opponent's choice").
+ *
+ * The activating player chose their own (controller) targets up front; those ride on [action].
+ * The handler then paused and raised a [com.wingedsheep.engine.core.ChooseTargetsDecision] routed
+ * to [deciderId] (the opponent) for the [opponentRequirements]. The resumer converts that response
+ * into [ChosenTarget]s, interleaves them with the controller's targets according to
+ * [fullRequirements] (preserving script order, so [com.wingedsheep.engine.handlers.EffectContext.buildNamedTargets]
+ * maps each to the right requirement), and re-enters the handler with
+ * `opponentTargetsChosen = true` so cost payment + stack placement proceed exactly once.
+ *
+ * The pause happens before any cost is paid, so cancellation pops this frame and restores priority
+ * with no side effects.
+ *
+ * @property action Original [ActivateAbility] carrying the controller's already-chosen targets.
+ * @property opponentRequirements The opponent-chosen requirements, in script order; aligned 1:1
+ *   with the indices in the [com.wingedsheep.engine.core.TargetsResponse].
+ * @property fullRequirements All target requirements (controller + opponent), in script order,
+ *   used to interleave the two target lists back into one aligned list.
+ * @property deciderId The opponent who makes the selection.
+ */
+@Serializable
+data class ActivateAbilityOpponentTargetContinuation(
+    val action: ActivateAbility,
+    val opponentRequirements: List<com.wingedsheep.sdk.scripting.targets.TargetRequirement>,
+    val fullRequirements: List<com.wingedsheep.sdk.scripting.targets.TargetRequirement>,
+    val deciderId: EntityId
+) : AnswerContinuation
+
+/**
+ * Resume after an activated ability's controller chooses which opponent will choose the
+ * "... of an opponent's choice" target. In two-player games the handler skips this frame and
+ * routes the target choice directly to the only opponent; this frame exists for multiplayer.
+ */
+@Serializable
+data class ActivateAbilityOpponentChooserContinuation(
+    val action: ActivateAbility,
+    val sourceName: String,
+    val opponentRequirements: List<com.wingedsheep.sdk.scripting.targets.TargetRequirement>,
+    val fullRequirements: List<com.wingedsheep.sdk.scripting.targets.TargetRequirement>,
+    val opponentIds: List<EntityId>
+) : AnswerContinuation
+
+/**
+ * Resume after a player picks which permanents to sacrifice to satisfy a
+ * [com.wingedsheep.sdk.scripting.costs.CostAtom.Sacrifice] cost on an activated ability.
+ *
+ * Surfaces the cost-choice the original engine path used to fail on: when an activation's
+ * `Sacrifice(filter, count, excludeSelf)` cost has more matching battlefield permanents than
+ * `count`, the handler raises a [SelectCardsDecision] and pushes this frame so the resumer can
+ * re-enter the handler with the player's chosen permanents filled into
+ * `costPayment.sacrificedPermanents`.
+ *
+ * Skipped (no pause) when `sacrificedPermanents` is already pre-filled (engine-direct path /
+ * resumed replay) or when candidate count ≤ required count (no real choice — CostHandler
+ * auto-picks). Sage of Lat-Nam ({T}, Sacrifice an artifact: Draw a card) is the canonical case.
+ *
+ * A joint cost with several sacrifice atoms ("Sacrifice a Swamp and a Forest" — Jarad, Golgari Lich
+ * Lord) raises one of these per atom that is a real choice; the resumer *appends* each answer, so
+ * the list fills as ordered per-atom segments
+ * ([com.wingedsheep.engine.mechanics.cost.SacrificeCostAssignment]).
+ *
+ * @property action The original [ActivateAbility] (`costPayment.sacrificedPermanents` empty, or
+ *   holding the earlier atoms' segments for a joint cost), so the resumer can re-enter the handler
+ *   with the chosen sacrifice victims appended.
+ * @property sacrificeCandidates The matching battlefield permanents offered to the player as
+ *   options; used to validate the response is a subset of the originally legal candidates.
+ * @property sacrificeCount Exact number of permanents the player must pick (`count` from the cost).
+ * @property distinctNames When true the chosen permanents must all have different names
+ *   ("sacrifice three artifact tokens with different names" — Transmutation Font).
+ */
+/**
+ * Resume after the player picks which hand card(s) pay a
+ * [com.wingedsheep.sdk.scripting.costs.CostAtom.PutFromHandOnTopOfLibrary] cost (Leashling). The
+ * resumer re-enters the handler with the choice in `costPayment.cardsPutOnLibrary`; the pause
+ * happens before any cost is paid, so nothing needs undoing on the way back in.
+ */
+@Serializable
+data class ActivateAbilityPutOnLibraryContinuation(
+    val action: ActivateAbility,
+    val candidates: List<EntityId>,
+    val count: Int
+) : AnswerContinuation
+
+@Serializable
+data class ActivateAbilitySacrificeContinuation(
+    val action: ActivateAbility,
+    val sacrificeCandidates: List<EntityId>,
+    val sacrificeCount: Int,
+    val distinctNames: Boolean = false
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks which permanents pay a variable-count
+ * [com.wingedsheep.sdk.scripting.costs.CostAtom.VariablePermanents] cost — "Exile one or more other
+ * [filter] you control with total mana value X" (Fabrication Foundry) or "Sacrifice one or more
+ * [filter]" (Radiant Lotus).
+ *
+ * The bare [ActivateAbility] arrives with no selection; the handler raised a [SelectCardsDecision]
+ * over the eligible permanents (min [minCount], max = all eligible) and pushed this frame. The
+ * resumer validates the pick, fills it into `costPayment.variableCostPermanents`, and re-enters the
+ * handler — which then computes X from it and pauses again for the target
+ * ([ActivateAbilityControllerTargetContinuation]). The selection pause happens before any cost is
+ * paid, so cancellation pops this frame with no side effects.
+ *
+ * @property action The original [ActivateAbility] (`costPayment.variableCostPermanents` still empty).
+ * @property candidates The eligible permanents offered as options (used to validate the pick).
+ * @property minCount Minimum number of permanents that must be chosen (the cost's floor).
+ * @property maxCount Maximum number that may be chosen (the cost's cap), or `null` for no cap.
+ */
+@Serializable
+data class ActivateAbilityVariablePermanentsContinuation(
+    val action: ActivateAbility,
+    val candidates: List<EntityId>,
+    val minCount: Int,
+    val maxCount: Int? = null
+) : AnswerContinuation
+
+/**
+ * Resume after the controller picks the target for an activated ability whose target legality
+ * depends on a value determined during activation — specifically the X-bounded reanimation target of
+ * a [com.wingedsheep.sdk.scripting.costs.CostAtom.VariablePermanents] ability (Fabrication Foundry:
+ * "Return target artifact card with mana value X or less from your graveyard to the battlefield").
+ *
+ * Because X isn't known until the exile selection is made, the target is chosen *after* the exile
+ * ([ActivateAbilityVariablePermanentsContinuation]) rather than up front. The handler raised a
+ * [ChooseTargetsDecision] whose legal targets were found with X threaded through the predicate
+ * context, and pushed this frame. The resumer converts the response into [ChosenTarget]s, fills
+ * `action.targets`, and re-enters the handler to pay the cost and put the ability on the stack.
+ *
+ * @property action The original [ActivateAbility] carrying the already-chosen exiled permanents
+ *   (and thus the resolved X) but no target yet.
+ * @property requirements The controller target requirements, in script order, aligned 1:1 with the
+ *   indices in the [TargetsResponse].
+ */
+@Serializable
+data class ActivateAbilityControllerTargetContinuation(
+    val action: ActivateAbility,
+    val requirements: List<TargetRequirement>
+) : AnswerContinuation

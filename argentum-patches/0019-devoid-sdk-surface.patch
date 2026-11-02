@@ -1,5 +1,16 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0019-devoid-sdk-surface
+
+---
+ docs/sdk-index.md                                   | 1 +
+ mtg-sdk/src/test/resources/sdk-surface-baseline.txt | 1 +
+ 2 files changed, 2 insertions(+)
+
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 02cde100d..348f7a27b 100644
+index 02cde100d9..348f7a27bf 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1416,6 +1416,7 @@ Families:
@@ -11,7 +22,7 @@ index 02cde100d..348f7a27b 100644
  - `ManaRestriction.EquipAbilityActivationOnly` — "Spend this mana only to activate equip abilities." Satisfied only by paying the cost of an **equip** ability (CR 702.6a — "Cost: Attach this permanent to target creature you control.
  - `ManaRestriction.FaceDownSpellsOnly` — "Spend this mana only to cast face-down spells." Satisfied by casting a card face down for its morph (CR 702.37a) or disguise (CR 702.168a) cost — a spell with no name and no characteristics but "2…
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index bf0eb74bc..1d90b5c8d 100644
+index bf0eb74bcc..1d90b5c8d8 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -1729,6 +1729,7 @@ ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaC
