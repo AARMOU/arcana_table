@@ -1,16 +1,13 @@
 package com.arcanatable.customcards.cards
 
-import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
-import com.wingedsheep.sdk.scripting.EntersWithCounters
-import com.wingedsheep.sdk.scripting.EventPattern
 import com.wingedsheep.sdk.scripting.GameObjectFilter
-import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
+import com.wingedsheep.sdk.scripting.GrantKeyword
+import com.wingedsheep.sdk.scripting.KeywordAbility
 import com.wingedsheep.sdk.scripting.effects.EffectChoice
 import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
 import com.wingedsheep.sdk.scripting.predicates.CardPredicate
-import com.wingedsheep.sdk.scripting.references.Player
 
 /**
  * Twins of Discord — Modern Horizons 3 Commander #37 (Eldrazi Incursion). {7} Creature — Eldrazi 8/6.
@@ -24,16 +21,14 @@ import com.wingedsheep.sdk.scripting.references.Player
  * not locked in on resolution: the engine's `CantBlockGroup` keeps a dynamic group filter, so a
  * creature that enters (or changes mana value) later that turn is covered too.
  *
- * **Bloodthirst grant.** Bloodthirst N (CR 702.54a) is the replacement effect "If an opponent was
- * dealt damage this turn, this permanent enters with N +1/+1 counters on it." The engine has no
- * bloodthirst keyword, so the granted ability is authored as the replacement it stands for, applied
- * from the Twins to each *other* colorless creature entering under its controller's control —
- * the same battlefield-source shape as Metallic Mimic. Per CR 614.12 the grant from a permanent
- * already on the battlefield applies to a creature as it enters, so this is the same event:
- * counters are there on entry (no trigger), it works for spells, tokens and reanimation, two Twins
- * add 2 + 2, and colour is read from the entering creature's characteristics (devoid counts as
- * colorless). `otherOnly = true` keeps the Twins from countering itself. "An opponent" is relative
- * to the Twins' controller, who is also the entering creature's controller.
+ * **Bloodthirst grant.** A real, grantable bloodthirst keyword from engine patch 0030:
+ * `GrantKeyword(KeywordAbility.grantedBloodthirst(2), …)` over other (`excludeSelf`) colorless
+ * creatures you control. The engine reads the entering creature's projected keywords as it would
+ * exist on the battlefield (CR 614.12), so a colorless creature entering while the Twins is out has
+ * bloodthirst 2 and, if an opponent was dealt damage this turn, enters with two +1/+1 counters (no
+ * trigger). Colour is the entering creature's projected colour (devoid counts as colorless); two
+ * Twins are two instances (2 + 2); a lose-all-abilities effect that applies to the creature removes
+ * the grant in the usual layer order; "an opponent" is relative to the creature's controller.
  */
 private val colorlessCreatureYouControl: GameObjectFilter =
     GameObjectFilter.Creature.withCardPredicate(CardPredicate.IsColorless).youControl()
@@ -61,18 +56,12 @@ val TwinsOfDiscord = card("Twins of Discord") {
     }
 
     // Each other colorless creature you control has bloodthirst 2.
-    replacementEffect(
-        EntersWithCounters(
-            count = 2,
-            otherOnly = true,
-            condition = Conditions.CompareAmounts(
-                DynamicAmounts.damageReceivedThisTurn(Player.EachOpponent),
-                ComparisonOperator.GTE,
-                1,
-            ),
-            appliesTo = EventPattern.ZoneChangeEvent(filter = colorlessCreatureYouControl, to = Zone.BATTLEFIELD),
+    staticAbility {
+        ability = GrantKeyword(
+            KeywordAbility.grantedBloodthirst(2),
+            GroupFilter(colorlessCreatureYouControl, excludeSelf = true),
         )
-    )
+    }
 
     metadata {
         rarity = Rarity.RARE

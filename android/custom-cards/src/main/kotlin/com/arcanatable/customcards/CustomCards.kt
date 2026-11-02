@@ -347,7 +347,7 @@ object CustomCards {
         Entry(AngelicAberration, "M3C", "Eldrazi Incursion"),
         // Eldrazi Incursion. No engine patch (existing cast trigger, permanent-or-opponent target, next-spell discount).
         Entry(MutatedCultist, "M3C", "Eldrazi Incursion"),
-        // Eldrazi Incursion. Needs engine patch 0030 (bloodthirst N keyword, grantable).
+        // Eldrazi Incursion. Needs engine patch 0030 (grantable bloodthirst N keyword).
         Entry(TwinsOfDiscord, "M3C", "Eldrazi Incursion"),
     )
 

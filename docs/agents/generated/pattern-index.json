@@ -29,7 +29,7 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 10,
+   "count": 9,
    "examples": [
     {
      "card": "Endless Atlas",
@@ -904,17 +904,6 @@
     }
    ]
   },
-  "DynamicAmounts.damageReceivedThisTurn": {
-   "count": 1,
-   "examples": [
-    {
-     "card": "Twins of Discord",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
-     "lines": 84,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
-    }
-   ]
-  },
   "DynamicAmounts.devotionTo": {
    "count": 1,
    "examples": [
@@ -1577,7 +1566,7 @@
     {
      "card": "Twins of Discord",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
-     "lines": 84,
+     "lines": 73,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
@@ -1668,7 +1657,7 @@
     {
      "card": "Twins of Discord",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
-     "lines": 84,
+     "lines": 73,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
@@ -4225,6 +4214,17 @@
     }
    ]
   },
+  "KeywordAbility.grantedBloodthirst": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 73,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "KeywordAbility.miracle": {
    "count": 2,
    "examples": [
@@ -4871,7 +4871,7 @@
     {
      "card": "Twins of Discord",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
-     "lines": 84,
+     "lines": 73,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
@@ -5272,7 +5272,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 22,
+   "count": 21,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5429,7 +5429,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 65,
+   "count": 66,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5554,7 +5554,7 @@
  },
  "field": {
   "condition": {
-   "count": 13,
+   "count": 12,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -6490,7 +6490,7 @@
    ]
   },
   "EntersWithCounters": {
-   "count": 4,
+   "count": 3,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -6509,12 +6509,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
-    },
-    {
-     "card": "Twins of Discord",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
-     "lines": 84,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
   },
@@ -6738,7 +6732,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -8024,7 +8018,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 20,
+   "count": 19,
    "examples": [
     {
      "card": "Silence",

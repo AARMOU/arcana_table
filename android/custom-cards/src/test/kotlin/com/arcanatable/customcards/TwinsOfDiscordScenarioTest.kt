@@ -190,6 +190,20 @@ class TwinsOfDiscordScenarioTest {
     }
 
     @Test
+    fun otherColorlessCreaturesHaveBloodthirstTwoAsAKeyword() {
+        val d = customScenario(TwinsOfDiscord, *lib)
+        val t = d.putCreatureOnBattlefield(d.player1, twins)
+        val thopter = d.cast(d.player1, "Ornithopter")
+        val bloodthirst2 = com.wingedsheep.sdk.scripting.KeywordAbility.grantedBloodthirst(2)
+        assertTrue(d.projected.hasKeyword(thopter, bloodthirst2))
+        assertFalse("not the Twins itself", d.projected.hasKeyword(t, bloodthirst2))
+        d.giveMana(d.player1, Color.GREEN, 2)
+        assertFalse("not a colored creature", d.projected.hasKeyword(d.cast(d.player1, "Grizzly Bears"), bloodthirst2))
+        d.moveToGraveyard(t)
+        assertFalse("gone with the Twins", d.projected.hasKeyword(thopter, bloodthirst2))
+    }
+
+    @Test
     fun noCountersWhenNoOpponentWasDamaged() {
         val d = customScenario(TwinsOfDiscord, *lib)
         d.putCreatureOnBattlefield(d.player1, twins)

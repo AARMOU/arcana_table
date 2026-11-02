@@ -45,6 +45,7 @@ MANDATORY = [
     "0026-free-cast-once-each-turn.patch",
     "0027-opponents-must-attack-anyone.patch",
     "0028-base-power-toughness-at-most.patch",
+    "0030-bloodthirst-keyword.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
