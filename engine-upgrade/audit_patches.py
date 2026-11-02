@@ -42,6 +42,7 @@ MANDATORY = [
     "0023-face-down-exile-hidden-from-owner.patch",
     "0024-commander-cast-history-amount.patch",
     "0025-akromas-will-modal-combat-trick.patch",
+    "0026-free-cast-once-each-turn.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

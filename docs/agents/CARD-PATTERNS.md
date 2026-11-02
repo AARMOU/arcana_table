@@ -425,3 +425,34 @@ What a reviewer rejects:
 - History of omissions and the few legacy approximations (do **not** add new ones):
   [`android/docs/CUSTOM_CARDS_HANDOFF.md`](../../android/docs/CUSTOM_CARDS_HANDOFF.md).
 - Engine primitive work is Claude's lane and tracked in issue #141.
+
+## 10. Mechanics added by Arcana engine patches (recipes)
+
+Each entry is a mechanic that a patch in [`argentum-patches/`](../../argentum-patches/) added to the engine, shown
+through the shortest real card that uses it. Copy the card's shape and its scenario test; the patch's own engine test
+is in the patch file. If your card needs the same thing with a different filter, zone or timing, change only those
+arguments.
+
+### Free cast "once each turn", including opponents' turns (patch 0026)
+
+Use for "Once each turn, you may pay {0} rather than pay the mana cost for …" and "Once each turn, you may cast … without
+paying its mana cost". `oncePerTurn = true` alone means "once during each of **your** turns" (Zaffai and the Tempests);
+`onAnyTurn = true` makes the use available on every turn, and the use refreshes each turn. It never changes timing: on
+another player's turn only instants and flash spells can use it. Additional costs still apply and X is 0 (CR 118.9).
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DarksteelMonolith.kt -->
+```kotlin
+    staticAbility {
+        ability = MayCastWithoutPayingManaCost(
+            controllerOnly = true,
+            spellFilter = GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless),
+            oncePerTurn = true,
+            onAnyTurn = true,
+            fromZones = setOf(Zone.HAND),
+        )
+    }
+```
+
+Test: [`DarksteelMonolithScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DarksteelMonolithScenarioTest.kt)
+(opponent-turn instant, once-per-turn on both turns, timing, filter, zone, controller, two sources, additional costs).
+Unlocks among missing six-deck cards: Darksteel Monolith.

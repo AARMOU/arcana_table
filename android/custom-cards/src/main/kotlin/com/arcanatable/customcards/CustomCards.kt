@@ -337,6 +337,8 @@ object CustomCards {
         // Eldrazi lands. Need the Eldrazi engine patches (engine-upgrade/eldrazi-temple, eldrazi-combined).
         Entry(EldraziTemple, "M3C", "Eldrazi Incursion"),
         Entry(CorruptedCrossroads, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Unbound. Needs engine patch 0026 (once-each-turn free cast on any turn).
+        Entry(DarksteelMonolith, "CMM", "Eldrazi Unbound"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
