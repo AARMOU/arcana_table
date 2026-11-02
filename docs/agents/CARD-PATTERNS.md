@@ -628,3 +628,31 @@ Test: [`BenthicAnomalyScenarioTest.kt`](../../android/custom-cards/src/test/kotl
 counters not copied, which chosen creature is copied, colorless Eldrazi creature with supertypes kept, copied ETB
 triggers, trigger resolves before and despite a countered spell, reanimation negative).
 Unlocks among missing six-deck cards: Benthic Anomaly.
+### "If you spend this mana to cast your commander, it enters with … counters" (patch 0034)
+
+Use for mana whose effect depends on it actually being spent on one of the caster's own commanders, with that
+commander's own command-zone cast count. Attach `ManaSpellRider.CommanderEntersWithCastCountCounters()` to the mana
+(`Effects.AddManaOfColorInCommanderColorIdentity(riders = …)` adds one mana of the commanders' combined identity; no
+commander or a colorless identity adds nothing). The rider owes the spell that commander's **own**
+`castsFromCommandZone` (never the partner-pair sum of 0024's `DynamicAmount.CommanderCastsFromCommandZone`), read after
+the cast is recorded: a command-zone cast counts itself, a countered earlier cast still counts, a cast from hand reads
+the count without adding to it. Counters are placed as it enters. Commander cast with other mana, or this mana spent
+on a noncommander: nothing. Each rider mana spent adds its own counters.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OpalPalace.kt -->
+```kotlin
+    activatedAbility {
+        cost = Costs.Composite(Costs.Mana("{1}"), Costs.Tap)
+        effect = Effects.AddManaOfColorInCommanderColorIdentity(
+            riders = setOf(ManaSpellRider.CommanderEntersWithCastCountCounters())
+        )
+        manaAbility = true
+        timing = TimingRule.ManaAbility
+```
+
+Test: [`OpalPalaceScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OpalPalaceScenarioTest.kt)
+(partners: count is per commander, swapped; Palace mana floating while the commander is cast with other mana; Palace
+mana on a noncommander; countered first cast + Palace-funded second cast = 2; hand casts read the count without adding;
+colors = combined / single identity; colorless identity and no commander make no mana; {T}: Add {C}; {1} must be paid);
+engine: `CommanderCastCountCountersRiderTest` (own count not pair sum, provenance, two rider mana = twice the count).
+Unlocks among missing six-deck cards: Opal Palace (Eldrazi Incursion, Tyranid Swarm).

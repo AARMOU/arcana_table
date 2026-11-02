@@ -35,10 +35,11 @@ class EldraziIncursionPlayableTest {
     private val commander = entries.single { it.commander }.name
     private val names = entries.flatMap { e -> List(e.count) { e.name } }
 
-    /** Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. */
-    private val expectedMissing = setOf(
-        "Opal Palace",
-    )
+    /**
+     * Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. Empty
+     * since Opal Palace (engine patch 0034): every original slot is indexed.
+     */
+    private val expectedMissing = emptySet<String>()
 
     @Test fun originalSlotIndexInventoryMatchesTheExplicitMissingList() {
         assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
@@ -62,13 +63,14 @@ class EldraziIncursionPlayableTest {
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
             "Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge", "Angelic Aberration",
-            "Mutated Cultist", "Hideous Taskmaster", "Twins of Discord", "Benthic Anomaly",
+            "Mutated Cultist", "Hideous Taskmaster", "Twins of Discord", "Benthic Anomaly", "Opal Palace",
         ).forEach { name ->
             assertNotNull("registered: $name", registry.getCard(name))
             assertTrue("in the deck: $name", name in setup.you.deck)
         }
-        val leftOut = setup.notes.first { "Left out" in it }
-        assertTrue(leftOut, "${expectedMissing.size} card" in leftOut)
+        val leftOut = setup.notes.filter { "Left out" in it }
+        if (expectedMissing.isEmpty()) assertEquals("nothing left out of the precon", emptyList<String>(), leftOut)
+        else assertTrue(leftOut.toString(), leftOut.single().let { "${expectedMissing.size} card" in it })
     }
 
     private fun mirrorRegistry() = CardRegistry().apply { register(lib.load(names.toSet())) }

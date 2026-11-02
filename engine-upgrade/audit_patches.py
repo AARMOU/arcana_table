@@ -48,6 +48,7 @@ MANDATORY = [
     "0032-per-player-target-binding.patch",
     "0030-bloodthirst-keyword.patch",
     "0033-property-sum-of-collection.patch",
+    "0034-commander-cast-count-counters-rider.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
