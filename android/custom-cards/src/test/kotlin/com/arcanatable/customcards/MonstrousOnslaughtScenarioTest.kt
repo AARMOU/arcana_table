@@ -46,11 +46,11 @@ class MonstrousOnslaughtScenarioTest {
 
     @Test
     fun greatestPowerLimitsHowManyCreaturesCanBeTargeted() {
-        val d = customScenario(MonstrousOnslaught, "Grizzly Bears")
+        val d = customScenario(MonstrousOnslaught, "Grizzly Bears", "Savannah Lions")
         val p = d.player1
         val opponent = d.player2
         val source = d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        val targets = List(3) { d.putCreatureOnBattlefield(opponent, "Grizzly Bears") }
+        val targets = List(3) { d.putCreatureOnBattlefield(opponent, "Savannah Lions") }
         val spell = d.putCardInHand(p, "Monstrous Onslaught")
         d.giveMana(p, Color.GREEN, 2)
         d.giveColorlessMana(p, 3)
@@ -78,7 +78,7 @@ class MonstrousOnslaughtScenarioTest {
         )
         d.resolveAll()
 
-        assertEquals(1, d.permanentsNamed(opponent, "Grizzly Bears").size)
+        assertEquals(1, d.permanentsNamed(opponent, "Savannah Lions").size)
     }
 
     @Test
