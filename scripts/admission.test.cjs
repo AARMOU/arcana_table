@@ -338,3 +338,20 @@ test('burst window: builds may take all three slots; repairs keep their rule; bu
   assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2), working(3)], ready: burst, snapshot: snap(100), now: NOW }).reason, /capacity: 3 of 3/);
   assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2)], ready: three, snapshot: snap(100), now: NOW }).reason, /builder slot occupied/);
 });
+
+test('owner daily credit limit (paceLimit) blocks new paid assignment and repair in admission, counting reservations', () => {
+  const three = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '3' }));
+  const base = snap(100);
+  const ok = { ...base, reportedUsed: 100, paceLimit: 200 };
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: ok, now: NOW }).allowed, true);
+  const at = { ...base, reportedUsed: 200, paceLimit: 200 };
+  const d = A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: at, now: NOW });
+  assert.equal(d.allowed, false); assert.match(String(d.reason), /daily-credit-limit/);
+  assert.equal(A.admit({ op: 'repair', unit: review(66), units: [], ready: three, snapshot: at, now: NOW }).allowed, false);
+  // Below the limit on billed credits, but the reservation for this candidate would cross it: blocked.
+  const near = { ...base, reportedUsed: 200 - three.estSession + 0.5, paceLimit: 200 };
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: near, now: NOW }).allowed, false);
+  // Malformed limit fails closed; no paceLimit at all leaves the monthly policy unchanged.
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: { ...ok, paceLimit: 'x' }, now: NOW }).allowed, false);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: base, now: NOW }).allowed, true);
+});
