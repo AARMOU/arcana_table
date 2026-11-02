@@ -47,6 +47,7 @@ MANDATORY = [
     "0028-base-power-toughness-at-most.patch",
     "0032-per-player-target-binding.patch",
     "0030-bloodthirst-keyword.patch",
+    "0033-property-sum-of-collection.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

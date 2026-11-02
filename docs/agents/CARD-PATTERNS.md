@@ -580,3 +580,51 @@ Test: [`TwinsOfDiscordScenarioTest.kt`](../../android/custom-cards/src/test/kotl
 creature, two Twins stack, Twins gone, not itself); engine: `BloodthirstKeywordTest` (printed, granted, stacking,
 lose all abilities).
 Unlocks among missing six-deck cards: Twins of Discord.
+### "For each opponent, choose a creature …" and the total power/toughness of those creatures (patch 0033)
+
+Use for a *choice* (not a target) of one object per opponent, then a number read off exactly the chosen objects.
+`forEachPlayerCollecting(Player.EachOpponent) { … }` runs once per opponent with `Player.You` bound to that opponent
+and returns the union of the slots the block returns; `Chooser.SourceController` makes the card's controller choose
+(hexproof and shroud don't apply; an opponent with nothing to choose adds nothing). Patch 0033 adds
+`slot.sumOf(CardNumericProperty.POWER | TOUGHNESS | …)` (`DynamicAmount.PropertySumOfCollection`): the total of that
+property over exactly the collection, projected on the battlefield (counters and pumps count). Don't accumulate with
+`StoreNumber` inside a for-each loop (the loop drops stored numbers) and don't use `AggregateBattlefield(SUM)` (that
+totals a filter, not a choice). Copy exceptions on `CreateTokenCopyOfTarget` (`basePower`/`baseToughness`,
+`overrideColors = emptySet()`, `overrideCardTypes`, `overrideSubtypes`) are copiable values; supertypes are kept.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BenthicAnomaly.kt -->
+```kotlin
+            val chosen = forEachPlayerCollecting(Player.EachOpponent) {
+                val theirs = gather(GameObjectFilter.Creature, player = Player.You)
+                listOf(
+                    chooseExactly(
+                        1,
+                        from = theirs,
+                        chooser = Chooser.SourceController,
+                        prompt = "Choose a creature that player controls",
+                    )
+                )
+            }.single()
+            val copied = chooseExactly(
+                1,
+                from = chosen,
+                chooser = Chooser.SourceController,
+                prompt = "Choose which of those creatures to copy",
+            )
+            run(
+                Effects.CreateTokenCopyOfTarget(
+                    target = copied.asTarget,
+                    basePower = chosen.sumOf(CardNumericProperty.POWER),
+                    baseToughness = chosen.sumOf(CardNumericProperty.TOUGHNESS),
+                    overrideColors = emptySet(),
+                    overrideCardTypes = setOf(CardType.CREATURE),
+                    overrideSubtypes = setOf(Subtype("Eldrazi")),
+                )
+            )
+```
+
+Test: [`BenthicAnomalyScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BenthicAnomalyScenarioTest.kt)
+(2- and 3-player, hexproof creature choosable, opponent with no creatures, no creatures at all, projected totals with
+counters not copied, which chosen creature is copied, colorless Eldrazi creature with supertypes kept, copied ETB
+triggers, trigger resolves before and despite a countered spell, reanimation negative).
+Unlocks among missing six-deck cards: Benthic Anomaly.
