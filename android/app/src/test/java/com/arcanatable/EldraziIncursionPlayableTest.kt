@@ -206,4 +206,73 @@ class EldraziIncursionPlayableTest {
             assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions ${progress(state)}", state.gameOver)
         }
     }
+
+    // ---- TEMP (Opal Palace / Eldrazi AI-passivity diagnosis, GSD to drop) ------------------------
+
+    private fun namesOf(state: GameState, ids: List<com.wingedsheep.sdk.model.EntityId>) =
+        ids.mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
+
+    /** Seed 1, strict loop: one line per action the active player takes at priority in a main phase. */
+    @Test fun tempSeed1MainPhaseDiagnostics() {
+        val registry = mirrorRegistry()
+        val init = GameInitializer(registry).initializeGame(mirrorConfig(1))
+        val processor = ActionProcessor(registry)
+        val enumerator = com.wingedsheep.engine.legalactions.LegalActionEnumerator.create(registry)
+        val ais = init.state.turnOrder.associateWith { AIPlayer.create(registry, it) }
+        val label = init.state.turnOrder.withIndex().associate { (i, id) -> id to if (i == 0) "A" else "B" }
+        var state = init.state
+        var n = 0
+        val out = StringBuilder()
+        while (!state.gameOver && state.turnNumber <= 30 && n < 8_000) {
+            val decision = state.pendingDecision
+            val actor = decision?.playerId ?: state.priorityPlayerId!!
+            val ai = ais.getValue(actor)
+            val action = if (decision != null) SubmitDecision(actor, ai.respondToDecision(state, decision)) else ai.chooseAction(state)
+            val main = state.step == com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN || state.step == com.wingedsheep.sdk.core.Step.POSTCOMBAT_MAIN
+            if (decision == null && main && actor == state.activePlayerId && state.stack.isEmpty()) {
+                val bf = state.getZone(actor, com.wingedsheep.sdk.core.Zone.BATTLEFIELD)
+                val untapped = bf.filter { state.getEntity(it)?.has<com.wingedsheep.engine.state.components.battlefield.TappedComponent>() == false }
+                val drops = state.getEntity(actor)?.get<com.wingedsheep.engine.state.components.player.LandDropsComponent>()
+                out.append("t${state.turnNumber} ${label[actor]} ${state.step} hand=${namesOf(state, state.getZone(actor, com.wingedsheep.sdk.core.Zone.HAND))} ")
+                    .append("untapped=${namesOf(state, untapped)} tapped=${namesOf(state, bf - untapped.toSet())} drops=$drops pool=${state.getEntity(actor)?.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()} ")
+                    .append("chose=${describe(state, action)}")
+                if (action is com.wingedsheep.engine.core.PassPriority) {
+                    val offered = runCatching { enumerator.enumerate(state, actor) }.getOrElse { e -> out.append(" ENUM-THREW=$e"); emptyList() }
+                        .filter { it.actionType != "PassPriority" && !it.isManaAbility }
+                    out.append(" offered=${offered.map { "${it.actionType}:${describe(state, it.action)}:${if (it.affordable) "ok" else "unaffordable"}" }}")
+                }
+                out.append('\n')
+            }
+            val result = processor.process(state, action).result
+            if (result.error != null) { out.append("REJECTED $action: ${result.error}\n"); break }
+            state = result.state
+            n++
+        }
+        out.append("END turn=${state.turnNumber} over=${state.gameOver} actions=$n ${progress(state)}")
+        throw AssertionError("TEMP seed-1 diagnostics (always fails, prints the trace):\n$out")
+    }
+
+    private fun looseMirror(seed: Int) {
+        val registry = mirrorRegistry()
+        val init = GameInitializer(registry).initializeGame(mirrorConfig(seed))
+        val processor = ActionProcessor(registry)
+        val ais = init.state.turnOrder.associateWith { AIPlayer.create(registry, it) }
+        var state: GameState = init.state
+        var actions = 0
+        while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000) {
+            val decision = state.pendingDecision
+            val next = if (decision != null) {
+                val r = processor.process(state, SubmitDecision(decision.playerId, ais.getValue(decision.playerId).respondToDecision(state, decision))).result
+                if (r.error != null) null else r.state
+            } else state.priorityPlayerId?.let { ais.getValue(it).playPriorityWindow(state, processor) }
+            actions++
+            state = next ?: break
+        }
+        assertTrue("seed $seed loose mirror must finish; turn=${state.turnNumber}, actions=$actions ${progress(state)}", state.gameOver)
+    }
+
+    @Test fun tempSeed2Strict() { strictMirror(2, mirrorRegistry()) }
+    @Test fun tempSeed3Strict() { strictMirror(3, mirrorRegistry()) }
+    @Test fun tempSeed2Loose() { looseMirror(2) }
+    @Test fun tempSeed3Loose() { looseMirror(3) }
 }
