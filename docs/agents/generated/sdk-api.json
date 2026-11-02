@@ -8044,6 +8044,9 @@
    "blitz": [
     "blitz(String, AdditionalCost): KeywordAbility"
    ],
+   "bloodthirst": [
+    "bloodthirst(Int): KeywordAbility"
+   ],
    "bushido": [
     "bushido(Int): KeywordAbility"
    ],
@@ -8125,6 +8128,9 @@
    ],
    "foretell": [
     "foretell(String): KeywordAbility"
+   ],
+   "grantedBloodthirst": [
+    "grantedBloodthirst(Int): String"
    ],
    "grantedCrew": [
     "grantedCrew(Int): String"
@@ -8661,6 +8667,7 @@
    "MODULAR",
    "FADING",
    "VANISHING",
+   "BLOODTHIRST",
    "CUMULATIVE_UPKEEP",
    "ECHO",
    "SOULSHIFT",
