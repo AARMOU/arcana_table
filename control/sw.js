@@ -5,7 +5,7 @@ const BUILD='dev';
 const CACHE='arcana-control-shell-v20-'+BUILD;
 const DATA='arcana-control-data-v1';
 const HONK_TITLE='🪿🪿🪿CARD READY FOR APPROVAL HONK🪿🪿🪿';
-const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./card-ready-notifications.js','./authorize.js','./team-checkin.js','./goosegeta.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./card-ready-notifications.js','./authorize.js','./team-checkin.js','./goosegeta.js','./orders-page.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const scope=new URL(self.registration.scope);
 const shellUrls=new Set(SHELL.map(s=>new URL(s,scope).href));
 // Public, read-only status feeds the dashboard reads. They are always fetched from the network first; the last good

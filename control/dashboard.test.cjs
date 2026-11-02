@@ -83,8 +83,8 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
   assert.match(script,/Feed unavailable · last recorded status/);
 });
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
-  // The only extra module is the owner's Web Push opt-in; the inline dashboard stays read-only.
-  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./card-ready-notifications.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
+  // Extra modules: owner Web Push opt-in, approvals, check-in, Goose, and the read-only owner briefing (orders-page.js).
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./card-ready-notifications.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"','<script src="./orders-page.js"']);});
 test('card-ready notifications are opt-in, same-origin, and carry the exact honk in the PWA',()=>{
   const client=fs.readFileSync(path.join(__dirname,'card-ready-notifications.js'),'utf8');
   const worker=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
