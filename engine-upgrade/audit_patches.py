@@ -47,6 +47,8 @@ MANDATORY = [
     "0032-per-player-target-binding.patch",
     "0030-bloodthirst-keyword.patch",
     "0033-property-sum-of-collection.patch",
+    "0034-commander-cast-count-counters-rider.patch",
+    "0035-ai-idle-mana-deploy.patch",
 ]
 # Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
 # numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.

@@ -1,0 +1,492 @@
+diff --git a/ai/CHANGELOG.md b/ai/CHANGELOG.md
+index 467f71ad..d891fb18 100644
+--- a/ai/CHANGELOG.md
++++ b/ai/CHANGELOG.md
+@@ -28,6 +28,7 @@ Format — newest first, one bullet each:
+ 
+ ## Changes
+ 
++- The default profile (`current`, which `AIPlayer.create` builds) now casts mana rocks and other cheap sorcery-speed permanents into mana it has no instant-speed use for, instead of passing every turn: tapping lands is charged only when an affordable instant or flash card in hand needs them, and a deployed permanent isn't charged as card loss. Sacrifice-mana tokens made inline (Eldrazi Scion and Spawn) can also pay for a cast
+ - #4092 Facing a 60-card deck it matches to a set, builds from all of that set's legal cards instead of only the set's reprints, and when that build would still be thin (under 4/5 of the spell slots or under 8 creatures in 60) builds a constructed deck for the deck's format instead, rather than seating a 44-land pile with no creatures
+ - #4085 Returning its own permanent to hand (Rescue Girl, First Responder) now picks the permanent worth recasting, like an enters-trigger creature, instead of a land or a token, and counts that recast as the reason to activate
+ - #4019 Facing a constructed deck with no single-set identity (a Standard deck spread over many sets), builds a fresh deck for the format that deck was built for — the one its saved or starter deck declares, else the narrowest of Standard to Vintage it is legal in — instead of a 40-card sealed pool from a random set; a deck from one or a few sets is still answered out of those sets, now to its declared format
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+index a924f22f..fa230013 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+@@ -361,6 +361,7 @@ class AIPlayer(
+                     holdUnusablePumps = profile.holdUnusablePumps,
+                     targetPolarityFromEffect = profile.targetPolarityFromEffect,
+                     permanentCastIsNotCardLoss = profile.permanentCastIsNotCardLoss,
++                    manaHeldOnlyForInstants = profile.manaHeldOnlyForInstants,
+                     fuelLoyaltyIsNotBoardValue = profile.fuelLoyaltyIsNotBoardValue,
+                     defendPlaneswalkers = profile.defendPlaneswalkers,
+                     spendFuelWalkers = profile.spendFuelWalkers,
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
+index c5bc458f..3b10e676 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
+@@ -566,6 +566,32 @@ data class AiProfile(
+      * value is real option value.
+      */
+     val permanentCastIsNotCardLoss: Boolean = false,
++    /**
++     * Charge a spell cast in our own main phase for the lands it taps only when those lands were
++     * holding up an instant-speed card — [permanentCastIsNotCardLoss]'s argument, applied to the
++     * mana instead of the card.
++     *
++     * `BoardPresence` prices an untapped land 0.6 and a tapped one 0.3, flat. Without
++     * [sequenceLandsByUsableMana] that is the whole cost of spending mana, and it is a real cost in
++     * one situation only: a land tapped now is not untapped on the opponent's turn, so an instant or
++     * flash card in hand loses its window. With nothing like that in hand, mana not spent in our own
++     * main phase is simply lost at end of turn, but the charge (0.45 per land at the default weight)
++     * still applies. A two-mana rock is worth 0.75 to the evaluator without card knowledge, so it is
++     * worth less than the two lands it taps, and so is every other cheap non-creature permanent.
++     * Off a 2026-11-02 Eldrazi Incursion mirror (`EldraziIncursionPlayableTest`, seed 1), both seats
++     * passed every main phase from turn 10 to 30 with two Talismans, Herald's Horn and Garruk's
++     * Uprising castable, each scored 0.25–1.0 below passing, and the game hit its turn cap.
++     *
++     * `Strategist` therefore refunds exactly the land charge the evaluator applied:
++     * `evaluate(leaf with the spent lands untapped) − evaluate(leaf)`. It does so only for a cast from
++     * our own main phase with the stack empty, and only if the lands left untapped can still cast
++     * every instant-speed card in hand that the root's untapped lands could cast. An instant we could
++     * not have afforded anyway (mana value above the untapped land count) does not hold mana. Like
++     * `BoardPresence`'s idle-mana term, this compares mana value with a land count and ignores colours;
++     * a mana solver call per candidate is not affordable here. A tap that breaks the instant's window
++     * is charged as before, so a held answer still keeps its mana.
++     */
++    val manaHeldOnlyForInstants: Boolean = false,
+     /**
+      * Score `ThreatAssessment`'s evasion term the way it reads after an attack, so attacking with a
+      * flier the opponent cannot block stops reading as a loss.
+@@ -1310,11 +1336,21 @@ data class AiProfile(
+         val LEGACY_V0 = AiProfile(id = "v0")
+ 
+         /**
+-         * What `AIPlayer.create(registry, playerId)` builds today. Identical to [LEGACY_V0] right
+-         * now — it diverges as later phases turn features on, and the gap between the two is
+-         * exactly what the arena measures.
++         * What `AIPlayer.create(registry, playerId)` builds today. It diverges from [LEGACY_V0] as
++         * later phases turn features on, and the gap between the two is exactly what the arena
++         * measures.
++         *
++         * Arcana (patch 0035) turns on the two halves of "a sorcery-speed cast is a deployment,
++         * not a loss": [permanentCastIsNotCardLoss] (already shipped in [LIVE]) for the card, and
++         * [manaHeldOnlyForInstants] for the mana. Without them this profile, which has no card
++         * knowledge, never cast a cheap non-creature permanent: a flat 0.5 board value against the
++         * card and mana charges.
+          */
+-        val CURRENT = AiProfile(id = "current")
++        val CURRENT = AiProfile(
++            id = "current",
++            permanentCastIsNotCardLoss = true,
++            manaHeldOnlyForInstants = true,
++        )
+ 
+         /**
+          * What a player faced in a real game **up to 2026-08-07**, when
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+index cbce75bf..fb6fb9e4 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+@@ -43,6 +43,7 @@ import com.wingedsheep.engine.handlers.PredicateEvaluator
+ import com.wingedsheep.engine.mechanics.layers.ProjectedState
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.state.components.battlefield.TappedComponent
+ import com.wingedsheep.engine.state.components.identity.CardComponent
+ import com.wingedsheep.engine.state.components.identity.TokenComponent
+ import com.wingedsheep.engine.state.ZoneKey
+@@ -51,6 +52,7 @@ import com.wingedsheep.engine.state.components.stack.ChosenTarget
+ import com.wingedsheep.sdk.core.Color
+ import com.wingedsheep.sdk.core.CounterType
+ import com.wingedsheep.sdk.core.Format
++import com.wingedsheep.sdk.core.Keyword
+ import com.wingedsheep.sdk.core.ManaCost
+ import com.wingedsheep.sdk.core.ManaSymbol
+ import com.wingedsheep.sdk.core.Step
+@@ -172,6 +174,11 @@ class Strategist(
+      * permanent cast. See [deploymentCredit].
+      */
+     private val permanentCastIsNotCardLoss: Boolean = false,
++    /**
++     * [AiProfile.manaHeldOnlyForInstants]: refund the tapped-land charge on a cast from our own
++     * main phase when no affordable instant-speed card needed those lands. See [idleManaCredit].
++     */
++    private val manaHeldOnlyForInstants: Boolean = false,
+     /**
+      * [AiProfile.fuelLoyaltyIsNotBoardValue] — refund the board price of loyalty a minus-only
+      * planeswalker spends on a loyalty ability. See [fuelLoyaltyCredit].
+@@ -792,8 +799,17 @@ class Strategist(
+     private fun sacrificesItself(state: GameState, action: GameAction): Boolean {
+         val activation = action as? ActivateAbility ?: return false
+         val card = state.getEntity(activation.sourceId)?.get<CardComponent>() ?: return false
++        // A token made by `CreateToken(activatedAbilities = …)` (the Eldrazi Scion and Spawn tokens
++        // most Eldrazi cards make) has no definition carrying the ability: it lives in
++        // `grantedActivatedAbilities`, where the enumerator and `ActivateAbilityHandler` find it.
++        // Looking only at the registry left every such token out, so a cast that needed its {C}
++        // was dropped as illegal.
+         val ability = simulator.cardRegistry.getCard(card.cardDefinitionId)?.script?.activatedAbilities
+-            ?.firstOrNull { it.id == activation.abilityId } ?: return false
++            ?.firstOrNull { it.id == activation.abilityId }
++            ?: state.grantedActivatedAbilities
++                .firstOrNull { it.entityId == activation.sourceId && it.ability.id == activation.abilityId }
++                ?.ability
++            ?: return false
+         return when (val cost = ability.cost) {
+             is AbilityCost.SacrificeSelf -> true
+             is AbilityCost.Composite -> cost.costs.any { it is AbilityCost.SacrificeSelf }
+@@ -991,10 +1007,12 @@ class Strategist(
+         if (spendFuelWalkers) fuelWalkerSpend(state, action, playerId, passScore, leafState)?.let { return it }
+         val deployed = deploymentCredit(state, action, leafState, playerId)
+         val fuel = fuelLoyaltyCredit(state, action, leafState, playerId)
+-        val credit = deployed + fuel
++        val idleMana = idleManaCredit(state, action, leafState, playerId)
++        val credit = deployed + fuel + idleMana
+         val leafScore = rawLeafScore + credit
+         val creditNote = listOfNotNull(
+             if (deployed > 0.0) "deployed, not spent %+.2f".format(deployed) else null,
++            if (idleMana > 0.0) "mana held for no instant %+.2f".format(idleMana) else null,
+             if (fuel > 0.0) "loyalty is only fuel %+.2f".format(fuel) else null,
+         ).joinToString("; ").ifEmpty { null }
+         val cardName = resolveCardName(state, action) ?: return AdjustedScore(leafScore, creditNote)
+@@ -1531,6 +1549,58 @@ class Strategist(
+         return charge.coerceAtLeast(0.0)
+     }
+ 
++    /**
++     * What the evaluator charged for the lands [action] tapped, refunded when that mana was not
++     * holding anything up ([AiProfile.manaHeldOnlyForInstants]).
++     *
++     * Measured with the evaluator, as [deploymentCredit] is:
++     * `evaluate(leaf with the spent lands untapped) − evaluate(leaf)`. Whichever land model the
++     * profile runs, the refund is exactly the charge it applied. If that model already refunded
++     * idle mana, the difference is zero and nothing is counted twice.
++     *
++     * The conditions:
++     *  - **A cast from our own main phase with the stack empty.** At sorcery timing, mana this
++     *    turn's main phases don't spend is gone at end of turn.
++     *  - **The lands left untapped still cast every instant-speed card the root's untapped lands
++     *    could.** Instants and flash cards in hand, other than the one being cast, are the only
++     *    reason to keep mana for the opponent's turn. One we couldn't afford anyway (mana value
++     *    above the untapped land count) holds nothing. A tap that breaks that window keeps its
++     *    full charge.
++     *  - **Lands only, mana value against land count, colours ignored.** These are the same
++     *    approximations [BoardPresence]'s land-sequencing term makes, for the same reason: a
++     *    solver call per candidate is not affordable.
++     *  - **Never negative.**
++     */
++    private fun idleManaCredit(
++        root: GameState,
++        action: LegalAction,
++        leaf: GameState,
++        playerId: EntityId,
++    ): Double {
++        if (!manaHeldOnlyForInstants) return 0.0
++        val cast = action.action as? CastSpell ?: return 0.0
++        if (!root.isActiveTurnFor(playerId) || root.stack.isNotEmpty()) return 0.0
++        if (root.step != Step.PRECOMBAT_MAIN && root.step != Step.POSTCOMBAT_MAIN) return 0.0
++        val projected = root.projectedState
++        val untappedAtRoot = projected.getBattlefieldControlledBy(playerId).filter {
++            projected.hasType(it, "LAND") && root.getEntity(it)?.has<TappedComponent>() != true
++        }
++        val spent = untappedAtRoot.filter { leaf.getEntity(it)?.has<TappedComponent>() == true }
++        if (spent.isEmpty()) return 0.0
++        val heldFor = root.getZone(playerId, Zone.HAND).asSequence()
++            .filter { it != cast.cardId }
++            .mapNotNull { root.getEntity(it)?.get<CardComponent>() }
++            .filter { !it.isLand && (it.typeLine.isInstant || Keyword.FLASH in it.baseKeywords) }
++            .map { it.manaValue }
++            .filter { it <= untappedAtRoot.size }
++            .maxOrNull()
++        if (heldFor != null && untappedAtRoot.size - spent.size < heldFor) return 0.0
++        val restored = spent.fold(leaf) { acc, id -> acc.updateEntity(id) { it.without<TappedComponent>() } }
++        val charge = evaluator.evaluate(restored, restored.projectedState, playerId) -
++            evaluator.evaluate(leaf, leaf.projectedState, playerId)
++        return charge.coerceAtLeast(0.0)
++    }
++
+     /**
+      * What the evaluator charged for the loyalty a loyalty ability spent, refunded when the walker
+      * can only ever spend it — [AiProfile.fuelLoyaltyIsNotBoardValue].
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
+new file mode 100644
+index 00000000..bc9d0fec
+--- /dev/null
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
+@@ -0,0 +1,174 @@
++package com.wingedsheep.ai.engine
++
++import com.wingedsheep.ai.insight.AiActionOption
++import com.wingedsheep.ai.insight.AiInsightSink
++import com.wingedsheep.ai.puzzles.advanceToPriority
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.core.GameAction
++import com.wingedsheep.engine.core.PassPriority
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.scripting.AbilityCost
++import com.wingedsheep.sdk.scripting.TimingRule
++import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
++import io.kotest.assertions.withClue
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * [AiProfile.manaHeldOnlyForInstants], which ships in [AiProfile.CURRENT] (Arcana patch 0035)
++ * together with [AiProfile.permanentCastIsNotCardLoss].
++ *
++ * The failure it fixes comes from the 2026-11-02 Eldrazi Incursion AI mirror (seed 1). Both seats
++ * passed every main phase for twenty turns with Talismans and Herald's Horn castable. Each scored
++ * just below passing because the flat tapped-land charge in `BoardPresence` cost more than a
++ * non-creature permanent is worth without card knowledge. The controls show that the charge still
++ * does its job when an affordable instant-speed card in hand needs the mana on the opponent's turn.
++ */
++class ManaHeldOnlyForInstantsTest : ScenarioTestBase() {
++
++    /** A two-mana "add one mana" rock. */
++    private val rock = card("Idle Mana Test Rock") {
++        manaCost = "{2}"
++        colorIdentity = ""
++        typeLine = "Artifact"
++        oracleText = "{T}: Add {C}."
++        activatedAbility {
++            cost = AbilityCost.Tap
++            effect = Effects.AddColorlessMana(1)
++            manaAbility = true
++            timing = TimingRule.ManaAbility
++        }
++    }
++
++    /** A three-mana permanent that does nothing. */
++    private val trinket = card("Idle Mana Test Trinket") {
++        manaCost = "{3}"
++        colorIdentity = ""
++        typeLine = "Artifact"
++    }
++
++    /** The six-drop the rock is played beside: never castable on three lands. */
++    private val colossus = card("Idle Mana Test Colossus") {
++        manaCost = "{5}{R}"
++        typeLine = "Creature — Giant"
++        power = 6
++        toughness = 6
++    }
++
++    /** An instant-speed answer with no target on our own turn, so it's never a candidate here. */
++    private fun counterspell(name: String, cost: String) = card(name) {
++        manaCost = cost
++        typeLine = "Instant"
++        oracleText = "Counter target spell."
++        spell {
++            target(TargetFilter.SpellOnStack)
++            effect = Effects.CounterSpell()
++        }
++    }
++
++    private val denial = counterspell("Idle Mana Test Denial", "{1}{R}{R}")
++    private val cheapDenial = counterspell("Idle Mana Test Snap", "{R}")
++    private val dearDenial = counterspell("Idle Mana Test Refusal", "{3}{R}{R}")
++
++    init {
++        cardRegistry.register(listOf(rock, trinket, colossus, denial, cheapDenial, dearDenial))
++    }
++
++    /** Our precombat main on turn 6: three untapped Mountains and [hand]. */
++    private fun board(vararg hand: String): TestGame = scenario().withPlayers()
++        .withRngSeed(RNG_SEED)
++        .withTurnNumber(6)
++        .withLandsOnBattlefield(1, "Mountain", 3)
++        .apply { hand.forEach { withCardInHand(1, it) } }
++        .apply { repeat(6) { withCardInLibrary(1, "Mountain") } }
++        .apply { repeat(6) { withCardInLibrary(2, "Mountain") } }
++        .build()
++        .advanceToPriority(1, Step.PRECOMBAT_MAIN)
++
++    /** The action [profile] takes, and the options it scored, for the failure message. */
++    private fun TestGame.choose(profile: AiProfile = AiProfile.CURRENT): Pair<GameAction, List<AiActionOption>> {
++        var options = emptyList<AiActionOption>()
++        val sink = AiInsightSink { _, insight -> if (insight.options.size > 1) options = insight.options }
++        val action = AIPlayer.create(cardRegistry, player1Id, profile, insightSink = sink).chooseAction(state)
++        return action to options
++    }
++
++    private fun TestGame.castName(action: GameAction): String? =
++        (action as? CastSpell)?.let { state.getEntity(it.cardId)?.get<CardComponent>()?.name }
++
++    /** Assert that [AiProfile.CURRENT] casts [expected] here, naming every scored option if not. */
++    private fun TestGame.shouldCast(expected: String) {
++        val (action, options) = choose()
++        withClue("options: $options") { castName(action) shouldBe expected }
++    }
++
++    init {
++        // ── The fix ──
++
++        test("casts a two-mana rock beside a six-drop it cannot cast, rather than passing") {
++            val game = board("Idle Mana Test Rock", "Idle Mana Test Colossus")
++            val (action, options) = game.choose()
++            withClue("options: $options") {
++                game.castName(action) shouldBe "Idle Mana Test Rock"
++            }
++        }
++
++        test("the frozen v0 profile still passes there: the change is the profile's, not the evaluator's") {
++            val game = board("Idle Mana Test Rock", "Idle Mana Test Colossus")
++            game.choose(AiProfile.LEGACY_V0).first shouldBe PassPriority(game.player1Id)
++        }
++
++        test("a cheap non-creature permanent is deployed when nothing in hand wants the mana") {
++            board("Idle Mana Test Trinket", "Idle Mana Test Colossus").shouldCast("Idle Mana Test Trinket")
++        }
++
++        // ── What the charge is still for ──
++
++        test("an affordable instant keeps its mana: the do-nothing permanent is not cast") {
++            val game = board("Idle Mana Test Trinket", "Idle Mana Test Denial")
++            val (action, options) = game.choose()
++            withClue("options: $options") {
++                game.castName(action) shouldNotBe "Idle Mana Test Trinket"
++            }
++        }
++
++        test("an instant still castable from the lands left over does not hold them all") {
++            // One Mountain stays up for the {R} answer after the rock taps two.
++            board("Idle Mana Test Rock", "Idle Mana Test Snap").shouldCast("Idle Mana Test Rock")
++        }
++
++        test("an instant it could not afford on three lands holds nothing") {
++            board("Idle Mana Test Trinket", "Idle Mana Test Refusal").shouldCast("Idle Mana Test Trinket")
++        }
++
++        // ── Land drops are untouched ──
++
++        test("the land drop is still made the turn the rock is cast") {
++            val game = board("Mountain", "Idle Mana Test Rock", "Idle Mana Test Colossus")
++            val ai = AIPlayer.create(cardRegistry, game.player1Id, AiProfile.CURRENT)
++            val taken = mutableListOf<GameAction>()
++            repeat(6) {
++                if (game.state.stack.isNotEmpty()) game.resolveStack()
++                if (game.state.step != Step.PRECOMBAT_MAIN || game.state.priorityPlayerId != game.player1Id) return@repeat
++                val action = ai.chooseAction(game.state)
++                if (action is PassPriority) return@repeat
++                taken += action
++                game.execute(action).error shouldBe null
++            }
++            withClue("actions: $taken") {
++                game.findPermanents("Mountain").size shouldBe 4
++                game.isOnBattlefield("Idle Mana Test Rock") shouldBe true
++                game.state.getZone(game.player1Id, Zone.HAND).size shouldBe 1
++            }
++        }
++    }
++
++    private companion object {
++        const val RNG_SEED = 35L
++    }
++}
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
+index 9954fe42..873a3ca0 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
+@@ -5,6 +5,7 @@ import com.wingedsheep.engine.core.CastSpell
+ import com.wingedsheep.engine.core.GameAction
+ import com.wingedsheep.engine.core.Outcome
+ import com.wingedsheep.engine.core.PlayLand
++import com.wingedsheep.engine.event.GrantedActivatedAbility
+ import com.wingedsheep.engine.legalactions.LegalActionEnumerator
+ import com.wingedsheep.engine.state.ZoneKey
+ import com.wingedsheep.engine.support.GameTestDriver
+@@ -12,9 +13,15 @@ import com.wingedsheep.engine.support.TestCards
+ import com.wingedsheep.mtg.sets.tokens.PredefinedTokens
+ import com.wingedsheep.sdk.core.Step
+ import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.Costs
++import com.wingedsheep.sdk.dsl.Effects
+ import com.wingedsheep.sdk.dsl.card
+ import com.wingedsheep.sdk.model.Deck
+ import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.AbilityId
++import com.wingedsheep.sdk.scripting.ActivatedAbility
++import com.wingedsheep.sdk.scripting.Duration
++import com.wingedsheep.sdk.scripting.TimingRule
+ import io.kotest.core.spec.style.FunSpec
+ import io.kotest.matchers.shouldBe
+ import io.kotest.matchers.types.shouldBeInstanceOf
+@@ -46,8 +53,26 @@ class SacrificeManaPaymentAiTest : FunSpec({
+         toughness = 3
+     }
+ 
++    /** A four-drop, Bismuth Mindrender's shape: three lands short of it by one. */
++    val fourDrop = card("Sacrifice Test Mindrender") {
++        manaCost = "{3}{R}"
++        typeLine = "Creature — Eldrazi"
++        power = 3
++        toughness = 2
++    }
++
++    /** The body of a token made inline: its mana ability is granted, not printed. */
++    val scionBody = card("Sacrifice Test Scion") {
++        colorIdentity = ""
++        typeLine = "Creature — Eldrazi Scion"
++        power = 1
++        toughness = 1
++    }
++
+     fun driver(): GameTestDriver = GameTestDriver().apply {
+-        registerCards(TestCards.all + listOf(PredefinedTokens.Treasure, PredefinedTokens.EldraziSpawn, ogre, eldrazi))
++        registerCards(
++            TestCards.all + listOf(PredefinedTokens.Treasure, PredefinedTokens.EldraziSpawn, ogre, eldrazi, fourDrop, scionBody),
++        )
+         initMirrorMatch(Deck.of("Mountain" to 20))
+         passPriorityUntil(Step.PRECOMBAT_MAIN)
+     }
+@@ -103,4 +128,44 @@ class SacrificeManaPaymentAiTest : FunSpec({
+         driver.findPermanent(player, "Sacrifice Test Eldrazi") shouldBe spell
+         driver.state.getZone(ZoneKey(player, Zone.BATTLEFIELD)).contains(spawn) shouldBe false
+     }
++
++    test("sacrifices an inline-token Eldrazi Scion, whose mana ability is granted, to cast a four-drop off three lands") {
++        // `CreateToken(activatedAbilities = …)` gives the token no definition carrying its
++        // "Sacrifice this token: Add {C}." It is a GrantedActivatedAbility on the entity, exactly as
++        // granted here. Eldrazi Incursion mirror, seed 1, turn 26: Bismuth Mindrender was offered as
++        // affordable off three lands and a Scion, then dropped as "illegal once materialized".
++        val driver = driver()
++        val player = driver.activePlayer!!
++        repeat(3) { driver.putLandOnBattlefield(player, "Mountain") }
++        val scion = driver.putCreatureOnBattlefield(player, "Sacrifice Test Scion")
++        driver.replaceState(
++            driver.state.copy(
++                grantedActivatedAbilities = driver.state.grantedActivatedAbilities + GrantedActivatedAbility(
++                    entityId = scion,
++                    ability = ActivatedAbility(
++                        id = AbilityId("sacrifice_test_scion_mana"),
++                        cost = Costs.SacrificeSelf,
++                        effect = Effects.AddColorlessMana(1),
++                        isManaAbility = true,
++                        timing = TimingRule.ManaAbility,
++                        descriptionOverride = "Sacrifice this token: Add {C}.",
++                    ),
++                    duration = Duration.Permanent,
++                ),
++            ),
++        )
++        val spell = driver.putCardInHand(player, "Sacrifice Test Mindrender")
++
++        val legal = LegalActionEnumerator.create(driver.cardRegistry).enumerate(driver.state, player)
++            .single { (it.action as? CastSpell)?.cardId == spell }
++        legal.affordable shouldBe true
++
++        val submitted = driver.aiPlaysUntilCast(player, spell)
++
++        (submitted.first() as ActivateAbility).sourceId shouldBe scion
++        submitted.last().shouldBeInstanceOf<CastSpell>()
++        driver.bothPass()
++        driver.findPermanent(player, "Sacrifice Test Mindrender") shouldBe spell
++        driver.state.getZone(ZoneKey(player, Zone.BATTLEFIELD)).contains(scion) shouldBe false
++    }
+ })
