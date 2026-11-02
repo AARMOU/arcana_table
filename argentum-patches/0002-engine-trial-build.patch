@@ -104,7 +104,7 @@ index 0000000000..b07af250d5
 +    if (!name.contains("Test")) compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
 +}
 diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-index f1241bd8bb..9d81743759 100644
+index 4d92858dbd..abdb2d39dc 100644
 --- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 +++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 @@ -12,6 +12,8 @@ plugins {

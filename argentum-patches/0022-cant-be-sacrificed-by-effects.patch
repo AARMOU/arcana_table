@@ -6,31 +6,31 @@ Subject: [PATCH] arcana: 0022-cant-be-sacrificed-by-effects
 
 ---
  docs/card-sdk-language-reference.md           |   3 +-
- .../effects/zones/ForceSacrificeExecutor.kt   |   4 +-
- .../effects/zones/SacrificeExecutor.kt        |   3 +-
+ .../effects/zones/ForceSacrificeExecutor.kt   |   2 +
+ .../effects/zones/SacrificeExecutor.kt        |   1 +
  .../CantBeSacrificedByEffectsTest.kt          | 116 ++++++++++++++++++
- 4 files changed, 123 insertions(+), 3 deletions(-)
+ 4 files changed, 121 insertions(+), 1 deletion(-)
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 22bdfe89ce..4edf7aaaf7 100644
+index 39f868ceef..6314ad2b1a 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11048,7 +11048,8 @@ staticAbility {
+@@ -11242,7 +11242,8 @@ staticAbility {
    abilities including mana abilities (Ashnod's Altar, auto-pay included). It is per permanent, as the
    ruling reads it: an artifact creature can't pay "Sacrifice an artifact", a noncreature artifact
    still can. Sacrifices a resolving spell or ability performs (edicts, exploit, "unless you
 -  sacrifice") ignore it. Pair with `PlayersCantPayLifeForCosts()` for "pay life or sacrifice".
 +  sacrifice") ignore the cost-only scope; `Scope.ANY` also removes the permanent from those choices
 +  (`ForceSacrificeExecutor`, `SacrificeExecutor`), so the player sacrifices another matching permanent or nothing. Pair with `PlayersCantPayLifeForCosts()` for "pay life or sacrifice".
- - `OpponentsCantMakeYouSacrifice` — "Spells and abilities your opponents control can't cause you to
-   sacrifice permanents" (Sigarda, Host of Herons). The **player-scoped** counterpart of
-   `CantBeSacrificed`: it protects the controller rather than a set of permanents, so it also covers
+ - `OpponentsCantCauseYouTo(actions: Set<CompelledAction>)` — "Spells and abilities your opponents
+   control can't cause you to sacrifice permanents" (Sigarda, Host of Herons:
+   `setOf(CompelledAction.SACRIFICE)`) / "… to discard cards or sacrifice permanents" (Tamiyo,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
-index 53ee6fe3c5..4ba2e54e3d 100644
+index c23c5c67f4..8692f93302 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
-@@ -134,10 +134,12 @@ class ForceSacrificeExecutor(
+@@ -136,6 +136,8 @@ class ForceSacrificeExecutor(
          // Pass sourceId so source-relative filter predicates (e.g.
          // DealtCombatDamageToSourceControllerThisTurn — Witch-king of Angmar) resolve against
          // the edict's source rather than the sacrificing player.
@@ -39,16 +39,11 @@ index 53ee6fe3c5..4ba2e54e3d 100644
          return BattlefieldFilterUtils.findMatchingOnBattlefield(
              state, filter.youControl(), PredicateContext(controllerId = playerId, sourceId = sourceId),
              predicateEvaluator = zones.predicateEvaluator
--        )
-+        ).filterNot { state.projectedState.hasKeyword(it, com.wingedsheep.sdk.core.AbilityFlag.CANT_BE_SACRIFICED) }
-     }
- 
-     private fun presentSacrificeDecision(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
-index 7603c756e2..9996f486d9 100644
+index 13a97b7038..ef1e5fd305 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
-@@ -95,10 +95,11 @@ class SacrificeExecutor(
+@@ -97,6 +97,7 @@ class SacrificeExecutor(
          // The resolving ability's whole context, as ReflexiveTriggerEffectExecutor's feasibility
          // check reads it — so a source-relative filter ("an Aura attached to Three Dog",
          // `attachedToSource()`) sees its source and the two agree on what can be sacrificed.
@@ -56,11 +51,6 @@ index 7603c756e2..9996f486d9 100644
          val matches = BattlefieldFilterUtils.findMatchingOnBattlefield(
              state, effect.filter.youControl(), context,
              predicateEvaluator = zones.predicateEvaluator
--        )
-+        ).filterNot { state.projectedState.hasKeyword(it, com.wingedsheep.sdk.core.AbilityFlag.CANT_BE_SACRIFICED) }
-         return if (effect.excludeSource && sourceId != null) {
-             matches.filter { it != sourceId }
-         } else {
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 new file mode 100644
 index 0000000000..ab2d4e306b

@@ -1,20 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0034-commander-cast-count-counters-rider
+
+---
+ docs/card-sdk-language-reference.md           |  16 +-
+ docs/sdk-index.md                             |   1 +
+ .../kotlin/com/wingedsheep/sdk/dsl/Effects.kt |   8 +-
+ .../sdk/scripting/effects/ManaSpellRider.kt   |  31 +++
+ .../test/resources/sdk-surface-baseline.txt   |   1 +
+ .../handlers/actions/spell/CastTriggers.kt    |  21 ++
+ .../CommanderCastCountCountersRiderTest.kt    | 216 ++++++++++++++++++
+ 7 files changed, 290 insertions(+), 4 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 1a7fb85d..6acd0ce4 100644
+index 126a588ec6..bc8ea279ff 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -2886,7 +2886,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
+@@ -2961,7 +2961,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
    colors; sugar for `ManaColorSet.AmongLinkedExiledCards`). Pit of Offerings ("any of the exiled
    cards' colors"). Pair with a `MoveToZoneEffect(linkToSource = true)` that records the exiled pile.
- - `AddManaOfColorLandsCouldProduce(scope)` — sugar for `AddManaOfChoice(ManaColorSet.LandsCouldProduce(scope))`. Fellwar Stone / Exotic Orchard shape. Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
+ - `AddManaOfColorLandsCouldProduce(scope, restriction?, landFilter?)` — sugar for `AddManaOfChoice(ManaColorSet.LandsCouldProduce(scope, landFilter))`. Fellwar Stone / Exotic Orchard shape; `landFilter` narrows the lands read (Plaza of Harmony: `landFilter = GameObjectFilter.Land.withSubtype("Gate")`). Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
 -- `AddManaOfColorInCommanderColorIdentity()` — sugar for `AddManaOfChoice(ManaColorSet.CommanderIdentity)`. Arcane Signet / Command Tower shape.
 +- `AddManaOfColorInCommanderColorIdentity(restriction?, riders?)` — sugar for `AddManaOfChoice(ManaColorSet.CommanderIdentity, restriction = …, riders = …)`. Arcane Signet / Command Tower shape; Opal Palace passes `riders = setOf(ManaSpellRider.CommanderEntersWithCastCountCounters())`.
  - `AddAnyColorManaSpendOnChosenType(amount?, creatureOnly?, riders?)` — sugar for `AddManaOfChoice(ManaColorSet.AnyColor, restriction = ManaRestriction.OfChosenType(creatureOnly), riders)`: any-color mana spendable only on spells (and, unless `creatureOnly`, abilities) of the source's chosen creature type. Secluded Courtyard, Eclipsed Realms (default); Cavern of Souls (`creatureOnly = true, riders = setOf(MakesSpellUncounterable())`).
  - `AddDynamicMana(amount, allowedColors, restriction?)` — split X across a fixed color set, distinct from `AddManaOfChoice` because it distributes the full X total across multiple colors rather than producing X copies of one chosen color.
  - `AddManaInAnyCombination(amount, allowedColors?, restriction?, expiry?)` — "Add N mana in any combination of colors" (Wizard's Rockets, Thornvault Forager, Interdimensional Web Watch). Sugar for `AddDynamicMana`; `allowedColors` defaults to all five. `expiry` (`AddDynamicManaEffect.expiry`) is the `ManaExpiry` as on `AddMana` — Klauth, Unrivaled Ancient's "add X mana in any combination of colors … Until end of turn, you don't lose this mana as steps and phases end" is `AddManaInAnyCombination(totalAttackingPower, restriction = ManaRestriction.SpellsOnly, expiry = ManaExpiry.KEPT_UNTIL_END_OF_TURN)`; every pip, whichever split path colors it, carries the expiry. The controller colors **each** pip independently at resolution (3+ colors → pip-by-pip color choice; 2 colors → one "how much of the first" prompt; ≤0 → no mana, no prompt), so the result can mix colors — distinct from `AddAnyColorMana`, where all N share one color. For "any combination of **its** colors" (a looked-at card), repeat `AddManaOfChoice(ManaColorSet.ColorsOf(…))` N times.
-@@ -18121,6 +18121,20 @@ the rider twice (Pyromancer's Goggles: "That many copies will be created").
-   `duration = Duration.Permanent` (the only other value accepted) drops the end date — Hall of the
-   Bandit Lord's "If that mana is spent on a creature spell, it gains haste.", so the grant lasts
-   until the permanent leaves the battlefield.
+@@ -18404,6 +18404,20 @@ the rider twice (Pyromancer's Goggles: "That many copies will be created").
+   zone, a copy owes none, and each rider-carrying mana spent owes its own `count`. For the *triggered* wording —
+   "When you spend this mana to cast …, it enters with an additional +1/+1 counter" (Jade Orb of Dragonkind) —
+   use `TriggersWhenSpent` with `AddCounters(…, TriggeringEntity)` instead.
 +- `ManaSpellRider.CommanderEntersWithCastCountCounters(counterType = CounterType.PLUS_ONE_PLUS_ONE)` —
 +  Opal Palace: "If you spend this mana to cast your commander, it enters with a number of additional
 +  +1/+1 counters on it equal to the number of times it's been cast from the command zone this game."
@@ -33,22 +50,22 @@ index 1a7fb85d..6acd0ce4 100644
  ### `ManaExpiry`<a id="manaexpiry"></a>
  
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 05d874c0..c052a1e9 100644
+index c0b6400c84..1f66512239 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1440,6 +1440,7 @@ Families:
+@@ -1448,6 +1448,7 @@ Families:
  
  ## ManaSpellRider
  
 +- `ManaSpellRider.CommanderEntersWithCastCountCounters(counterType: CounterType)` — If this mana is spent to cast your commander, it enters with additional counters equal to the number of times that commander has been cast from the command zone this game.
+ - `ManaSpellRider.EntersWithCountersWhenSpent(spellFilter: GameObjectFilter, counterType: CounterType, count: Int)` — "If that mana is spent on a spellFilter spell, that creature enters with count additional counterType counter(s) on it." (Guildmages' Forum, with `spellFilter = GameObjectFilter.Creature and GameOb…
  - `ManaSpellRider.GrantsKeywordWhenSpent(keyword: String, spellFilter: GameObjectFilter, duration: Duration)` — "If that mana is spent on a spellFilter spell, it gains keyword until end of turn." (Carnelian Orb of Dragonkind, with `spellFilter = GameObjectFilter.Creature.withSubtype("Dragon")` and `keyword =…
  - `ManaSpellRider.MakesSpellUncounterable(spellFilter: GameObjectFilter)` — "That spell can't be countered." (Cavern of Souls, with the default spellFilter.) "If that mana is spent on an instant or sorcery spell, that spell can't be countered." (Boseiju, Who Shelters All,…
- - `ManaSpellRider.ScryOnSharedTypeWithCommander(amount: Int)` — "When that mana is spent to cast a creature spell that shares a creature type with your commander, scry amount." (Path of Ancestry) On consumption the cast pipeline checks the spell's projected cre…
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
-index 3adafd0d..cac40ba9 100644
+index 30fb0c78b4..f7f879327c 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
-@@ -3299,11 +3299,13 @@ object Effects {
+@@ -3378,11 +3378,13 @@ object Effects {
      /**
       * Add one mana of any color in your commander's color identity. Used by Arcane Signet
       * and Command Tower. Sugar for
@@ -66,19 +83,12 @@ index 3adafd0d..cac40ba9 100644
      // =========================================================================
      // Token Effects
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
-index 8eaaefc9..f9fd15d2 100644
+index 771226f066..099982382d 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
-@@ -1,5 +1,6 @@
- package com.wingedsheep.sdk.scripting.effects
- 
-+import com.wingedsheep.sdk.core.CounterType
- import com.wingedsheep.sdk.core.Keyword
- import com.wingedsheep.sdk.scripting.Duration
- import com.wingedsheep.sdk.scripting.GameObjectFilter
-@@ -146,6 +147,37 @@ sealed interface ManaSpellRider {
-                 keyword.lowercase().replace('_', ' ') +
-                 (if (duration == Duration.Permanent) "" else " until end of turn")
+@@ -185,6 +185,37 @@ sealed interface ManaSpellRider {
+                 (if (count == 1) "an additional ${counterType.printed} counter" else "$count additional ${counterType.printed} counters") +
+                 " on it"
      }
 +
 +    /**
@@ -115,22 +125,22 @@ index 8eaaefc9..f9fd15d2 100644
  
  /** "an instant or sorcery", "a creature" — the article a rider description puts before a filter. */
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 74d7991a..558ba7ee 100644
+index 65878b8375..f5e6db047a 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1738,6 +1738,7 @@ ManaRestriction.DevoidSpellsOnly — ManaRestriction — Corrupted Crossroads 
+@@ -1744,6 +1744,7 @@ ManaRestriction.DevoidSpellsOnly — ManaRestriction — Corrupted Crossroads 
  ManaRestriction.ForetellOnly — ManaRestriction — Karfell Harbinger — ManaRestriction.UnlockDoorOnly, ManaRestriction.TurnPermanentsFaceUpOnly — each whitelists one special action's payment and is a shipped data object on the wire, so none can take another action as an axis; foretelling is its own special action (CR 702.143b), and casting the foretold card later is a spell cast that SpellsWithKeywordOnly covers
  ManaRestriction.OfChosenType — ManaRestriction — The Ringhart Crest (Kolvori, God of Kinship) — ManaRestriction.SubtypeSpellsOrAbilitiesOnly, ManaRestriction.SubtypeSpellsOnly — both carry a fixed subtype baked into the pool entry; "the chosen type" is unknown until the producing source is known, and a sentinel subtype string would collide with a printed one, so this is the unbound template the engine binds to SubtypeSpellsOrAbilitiesOnly as the mana is made (it subsumes the deleted AddAnyColorManaSpendOnChosenTypeEffect)
  ManaRestriction.SpellsWithKeywordOnly — ManaRestriction — Niko Defies Destiny — ManaRestriction.KickedSpellsOnly, ManaRestriction.SubtypeSpellsOnly — KickedSpellsOnly asks whether the kicker cost was paid, not whether the card has a keyword; SubtypeSpellsOnly reads type-line subtypes, and a keyword is not a subtype
 +ManaSpellRider.CommanderEntersWithCastCountCounters — ManaSpellRider — Opal Palace — ManaSpellRider.ScryOnSharedTypeWithCommander, ManaSpellRider.TriggersWhenSpent — ScryOnSharedTypeWithCommander bakes in scry and a creature-type test, and TriggersWhenSpent filters by GameObjectFilter, which can't say "this caster's own commander" nor read that commander's own command-zone cast count at cast time; the counters are owed to the spell, not a trigger
+ ManaSpellRider.EntersWithCountersWhenSpent — ManaSpellRider — Guildmages' Forum — ManaSpellRider.GrantsKeywordWhenSpent, ManaSpellRider.TriggersWhenSpent — GrantsKeywordWhenSpent freezes a keyword, not counters, onto the spell; TriggersWhenSpent with AddCounters is the triggered reading (Jade Orb's "When you spend this mana"), which queues a respondable ability above the spell, while "If that mana is spent …" owes the counters at payment with nothing on the stack
  ManaSpellRider.TriggersWhenSpent — ManaSpellRider — Scaled Nurturer — ManaSpellRider.ScryOnSharedTypeWithCommander, ManaSpellRider.GrantsKeywordWhenSpent — the first bakes in both its effect (scry) and a commander-relative test no GameObjectFilter expresses, the second is a continuous grant that queues nothing; this is the arbitrary-effect delayed trigger, and it subsumes the deleted CopySpellWhenSpent (Pyromancer's Goggles migrated to it with a copy effect)
  MarkMustAttackEffect — Effect — Sizzling Soloist — MarkMustAttackThisTurnEffect (renamed into this), MarkMustBlockThisTurnEffect — renames MarkMustAttackThisTurnEffect and gives it a window axis (this turn / its controller's next combat phase), no net new type; the blocking mirror is a floating effect with its own blocker-side semantics and no cross-turn window
- MaxCounters — StaticAbility — Rasputin Dreamweaver — CantReceiveCounters, CapCounterPlacementThisTurn — CantReceiveCounters is a group prohibition (all kinds, or one kind) projected as a flag that cost legality reads, with no number to carry a limit; CapCounterPlacementThisTurn is a replacement that caps one placement then locks the recipient for the turn, blind to the counters already on it
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-index 33dd2f92..e9be4fcc 100644
+index 8539326b83..9318bb69bb 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-@@ -9,16 +9,19 @@ import com.wingedsheep.engine.event.TriggerContext
+@@ -9,17 +9,20 @@ import com.wingedsheep.engine.event.TriggerContext
  import com.wingedsheep.engine.handlers.ObjectReferenceEnvironment
  import com.wingedsheep.engine.handlers.PredicateContext
  import com.wingedsheep.engine.handlers.PredicateEvaluator
@@ -143,6 +153,7 @@ index 33dd2f92..e9be4fcc 100644
 +import com.wingedsheep.engine.state.components.identity.CommanderComponent
  import com.wingedsheep.engine.state.components.identity.CommanderRegistryComponent
  import com.wingedsheep.engine.state.components.player.GrantedSpellKeywordsComponent
+ import com.wingedsheep.engine.state.components.stack.AdditionalEntryCounters
  import com.wingedsheep.engine.state.components.stack.EntryKeywordGrant
  import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
  import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
@@ -150,10 +161,10 @@ index 33dd2f92..e9be4fcc 100644
  import com.wingedsheep.sdk.core.Keyword
  import com.wingedsheep.sdk.core.Zone
  import com.wingedsheep.sdk.dsl.Effects
-@@ -238,8 +241,26 @@ internal class CastTriggers(
-                 state to triggerWhenSpent(state, spell, rider.spellFilter, rider.effect)
-             is ManaSpellRider.GrantsKeywordWhenSpent ->
+@@ -241,8 +244,26 @@ internal class CastTriggers(
                  grantKeywordWhenSpent(state, spell, rider.keyword, rider.spellFilter, rider.duration) to emptyList()
+             is ManaSpellRider.EntersWithCountersWhenSpent ->
+                 oweEntryCountersWhenSpent(state, spell, rider) to emptyList()
 +            is ManaSpellRider.CommanderEntersWithCastCountCounters ->
 +                commanderCastCountCounters(state, spell, rider.counterType) to emptyList()
          }
@@ -179,7 +190,7 @@ index 33dd2f92..e9be4fcc 100644
  
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
 new file mode 100644
-index 00000000..9138394b
+index 0000000000..9138394bb9
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
 @@ -0,0 +1,216 @@

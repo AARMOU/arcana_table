@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "argentum-engine"
 PATCHES = ROOT / "argentum-patches"
 REPORT = ROOT / "engine-upgrade" / "patch-report.json"
-TARGET = "c1c04ca3265c61df913af6db65460ad4ce409614"
+TARGET = "b38db9760cbf8c961bc548bf23420a13c763be95"
 MANDATORY = [
     "0001-android-regex.patch",
     "0002-engine-trial-build.patch",

@@ -10,10 +10,10 @@ Subject: [PATCH] arcana: 0023-face-down-exile-hidden-from-owner
  2 files changed, 40 insertions(+), 1 deletion(-)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
-index 33b3c10240..d50babd63b 100644
+index ce6bf5eb46..74efab8b9b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
-@@ -96,7 +96,14 @@ internal class CardProjector(
+@@ -97,7 +97,14 @@ internal class CardProjector(
          // Handle face-down card masking
          // Opponents and spectators see modified stats but no card information
          // Controller sees real card info + morph cost (but not spectators)

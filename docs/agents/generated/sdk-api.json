@@ -222,6 +222,9 @@
    "HEXPROOF": [
     "HEXPROOF: String"
    ],
+   "HIT": [
+    "HIT: String"
+   ],
    "HONE": [
     "HONE: String"
    ],
@@ -350,6 +353,9 @@
    ],
    "PAGE": [
     "PAGE: String"
+   ],
+   "PHYLACTERY": [
+    "PHYLACTERY: String"
    ],
    "PHYRESIS": [
     "PHYRESIS: String"
@@ -643,7 +649,7 @@
   },
   "com.wingedsheep.sdk.dsl.BatchTriggerSubject": {
    "becomeTapped": [
-    "becomeTapped(TapReason): TriggerSpec"
+    "becomeTapped(TapReason, TapReason): TriggerSpec"
    ],
    "becomeUntapped": [
     "becomeUntapped(): TriggerSpec"
@@ -1078,6 +1084,9 @@
    "key": [
     "key: String"
    ],
+   "sumOf-impl": [
+    "sumOf-impl(String, CardNumericProperty): DynamicAmount"
+   ],
    "toString-impl": [
     "toString-impl(String): String"
    ],
@@ -1108,6 +1117,9 @@
    ],
    "All": [
     "All(Condition...): Condition"
+   ],
+   "AllInCollectionShareCardType": [
+    "AllInCollectionShareCardType(String): Condition"
    ],
    "AmountIsEven": [
     "AmountIsEven(DynamicAmount): Condition"
@@ -1470,11 +1482,11 @@
    "PermanentPutIntoYourHandFromBattlefieldThisTurn": [
     "PermanentPutIntoYourHandFromBattlefieldThisTurn: Condition"
    ],
+   "PermanentPutIntoZoneFromBattlefieldThisTurn": [
+    "PermanentPutIntoZoneFromBattlefieldThisTurn(Zone, CardType, Player): Condition"
+   ],
    "PermanentTypeEnteredBattlefieldThisTurn": [
     "PermanentTypeEnteredBattlefieldThisTurn(CardType, Player): Condition"
-   ],
-   "PermanentTypePutIntoGraveyardFromBattlefieldThisTurn": [
-    "PermanentTypePutIntoGraveyardFromBattlefieldThisTurn(CardType, Player): Condition"
    ],
    "PermanentWithCounterPutIntoGraveyardThisTurn": [
     "PermanentWithCounterPutIntoGraveyardThisTurn(String): Condition"
@@ -1659,6 +1671,9 @@
    "SubtypeCreatureDiedThisTurn": [
     "SubtypeCreatureDiedThisTurn(String, Player): Condition"
    ],
+   "SurveiledThisTurn": [
+    "SurveiledThisTurn: Condition"
+   ],
    "TargetHasCounter": [
     "TargetHasCounter(String, Int): Condition",
     "TargetHasCounter(String, EffectTarget.SingleEntity): Condition"
@@ -1701,6 +1716,9 @@
    ],
    "TriggeringAttackersAttackedPlayer": [
     "TriggeringAttackersAttackedPlayer(Player): Condition"
+   ],
+   "TriggeringEntityEnteredOrWasCastFrom": [
+    "TriggeringEntityEnteredOrWasCastFrom(Zone): Condition"
    ],
    "TriggeringEntityEnteredOrWasCastFromGraveyard": [
     "TriggeringEntityEnteredOrWasCastFromGraveyard: Condition"
@@ -1848,6 +1866,9 @@
    ],
    "YouDrewCardsThisTurn": [
     "YouDrewCardsThisTurn(Int): Condition"
+   ],
+   "YouFacedADilemmaThisTurn": [
+    "YouFacedADilemmaThisTurn(Int, Player): Condition"
    ],
    "YouGainedAndLostLifeThisTurn": [
     "YouGainedAndLostLifeThisTurn: Condition"
@@ -2054,6 +2075,12 @@
    ],
    "PutFromHandOnTopOfLibrary": [
     "PutFromHandOnTopOfLibrary(Int, GameObjectFilter): AbilityCost"
+   ],
+   "PutSelfOnBottomOfLibrary": [
+    "PutSelfOnBottomOfLibrary: AbilityCost"
+   ],
+   "PutSelfOnTopOfLibrary": [
+    "PutSelfOnTopOfLibrary: AbilityCost"
    ],
    "RemoveAllCountersFromGrantingPermanent": [
     "RemoveAllCountersFromGrantingPermanent(String): AbilityCost"
@@ -2545,6 +2572,9 @@
    "colorsSpentOnTriggeringSpell": [
     "colorsSpentOnTriggeringSpell(): DynamicAmount"
    ],
+   "commanderCastsFromCommandZone": [
+    "commanderCastsFromCommandZone(Player): DynamicAmount"
+   ],
    "commanderColorIdentityCount": [
     "commanderColorIdentityCount(Player): DynamicAmount"
    ],
@@ -2587,6 +2617,9 @@
    ],
    "creatureCardsInYourGraveyard": [
     "creatureCardsInYourGraveyard(Player): DynamicAmount"
+   ],
+   "creatureTypesAmong": [
+    "creatureTypesAmong(GameObjectFilter, Player): DynamicAmount"
    ],
    "creaturesAttackingYou": [
     "creaturesAttackingYou(Int): DynamicAmount"
@@ -2642,6 +2675,9 @@
    "differentlyNamedLandsYouControl": [
     "differentlyNamedLandsYouControl(Player): DynamicAmount"
    ],
+   "dilemmasFacedThisTurn": [
+    "dilemmasFacedThisTurn(Player): DynamicAmount"
+   ],
    "distinctBendsThisTurn": [
     "distinctBendsThisTurn(Player): DynamicAmount"
    ],
@@ -2681,6 +2717,12 @@
    ],
    "equippedCreaturesYouControl": [
     "equippedCreaturesYouControl(Player): DynamicAmount"
+   ],
+   "extraTurnsBegunThisGame": [
+    "extraTurnsBegunThisGame(Player): DynamicAmount"
+   ],
+   "federation": [
+    "federation(Player): DynamicAmount"
    ],
    "fewestControlledBySinglePlayer": [
     "fewestControlledBySinglePlayer(GameObjectFilter, Player): DynamicAmount"
@@ -2859,6 +2901,9 @@
    ],
    "propertyOf": [
     "propertyOf(EffectTarget.SingleEntity, EntityNumericProperty): DynamicAmount"
+   ],
+   "propertySumOf": [
+    "propertySumOf(String, CardNumericProperty): DynamicAmount"
    ],
    "replacementLifeGainAmount": [
     "replacementLifeGainAmount(): DynamicAmount"
@@ -3208,10 +3253,13 @@
     "AddManaOfColorAmongLinkedExile(ManaRestriction): Effect"
    ],
    "AddManaOfColorInCommanderColorIdentity": [
-    "AddManaOfColorInCommanderColorIdentity(ManaRestriction): Effect"
+    "AddManaOfColorInCommanderColorIdentity(ManaRestriction, Set<? extends ManaSpellRider>): Effect"
    ],
    "AddManaOfColorLandsCouldProduce": [
-    "AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction): Effect"
+    "AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction, GameObjectFilter): Effect"
+   ],
+   "AddManaOfDifferentColors": [
+    "AddManaOfDifferentColors(Int, ManaRestriction): Effect"
    ],
    "AddOneManaOfEachColorAmong": [
     "AddOneManaOfEachColorAmong(GameObjectFilter, ManaRestriction): Effect"
@@ -3253,6 +3301,9 @@
    ],
    "AnyPlayerMayPay": [
     "AnyPlayerMayPay(PayCost, Effect, Player): Effect"
+   ],
+   "Assimilate": [
+    "Assimilate(EffectTarget, Zone): Effect"
    ],
    "AttachEquipment": [
     "AttachEquipment(EffectTarget): Effect"
@@ -3507,11 +3558,17 @@
    "CopyCollectionIntoCollection": [
     "CopyCollectionIntoCollection(String, String): Effect"
    ],
+   "CopyControlledStackObjects": [
+    "CopyControlledStackObjects(Set<? extends StackObjectKind>, Player): Effect"
+   ],
    "CopyEachSpellCast": [
     "CopyEachSpellCast(Int, GameObjectFilter): Effect"
    ],
    "CopyEachTargetSpell": [
     "CopyEachTargetSpell(List<? extends Keyword>, Boolean): Effect"
+   ],
+   "CopyForChosenOtherPossibleTarget": [
+    "CopyForChosenOtherPossibleTarget(GameObjectFilter, EffectTarget, Player): Effect"
    ],
    "CopyForEachOtherPossibleTarget": [
     "CopyForEachOtherPossibleTarget(GameObjectFilter, EffectTarget, Player): Effect"
@@ -3781,7 +3838,7 @@
     "DoubleDamageToPlayer(EffectTarget, Duration): Effect"
    ],
    "DrainLife": [
-    "DrainLife(DynamicAmount, EffectTarget, EffectTarget): Effect",
+    "DrainLife(DynamicAmount, EffectTarget, EffectTarget, Boolean): Effect",
     "DrainLife(Int, EffectTarget, EffectTarget): Effect"
    ],
    "DrawCards": [
@@ -3909,7 +3966,7 @@
     "FlipCoins(Int, String): Effect"
    ],
    "FlipCoinsUntilLoss": [
-    "FlipCoinsUntilLoss(String): Effect"
+    "FlipCoinsUntilLoss(String, Boolean): Effect"
    ],
    "FlipTwoCoins": [
     "FlipTwoCoins(Effect, Effect, Effect): Effect"
@@ -4020,7 +4077,7 @@
     "GrantCastCreaturesFromGraveyardWithForage(Duration): Effect"
    ],
    "GrantCounterPlacementModifier": [
-    "GrantCounterPlacementModifier(Int, Duration, String, Recipient): Effect"
+    "GrantCounterPlacementModifier(Int, Duration, String, Recipient, Player): Effect"
    ],
    "GrantDamageBonus": [
     "GrantDamageBonus(Int, GameObjectFilter, EffectTarget, Duration): Effect"
@@ -4072,8 +4129,8 @@
     "GrantKeywordToSpell(Keyword, EffectTarget, Duration): Effect"
    ],
    "GrantMayPlayFromExile": [
-    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Integer, ManaSpentAsAnyColor, Boolean): Effect",
-    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, EffectTarget, Boolean, Integer, ManaSpentAsAnyColor, Boolean): Effect"
+    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Set<? extends CardType>, Integer, ManaSpentAsAnyColor, Boolean): Effect",
+    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Set<? extends CardType>, EffectTarget, Boolean, Integer, ManaSpentAsAnyColor, Boolean): Effect"
    ],
    "GrantNextSpellAffinity": [
     "GrantNextSpellAffinity(GameObjectFilter, CardType): Effect"
@@ -4147,6 +4204,9 @@
    "GrantTriggeredAbility": [
     "GrantTriggeredAbility(TriggeredAbility, EffectTarget, Duration): Effect"
    ],
+   "HealDamage": [
+    "HealDamage(EffectTarget): Effect"
+   ],
    "HijackNextCombatPhase": [
     "HijackNextCombatPhase(EffectTarget): Effect"
    ],
@@ -4190,6 +4250,9 @@
    ],
    "LockOrUnlockDoor": [
     "LockOrUnlockDoor(EffectTarget): Effect"
+   ],
+   "LockPlayerCounters": [
+    "LockPlayerCounters(EffectTarget, Duration): Effect"
    ],
    "LookAtFaceDown": [
     "LookAtFaceDown(EffectTarget, FaceDownLookScope): Effect"
@@ -4236,11 +4299,11 @@
    "MarkMustBlockThisTurn": [
     "MarkMustBlockThisTurn(EffectTarget): Effect"
    ],
+   "MarkSpellExileOnResolve": [
+    "MarkSpellExileOnResolve(ExiledSpellRider, EffectTarget): Effect"
+   ],
    "MarkSpellExileWithCounters": [
     "MarkSpellExileWithCounters(EffectTarget, String, Int): Effect"
-   ],
-   "MarkSpellPlotOnResolve": [
-    "MarkSpellPlotOnResolve(EffectTarget): Effect"
    ],
    "MassAnimate": [
     "MassAnimate(GameObjectFilter, DynamicAmount, DynamicAmount, Boolean, Duration): Effect"
@@ -4529,6 +4592,9 @@
     "RemoveCounters(String, Int, EffectTarget): Effect",
     "RemoveCounters(String, DynamicAmount, EffectTarget): Effect"
    ],
+   "RemoveCountersFromAmong": [
+    "RemoveCountersFromAmong(String, GameObjectFilter, String): Effect"
+   ],
    "RemoveCountersOfIteratedKind": [
     "RemoveCountersOfIteratedKind(EffectTarget, Int): Effect"
    ],
@@ -4546,7 +4612,7 @@
     "RemoveKeyword(AbilityFlag, EffectTarget, Duration): Effect"
    ],
    "RemoveMaximumHandSize": [
-    "RemoveMaximumHandSize(EffectTarget): Effect"
+    "RemoveMaximumHandSize(EffectTarget, Duration): Effect"
    ],
    "Repeat": [
     "Repeat(DynamicAmount, Effect): Effect"
@@ -4702,7 +4768,7 @@
     "SkipStepOrPhaseThisTurn(TurnPart, EffectTarget): Effect"
    ],
    "SkipUntap": [
-    "SkipUntap(EffectTarget, GameObjectFilter): Effect"
+    "SkipUntap(EffectTarget, GameObjectFilter, Boolean): Effect"
    ],
    "SpendAnyManaTypeForOneSpell": [
     "SpendAnyManaTypeForOneSpell(GameObjectFilter): Effect"
@@ -5696,7 +5762,7 @@
     "becomesSaddled(Boolean): TriggerSpec"
    ],
    "becomesTapped": [
-    "becomesTapped(TapReason, Boolean): TriggerSpec"
+    "becomesTapped(TapReason, Boolean, TapReason): TriggerSpec"
    ],
    "becomesTarget": [
     "becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Player, Boolean, Boolean, Boolean): TriggerSpec"
@@ -5984,6 +6050,9 @@
    "forEachCounterKindAmong": [
     "forEachCounterKindAmong(GroupFilter, Function1<? super PipelineBuilder, Unit>): Unit"
    ],
+   "forEachInGroupCollecting": [
+    "forEachInGroupCollecting(GroupFilter, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>"
+   ],
    "forEachPlayerCollecting": [
     "forEachPlayerCollecting(Player, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>"
    ],
@@ -6060,6 +6129,9 @@
    ],
    "storeCardName": [
     "storeCardName(String, String): String"
+   ],
+   "storeEntity-fH4-G1E": [
+    "storeEntity-fH4-G1E(EffectTarget.SingleEntity, Condition, String): String"
    ],
    "storeNumber": [
     "storeNumber(DynamicAmount, String): String"
@@ -6215,6 +6287,9 @@
    "exploits": [
     "exploits(Boolean): TriggerSpec"
    ],
+   "facesADilemma": [
+    "facesADilemma(): TriggerSpec"
+   ],
    "finalSagaChapterTriggers": [
     "finalSagaChapterTriggers(): TriggerSpec"
    ],
@@ -6240,7 +6315,7 @@
     "investigates(Boolean): TriggerSpec"
    ],
    "isAttacked": [
-    "isAttacked(Int, Boolean, Boolean): TriggerSpec"
+    "isAttacked(Int, AttackedDefenders, Boolean): TriggerSpec"
    ],
    "isDealtDamage": [
     "isDealtDamage(GameObjectFilter, DamageType): TriggerSpec"
@@ -6315,7 +6390,7 @@
     "solvesACase(): TriggerSpec"
    ],
    "surveils": [
-    "surveils(): TriggerSpec"
+    "surveils(Boolean): TriggerSpec"
    ],
    "takesTheInitiative": [
     "takesTheInitiative(): TriggerSpec"
@@ -7003,13 +7078,25 @@
     "basePower(Int): GameObjectFilter",
     "basePower(Int): Any"
    ],
+   "basePowerAtMost": [
+    "basePowerAtMost(Int): GameObjectFilter",
+    "basePowerAtMost(Int): Any"
+   ],
    "basePowerOrToughness": [
     "basePowerOrToughness(Int): GameObjectFilter",
     "basePowerOrToughness(Int): Any"
    ],
+   "basePowerOrToughnessAtMost": [
+    "basePowerOrToughnessAtMost(Int): GameObjectFilter",
+    "basePowerOrToughnessAtMost(Int): Any"
+   ],
    "baseToughness": [
     "baseToughness(Int): GameObjectFilter",
     "baseToughness(Int): Any"
+   ],
+   "baseToughnessAtMost": [
+    "baseToughnessAtMost(Int): GameObjectFilter",
+    "baseToughnessAtMost(Int): Any"
    ],
    "becameTappedOnlyOnceThisTurn": [
     "becameTappedOnlyOnceThisTurn(): GameObjectFilter",
@@ -7425,6 +7512,10 @@
     "notOfSourceChosenType(): GameObjectFilter",
     "notOfSourceChosenType(): Any"
    ],
+   "notPutIntoGraveyardThisCombat": [
+    "notPutIntoGraveyardThisCombat(): GameObjectFilter",
+    "notPutIntoGraveyardThisCombat(): Any"
+   ],
    "notSharingCreatureTypeWithPermanentYouControl": [
     "notSharingCreatureTypeWithPermanentYouControl(GameObjectFilter): GameObjectFilter",
     "notSharingCreatureTypeWithPermanentYouControl(GameObjectFilter): Any"
@@ -7562,6 +7653,10 @@
     "putIntoGraveyardFromBattlefieldThisTurn(): GameObjectFilter",
     "putIntoGraveyardFromBattlefieldThisTurn(): Any"
    ],
+   "putIntoGraveyardThisCombat": [
+    "putIntoGraveyardThisCombat(): GameObjectFilter",
+    "putIntoGraveyardThisCombat(): Any"
+   ],
    "putIntoGraveyardThisTurn": [
     "putIntoGraveyardThisTurn(): GameObjectFilter",
     "putIntoGraveyardThisTurn(): Any"
@@ -7637,6 +7732,9 @@
    "sharingNameWithPermanentYouControl": [
     "sharingNameWithPermanentYouControl(GameObjectFilter): GameObjectFilter",
     "sharingNameWithPermanentYouControl(GameObjectFilter): Any"
+   ],
+   "singularPermanentDescription": [
+    "singularPermanentDescription: String"
    ],
    "snow": [
     "snow(): GameObjectFilter",
@@ -8026,6 +8124,9 @@
    "blitz": [
     "blitz(String, AdditionalCost): KeywordAbility"
    ],
+   "bloodthirst": [
+    "bloodthirst(Int): KeywordAbility"
+   ],
    "bushido": [
     "bushido(Int): KeywordAbility"
    ],
@@ -8107,6 +8208,9 @@
    ],
    "foretell": [
     "foretell(String): KeywordAbility"
+   ],
+   "grantedBloodthirst": [
+    "grantedBloodthirst(Int): String"
    ],
    "grantedCrew": [
     "grantedCrew(Int): String"
@@ -8643,6 +8747,7 @@
    "MODULAR",
    "FADING",
    "VANISHING",
+   "BLOODTHIRST",
    "CUMULATIVE_UPKEEP",
    "ECHO",
    "SOULSHIFT",
@@ -8725,6 +8830,7 @@
   "AddManaOfColorAmongLinkedExile",
   "AddManaOfColorInCommanderColorIdentity",
   "AddManaOfColorLandsCouldProduce",
+  "AddManaOfDifferentColors",
   "AddOneManaOfEachColorAmong",
   "AddOneManaOfEachCraftedMaterialColor",
   "AddSubtype",
@@ -8738,6 +8844,7 @@
   "AnotherPermanentWithSameNameAsTarget",
   "AnyPlayerControls",
   "AnyPlayerMayPay",
+  "Assimilate",
   "AttachToChosenHost",
   "AttacksWithoutTappingGroup",
   "BecomeAllColors",
@@ -8815,8 +8922,10 @@
   "Connive",
   "ControlPlayerDuringResolution",
   "ConvertCountersToTokens",
+  "CopyControlledStackObjects",
   "CopyEachSpellCast",
   "CopyEachTargetSpell",
+  "CopyForChosenOtherPossibleTarget",
   "CopyForEachOtherPossibleTarget",
   "CopyNextSpellCast",
   "CopyTargetSpell",
@@ -9019,6 +9128,7 @@
   "LinkedExiledCardMatches",
   "LockLifeGain",
   "LockLifeLoss",
+  "LockPlayerCounters",
   "LoseAllCreatureTypes",
   "LoseGame",
   "LoseHalfLife",
@@ -9028,8 +9138,8 @@
   "MakePlotted",
   "ManaSpentToCastIncludes",
   "MarkExileOnDeath",
+  "MarkSpellExileOnResolve",
   "MarkSpellExileWithCounters",
-  "MarkSpellPlotOnResolve",
   "MassAnimate",
   "May",
   "MayPay",
@@ -9060,8 +9170,8 @@
   "PayPlayerCounters",
   "PayRepeatedly",
   "PayXLife",
+  "PermanentPutIntoZoneFromBattlefieldThisTurn",
   "PermanentTypeEnteredBattlefieldThisTurn",
-  "PermanentTypePutIntoGraveyardFromBattlefieldThisTurn",
   "PhaseOut",
   "PhaseOutUntilLeaves",
   "Pipeline",
@@ -9199,6 +9309,7 @@
   "YouDealtRedNoncombatDamageThisTurn",
   "YouDescendedThisTurn",
   "YouDrewCardsThisTurn",
+  "YouFacedADilemmaThisTurn",
   "YouPaidOrLostEnergyThisTurn",
   "YouPlayedLandThisTurn",
   "YouSacrificedNontokenPermanentsThisTurn",
@@ -9267,6 +9378,7 @@
   "colorPairsAmongPermanents",
   "colorsAmongPermanents",
   "colorsOfManaSpent",
+  "commanderCastsFromCommandZone",
   "commanderColorIdentityCount",
   "connive",
   "conniveTargeting",
@@ -9283,6 +9395,7 @@
   "craft",
   "createsToken",
   "creatureCardsInYourGraveyard",
+  "creatureTypesAmong",
   "creatures",
   "creaturesAttackingYou",
   "creaturesDiedThisTurn",
@@ -9309,6 +9422,7 @@
   "destroyCombatPairedWithSourcePipeline",
   "destroyLeastPowerCreature",
   "differentlyNamedLandsYouControl",
+  "dilemmasFacedThisTurn",
   "discard",
   "discardAnyNumber",
   "discardCards",
@@ -9353,7 +9467,9 @@
   "exploits",
   "explore",
   "explores",
+  "extraTurnsBegunThisGame",
   "factOrFiction",
+  "federation",
   "fewestControlledBySinglePlayer",
   "filter",
   "filterSplit",
@@ -9471,11 +9587,13 @@
   "squad",
   "startingLifeTotal",
   "storeCardName",
+  "storeEntity-fH4-G1E",
   "storeNumber",
   "storePlayer-fH4-G1E",
   "subtypeEnteredUnderControlThisTurn",
   "subtypesEnteredUnderControlThisTurn",
   "surveilPipeline",
+  "surveils",
   "takeFromLinkedExile",
   "taps",
   "tapsLandForMana",

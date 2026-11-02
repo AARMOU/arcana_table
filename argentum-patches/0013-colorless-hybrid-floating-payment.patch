@@ -52,7 +52,7 @@ index 25044cc560..3c9f8ababb 100644
                  acceptsColor(unit, symbol.color1) || acceptsColor(unit, symbol.color2)
              is ManaSymbol.Phyrexian -> acceptsColor(unit, symbol.color)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index 3d468e0ad0..efdc2b31e4 100644
+index b3a3d0a491..19937b09ac 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -410,7 +410,7 @@ data class ManaPool(
@@ -73,7 +73,7 @@ index 3d468e0ad0..efdc2b31e4 100644
  
      /**
       * Get amount of mana for a specific color.
-@@ -693,6 +693,7 @@ data class ManaPool(
+@@ -698,6 +698,7 @@ data class ManaPool(
                  is ManaSymbol.Phyrexian -> {
                      remaining = remaining.trySpendColored(symbol.color, spellContext) ?: return false
                  }
@@ -81,7 +81,7 @@ index 3d468e0ad0..efdc2b31e4 100644
                  is ManaSymbol.MonocolorHybrid -> {
                      // Resolved after strict pips below so a strict pip of the same color claims
                      // its mana first.
-@@ -790,6 +791,7 @@ data class ManaPool(
+@@ -795,6 +796,7 @@ data class ManaPool(
                  is ManaSymbol.Phyrexian -> {
                      remaining = remaining.trySpendColored(symbol.color, spellContext)!!
                  }
@@ -89,7 +89,7 @@ index 3d468e0ad0..efdc2b31e4 100644
                  is ManaSymbol.MonocolorHybrid -> {
                      // Resolved after strict pips below (mirrors canPay).
                  }
-@@ -967,6 +969,7 @@ data class ManaPool(
+@@ -972,6 +974,7 @@ data class ManaPool(
                          unpaidSymbols.add(symbol)
                      }
                  }
@@ -97,7 +97,7 @@ index 3d468e0ad0..efdc2b31e4 100644
                  is ManaSymbol.MonocolorHybrid -> {
                      // Spend floating mana of the color if available; otherwise leave the hybrid
                      // unpaid (as-is) so the land solver keeps the color-vs-generic choice rather
-@@ -1076,6 +1079,7 @@ data class ManaPool(
+@@ -1081,6 +1084,7 @@ data class ManaPool(
                  is ManaSymbol.Phyrexian -> colors(symbol.color)
                  is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> colors(symbol.color1, symbol.color2)
                  is ManaSymbol.MonocolorHybrid -> colors(symbol.color)

@@ -48,11 +48,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "0430c73af957c16936fca2d0150fb3cedb2af824a2d983103948dc3175f5e3d0",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -74,11 +79,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "9ea1226afa0d32a700ed917f61a5956ec023cf43fec5ebb15e451dc8b843a756",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -101,11 +111,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "8f141c4009468cca3f2009b2579a7cc201c49723bd3807d55846eff8005e1533",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -129,11 +144,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "7202ea2cbdfd23153efa3a4047f006bcf930b740c1d276650ec0df0b83354223",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -156,11 +176,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "777a9ade22c6399ce0713e47535efa8540d314cf619c5041dd6616d8f7b8f610",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -182,11 +207,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "743804b71a860717671e47f3ee7b3579e702ae928f0462312d8c50498a8dc2a2",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -208,11 +238,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "a18679acde76a50e29fb69802a28a3addec8baeec5b49ee6e15803fec93d8b30",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -235,11 +270,16 @@
       ],
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "20532c4d8ba4db7eb8e67ef214b505642d28245c301151341dc31dee8cfccb14",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -264,11 +304,16 @@
       ],
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -299,11 +344,16 @@
       ],
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -334,11 +384,16 @@
       ],
       "baseSha": "45c62f77393a34105469deb5436785375ffe17c9",
       "oracleHash": "eda0d6c9d963e00f38ce698ec35a378bb0ca05c474131c3b8dc10352cb49bdb8",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -363,11 +418,16 @@
       ],
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "aacbe1c9180ea8d934acf8f40798f64452bfc981a84c42b8492ff2273de444d2",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -397,11 +457,16 @@
       ],
       "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
       "oracleHash": "452abb7610483ac128e8f5980c884986bb7b838b507081bdaee2fa7544e835ca",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -436,11 +501,16 @@
       ],
       "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
       "oracleHash": "98b3957af8f25d1d493e967d67cbc1a8591d854c55e84ed7d675c7ab1963b7dc",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
       "restamps": [
         {
           "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
           "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        },
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
@@ -468,7 +538,14 @@
       ],
       "baseSha": "853ce781efa03bbeff90d2f8a799b6d1c98a1069",
       "oracleHash": "11bcaf4f9413e1ae76bc0df32df97ff574a6e817d02567ed48d7cf2c6e087606",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     },
     "Abaddon the Despoiler": {
       "summary": "The line is covered by a cast-triggered Effects.Cascade (Wildsear, Quandrix), with a hand-zone spell predicate; a dynamic mana-value filter is implemented (Rocco), and DynamicAmounts.lifeLostThisTurn(Player.EachOpponent) sums opponents' life loss (Bloodsoaked Insight). During-your-turn is a triggerRestriction.",
@@ -494,7 +571,14 @@
       ],
       "baseSha": "bc20a025ba8857f1a5dab41ca8c84d138cde047b",
       "oracleHash": "63177c9660b62d94fb0d886ebbd66c99d6ef6f3545ca62d4ee8fde589252b02b",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     },
     "Anrakyr the Traveller": {
       "summary": "Triggers.self.attacks plus gather from multiple zones (HAND and GRAVEYARD), filter artifacts, choose up to one, then Effects.CastFromCollectionByPaying with Costs.additional.PayLifeEqualToManaValueOfSpell supplies the life-equals-mana-value alternative cost. Surtland Elementalist shows attack-trigger gather/choose/cast; Amped Raptor uses CastFromCollectionByPaying with an AdditionalCost during a trigger; Nashi uses the exact mana-value life cost.",
@@ -520,7 +604,14 @@
       ],
       "baseSha": "7999edca6725a93fc1d273d7dbf9e17f73da3793",
       "oracleHash": "6fcf58d8ce11908606ef33519bc5811f3157c1a5c21e6ed20d2008a624061880",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     },
     "Arch of Orazca": {
       "summary": "The activated draw ability uses Costs.Composite(Costs.Mana, Costs.Tap), Effects.DrawCards, and ActivationRestriction.OnlyIfCondition(Conditions.YouHaveCitysBlessing). Fool's Tome demonstrates the activated draw/only-if pattern; Sea Gate Wreckage has real positive/negative activation-restriction scenarios; Wayward Swordtooth uses the blessing condition in implemented rules and a scenario verifies the no-blessing restriction.",
@@ -547,7 +638,14 @@
       ],
       "baseSha": "ac7221f343ccdfa1532cd620ee7d1cadd8b0028d",
       "oracleHash": "d0d22fa8102670b67b82e29dd5fa15e87e96865d2e8ea901f7873b00054a891c",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     },
     "Aspiring Champion": {
       "summary": "Combat-damage trigger (Aberrant) -> IfYouDo(SacrificeSelfEffect, PermanentsSacrificed) (Marit Lage's Slumber) -> Pipeline gatherUntilMatch(Creature)/reveal/move to battlefield/ShuffleLibrary (Riptide Shapeshifter, Hei Bai, Selvala's Stampede) -> Effects.If(CollectionContainsMatch(found, Creature.withSubtype Demon)) with DealDamage(powerOf(found.asTarget), each opponent, damageSource = found.asTarget) (powerOf/damageSource shape per Spinning Wheel Kick; CollectionSlot.asTarget in sdk language reference). Source review only; candidate implementation must prove the Demon power damage with a scenario test.",
@@ -581,7 +679,14 @@
       ],
       "baseSha": "759c35233bae183e4f061ee2e89be65e7c8a98b7",
       "oracleHash": "cac1f05df7aefc0a7cb3166c5f3dbfee9fc370b36d4e3f74329ce69965164e9b",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     },
     "Assault Suit": {
       "summary": "Existing equipment stats/haste, equipped-creature attack and sacrifice restrictions, opponent-upkeep may/if-you-do flow, target-player control transfer and untap primitives cover both lines.",
@@ -616,7 +721,14 @@
       ],
       "baseSha": "bbf3ec8cbc6f5533578a4b69f637d28e05fc7f0f",
       "oracleHash": "67cec29a87564650b16e0e9b480a02effd58946ea9f1700612131b3efda6820e",
-      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+      "runtimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+      "restamps": [
+        {
+          "fromRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "toRuntimeHash": "a5a2ead07f5e8dd605f8f619c7b2aaf65a2cc0bf23373600bf7b1763f56b95de",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     }
   }
 }
