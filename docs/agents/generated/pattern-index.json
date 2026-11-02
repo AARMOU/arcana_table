@@ -1566,6 +1566,17 @@
     }
    ]
   },
+  "Effects.CantBlockGroup": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 73,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.CantCastSpells": {
    "count": 1,
    "examples": [
@@ -1643,6 +1654,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DescendantsPath.kt",
      "lines": 90,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DescendantsPathScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.ChooseAction": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 73,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
   },
@@ -4239,6 +4261,17 @@
     }
    ]
   },
+  "KeywordAbility.grantedBloodthirst": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 73,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "KeywordAbility.miracle": {
    "count": 2,
    "examples": [
@@ -4879,6 +4912,17 @@
     }
    ]
   },
+  "Triggers.you.attacks": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 73,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "Triggers.you.beginningOf": {
    "count": 22,
    "examples": [
@@ -5432,7 +5476,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 65,
+   "count": 66,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5473,7 +5517,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 162,
+   "count": 163,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6735,7 +6779,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -7557,7 +7601,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 116,
+   "count": 117,
    "examples": [
     {
      "card": "Their Name Is Death",

@@ -46,6 +46,7 @@ MANDATORY = [
     "0027-opponents-must-attack-anyone.patch",
     "0028-base-power-toughness-at-most.patch",
     "0032-per-player-target-binding.patch",
+    "0030-bloodthirst-keyword.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

@@ -39,7 +39,6 @@ class EldraziIncursionPlayableTest {
     private val expectedMissing = setOf(
         "Benthic Anomaly",
         "Opal Palace",
-        "Twins of Discord",
     )
 
     @Test fun originalSlotIndexInventoryMatchesTheExplicitMissingList() {
@@ -64,7 +63,7 @@ class EldraziIncursionPlayableTest {
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
             "Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge", "Angelic Aberration",
-            "Mutated Cultist", "Hideous Taskmaster",
+            "Mutated Cultist", "Hideous Taskmaster", "Twins of Discord",
         ).forEach { name ->
             assertNotNull("registered: $name", registry.getCard(name))
             assertTrue("in the deck: $name", name in setup.you.deck)
