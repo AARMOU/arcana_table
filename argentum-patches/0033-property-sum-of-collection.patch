@@ -11,10 +11,10 @@ index 8907dda6..7ece26e2 100644
              // Opaque at analysis time: a pipeline variable or a trigger-context value could be anything.
              is DynamicAmount.VariableReference, is DynamicAmount.ContextProperty -> UNKNOWN
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 5ff6e246..fc5f7133 100644
+index c87e52c2..1a7fb85d 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -17395,7 +17395,7 @@ read is available to other snapshot-backed entity references once their captured
+@@ -17412,7 +17412,7 @@ read is available to other snapshot-backed entity references once their captured
    **Pipeline-scoped counts get the same treatment, board-state counts deliberately do not.** A
    `CreateTokenEffect` scheduled into a delayed trigger has its `count` frozen at scheduling time *only
    if* the amount reads the pipeline that produced it — `DistinctEntitiesInCollections`,
@@ -23,7 +23,7 @@ index 5ff6e246..fc5f7133 100644
    `VariableReference`, or any arithmetic tree containing one. Those live in the resolving
    `EffectContext` and would silently read 0 an upkeep later. A *board-state* count
    (`AggregateBattlefield`, …) is left lazy, because "at the beginning of your end step, create a token
-@@ -17854,6 +17854,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
+@@ -17871,6 +17871,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
    graveyard). For "you mill X cards … that player loses life equal to the total mana value of those
    cards" — Palantír of Orthanc mills into the default `"milled"` collection
    (`Patterns.Library.mill(X)`), then `Effects.LoseLife(DynamicAmounts.manaValueSumOf("milled"), opponent)`.
