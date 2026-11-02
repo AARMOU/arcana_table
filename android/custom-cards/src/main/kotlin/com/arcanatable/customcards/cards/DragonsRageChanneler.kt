@@ -4,6 +4,7 @@ import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.*
+import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
 
 val DragonsRageChanneler = card("Dragon's Rage Channeler") {
     manaCost = "{R}"
@@ -20,11 +21,11 @@ val DragonsRageChanneler = card("Dragon's Rage Channeler") {
 
     staticAbility {
         condition = Conditions.Delirium(4)
-        ability = ModifyStats(2, 2)
+        ability = ModifyStats(2, 2, GroupFilter.source())
     }
     staticAbility {
         condition = Conditions.Delirium(4)
-        ability = GrantKeyword(Keyword.FLYING)
+        ability = GrantKeyword(Keyword.FLYING, GroupFilter.source())
     }
     staticAbility {
         condition = Conditions.Delirium(4)
