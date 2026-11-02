@@ -345,6 +345,8 @@ object CustomCards {
         Entry(AzlaskTheSwellingScourge, "M3C", "Eldrazi Incursion"),
         // Eldrazi Incursion. Needs engine patch 0028 (base power/toughness at-most filter).
         Entry(AngelicAberration, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Incursion. No engine patch (existing cast trigger, permanent-or-opponent target, next-spell discount).
+        Entry(MutatedCultist, "M3C", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
