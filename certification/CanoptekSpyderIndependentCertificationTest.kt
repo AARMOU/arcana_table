@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.CanoptekSpyder
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -145,25 +146,27 @@ class CanoptekSpyderIndependentCertificationTest {
     }
 
     @Test
-    fun controlledArtifactCreatureTokensDoNotTrigger() {
-        val d = customScenario(CanoptekSpyder, "Servo Exhibition")
+    fun artifactCreatureTokensEnteringWithAnotherArtifactCreatureDoNotTrigger() {
+        val d = customScenario(CanoptekSpyder, "Myr Battlesphere", "Forest")
         val player = d.player1
         d.putCreatureOnBattlefield(player, "Canoptek Spyder")
-        val exhibition = d.putCardInHand(player, "Servo Exhibition")
-        d.giveMana(player, Color.WHITE)
-        d.giveColorlessMana(player, 1)
+        val forest = d.putCardOnTopOfLibrary(player, "Forest")
+        val battlesphere = d.putCardInHand(player, "Myr Battlesphere")
+        d.giveColorlessMana(player, 7)
         val handBeforeCast = d.getHandSize(player)
 
-        assertNull(d.castSpell(player, exhibition).error)
+        assertNull(d.castSpell(player, battlesphere).error)
         d.resolveAll()
 
-        val servos = d.permanentsNamed(player, "Servo")
-        assertEquals(2, servos.size)
-        servos.forEach { servo ->
-            assertTrue(d.projected.hasType(servo, "ARTIFACT"))
-            assertTrue(d.projected.hasType(servo, "CREATURE"))
+        val myr = d.permanentsNamed(player, "Myr")
+        assertEquals(4, myr.size)
+        myr.forEach { token ->
+            assertTrue(d.state.getEntity(token)!!.has<TokenComponent>())
+            assertTrue(d.projected.hasType(token, "ARTIFACT"))
+            assertTrue(d.projected.hasType(token, "CREATURE"))
         }
-        assertEquals("Artifact creature tokens are excluded from the trigger",
-            handBeforeCast - 1, d.getHandSize(player))
+        assertTrue(d.getHand(player).contains(forest))
+        assertEquals("Only Myr Battlesphere, not its four artifact creature tokens, draws",
+            handBeforeCast, d.getHandSize(player))
     }
 }
