@@ -125,8 +125,10 @@ The `android` check (`tools/check_android_engine.py`) reads the new jars themsel
   `integration/policy.json` `target`) gained an engine patch directly. Copy each named patch from that
   branch into `argentum-patches/` and the MANDATORY list here, the same day (byte-identical when the pins
   match). The daily early warning reports this within a day.
-- **The current build's cards fail on the new engine**: a card regression (GPT's lane) unless the failure
-  is in an engine patch.
+- **The current build's cards fail on the new engine**: tested in a scratch copy of that build's own
+  Android tree with only the engine swapped in. Cards Argentum now also has are reconciled first, exactly
+  like this base's (Arcana's version kept where Argentum's fails its tests). What still fails is a card
+  regression (GPT's lane) unless the failure is in an engine patch.
 
 ## Failing test or lost precon slot
 

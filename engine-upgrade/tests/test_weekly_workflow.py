@@ -300,6 +300,7 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         self.assertIn("git archive FETCH_HEAD android |", cards["run"])  # the build's own tree, not ours
         self.assertIn('cp android/app/libs/argentum-*.jar "$d/android/app/libs/"', cards["run"])
         self.assertIn('align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"', cards["run"])
+        self.assertIn('weekly.py reconcile 4 --android "$d/android" --name currentreconcile', cards["run"])
         report = self.step("validate", "Write the report")["run"]
         self.assertIn("env['CURRENTCARDS'] == 'success'", report)
         self.assertIn("synced,", report)
