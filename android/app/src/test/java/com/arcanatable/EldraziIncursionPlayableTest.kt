@@ -113,6 +113,21 @@ class EldraziIncursionPlayableTest {
         assertNotEquals(first.state.rng, other.state.rng)
     }
 
+    /** Life, library and battlefield sizes per player: tells a long game from a stalled one. */
+    private fun progress(state: GameState): String = state.turnOrder.joinToString(prefix = "[", postfix = "]") { p ->
+        val life = state.getEntity(p)?.get<com.wingedsheep.engine.state.components.identity.LifeTotalComponent>()?.life
+        "life=$life lib=${state.getZone(p, com.wingedsheep.sdk.core.Zone.LIBRARY).size} " +
+            "bf=${state.getZone(p, com.wingedsheep.sdk.core.Zone.BATTLEFIELD).size}"
+    } + " step=${state.step} stack=${state.stack.size} decision=${state.pendingDecision?.let { it::class.simpleName }}"
+
+    /** An AI action with the names of the cards it mentions. */
+    private fun describe(state: GameState, action: GameAction): String {
+        val text = action.toString()
+        val names = state.entities.keys.filter { Regex("""\b${Regex.escape(it.toString())}\b""").containsMatchIn(text) }
+            .mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
+        return "${action::class.simpleName}$names"
+    }
+
     private data class AiStep(val before: GameState, val action: GameAction, val after: GameState)
 
     /** Direct processing exposes rejections that playPriorityWindow can replace with a pass. */
@@ -143,7 +158,8 @@ class EldraziIncursionPlayableTest {
             trace += AiStep(state, action, result.state)
             state = result.state
         }
-        assertTrue("Strict AI mirror must finish: seed=$seed turn=${state.turnNumber} actions=${trace.size}", state.gameOver)
+        assertTrue("Strict AI mirror must finish: seed=$seed turn=${state.turnNumber} actions=${trace.size} " +
+            "${progress(state)} last=${trace.takeLast(12).joinToString(" | ") { describe(it.before, it.action) }}", state.gameOver)
         if (expected != null) assertEquals("Replay ended at a different action; seed=$seed", expected.size, trace.size)
         println("[eldrazi-incursion-strict] seed=$seed replay=${expected != null} " +
             "turn=${state.turnNumber} actions=${trace.size} winner=${state.winnerId} rejections=0")
@@ -182,7 +198,7 @@ class EldraziIncursionPlayableTest {
             }
             println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
-            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions", state.gameOver)
+            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions ${progress(state)}", state.gameOver)
         }
     }
 }
