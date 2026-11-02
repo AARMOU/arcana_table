@@ -1,7 +1,7 @@
 {
   "key": "dragons-rage-channeler",
   "name": "Dragon's Rage Channeler",
-  "issue": 678,
+  "issue": 860,
   "source": "certification/DragonsRageChannelerIndependentCertificationTest.kt",
   "testClass": "com.arcanatable.customcards.DragonsRageChannelerIndependentCertificationTest",
   "tests": 17
