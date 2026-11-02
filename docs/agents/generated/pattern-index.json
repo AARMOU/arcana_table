@@ -29,7 +29,7 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Endless Atlas",
@@ -904,6 +904,17 @@
     }
    ]
   },
+  "DynamicAmounts.damageReceivedThisTurn": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 84,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.devotionTo": {
    "count": 1,
    "examples": [
@@ -1560,6 +1571,17 @@
     }
    ]
   },
+  "Effects.CantBlockGroup": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 84,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.CantCastSpells": {
    "count": 1,
    "examples": [
@@ -1637,6 +1659,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DescendantsPath.kt",
      "lines": 90,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DescendantsPathScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.ChooseAction": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 84,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
   },
@@ -4832,6 +4865,17 @@
     }
    ]
   },
+  "Triggers.you.attacks": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 84,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
+    }
+   ]
+  },
   "Triggers.you.beginningOf": {
    "count": 22,
    "examples": [
@@ -5228,7 +5272,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5426,7 +5470,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 161,
+   "count": 162,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5510,7 +5554,7 @@
  },
  "field": {
   "condition": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -6446,7 +6490,7 @@
    ]
   },
   "EntersWithCounters": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -6465,6 +6509,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
+    },
+    {
+     "card": "Twins of Discord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt",
+     "lines": 84,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt"
     }
    ]
   },
@@ -7510,7 +7560,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 116,
+   "count": 117,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7974,7 +8024,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Silence",
