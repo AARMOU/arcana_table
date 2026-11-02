@@ -1,5 +1,5 @@
 upstream wingedsheep/argentum-engine@c1c04ca3265c61df913af6db65460ad4ce409614
-series: argentum-patches/ MANDATORY (engine-upgrade/audit_patches.py), validated by run 41369081076
+series: argentum-patches/ MANDATORY (engine-upgrade/audit_patches.py), validated by run 41371640127
 a2b5f90d02de01754b0474aa04da4ce2e7132e404700756c8c0289a3fe7eabba  android/app/libs/argentum-ai.jar
 c5677903637efaff3d57043a3f925a05b063f243e38cfbbfd8b7241de3af2fa0  android/app/libs/argentum-mtg-sdk-tooling.jar
 92b5c81d12b2176d2418d6d36c06f7bc14e85c2c6232236a0388162f02888939  android/app/libs/argentum-mtg-sdk.jar
