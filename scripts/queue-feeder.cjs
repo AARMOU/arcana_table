@@ -331,10 +331,27 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-base-provenance' };
   const head = (await github.rest.repos.getBranch({ owner, repo, branch: payload.base })).data.commit.sha;
   if (head !== payload.baseSha) return { reason: 'integration-base-moved' };
+  // A card already on the destination build (integrated, or hand-applied) is never re-queued. Without this, closing
+  // its finished PR removed the only "claim" and Copilot was paid to rebuild it (2026-11-01: Knuckles, Armory
+  // Automaton, Dragon's Rage Channeler, Monstrous Onslaught, Verdant Sun's Avatar). Fails closed: no new queue item
+  // if the destination index can't be read.
+  let onDestination = new Set();
+  if (github.rest.repos.getContent) {
+    try {
+      const { TARGET } = require('./card-integration.cjs');
+      const d = (await github.rest.repos.getContent({ owner, repo, ref: TARGET,
+        path: 'android/app/src/main/assets/argentum/custom-cards.index.tsv' })).data;
+      const text = Buffer.from(d.content || '', d.encoding === 'base64' ? 'base64' : 'utf8').toString('utf8');
+      onDestination = new Set(text.split('\n').map(r => r.split('\t')[0]).filter(Boolean).map(F.normName));
+    } catch { return { reason: 'destination-index-unavailable' }; }
+  }
+  const skippedOnDestination = (payload.suggestions || []).filter(x => onDestination.has(F.normName(x.name))).map(x => x.name);
+  payload = { ...payload, suggestions: (payload.suggestions || []).filter(x => !onDestination.has(F.normName(x.name))) };
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const closed = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'closed', per_page: 100 });
   const pick = chooseAutoQueue(payload, open, closed);
-  const notes = { stuck: pick.stuck || [], held: pick.held || [] };
+  if (skippedOnDestination.length) pick.skippedOnDestination = skippedOnDestination;
+  const notes = { stuck: pick.stuck || [], held: pick.held || [], ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
   if (!pick.suggestion) return { reason: pick.reason, ...notes, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
   const body = [A.AUTO_QUEUE_MARKER,
