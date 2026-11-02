@@ -283,6 +283,9 @@ def export_series(engine, target, mandatory, text, report):
     listing = "".join(f'    "{n}",\n' for n in kept)
     text = re.sub(r'^TARGET = "[0-9a-f]{40}"', f'TARGET = "{target}"', text, flags=re.M)
     text = re.sub(r"^MANDATORY = \[\n.*?^\]", "MANDATORY = [\n" + listing + "]", text, flags=re.M | re.S)
+    for name in mandatory:
+        if name not in kept:
+            text = add_retired(text, name, f"upstream has it as of {target[:10]}")
     AUDIT.write_text(text)
     config = json.loads(CONFIG.read_text())
     config["upstream"] = target
@@ -292,6 +295,18 @@ def export_series(engine, target, mandatory, text, report):
     write("rebase.json", report)
     write("auto-resolved.md", auto_resolved_markdown(report))
     return kept
+
+
+def add_retired(text, name, why):
+    """Record a patch that left the series in audit_patches.py's RETIRED (created if absent)."""
+    entry = f'    "{name}": "{why}",\n'
+    block = re.search(r"^RETIRED = \{\n(.*?)^\}\n", text, re.M | re.S)
+    if block is None:
+        mandatory = re.search(r"^MANDATORY = \[\n.*?^\]\n", text, re.M | re.S)
+        return text[:mandatory.end()] + "RETIRED = {\n" + entry + "}\n" + text[mandatory.end():]
+    if f'    "{name}":' in block[1]:
+        return text
+    return text[:block.end(1)] + entry + text[block.end(1):]
 
 
 def auto_resolved_markdown(report):

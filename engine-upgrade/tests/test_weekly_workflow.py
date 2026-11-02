@@ -301,6 +301,11 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         self.assertIn("synced,", report)
         self.assertEqual(self.report_env()["SYNCED"], "${{ steps.current.outputs.synced }}")
 
+    def test_patches_retired_on_purpose_do_not_count_as_missing(self):
+        run = next(s for s in self.validate["steps"] if s.get("id") == "current")["run"]
+        self.assertIn("RETIRED = ", run)
+        self.assertIn("p not in base and p not in retired", run)
+
     def test_engine_status_takes_only_fixed_keys_from_validate(self):
         status = self.step("verdict", "Publish the engine status for Arcana Control")
         self.assertIn("github.event_name != 'push'", status["if"])

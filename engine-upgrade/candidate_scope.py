@@ -11,7 +11,7 @@ It reads the staged index (git's own view, so quoted paths, renames and mode cha
 it) and fails unless every change is one the upgrade itself makes:
   * argentum-patches/<name>.patch            added, modified or deleted
   * engine-upgrade/forward-ports/<name>      deleted only (folded into the refreshed patch)
-  * engine-upgrade/audit_patches.py          only its TARGET pin and MANDATORY list may change
+  * engine-upgrade/audit_patches.py          only its TARGET pin, MANDATORY list and RETIRED record may change
   * engine-upgrade/preview-config.json       modified
   * android/app/libs/argentum-<module>.jar   modified
   * android/app/src/main/assets/argentum/... added, modified or deleted
@@ -143,7 +143,8 @@ def staged() -> list[tuple[str, str, str]]:
 
 def strip_pins(source: str) -> str:
     source = re.sub(r'^TARGET = "[0-9a-f]{40}"$', "TARGET = <pin>", source, flags=re.M)
-    return re.sub(r"^MANDATORY = \[\n.*?^\]$", "MANDATORY = <list>", source, flags=re.M | re.S)
+    source = re.sub(r"^MANDATORY = \[\n.*?^\]$", "MANDATORY = <list>", source, flags=re.M | re.S)
+    return re.sub(r"^RETIRED = \{\n.*?^\}\n?", "", source, flags=re.M | re.S)  # present or not
 
 
 def problems() -> list[str]:

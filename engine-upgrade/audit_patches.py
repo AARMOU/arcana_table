@@ -48,6 +48,11 @@ MANDATORY = [
     "0030-bloodthirst-keyword.patch",
     "0033-property-sum-of-collection.patch",
 ]
+# Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
+# numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.
+RETIRED = {
+    "0008-jvm-test-toolchain.patch": "folded into 0002-engine-trial-build.patch (2026-11-02)",
+}
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
 

@@ -89,7 +89,7 @@ jobs:
           python3 -m pip install --quiet pyyaml
           set +e
           python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
-            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py \
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py engine-upgrade/tests/test_weekly_retired.py \
             tools/tests/test_check_android_engine.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
@@ -124,12 +124,17 @@ jobs:
           def show(ref, path):
               r = subprocess.run(["git", "show", f"{ref}:{path}"], capture_output=True, text=True)
               return r.stdout if r.returncode == 0 else None
-          def body(p):  # a patch's change, ignoring headers, blob ids and line numbers
-              p = p[p.find("diff --git"):] if "diff --git" in p else p
-              return [l for l in p.splitlines() if not l.startswith(("index ", "@@")) and not re.match(r"^-- ?$|^\d+\.\d+", l)]
+          def body(p):  # the added and removed lines per file: ignores headers, file order, context and line numbers
+              files = re.split(r"^(?=diff --git )", p, flags=re.M)[1:]
+              keep = lambda f: "\n".join(l for l in f.splitlines()[1:] if l[:1] in ("+", "-") and not re.match(r"^-- ?$", l))
+              return sorted(keep(f) for f in files)
           build = series(show(sha, "engine-upgrade/audit_patches.py") or 'MANDATORY = []')
           base = series(open("engine-upgrade/audit_patches.py").read())
-          missing = [p for p in build if p not in base]
+          src = open("engine-upgrade/audit_patches.py").read()
+          retired = re.search(r"^RETIRED = \{\n(.*?)^\}", src, re.M | re.S)
+          retired = dict(re.findall(r'"([^"]+\.patch)": "([^"]*)"', retired[1])) if retired else {}
+          missing = [p for p in build if p not in base and p not in retired]
+          gone = [p for p in build if p not in base and p in retired]
           differs = [p for p in build if p in base and (show(sha, f"argentum-patches/{p}") or "") and
                      body(show(sha, f"argentum-patches/{p}")) != body(open(f"argentum-patches/{p}").read())]
           short = branch.split("/")[-1]
@@ -140,6 +145,8 @@ jobs:
                         f"`{branch}` into `argentum-patches/` and the MANDATORY list (engine lane)."]
           else:
               lines += [f"✅ All {len(build)} engine patches the current build uses are carried here."]
+          if gone:
+              lines += ["", "ℹ️ Retired here on purpose: " + "; ".join(f"`{p}` ({retired[p]})" for p in gone) + "."]
           if differs:
               lines += ["", "ℹ️ Same name, different change (check the newer one is carried): " +
                         ", ".join(f"`{p}`" for p in differs) + "."]

@@ -171,6 +171,16 @@ class CandidateScope(unittest.TestCase):
         self.stage()
         self.assertRejected("android/settings.gradle.kts: outside the upgrade scope")
 
+    def test_recording_a_retired_patch_is_in_scope(self):
+        retired = 'RETIRED = {\n    "0001-a.patch": "upstream has it as of bbbbbbbbbb",\n}\n'
+        self.write("engine-upgrade/audit_patches.py", audit("a" * 40, []).replace("EXPERIMENTAL", retired + "EXPERIMENTAL"))
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+        self.write("engine-upgrade/audit_patches.py", audit("a" * 40, []).replace("EXPERIMENTAL", retired + "EVIL = 1\nEXPERIMENTAL"))
+        self.stage()
+        self.assertRejected("changes beyond the TARGET pin")
+
     def test_empty_candidate_is_rejected(self):
         self.assertRejected("changes nothing")
 
