@@ -859,6 +859,17 @@
     }
    ]
   },
+  "DynamicAmounts.countersOn": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mutated Cultist",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MutatedCultist.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MutatedCultistScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.countersOnSelf": {
    "count": 1,
    "examples": [
@@ -2858,7 +2869,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2931,6 +2942,17 @@
     }
    ]
   },
+  "Effects.ReduceNextSpellCost": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mutated Cultist",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MutatedCultist.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MutatedCultistScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.ReflexiveTrigger": {
    "count": 1,
    "examples": [
@@ -2950,6 +2972,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/YavimayaHollow.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/YavimayaHollowScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.RemoveAllCounters": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mutated Cultist",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MutatedCultist.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MutatedCultistScenarioTest.kt"
     }
    ]
   },
@@ -3325,7 +3358,7 @@
    ]
   },
   "Keyword.DEATHTOUCH": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3350,6 +3383,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
+    },
+    {
+     "card": "Mutated Cultist",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MutatedCultist.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MutatedCultistScenarioTest.kt"
     }
    ]
   },
@@ -3377,7 +3416,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -4635,7 +4674,7 @@
    ]
   },
   "Triggers.self.isCast": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Noise Marine",
@@ -5019,7 +5058,7 @@
    ]
   },
   "keywords()": {
-   "count": 105,
+   "count": 106,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5332,7 +5371,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 158,
+   "count": 159,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5539,7 +5578,7 @@
    ]
   },
   "optional": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -8477,7 +8516,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Defile",
