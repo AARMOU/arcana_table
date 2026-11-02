@@ -1,6 +1,7 @@
 """tools/check_android_engine.py on small real class files compiled here (javac), not mocks."""
 
 import importlib.util
+import re
 import shutil
 import subprocess
 import tempfile
@@ -104,10 +105,14 @@ class CheckAndroidEngineTest(unittest.TestCase):
         self.assertEqual(["lib/foo"], r["newLibraries"])
 
     def test_bytecode_newer_than_java_17_blocks(self):
-        r = self.run_check(self.engine("new", OLD, release="21"), self.engine("old", OLD))
+        out = subprocess.run([JAVAC, "-version"], capture_output=True, text=True)
+        major = int(re.search(r"javac (\d+)", out.stdout + out.stderr).group(1))
+        if major <= 17:
+            self.skipTest(f"javac {major} cannot emit bytecode newer than Java 17")
+        r = self.run_check(self.engine("new", OLD, release=str(major)), self.engine("old", OLD))
         self.assertFalse(r["ok"])
         self.assertEqual(1, r["bytecodeCount"])
-        self.assertIn("class version 65", r["bytecode"][0])
+        self.assertIn(f"class version {major + 44}", r["bytecode"][0])
 
     def test_report_names_the_problem_in_plain_words(self):
         r = self.run_check(self.engine("new", OLD, NEW_CALL), self.engine("old", OLD))
