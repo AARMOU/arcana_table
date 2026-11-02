@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { refreshWorkerStatus, eventInputKey } = require('./worker-status.cjs');
+const { refreshWorkerStatus, eventInputKey, eventIntervalMs } = require('./worker-status.cjs');
 const ctx = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 321, eventName: 'workflow_run',
   payload: { workflow_run: { id: 44, name: 'Running Copilot cloud agent', status: 'completed',
     head_sha: 'a'.repeat(40), conclusion: 'success' } } };
@@ -86,6 +86,36 @@ test('observer event keys track relevant state and ignore unrelated completions'
   assert.notEqual(eventInputKey(issue('labeled')), eventInputKey({ ...issue('labeled'), payload: {
     ...issue('labeled').payload, issue: { ...issue('labeled').payload.issue, updated_at: '2026-10-29T05:01:00Z' },
   } }));
+});
+
+test('distinct issue events inside 15 minutes share one scan; Copilot completions keep the 5-minute window', async () => {
+  let lastScanAt = null;
+  let loads = 0;
+  let priorKey = null;
+  let checkedAt = null;
+  const runIssueEvent = async (number, minutesAfterStart) => {
+    const at = new Date(Date.parse('2026-10-29T05:00:00Z') + minutesAfterStart * 60_000);
+    const context = { ...ctx, eventName: 'issues', payload: { action: 'labeled', issue: {
+      number, state: 'open', updated_at: at.toISOString(), labels: [{ name: 'arcana:queue' }],
+    } } };
+    return refreshWorkerStatus({
+      github: {}, context, core, now: () => at,
+      previous: async () => ({ lastInputKey: priorKey, checkedAt }),
+      load: async () => { loads++; lastScanAt = at.getTime(); return { units: [] }; },
+      publish: async ({ payload }) => { priorKey = payload.lastInputKey; checkedAt = payload.checkedAt; return 'updated'; },
+    });
+  };
+
+  assert.equal((await runIssueEvent(10, 0)).published, 'updated');
+  assert.equal((await runIssueEvent(11, 3)).reason, 'fresh-status');
+  assert.equal((await runIssueEvent(12, 14)).reason, 'fresh-status');
+  assert.equal(loads, 1);
+  assert.equal((await runIssueEvent(13, 16)).published, 'updated');
+  assert.equal(loads, 2);
+  assert.notEqual(lastScanAt, null);
+
+  assert.equal(eventIntervalMs(ctx), 5 * 60_000);
+  assert.equal(eventIntervalMs({ eventName: 'issues' }), 15 * 60_000);
 });
 
 test('scheduled and manual runs always refresh and preserve the last event key', async () => {

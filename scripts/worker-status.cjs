@@ -3,6 +3,20 @@
 const { loadUnits } = require('./units.cjs');
 const { summarizeUnits, publishStatus, previousStatus } = require('./control-status.cjs');
 
+const MIN_EVENT_INTERVAL_MS = 5 * 60 * 1000;
+const LOW_VALUE_EVENT_INTERVAL_MS = 15 * 60 * 1000;
+
+function eventIntervalMs(context = {}) {
+  return context.eventName === 'workflow_run' &&
+    /^Running Copilot cloud agent$/.test(String(context.payload?.workflow_run?.name || ''))
+    ? MIN_EVENT_INTERVAL_MS : LOW_VALUE_EVENT_INTERVAL_MS;
+}
+
+function statusIsFresh(status, { maxAgeMs, now = Date.now() }) {
+  const checkedAt = Date.parse(status?.checkedAt);
+  return Number.isFinite(checkedAt) && now >= checkedAt && now - checkedAt < maxAgeMs;
+}
+
 // A duplicate event for the same underlying state must not trigger another ~100-call scan.
 // The bounded schedule remains the recovery path for missed or newly visible GitHub state.
 function eventInputKey(context = {}) {
@@ -30,7 +44,7 @@ function eventInputKey(context = {}) {
 }
 
 async function refreshWorkerStatus({ github, context, core, now = () => new Date(), load = loadUnits, publish = publishStatus,
-  previous = previousStatus }) {
+  previous = previousStatus, minIntervalMs = eventIntervalMs(context) }) {
   const { owner, repo } = context.repo;
   const checkedAt = now();
   const inputKey = eventInputKey(context);
@@ -45,6 +59,12 @@ async function refreshWorkerStatus({ github, context, core, now = () => new Date
     if (prior?.lastInputKey === inputKey) {
       core.info('Worker-status input already observed; skipped duplicate event.');
       return { skipped: true, reason: 'duplicate-input' };
+    }
+    // Distinct issue/PR events can arrive in bursts. Keep the original rate limit as well
+    // as input-key de-duplication so each 100-call scan is bounded to one per event window.
+    if (statusIsFresh(prior, { maxAgeMs: minIntervalMs, now: checkedAt.getTime() })) {
+      core.info('Worker status refreshed within the last ' + minIntervalMs / 60000 + ' min; skipped.');
+      return { skipped: true, reason: 'fresh-status' };
     }
   }
   // Same GitHub event/ledger observation as admission, but NO writes or spending.
@@ -69,4 +89,4 @@ async function refreshWorkerStatus({ github, context, core, now = () => new Date
   if (published.startsWith('failed')) throw Error('Worker status publication failed: ' + published);
   return { payload, published };
 }
-module.exports = { refreshWorkerStatus, eventInputKey };
+module.exports = { refreshWorkerStatus, eventInputKey, eventIntervalMs, statusIsFresh, MIN_EVENT_INTERVAL_MS, LOW_VALUE_EVENT_INTERVAL_MS };
