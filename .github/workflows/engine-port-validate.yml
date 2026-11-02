@@ -17,6 +17,10 @@ on:
         description: Commit the validated engine and data to this branch
         type: boolean
         default: false
+      ai_tests:
+        description: Also run the engine AI suite (:ai:test) and print its summary (report only, not gating)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -76,6 +80,28 @@ jobs:
                   f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
           print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
           assert t>1000 and f==0
+          PY
+      - name: Engine AI tests (opt-in, report only)
+        if: always() && inputs.ai_tests
+        continue-on-error: true
+        timeout-minutes: 75
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-ai \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 --continue \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :ai:test || true
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=0; bad=[]
+          for p in Path("ai/build/test-results/test").glob("TEST-*.xml"):
+            r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+            for tc in r.iter("testcase"):
+              if tc.find("failure") is not None or tc.find("error") is not None:
+                f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+          print("ai", {"tests":t,"failed":f}); print("\n".join(bad[:300]))
           PY
       - name: Keep the shipped card data for comparison
         run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
