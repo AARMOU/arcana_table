@@ -1,0 +1,463 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 5ff6e246..c87e52c2 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -14788,6 +14788,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+   abilities (as suspend's countdown and cast do): a vanishing permanent sits where instant-speed
+   counter removal can reach it, and it is sacrificed whenever the last counter leaves, not only on
+   an upkeep.
++- `Bloodthirst(n)` — **engine-live.** Declare it and nothing else:
++  `keywordAbility(KeywordAbility.bloodthirst(2))`. The engine supplies the replacement effect
++  from [`Bloodthirst`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bloodthirst.kt):
++  "if an opponent was dealt damage this turn, it enters with N +1/+1 counters". It runs at the
++  shared entry seam (`EntersWithReplacements.applyGlobal`, so spells, tokens, reanimation and blinks
++  alike), through `placeEntryCounters` (so Hardened Scales applies), with no trigger and no stack.
++  Whether the permanent has bloodthirst is read from its **projected** keywords as it would exist on
++  the battlefield (CR 614.12): the printed half is gated on the bare `BLOODTHIRST` keyword and reads
++  N from the printed `KeywordAbility.Numeric`; a lose-all-abilities effect that applies to it strips
++  both halves. "An opponent" is relative to the entering permanent's controller; only damage counts,
++  not life loss. **Granted bloodthirst** ("Each other colorless creature you control has
++  bloodthirst 2", Twins of Discord) is `GrantKeyword(KeywordAbility.grantedBloodthirst(2),
++  GroupFilter(<filter>, excludeSelf = true))`, the projected `BLOODTHIRST_<n>` keyword carrying
++  its own N. Like renown, grants are **not summed**: projection tallies identical grants
++  (`ProjectedState.grantedKeywordInstances`), each instance adds its own N, and the client shows
++  the keyword as "bloodthirst 2". Do **not** hand-write an `EntersWithCounters`; it would stack
++  with the engine's. Pinned by `BloodthirstKeywordTest`.
+ - `Renown(n)` — **engine-live.** Declare it and nothing else:
+   `keywordAbility(KeywordAbility.renown(1))` (Topan Freeblade). The engine supplies the CR 702.112
+   ability from [`Renown`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Renown.kt): a
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+index 9196eed7..1f37b588 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+@@ -839,6 +839,13 @@ enum class Keyword(val displayName: String) {
+     FADING("Fading"),
+     VANISHING("Vanishing"),
+ 
++    /**
++     * Bloodthirst N: "If an opponent was dealt damage this turn, this permanent enters
++     * with N +1/+1 counters on it." Printed via `KeywordAbility.bloodthirst(n)`, granted via
++     * `KeywordAbility.grantedBloodthirst(n)`; see [com.wingedsheep.sdk.scripting.Bloodthirst].
++     */
++    BLOODTHIRST("Bloodthirst"),
++
+     /**
+      * Cumulative upkeep [cost] (CR 702.24). Display-only; the `cumulativeUpkeep(cost)` DSL helper
+      * composes the upkeep trigger (age counter, then pay the cost per age counter or sacrifice).
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bloodthirst.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bloodthirst.kt
+new file mode 100644
+index 00000000..08ccef27
+--- /dev/null
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bloodthirst.kt
+@@ -0,0 +1,70 @@
++package com.wingedsheep.sdk.scripting
++
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.scripting.conditions.Compare
++import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
++import com.wingedsheep.sdk.scripting.conditions.Condition
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.values.DynamicAmount
++import com.wingedsheep.sdk.scripting.values.TurnTracker
++
++/**
++ * Bloodthirst N as pure data — the replacement effect every bloodthirst permanent has and none of
++ * them prints as a separate line. Twins of Discord's reminder text for a granted "bloodthirst 2":
++ *
++ * > "If an opponent was dealt damage this turn, that creature enters with two additional +1/+1
++ * > counters on it."
++ *
++ * A replacement effect on the permanent's own entry (CR 614.1c): no trigger, no stack, the counters
++ * are on it as it enters and counter-placement replacements apply to them.
++ *
++ * **Printed and granted bloodthirst derive separately**, the [Renown] shape:
++ *  - **Printed** — `keywordAbility(KeywordAbility.bloodthirst(n))`. The engine gates it on the
++ *    entering permanent's *projected* bare `BLOODTHIRST` keyword, so a permanent that would enter
++ *    having lost all abilities has no bloodthirst, and reads N from the printed
++ *    [KeywordAbility.Numeric] ([printedCounts]).
++ *  - **Granted** — `GrantKeyword(KeywordAbility.grantedBloodthirst(n), filter)` ("Each other
++ *    colorless creature you control has bloodthirst 2", Twins of Discord) floats the projected
++ *    keyword `BLOODTHIRST_<n>` ([grantedKeyword]). Projection never sums bloodthirst grants: each
++ *    grant is its own instance and identical ones are tallied, so two "has bloodthirst 2" grants
++ *    show as two instances and add 2 + 2 counters.
++ *
++ * Whether the permanent has bloodthirst is read from its projected characteristics as it would
++ * exist on the battlefield (CR 614.12), so a grant from a permanent already there applies, and a
++ * later-timestamped "loses all abilities" effect that covers it removes printed and granted
++ * instances alike (layer 6). "An opponent" is relative to the entering permanent's controller.
++ */
++object Bloodthirst {
++
++    /** The projected keyword prefix a granted bloodthirst floats under; see [grantedKeyword]. */
++    private val GRANTED_PREFIX = "${Keyword.BLOODTHIRST.name}_"
++
++    /**
++     * The projected keyword string a *granted* "bloodthirst [n]" floats — `BLOODTHIRST_<n>`. Cards
++     * spell it [KeywordAbility.grantedBloodthirst].
++     */
++    fun grantedKeyword(n: Int): String = "$GRANTED_PREFIX$n"
++
++    /** The N of a projected granted-bloodthirst keyword string, or null when [keyword] isn't one. */
++    fun grantedN(keyword: String): Int? =
++        if (keyword.startsWith(GRANTED_PREFIX)) keyword.substring(GRANTED_PREFIX.length).toIntOrNull()?.takeIf { it > 0 }
++        else null
++
++    /** The Ns of a card's printed `Bloodthirst N` abilities, one per instance. */
++    fun printedCounts(cardDef: CardDefinition): List<Int> =
++        cardDef.keywordAbilities
++            .filterIsInstance<KeywordAbility.Numeric>()
++            .filter { it.keyword == Keyword.BLOODTHIRST }
++            .map { it.n }
++
++    /**
++     * "If an opponent was dealt damage this turn" — evaluated with the entering permanent's
++     * controller as "you". Damage only: life loss that isn't damage doesn't count.
++     */
++    val condition: Condition = Compare(
++        DynamicAmount.TurnTracking(Player.EachOpponent, TurnTracker.DAMAGE_RECEIVED),
++        ComparisonOperator.GTE,
++        DynamicAmount.Fixed(1),
++    )
++}
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
+index f0166edc..6fd9445d 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
+@@ -2045,6 +2045,13 @@ sealed interface KeywordAbility {
+          * per grant instance, beside any printed renown's (CR 702.112c); see [Renown].
+          */
+         fun grantedRenown(n: Int): String = Renown.grantedKeyword(n)
++
++        /**
++         * The projected keyword a *granted* "bloodthirst [n]" floats — `BLOODTHIRST_<n>` — for
++         * `GrantKeyword(KeywordAbility.grantedBloodthirst(2), filter)` ("Each other colorless creature you
++         * control has bloodthirst 2", Twins of Discord). Each grant is its own instance; see [Bloodthirst].
++         */
++        fun grantedBloodthirst(n: Int): String = Bloodthirst.grantedKeyword(n)
+         fun saddle(n: Int): KeywordAbility = Numeric(Keyword.SADDLE, n)
+         fun modular(n: Int): KeywordAbility = Numeric(Keyword.MODULAR, n)
+         fun fading(n: Int): KeywordAbility = Numeric(Keyword.FADING, n)
+@@ -2054,6 +2061,7 @@ sealed interface KeywordAbility {
+          * Do not also hand-write those three parts, or they will stack with the engine's.
+          */
+         fun vanishing(n: Int): KeywordAbility = Numeric(Keyword.VANISHING, n)
++        fun bloodthirst(n: Int): KeywordAbility = Numeric(Keyword.BLOODTHIRST, n)
+         fun renown(n: Int): KeywordAbility = Numeric(Keyword.RENOWN, n)
+         fun fabricate(n: Int): KeywordAbility = Numeric(Keyword.FABRICATE, n)
+         fun tribute(n: Int): KeywordAbility = Numeric(Keyword.TRIBUTE, n)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
+index a9004297..133d389b 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
+@@ -33,6 +33,7 @@ import com.wingedsheep.sdk.scripting.EntersWithChoice
+ import com.wingedsheep.sdk.scripting.EntersWithCounters
+ import com.wingedsheep.sdk.scripting.EntersWithDynamicCounters
+ import com.wingedsheep.sdk.scripting.EntersWithKeywords
++import com.wingedsheep.sdk.scripting.Bloodthirst
+ import com.wingedsheep.sdk.scripting.Vanishing
+ import com.wingedsheep.sdk.scripting.conditions.SourceChosenModeIs
+ 
+@@ -466,6 +467,24 @@ object EntersWithReplacements {
+         val events = mutableListOf<GameEvent>()
+         val entityName = newState.getEntity(enteringEntityId)?.get<CardComponent>()?.name ?: ""
+ 
++        // Bloodthirst N — the entrant's own keyword, printed or granted, read off its projected
++        // characteristics as it would exist on the battlefield (CR 614.12).
++        val bloodthirst = bloodthirstCount(
++            newState, enteringEntityId, enteringControllerId, cardRegistry, predicateEvaluator, replacementSourceState
++        )
++        if (bloodthirst > 0) {
++            if (counterTotals != null) {
++                counterTotals[CounterType.PLUS_ONE_PLUS_ONE] = (counterTotals[CounterType.PLUS_ONE_PLUS_ONE] ?: 0) + bloodthirst
++            } else {
++                val (placed, placedEvents) = placeEntryCounters(
++                    newState, enteringEntityId, CounterType.PLUS_ONE_PLUS_ONE, bloodthirst, enteringControllerId,
++                    entityName, predicateEvaluator, replacementSourceState
++                )
++                newState = placed
++                events.addAll(placedEvents)
++            }
++        }
++
+         val sources = mutableListOf<GlobalReplacementSource>()
+         val sourceState = replacementSourceState ?: newState
+         for (sourceId in sourceState.getBattlefield()) {
+@@ -623,6 +642,47 @@ object EntersWithReplacements {
+      * applying to the objects entering simultaneously with this one and is purged at the next
+      * event boundary ([com.wingedsheep.engine.replacement.ActiveReplacements.purgeSpent]).
+      */
++    /**
++     * The +1/+1 counters the entering permanent's bloodthirst abilities put on it — the sum of every
++     * instance's N, or zero when no opponent of [controllerId] was dealt damage this turn.
++     *
++     * Read off the entrant's projected keywords as it would exist on the battlefield (CR 614.12), so a grant from a
++     * permanent already there counts and a "loses all abilities" effect that applies to it removes
++     * both kinds:
++     * - **printed** `Bloodthirst N` is gated on the projected bare `BLOODTHIRST` keyword, N read from
++     *   the printed definition (needs [cardRegistry]; without one only granted instances count);
++     * - **granted** `BLOODTHIRST_<n>` keywords count once per grant instance.
++     */
++    fun bloodthirstCount(
++        state: GameState,
++        entityId: EntityId,
++        controllerId: EntityId,
++        cardRegistry: CardRegistry?,
++        predicateEvaluator: PredicateEvaluator,
++        replacementSourceState: GameState? = null
++    ): Int {
++        // The spell-resolution path applies entry replacements before the permanent is put into the
++        // battlefield zone; project it there so grants and ability-loss effects that would apply to it
++        // once it's on the battlefield are seen.
++        val onBattlefield = if (entityId in state.getBattlefield()) state
++            else state.addToZone(ZoneKey(controllerId, Zone.BATTLEFIELD), entityId)
++        val projected = prospectiveEntryView(onBattlefield, entityId, replacementSourceState).projectedState
++        val keywords = projected.getKeywords(entityId)
++        if (keywords.isEmpty()) return 0
++        val printed = if (Keyword.BLOODTHIRST.name in keywords) {
++            val defId = state.getEntity(entityId)?.get<CardComponent>()?.cardDefinitionId
++            defId?.let { cardRegistry?.getCard(it) }?.let(Bloodthirst::printedCounts).orEmpty().sum()
++        } else 0
++        val granted = keywords.sumOf { keyword ->
++            val n = Bloodthirst.grantedN(keyword) ?: return@sumOf 0
++            n * projected.grantedKeywordInstances(entityId, keyword)
++        }
++        val total = printed + granted
++        if (total <= 0) return 0
++        val context = EffectContext(sourceId = entityId, controllerId = controllerId)
++        return if (predicateEvaluator.conditions.evaluate(state, Bloodthirst.condition, context)) total else 0
++    }
++
+     private fun spendGrant(state: GameState, source: GlobalReplacementSource): GameState {
+         val index = source.grantIndex ?: return state
+         val grant = state.grantedReplacementEffects.getOrNull(index) ?: return state
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
+index 1187cfdf..aec44b89 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
+@@ -40,7 +40,8 @@ internal class EffectApplicator(
+      * printed toxic 2 plus a granted toxic 2 — would otherwise collapse to one and lose the N the
+      * readers sum (CR 702.164b's total toxic value, `KeywordValue`).
+      *
+-     * Crew and renown are the exceptions: each `CREW_<n>` / `RENOWN_<n>` is a separate ability,
++     * Crew, renown and bloodthirst are the exceptions (bloodthirst like renown: each grant is
++     * its own instance, so grants are tallied, not summed): each `CREW_<n>` / `RENOWN_<n>` is a separate ability,
+      * not a share of one total (a Vehicle with crew 3 that gains crew 1 can be crewed for 1, not 4;
+      * renown 1 twice is two triggers, CR 702.112c, not one renown 2), so distinct Ns sit side by
+      * side. Renown grants are also tallied in [MutableProjectedValues.grantedKeywordInstances],
+@@ -51,9 +52,11 @@ internal class EffectApplicator(
+         val keywords = values.keywords
+         val split = keyword.lastIndexOf('_')
+         val n = if (split > 0) keyword.substring(split + 1).toIntOrNull() else null
+-        if (n == null || keyword.startsWith(CREW_PREFIX) || keyword.startsWith(RENOWN_PREFIX)) {
++        if (n == null || keyword.startsWith(CREW_PREFIX) || keyword.startsWith(RENOWN_PREFIX) || keyword.startsWith(BLOODTHIRST_PREFIX)) {
+             keywords.add(keyword)
+-            if (keyword.startsWith(RENOWN_PREFIX)) values.grantedKeywordInstances.merge(keyword, 1, Int::plus)
++            if (keyword.startsWith(RENOWN_PREFIX) || keyword.startsWith(BLOODTHIRST_PREFIX)) {
++                values.grantedKeywordInstances.merge(keyword, 1, Int::plus)
++            }
+             return
+         }
+         val prefix = keyword.substring(0, split + 1)
+@@ -561,3 +564,4 @@ private val CREW_PREFIX = "${com.wingedsheep.sdk.core.Keyword.CREW.name}_"
+ 
+ /** Prefix of a granted renown keyword ([com.wingedsheep.sdk.scripting.KeywordAbility.grantedRenown]); see `addKeyword`. */
+ private val RENOWN_PREFIX = "${com.wingedsheep.sdk.core.Keyword.RENOWN.name}_"
++private val BLOODTHIRST_PREFIX = "${com.wingedsheep.sdk.core.Keyword.BLOODTHIRST.name}_"
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
+new file mode 100644
+index 00000000..98083ec7
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
+@@ -0,0 +1,171 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.CounterType
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.GrantKeyword
++import com.wingedsheep.sdk.scripting.KeywordAbility
++import com.wingedsheep.sdk.scripting.LoseAllAbilities
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.predicates.CardPredicate
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/**
++ * Bloodthirst N — "if an opponent was dealt damage this turn, this permanent enters with N +1/+1
++ * counters on it" — printed (`KeywordAbility.bloodthirst(n)`) and granted
++ * (`GrantKeyword(KeywordAbility.grantedBloodthirst(n), …)`), applied at the entry seam from the
++ * entrant's projected keywords.
++ */
++class BloodthirstKeywordTest : FunSpec({
++
++    val printed = card("Test Bloodthirsty Brute") {
++        manaCost = "{1}{R}"
++        typeLine = "Creature — Ogre"
++        oracleText = "Bloodthirst 2"
++        power = 2
++        toughness = 2
++        keywordAbility(KeywordAbility.bloodthirst(2))
++    }
++    val granter = card("Test Thirst Totem") {
++        manaCost = "{3}"
++        typeLine = "Artifact Creature — Eldrazi"
++        oracleText = "Each other colorless creature you control has bloodthirst 2."
++        power = 0
++        toughness = 1
++        staticAbility {
++            ability = GrantKeyword(
++                KeywordAbility.grantedBloodthirst(2),
++                GroupFilter(
++                    GameObjectFilter.Creature.withCardPredicate(CardPredicate.IsColorless).youControl(),
++                    excludeSelf = true,
++                ),
++            )
++        }
++    }
++    val colorless = card("Test Colorless Walker") {
++        manaCost = "{2}"
++        typeLine = "Artifact Creature — Construct"
++        oracleText = ""
++        power = 1
++        toughness = 1
++    }
++    val colorlessThirsty = card("Test Colorless Brute") {
++        manaCost = "{2}"
++        typeLine = "Artifact Creature — Construct"
++        oracleText = "Bloodthirst 1"
++        power = 1
++        toughness = 1
++        keywordAbility(KeywordAbility.bloodthirst(1))
++    }
++    val humility = card("Test Ability Drain") {
++        manaCost = "{2}{W}{W}"
++        typeLine = "Enchantment"
++        oracleText = "All creatures lose all abilities."
++        staticAbility { ability = LoseAllAbilities(GroupFilter(GameObjectFilter.Creature)) }
++    }
++
++    fun newDriver(): Pair<GameTestDriver, EntityId> {
++        val driver = GameTestDriver()
++        driver.registerCards(TestCards.all + listOf(printed, granter, colorless, colorlessThirsty, humility))
++        driver.initMirrorMatch(deck = Deck.of("Mountain" to 40), skipMulligans = true, startingPlayer = 0)
++        val me = driver.activePlayer!!
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return driver to me
++    }
++
++    fun GameTestDriver.settle() {
++        repeat(20) { if (state.stack.isEmpty()) return; bothPass() }
++    }
++
++    fun GameTestDriver.bolt(caster: EntityId, target: EntityId) {
++        giveMana(caster, Color.RED)
++        castSpell(caster, putCardInHand(caster, "Lightning Bolt"), listOf(target)).error shouldBe null
++        settle()
++    }
++
++    fun GameTestDriver.cast(caster: EntityId, name: String): EntityId {
++        giveMana(caster, Color.RED)
++        giveColorlessMana(caster, 2)
++        val id = putCardInHand(caster, name)
++        castSpell(caster, id).error shouldBe null
++        settle()
++        (id in state.getBattlefield()) shouldBe true
++        return id
++    }
++
++    fun GameTestDriver.plusCounters(id: EntityId): Int =
++        state.getEntity(id)?.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0
++
++    test("printed bloodthirst: counters on entry once an opponent was dealt damage") {
++        val (d, me) = newDriver()
++        d.bolt(me, d.getOpponent(me))
++        val brute = d.cast(me, "Test Bloodthirsty Brute")
++        d.plusCounters(brute) shouldBe 2
++        d.state.projectedState.hasKeyword(brute, Keyword.BLOODTHIRST) shouldBe true
++    }
++
++    test("printed bloodthirst: nothing without opponent damage, and damage to yourself doesn't count") {
++        val (d, me) = newDriver()
++        d.plusCounters(d.cast(me, "Test Bloodthirsty Brute")) shouldBe 0
++        d.bolt(me, me)
++        d.plusCounters(d.cast(me, "Test Bloodthirsty Brute")) shouldBe 0
++    }
++
++    test("granted bloodthirst: the entering creature has it as a keyword and gets the counters") {
++        val (d, me) = newDriver()
++        d.putPermanentOnBattlefield(me, "Test Thirst Totem")
++        d.bolt(me, d.getOpponent(me))
++        val walker = d.cast(me, "Test Colorless Walker")
++        d.plusCounters(walker) shouldBe 2
++        d.state.projectedState.hasKeyword(walker, KeywordAbility.grantedBloodthirst(2)) shouldBe true
++    }
++
++    test("granted bloodthirst: only matching creatures, and not without opponent damage") {
++        val (d, me) = newDriver()
++        d.putPermanentOnBattlefield(me, "Test Thirst Totem")
++        withClue("no damage yet") { d.plusCounters(d.cast(me, "Test Colorless Walker")) shouldBe 0 }
++        d.bolt(me, d.getOpponent(me))
++        withClue("a red creature gets only its printed 2, no grant") { d.plusCounters(d.cast(me, "Test Bloodthirsty Brute")) shouldBe 2 }
++    }
++
++    test("instances stack: two grants plus a printed bloodthirst") {
++        val (d, me) = newDriver()
++        d.putPermanentOnBattlefield(me, "Test Thirst Totem")
++        d.putPermanentOnBattlefield(me, "Test Thirst Totem")
++        d.bolt(me, d.getOpponent(me))
++        val walker = d.cast(me, "Test Colorless Walker")
++        d.plusCounters(walker) shouldBe 4
++        d.state.projectedState.grantedKeywordInstances(walker, KeywordAbility.grantedBloodthirst(2)) shouldBe 2
++        withClue("printed 1 + granted 2 + 2") { d.plusCounters(d.cast(me, "Test Colorless Brute")) shouldBe 5 }
++    }
++
++    test("losing all abilities removes printed and granted bloodthirst") {
++        // The granter is a creature too, so "all creatures lose all abilities" strips the grant at
++        // its source (as with Twins of Discord) and the entrant's printed bloodthirst alike.
++        val (d, me) = newDriver()
++        d.giveColorlessMana(me, 3)
++        d.castSpell(me, d.putCardInHand(me, "Test Thirst Totem")).error shouldBe null
++        d.settle()
++        d.giveMana(me, Color.WHITE, 2)
++        d.giveColorlessMana(me, 2)
++        d.castSpell(me, d.putCardInHand(me, "Test Ability Drain")).error shouldBe null
++        d.settle()
++        d.bolt(me, d.getOpponent(me))
++        val brute = d.cast(me, "Test Colorless Brute")
++        val keywords = d.state.projectedState.getKeywords(brute)
++        withClue("projected keywords $keywords") {
++            keywords.any { it.startsWith(Keyword.BLOODTHIRST.name) } shouldBe false
++            d.plusCounters(brute) shouldBe 0
++        }
++    }
++})
+diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
+index 66a5f408..56641ec7 100644
+--- a/web-client/src/types/enums.ts
++++ b/web-client/src/types/enums.ts
+@@ -311,6 +311,7 @@ export enum Keyword {
+   SOULSHIFT = 'SOULSHIFT',
+   FADING = 'FADING',
+   VANISHING = 'VANISHING',
++  BLOODTHIRST = 'BLOODTHIRST',
+   CUMULATIVE_UPKEEP = 'CUMULATIVE_UPKEEP',
+   ECHO = 'ECHO',
+   SUSPEND = 'SUSPEND',
+@@ -455,6 +456,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
+   [Keyword.MODULAR]: 'Modular',
+   [Keyword.FADING]: 'Fading',
+   [Keyword.VANISHING]: 'Vanishing',
++  [Keyword.BLOODTHIRST]: 'Bloodthirst',
+   [Keyword.CUMULATIVE_UPKEEP]: 'Cumulative upkeep',
+   [Keyword.ECHO]: 'Echo',
+   [Keyword.SUSPEND]: 'Suspend',

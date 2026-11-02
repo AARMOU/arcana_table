@@ -349,6 +349,8 @@ object CustomCards {
         Entry(MutatedCultist, "M3C", "Eldrazi Incursion"),
         // Eldrazi Incursion. Needs engine patch 0032 (per-opponent targets bound to the player they were chosen for).
         Entry(HideousTaskmaster, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Incursion. Needs engine patch 0030 (grantable bloodthirst N keyword).
+        Entry(TwinsOfDiscord, "M3C", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

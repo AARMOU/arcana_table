@@ -554,3 +554,29 @@ Test: [`HideousTaskmasterScenarioTest.kt`](../../android/custom-cards/src/test/k
 opponent illegal while the other resolves, countered spell, reanimation negative, vanished target, real annihilator
 on the stolen creature and on Taskmaster, end-of-turn expiry, {R} still required under Devoid).
 Unlocks among missing six-deck cards: Hideous Taskmaster (and makes Desecrate Reality's per-opponent targets exact).
+
+### Bloodthirst N, printed or granted (patch 0030)
+
+Use for "bloodthirst N" on a card (`keywordAbility(KeywordAbility.bloodthirst(n))`) or for a static that grants it
+("Each other colorless creature you control has bloodthirst 2"). The engine applies it as the permanent enters: if an
+opponent of its controller was dealt damage this turn, it enters with N +1/+1 counters (no trigger; Hardened Scales
+applies). It reads the entrant's projected keywords as it would exist on the battlefield, so grants from permanents
+already there count, each grant is a separate instance (two grants of 2 give 4), and lose-all-abilities effects remove
+it. Don't add an `EntersWithCounters` for it as well; the counters would be placed twice.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TwinsOfDiscord.kt -->
+```kotlin
+    // Each other colorless creature you control has bloodthirst 2.
+    staticAbility {
+        ability = GrantKeyword(
+            KeywordAbility.grantedBloodthirst(2),
+            GroupFilter(colorlessCreatureYouControl, excludeSelf = true),
+        )
+    }
+```
+
+Test: [`TwinsOfDiscordScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TwinsOfDiscordScenarioTest.kt)
+(keyword visible, counters with/without opponent damage, self damage, colored, devoid, combat damage, opponent's
+creature, two Twins stack, Twins gone, not itself); engine: `BloodthirstKeywordTest` (printed, granted, stacking,
+lose all abilities).
+Unlocks among missing six-deck cards: Twins of Discord.
