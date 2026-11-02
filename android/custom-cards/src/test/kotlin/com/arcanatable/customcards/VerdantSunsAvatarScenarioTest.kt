@@ -19,6 +19,7 @@ class VerdantSunsAvatarScenarioTest {
 
         val bear = d.putCardInHand(p, "Grizzly Bears")
         d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
         assertNull(d.castSpell(p, bear).error)
         d.resolveAll()
 
@@ -36,6 +37,7 @@ class VerdantSunsAvatarScenarioTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         val bear = d.putCardInHand(opponent, "Grizzly Bears")
         d.giveMana(opponent, Color.GREEN)
+        d.giveColorlessMana(opponent, 1)
         assertNull(d.castSpell(opponent, bear).error)
         d.resolveAll()
 
