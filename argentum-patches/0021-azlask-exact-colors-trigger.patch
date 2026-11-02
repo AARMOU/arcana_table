@@ -1,5 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0021-azlask-exact-colors-trigger
+
+---
+ .../com/wingedsheep/engine/event/TriggerMatcher.kt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index 661be4c91..dd68d1a1d 100644
+index 661be4c911..dd68d1a1db 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 @@ -1650,6 +1650,17 @@ class TriggerMatcher(

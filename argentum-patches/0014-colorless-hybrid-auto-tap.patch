@@ -1,5 +1,17 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0014-colorless-hybrid-auto-tap
+
+---
+ .../engine/mechanics/mana/ManaSolver.kt       | 47 +++++++--
+ .../ColorlessHybridManaSolverTest.kt          | 97 +++++++++++++++++++
+ 2 files changed, 138 insertions(+), 6 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 6e41eb9f1..0acc0e501 100644
+index 6e41eb9f16..0acc0e501e 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 @@ -810,10 +810,13 @@ class ManaSolver private constructor(
@@ -113,7 +125,7 @@ index 6e41eb9f1..0acc0e501 100644
          }
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 new file mode 100644
-index 000000000..90f3c36ce
+index 0000000000..90f3c36ce2
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 @@ -0,0 +1,97 @@

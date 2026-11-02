@@ -1,5 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0022-cant-be-sacrificed-by-effects
+
+---
+ docs/card-sdk-language-reference.md           |   3 +-
+ .../effects/zones/ForceSacrificeExecutor.kt   |   4 +-
+ .../effects/zones/SacrificeExecutor.kt        |   3 +-
+ .../CantBeSacrificedByEffectsTest.kt          | 116 ++++++++++++++++++
+ 4 files changed, 123 insertions(+), 3 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 22bdfe89c..4edf7aaaf 100644
+index 22bdfe89ce..4edf7aaaf7 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
 @@ -11048,7 +11048,8 @@ staticAbility {
@@ -13,7 +27,7 @@ index 22bdfe89c..4edf7aaaf 100644
    sacrifice permanents" (Sigarda, Host of Herons). The **player-scoped** counterpart of
    `CantBeSacrificed`: it protects the controller rather than a set of permanents, so it also covers
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
-index 53ee6fe3c..4ba2e54e3 100644
+index 53ee6fe3c5..4ba2e54e3d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
 @@ -134,10 +134,12 @@ class ForceSacrificeExecutor(
@@ -31,7 +45,7 @@ index 53ee6fe3c..4ba2e54e3 100644
  
      private fun presentSacrificeDecision(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
-index 7603c756e..9996f486d 100644
+index 7603c756e2..9996f486d9 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
 @@ -95,10 +95,11 @@ class SacrificeExecutor(
@@ -49,7 +63,7 @@ index 7603c756e..9996f486d 100644
          } else {
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 new file mode 100644
-index 000000000..ab2d4e306
+index 0000000000..ab2d4e306b
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 @@ -0,0 +1,116 @@

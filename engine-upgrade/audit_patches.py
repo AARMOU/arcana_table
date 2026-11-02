@@ -26,7 +26,6 @@ MANDATORY = [
     "0005-last-known-negative-subtype.patch",
     "0006-ai-decision-deadline.patch",
     "0007-ai-bounded-stack-search.patch",
-    "0008-jvm-test-toolchain.patch",
     "0011-stack-object-copying.patch",
     "0012-colorless-hybrid-sdk.patch",
     "0013-colorless-hybrid-floating-payment.patch",
@@ -40,6 +39,14 @@ MANDATORY = [
     "0021-azlask-exact-colors-trigger.patch",
     "0022-cant-be-sacrificed-by-effects.patch",
     "0023-face-down-exile-hidden-from-owner.patch",
+    "0024-commander-cast-history-amount.patch",
+    "0025-akromas-will-modal-combat-trick.patch",
+    "0026-free-cast-once-each-turn.patch",
+    "0027-opponents-must-attack-anyone.patch",
+    "0028-base-power-toughness-at-most.patch",
+    "0032-per-player-target-binding.patch",
+    "0030-bloodthirst-keyword.patch",
+    "0033-property-sum-of-collection.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

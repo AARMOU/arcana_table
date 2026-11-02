@@ -1,5 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0016-granted-keyword-mana-value-cap
+
+---
+ docs/card-sdk-language-reference.md           | 11 +++++-
+ docs/sdk-index.md                             |  2 +-
+ .../sdk/scripting/SpellStaticAbilities.kt     | 24 +++++++++---
+ .../actions/spell/CastSpellHandler.kt         |  2 +-
+ .../handlers/actions/spell/CastTriggers.kt    | 12 +++++-
+ .../mechanics/mana/GrantedKeywordResolver.kt  | 38 ++++++++++++++++---
+ 6 files changed, 74 insertions(+), 15 deletions(-)
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index d27c8cdd4..22bdfe89c 100644
+index d27c8cdd46..22bdfe89ce 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
 @@ -13177,7 +13177,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
@@ -28,7 +43,7 @@ index d27c8cdd4..22bdfe89c 100644
      `GrantedKeywordResolver.countGrants` when `CastSpellHandler` builds the spell's storm triggers — one storm
      instance per matching grant (CR 702.40b), added to the printed-keyword count. **Prismari, the Inspiration** =
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 1522ce471..0d3fbf694 100644
+index 1522ce4713..0d3fbf6943 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1917,7 +1917,7 @@ Families:
@@ -41,7 +56,7 @@ index 1522ce471..0d3fbf694 100644
  - `GrantMadnessToOwnedCards(filter: GameObjectFilter)` — Grants madness (CR 702.35) to cards the granter's controller **owns** that match filter and aren't on the battlefield, with the madness cost equal to each card's own mana cost.
  - `GrantMayCastFromLinkedExile(filter: GameObjectFilter, duringYourTurnOnly: Boolean, additionalCost: AdditionalCost?, ownedByYou: Boolean, withoutPayingManaCost: Boolean, oncePerTurn: Boolean, maxManaValue: DynamicAmount?, exiledThisTurnOnly: Boolean, entersWithCounter: CounterType?, withAnyManaType: Boolean)` — You may cast cards exiled with this permanent (linked via LinkedExileComponent).
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
-index f02a8b968..f7645a64d 100644
+index f02a8b9683..f7645a64d3 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 @@ -335,6 +335,13 @@ data class GrantMayCastFromLinkedExile(
@@ -92,7 +107,7 @@ index f02a8b968..f7645a64d 100644
  }
  
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
-index c2d8bb62e..6cc6730f0 100644
+index c2d8bb62e1..6cc6730f06 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
 @@ -186,7 +186,7 @@ class CastSpellHandler(
@@ -105,7 +120,7 @@ index c2d8bb62e..6cc6730f0 100644
          cardRegistry, turnManager, costCalculator, alternativePaymentHandler, costHandler, targetValidator,
          conditionEvaluator, zoneResolver, castPermissionUtils, castCostTotaller, castCostPayer,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-index 0d4899a65..33dd2f92c 100644
+index 0d4899a650..33dd2f92ca 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 @@ -66,7 +66,17 @@ internal class CastTriggers(
@@ -136,7 +151,7 @@ index 0d4899a65..33dd2f92c 100644
      }
  
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
-index f99d04fa7..db39a7c7b 100644
+index f99d04fa76..db39a7c7b7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 @@ -16,6 +16,7 @@ import com.wingedsheep.sdk.scripting.GrantKeywordToOwnSpells
