@@ -188,3 +188,18 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   assert.ok(workflow.includes('types: [opened, synchronize, ready_for_review, review_requested]'),
     'Copilot finishing (review_requested) wakes the feeder when its slot frees');
 });
+
+test('a card already on the destination build is never re-queued; an unreadable destination index fails closed', async () => {
+  const index = names => ({ data: { encoding: 'base64', content: Buffer.from(names.map(n => n + '\tcard').join('\n')).toString('base64') } });
+  const mk = getContent => { const g = fakeGitHub(); g.github.rest.repos.getContent = getContent; return g; };
+  let g = mk(async ({ ref, path }) => { assert.match(ref, /^gpt\/b\d+-candidate-/); assert.match(path, /custom-cards\.index\.tsv$/); return index([CARD]); });
+  let r = await Q.createNextAutoQueue({ github: g.github, owner: 'AARMOU', repo: 'arcana_table', payload: payload(), runId: 1, enabled: true });
+  assert.equal(r.created, undefined); assert.deepEqual(r.skippedOnDestination, [CARD]);
+  assert.equal(g.calls.some(c => c[0] === 'create'), false, 'no paid queue item for a card already in the build');
+  g = mk(async () => index(['Some Other Card']));
+  r = await Q.createNextAutoQueue({ github: g.github, owner: 'AARMOU', repo: 'arcana_table', payload: payload(), runId: 1, enabled: true });
+  assert.equal(r.created, true, 'cards not on the destination still queue normally');
+  g = mk(async () => { throw Error('rate limited'); });
+  r = await Q.createNextAutoQueue({ github: g.github, owner: 'AARMOU', repo: 'arcana_table', payload: payload(), runId: 1, enabled: true });
+  assert.equal(r.reason, 'destination-index-unavailable'); assert.equal(g.calls.some(c => c[0] === 'create'), false);
+});
