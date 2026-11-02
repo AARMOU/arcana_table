@@ -154,17 +154,22 @@ async function readBudget(env=process.env,opts={}){
  }
 }
 const messages={normal:'Usage returned below the warning threshold',warn:'Copilot AI credit usage at warning level (50%)',
- slow:'Copilot AI credit usage at throttling level (75%)',paused:'Copilot AI credit usage paused (90% of the month, or the owner\'s daily credit limit; it resumes the next day)',
+ slow:'Copilot AI credit usage at throttling level (75%)',paused:'Copilot AI credit usage paused',
  unknown:'Copilot billing data unavailable; new assignments blocked'};
 async function alertChange({github,level,period,reason,env={}}){
  if(!Object.hasOwn(messages,level)||! /^\d{4}-\d{2}$/.test(period))throw Error('invalid-alert');
  const owner='AARMOU',repo='arcana_table',issue_number=78;
+ // Owner 2026-11-02: say WHICH limit paused Copilot. The daily limit lifts at midnight Denver; the monthly budget
+ // does not lift until the 1st unless the owner raises it. A switch between the two is a new alert.
+ const limit=level==='paused'?(reason==='daily-credit-limit'?'daily':'monthly'):'';
+ const pausedText={daily:'Copilot paused: TODAY\'s credit limit is reached. It starts again automatically after midnight (Denver time)',
+  monthly:'Copilot paused: the MONTHLY budget is 90% used (including a 10% safety cushion). It stays paused until the 1st of next month unless the owner raises the budget'};
  const comments=await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number,per_page:100});
  const previous=[...comments].reverse().find(c=>c.user?.login==='github-actions[bot]'&&c.user?.type==='Bot'&&c.body?.startsWith(MARKER));
- if(previous?.body?.includes('period:'+period)&&previous?.body?.includes('level:'+level))return 'unchanged';
+ if(previous?.body?.includes('period:'+period)&&previous?.body?.includes('level:'+level)&&(!limit||previous.body.includes('limit:'+limit)))return 'unchanged';
  if(!previous&&level==='normal')return 'healthy-initial';
- const body=[MARKER,'period:'+period,'level:'+level,
-  '@AARMOU **Arcana Table usage alert:** '+messages[level]+'.',
+ const body=[MARKER,'period:'+period,'level:'+level,...(limit?['limit:'+limit]:[]),
+  '@AARMOU **Arcana Table usage alert:** '+(limit?pausedText[limit]:messages[level])+'.',
   'The billing API can lag. The existing readiness gate is independent; no automatic worker launch is authorized by this comment.',
   level==='unknown'?'Reason: `'+(KNOWN_REASON.test(String(reason||''))?reason:'billing-unavailable')+'`. Next step: '+
    (billingAction(KNOWN_REASON.test(String(reason||''))?reason:'billing-unavailable',env)||'check the Billing Watch run.'):'The worker budget gate uses a conservative buffer.',
