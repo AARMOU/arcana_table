@@ -218,7 +218,11 @@ class EldraziIncursionPlayableTest {
         val init = GameInitializer(registry).initializeGame(mirrorConfig(1))
         val processor = ActionProcessor(registry)
         val enumerator = com.wingedsheep.engine.legalactions.LegalActionEnumerator.create(registry)
-        val ais = init.state.turnOrder.associateWith { AIPlayer.create(registry, it) }
+        val insights = mutableListOf<com.wingedsheep.ai.insight.AiDecisionInsight>()
+        val ais = init.state.turnOrder.associateWith {
+            AIPlayer.create(registry, it, com.wingedsheep.ai.engine.AiProfile.CURRENT.copy(advisorModules = emptyList()),
+                insightSink = { _, insight -> insights += insight })
+        }
         val label = init.state.turnOrder.withIndex().associate { (i, id) -> id to if (i == 0) "A" else "B" }
         var state = init.state
         var n = 0
@@ -227,6 +231,7 @@ class EldraziIncursionPlayableTest {
             val decision = state.pendingDecision
             val actor = decision?.playerId ?: state.priorityPlayerId!!
             val ai = ais.getValue(actor)
+            insights.clear()
             val action = if (decision != null) SubmitDecision(actor, ai.respondToDecision(state, decision)) else ai.chooseAction(state)
             val main = state.step == com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN || state.step == com.wingedsheep.sdk.core.Step.POSTCOMBAT_MAIN
             if (decision == null && main && actor == state.activePlayerId && state.stack.isEmpty()) {
@@ -240,6 +245,12 @@ class EldraziIncursionPlayableTest {
                     val offered = runCatching { enumerator.enumerate(state, actor) }.getOrElse { e -> out.append(" ENUM-THREW=$e"); emptyList() }
                         .filter { it.actionType != "PassPriority" && !it.isManaAbility }
                     out.append(" offered=${offered.map { "${it.actionType}:${describe(state, it.action)}:${if (it.affordable) "ok" else "unaffordable"}" }}")
+                    insights.lastOrNull()?.let { ins ->
+                        out.append(" INSIGHT baseline=${ins.baselineLabel}:${"%.3f".format(ins.baselineScore)} chosen=${ins.chosenLabel} options=")
+                            .append(ins.options.joinToString("; ") { o ->
+                                "${o.label}|score=${o.score?.let { "%.3f".format(it) }}|raw=${o.rawScore?.let { "%.3f".format(it) }}|note=${o.note}"
+                            })
+                    } ?: out.append(" INSIGHT=none(${insights.size})")
                 }
                 out.append('\n')
             }
