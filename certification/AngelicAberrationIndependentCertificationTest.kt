@@ -80,12 +80,16 @@ class AngelicAberrationIndependentCertificationTest {
         val d = customScenario(AngelicAberration, "Ornithopter", "Savannah Lions", "Grizzly Bears")
         val p = d.player1
         val opponent = d.player2
-        val angel = d.putCreatureOnBattlefield(p, name)
         val lowPower = d.putCreatureOnBattlefield(p, "Ornithopter")
         val lowToughness = d.putCreatureOnBattlefield(p, "Savannah Lions")
         val neitherLow = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val opposingEligible = d.putCreatureOnBattlefield(opponent, "Ornithopter")
+        val angel = d.putCardInHand(p, name)
+        d.giveColorlessMana(p, 5)
+        d.giveMana(p, Color.WHITE)
 
+        assertNull(d.castSpell(p, angel).error)
+        d.bothPass()
         assertEquals("the enter trigger waits on the stack", 1, d.stackSize)
         assertTrue(d.permanentsNamed(p, "Ornithopter").contains(lowPower))
         assertTrue(d.permanentsNamed(p, "Savannah Lions").contains(lowToughness))
@@ -113,9 +117,14 @@ class AngelicAberrationIndependentCertificationTest {
     fun choosingZeroCreaturesLeavesEligibleCreaturesAndCreatesNoTokens() {
         val d = customScenario(AngelicAberration, "Ornithopter")
         val p = d.player1
-        val angel = d.putCreatureOnBattlefield(p, name)
         val eligible = d.putCreatureOnBattlefield(p, "Ornithopter")
+        val angel = d.putCardInHand(p, name)
+        d.giveColorlessMana(p, 5)
+        d.giveMana(p, Color.WHITE)
 
+        assertNull(d.castSpell(p, angel).error)
+        d.bothPass()
+        assertEquals("the enter trigger waits on the stack", 1, d.stackSize)
         d.resolveAll(Choices(pick = emptyList()))
 
         assertTrue(d.permanentsNamed(p, name).contains(angel))
