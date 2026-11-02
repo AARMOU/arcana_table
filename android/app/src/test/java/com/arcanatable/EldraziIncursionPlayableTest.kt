@@ -38,7 +38,7 @@ class EldraziIncursionPlayableTest {
     /** Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. */
     private val expectedMissing = setOf(
         "Benthic Anomaly",
-        "Hideous Taskmaster", "Opal Palace",
+        "Opal Palace",
         "Twins of Discord",
     )
 
@@ -64,7 +64,7 @@ class EldraziIncursionPlayableTest {
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
             "Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge", "Angelic Aberration",
-            "Mutated Cultist",
+            "Mutated Cultist", "Hideous Taskmaster",
         ).forEach { name ->
             assertNotNull("registered: $name", registry.getCard(name))
             assertTrue("in the deck: $name", name in setup.you.deck)
