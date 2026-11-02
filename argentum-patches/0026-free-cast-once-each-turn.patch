@@ -1,0 +1,265 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 4edf7aaa..681b0f4b 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -13321,7 +13321,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   `GrantAlternativeCastingCost("{0}", listOf(Costs.additional.PayPlayerCounters(CounterType.ENERGY, 1)),
+   spellFilter = GameObjectFilter.Creature.manaValueAtMost(3), asThoughFlash = true)`. Like every
+   granted alternative cost it is offered for casts from hand only.
+-- `MayCastWithoutPayingManaCost(controllerOnly = false, firstSpellOfTurnOnly = false, spellFilter = Any, oncePerTurn = false, fromZones = null)` — a
++- `MayCastWithoutPayingManaCost(controllerOnly = false, firstSpellOfTurnOnly = false, spellFilter = Any, oncePerTurn = false, fromZones = null, onAnyTurn = false)` — a
+   battlefield permission to cast a spell without paying its mana cost (CR 118.9). Like every
+   "without paying its mana cost" cast (cascade, discover, `PlayWithoutPayingCostComponent`
+   permissions), it is priced as a {0} base through the full cost-modifier pipeline
+@@ -13333,7 +13333,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   zero spells this turn; `oncePerTurn = true` allows one free cast during each of the caster's own
+   turns (active player only) regardless of how many spells were cast first — unlike
+   `firstSpellOfTurnOnly`, the caster may cast other spells before using it; each source tracks its
+-  own use via `MayCastWithoutPayingCostUsedThisTurnComponent`, cleared at end of turn; `spellFilter`
++  own use via `MayCastWithoutPayingCostUsedThisTurnComponent`, cleared at end of turn;
++  `onAnyTurn = true` (with `oncePerTurn`) makes that one use available during **every** turn,
++  opponents' included, for "Once each turn, you may pay {0} rather than pay the mana cost for …"
++  (**Darksteel Monolith**: `MayCastWithoutPayingManaCost(controllerOnly = true, oncePerTurn = true,
++  onAnyTurn = true, spellFilter = GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless),
++  fromZones = setOf(Zone.HAND))`) —
++  it changes only when the permission exists, never the spell's own timing; `spellFilter`
+   restricts *which* spells may be cast for free (card predicates, matched in any zone — default
+   `GameObjectFilter.Any` = every spell). `fromZones` restricts the permission to spells cast **from** the listed zones (the zone the
+   spell left, CR 601.2a; `null` = any zone): the free cast is offered on each listed zone's cast path
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
+index f7645a64..f9d69a27 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
+@@ -1171,7 +1171,19 @@ data class MayCastWithoutPayingManaCost(
+      *
+      * The engine gates this on the cast's source zone through [allowsCastFrom].
+      */
+-    val fromZones: Set<Zone>? = null
++    val fromZones: Set<Zone>? = null,
++    /**
++     * Only meaningful with [oncePerTurn]. When true the single use is available during **every**
++     * turn — the caster's own and each opponent's — instead of only during the caster's own turns:
++     * "Once each turn, you may pay {0} rather than pay the mana cost for …" (Darksteel Monolith).
++     * The use is still tracked per source by
++     * `com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent`
++     * and cleared at each turn's cleanup, so it refreshes on every turn. This changes only *when*
++     * the permission is available, never the spell's timing: a non-instant spell still needs its
++     * normal sorcery timing. Default false keeps "Once during each of your turns" (Zaffai and the
++     * Tempests, One with the Multiverse) unchanged.
++     */
++    val onAnyTurn: Boolean = false
+ ) : StaticAbility {
+     init {
+         require(fromZones == null || fromZones.isNotEmpty()) { "fromZones must be null (any zone) or non-empty" }
+@@ -1200,7 +1212,9 @@ data class MayCastWithoutPayingManaCost(
+                 }
+             }
+         } ?: ""
+-        if (oncePerTurn) {
++        if (oncePerTurn && onAnyTurn) {
++            append("Once each turn, you may cast a $singular$fromZone without paying its mana cost")
++        } else if (oncePerTurn) {
+             append("Once during each of your turns, you may cast a $singular$fromZone without paying its mana cost")
+         } else if (firstSpellOfTurnOnly) {
+             if (controllerOnly) append("The first spell you cast each turn may be cast without paying its mana cost")
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+index f1b41102..ff4e518e 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+@@ -2319,10 +2319,11 @@ class CostCalculator(
+                     if (!state.isActiveTurnFor(casterId)) continue
+                     if ((state.playerSpellsCastThisTurn[casterId] ?: 0) > 0) continue
+                 }
+-                // `oncePerTurn` (Zaffai and the Tempests): only during the caster's own turn, and
+-                // only while this specific source hasn't already been used this turn.
++                // `oncePerTurn` (Zaffai and the Tempests): only during the caster's own turn —
++                // or during any turn with `onAnyTurn` (Darksteel Monolith's "once each turn") —
++                // and only while this specific source hasn't already been used this turn.
+                 if (ability.oncePerTurn) {
+-                    if (!state.isActiveTurnFor(casterId)) continue
++                    if (!ability.onAnyTurn && !state.isActiveTurnFor(casterId)) continue
+                     if (container.has<com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent>()) continue
+                 }
+                 // The permission may be scoped to a spell type (e.g. Dracogenesis — Dragons only).
+@@ -2462,7 +2463,7 @@ class CostCalculator(
+                     !matchesCardDefinition(spellCardDef, ability.spellFilter, entityId, state, state.projectedState, spellColors = spellColorsFor(state, spellCardDef, casterId))
+                 ) continue
+                 if (ability.oncePerTurn) {
+-                    if (!state.isActiveTurnFor(casterId)) continue
++                    if (!ability.onAnyTurn && !state.isActiveTurnFor(casterId)) continue
+                     if (container.has<com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent>()) continue
+                     if (oncePerTurnCandidate == null) oncePerTurnCandidate = entityId
+                 } else {
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt
+new file mode 100644
+index 00000000..26b40e6e
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt
+@@ -0,0 +1,167 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.MayCastWithoutPayingManaCost
++import com.wingedsheep.sdk.scripting.predicates.CardPredicate
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * `MayCastWithoutPayingManaCost(oncePerTurn = true, onAnyTurn = true)`: "Once each turn, you may
++ * pay {0} rather than pay the mana cost for a colorless spell you cast from your hand" (Darksteel
++ * Monolith). The single use exists on every turn, opponents' included, and refreshes each turn.
++ * Without `onAnyTurn` the permission keeps its "once during each of your turns" meaning (Zaffai and
++ * the Tempests, One with the Multiverse). Neither form changes a spell's timing.
++ */
++class FreeCastOnceEachTurnTest : FunSpec({
++
++    val colorlessFromHand = GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless)
++
++    val anyTurnSource = card("Any Turn Free Caster") {
++        manaCost = "{8}"
++        typeLine = "Artifact"
++        oracleText = "Once each turn, you may pay {0} rather than pay the mana cost for a colorless spell you cast from your hand."
++        staticAbility {
++            ability = MayCastWithoutPayingManaCost(
++                controllerOnly = true,
++                oncePerTurn = true,
++                onAnyTurn = true,
++                spellFilter = colorlessFromHand,
++                fromZones = setOf(Zone.HAND),
++            )
++        }
++    }
++    val ownTurnSource = card("Own Turn Free Caster") {
++        manaCost = "{8}"
++        typeLine = "Artifact"
++        oracleText = "Once during each of your turns, you may cast a colorless spell from your hand without paying its mana cost."
++        staticAbility {
++            ability = MayCastWithoutPayingManaCost(
++                controllerOnly = true,
++                oncePerTurn = true,
++                spellFilter = colorlessFromHand,
++                fromZones = setOf(Zone.HAND),
++            )
++        }
++    }
++    val colorlessInstant = card("Colorless Test Instant") {
++        manaCost = "{7}"
++        typeLine = "Instant"
++        oracleText = "You gain 1 life."
++        spell { effect = Effects.GainLife(1) }
++    }
++    val colorlessSorcery = card("Colorless Test Sorcery") {
++        manaCost = "{7}"
++        typeLine = "Sorcery"
++        oracleText = "You gain 1 life."
++        spell { effect = Effects.GainLife(1) }
++    }
++    val blueInstant = card("Blue Test Instant") {
++        manaCost = "{6}{U}"
++        typeLine = "Instant"
++        oracleText = "You gain 1 life."
++        spell { effect = Effects.GainLife(1) }
++    }
++
++    fun newDriver(): Pair<GameTestDriver, EntityId> {
++        val driver = GameTestDriver()
++        driver.registerCards(
++            TestCards.all + listOf(anyTurnSource, ownTurnSource, colorlessInstant, colorlessSorcery, blueInstant)
++        )
++        driver.initMirrorMatch(deck = Deck.of("Swamp" to 40), skipMulligans = true, startingPlayer = 0)
++        val me = driver.activePlayer!!
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return driver to me
++    }
++
++    /** Advance to the opponent's precombat main phase and let the opponent pass, so [me] holds priority. */
++    fun GameTestDriver.toOpponentsMainWithPriority(me: EntityId) {
++        val opponent = getOpponent(me)
++        passPriorityUntil(Step.PRECOMBAT_MAIN, opponent)
++        passPriority(opponent)
++        withClue("the non-active player now holds priority on the opponent's turn") {
++            state.priorityPlayerId shouldBe me
++        }
++    }
++
++    fun GameTestDriver.freeCast(player: EntityId, cardId: EntityId) =
++        submit(CastSpell(playerId = player, cardId = cardId, useWithoutPayingManaCost = true))
++
++    test("the once-each-turn use is available during an opponent's turn") {
++        val (driver, me) = newDriver()
++        driver.putPermanentOnBattlefield(me, "Any Turn Free Caster")
++        val instant = driver.putCardInHand(me, "Colorless Test Instant")
++        driver.toOpponentsMainWithPriority(me)
++        withClue("no lands: the cast only succeeds because it is free") {
++            driver.freeCast(me, instant).error shouldBe null
++        }
++    }
++
++    test("it is used up for the rest of that turn and refreshes on the next turn") {
++        val (driver, me) = newDriver()
++        val source = driver.putPermanentOnBattlefield(me, "Any Turn Free Caster")
++        val first = driver.putCardInHand(me, "Colorless Test Instant")
++        val second = driver.putCardInHand(me, "Colorless Test Instant")
++        val third = driver.putCardInHand(me, "Colorless Test Instant")
++
++        driver.freeCast(me, first).error shouldBe null
++        driver.state.getEntity(source)?.get<MayCastWithoutPayingCostUsedThisTurnComponent>() shouldNotBe null
++        driver.bothPass()
++        withClue("a second free cast in the same turn is refused") {
++            driver.freeCast(me, second).error shouldNotBe null
++        }
++
++        driver.toOpponentsMainWithPriority(me)
++        withClue("the next turn (the opponent's) has a fresh use") {
++            driver.freeCast(me, second).error shouldBe null
++        }
++        driver.bothPass()
++        driver.passPriority(driver.getOpponent(me))
++        withClue("...and only one") {
++            driver.freeCast(me, third).error shouldNotBe null
++        }
++    }
++
++    test("without onAnyTurn the use stays limited to the caster's own turns") {
++        val (driver, me) = newDriver()
++        driver.putPermanentOnBattlefield(me, "Own Turn Free Caster")
++        val instant = driver.putCardInHand(me, "Colorless Test Instant")
++        driver.toOpponentsMainWithPriority(me)
++        driver.freeCast(me, instant).error shouldNotBe null
++    }
++
++    test("timing is unchanged: a sorcery can't be cast this way on an opponent's turn") {
++        val (driver, me) = newDriver()
++        driver.putPermanentOnBattlefield(me, "Any Turn Free Caster")
++        val sorcery = driver.putCardInHand(me, "Colorless Test Sorcery")
++        driver.toOpponentsMainWithPriority(me)
++        driver.freeCast(me, sorcery).error shouldNotBe null
++    }
++
++    test("filters and controller still apply: colored spells and the opponent get nothing") {
++        val (driver, me) = newDriver()
++        driver.putPermanentOnBattlefield(me, "Any Turn Free Caster")
++        val blue = driver.putCardInHand(me, "Blue Test Instant")
++        driver.freeCast(me, blue).error shouldNotBe null
++
++        val opponent = driver.getOpponent(me)
++        val theirs = driver.putCardInHand(opponent, "Colorless Test Instant")
++        driver.passPriority(me)
++        withClue("the opponent holds priority on my turn") { driver.state.priorityPlayerId shouldBe opponent }
++        withClue("controllerOnly: the source's opponent can't use it") {
++            driver.freeCast(opponent, theirs).error shouldNotBe null
++        }
++    }
++})
