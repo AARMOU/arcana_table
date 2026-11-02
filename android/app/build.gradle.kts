@@ -51,6 +51,8 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "3g"
+                // TEMP (Benthic diagnosis, GSD to drop): print assertion messages of failing tests.
+                test.testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
                 // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
