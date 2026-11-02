@@ -20,7 +20,7 @@ function snapshot(){return {
     {filename:P.REGISTRY,status:'modified'},...P.GENERATED.map(filename=>({filename,status:'modified'}))]
 };}
 const plan=()=>({schema:1,pr:410,sourceSha:source,sourceBase:base,sourceBaseRef:cfg.manifest.base,
-  baseSha:base,target:cfg.policy.target,controlSha:control,policyHash:cfg.policyHash,reviewId:20,
+  baseSha:base,target:cfg.policy.target,controlSha:control,policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],reviewId:20,
   suite,paths,sourceFiles:snapshot().files.map(f=>f.filename)});
 function result(p=plan()){
   const files=[paths.source,paths.scenario,P.REGISTRY,...P.GENERATED].map(path=>({path,mode:'100644',type:'blob',content:'safe '+path+'\n'}));
@@ -211,6 +211,7 @@ test('skip report posts approved, receipt-less, ineligible PRs on #78 only when 
 function transientReport(p=plan()) {
   const r=result(p).report;
   r.status='blocked';r.gates.find(g=>g.name==='custom-and-android').ok=false;
+  r.gates.find(g=>g.name==='custom-and-android').detail='LAN multi-host failed to bind';
   r.failureEvidence={complete:true,cases:[{
     className:'com.arcanatable.FourPlayerLanTransportTest',
     name:'threeGuestSocketsHavePrivateSendChannelsAndRejectFifthPhone',type:'java.lang.AssertionError',
@@ -360,7 +361,7 @@ test('partial reservation publication cannot refund the consumed attempt or run 
 });
 test('changed base or policy gets fresh full revalidation, not an unchanged automatic retry',async()=>{
   const m=retryMock();await firstTransient(m);
-  const changed=await P.planNext({...common,github:m.github,controlSha:control,cfg:{...cfg,policyHash:'new-policy'}});
+  const changed=await P.planNext({...common,github:m.github,controlSha:control,cfg:{...cfg,policyHash:'new-policy',retryHashes:{...cfg.retryHashes,[suite.key]:'new-policy'}}});
   assert.equal(changed.autoRetry,undefined);
   const get=m.github.rest.git.getRef;
   m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
@@ -418,4 +419,82 @@ test('an already-registered card runs once to a visible "already registered" rec
   // A different block reason is not affected by this rule.
   m=githubMock(snapshot(),{comments:[receipt('scenario: 1 failed')]});m.github.rest.repos.getContent=present;
   assert.notEqual(await P.planNext({...common,github:m.github,controlSha:control,retry:true}),null);
+});
+
+test('B9 unchanged card inputs stay quiet across unrelated destination and suite commits',async()=>{
+  const m=retryMock(), p=plan(), r=result(p).report;
+  r.status='blocked';r.gates[4].ok=false;r.gates[4].detail='expected counter was missing';
+  const rec=await P.publish({...common,github:m.github,plan:p,report:r,files:[],expectedSources:{}});
+  assert.equal(rec.primaryCause,'scenario: expected counter was missing');
+  assert.equal(rec.retryInputHash,p.retryInputHash);
+  const get=m.github.rest.git.getRef;
+  m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
+  m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[
+    {filename:'control/index.html',status:'modified'},
+    {filename:'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Other.kt',status:'added'}]}});
+  for(let i=0;i<3;i++)assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control,
+    cfg:{...cfg,policyHash:'another-suite-changed'}}),null,'global suite catalog changes do not reset this card');
+  assert.ok(await P.planNext({...common,github:m.github,controlSha:control,
+    cfg:{...cfg,retryHashes:{...cfg.retryHashes,[suite.key]:'own-suite-changed'}}}));
+});
+
+test('B9 each relevant destination change allows one full attempt, then stays quiet',async()=>{
+  for(const path of [P.REGISTRY,paths.source,paths.scenario,'android/app/libs/argentum-ai.jar',
+    'android/app/src/main/assets/argentum/all-cards.index.tsv','android/custom-cards/build.gradle.kts']){
+    const m=retryMock(), p=plan(), r=result(p).report;
+    r.status='blocked';r.reason='scenario mismatch';
+    await P.publish({...common,github:m.github,plan:p,report:r,files:[],expectedSources:{}});
+    const get=m.github.rest.git.getRef;
+    m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
+    m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[{filename:path,status:'modified'}]}});
+    const next=await P.planNext({...common,github:m.github,controlSha:control});
+    assert.equal(next.baseSha,destination,path);assert.equal(next.autoRetry,undefined);
+    const blocked=result(next).report;blocked.status='blocked';blocked.reason='scenario mismatch';
+    await P.publish({...common,github:m.github,plan:next,report:blocked,files:[],expectedSources:{}});
+    for(let i=0;i<3;i++)assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null,path);
+  }
+});
+
+test('B9 missing primary cause fails before any receipt or target write',async()=>{
+  const p=plan(), m=githubMock();
+  for(const detail of [undefined,'','   ','Not run after earlier blocker']){
+    const r=result(p).report;r.status='blocked';r.gates[4].ok=false;r.gates[4].detail=detail;
+    await assert.rejects(P.publish({...common,github:m.github,plan:p,report:r,files:[],expectedSources:{}}),/primary cause/);
+  }
+  assert.equal(m.writes.length,0);
+});
+
+test('B9 incomplete comparisons and renamed relevant inputs never suppress validation',async()=>{
+  const p=plan(), receipt={...p,status:'blocked',baseSha:'e'.repeat(40)};
+  for(const d of [{status:'diverged',files:[]},{status:'ahead'},
+    {status:'ahead',files:Array.from({length:300},()=>({filename:'unrelated'}))},
+    {status:'ahead',files:[{filename:'archive.kt',previous_filename:P.REGISTRY}]}]){
+    const m=githubMock();m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:d});
+    assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:p}),false);
+  }
+  const m=githubMock();m.github.rest.repos.compareCommitsWithBasehead=async()=>{throw Error('rate limited');};
+  await assert.rejects(P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:p}),/rate limited/);
+  assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt:{...receipt,sourceSha:destination},plan:p}),false);
+});
+
+test('B9 config hashes isolate real suite content while keeping shared policy inputs',()=>{
+  const fs=require('node:fs'), os=require('node:os'), path=require('node:path');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'arcana-b9-'));
+  try {
+    const C=require('../certification/policy.cjs');
+    const files=['integration/policy.json','scripts/card-integration.cjs','integration/runner.py',
+      'certification/runner.py','certification/policy.cjs',...C.manifestFiles('certification/suites.json'),
+      ...cfg.manifest.suites.map(s=>s.source)];
+    for(const f of files){fs.mkdirSync(path.dirname(root+'/'+f),{recursive:true});fs.copyFileSync(f,root+'/'+f);}
+    const before=P.config(root), other=cfg.manifest.suites.find(s=>s.key!==suite.key);
+    fs.appendFileSync(root+'/'+other.source,'\n// another card changed\n');
+    const unrelated=P.config(root);
+    assert.notEqual(unrelated.policyHash,before.policyHash);
+    assert.equal(unrelated.retryHashes[suite.key],before.retryHashes[suite.key]);
+    fs.appendFileSync(root+'/'+suite.source,'\n// own suite changed\n');
+    assert.notEqual(P.config(root).retryHashes[suite.key],before.retryHashes[suite.key]);
+    fs.appendFileSync(root+'/certification/policy.cjs','\n// shared policy changed\n');
+    assert.notEqual(P.config(root).retryHashes[other.key],unrelated.retryHashes[other.key]);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
 });
