@@ -51,6 +51,8 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "3g"
+                // DIAGNOSTIC ONLY (never merge): name each app test as it starts, to locate the intermittent CI hang.
+                test.testLogging { events("started", "passed", "failed", "skipped") }
                 // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.

@@ -103,8 +103,22 @@ jobs:
         continue-on-error: true
         working-directory: android
         run: |
+          # DIAGNOSTIC ONLY (never merge): after 20 min, dump test JVM threads + GC stats every 10 min.
+          ( sleep 1200; while true; do
+              for pid in $(jps -l | awk '/GradleWorkerMain|Gradle Test Executor/{print $1}'); do
+                echo "::group::HANGDIAG $(date -u +%H:%M:%S) pid=$pid"
+                jstat -gcutil "$pid" || true
+                jstack "$pid" | grep -A 40 -E '^"(Test worker|main)"' || true
+                jstack "$pid" | grep -c '^"' || true
+                echo "::endgroup::"
+              done
+              jps -l; sleep 600
+            done ) &
+          diag=$!
           bash ../engine-upgrade/build140/run_gradle.sh port-app \
-            ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest
+            ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest || rc=$?
+          kill $diag 2>/dev/null || true
+          exit ${rc:-0}
       - name: Card and app test summary (failures listed)
         if: always()
         run: |
