@@ -16,6 +16,11 @@ on:
     # already merged stops at "up to date"; one that finds it still open refreshes the same PR.
     - cron: '47 14 * * 1'  # Mondays 14:47 UTC
     - cron: '47 14 * * 2'  # Tuesdays 14:47 UTC
+    # Daily early warning (2026-11-02, owner: "proactive checking of the Argentum engine"): the same full
+    # validation against upstream's latest main as a dry run — never publishes or merges. It records the
+    # result for Arcana Control and tells #81 when upstream starts clashing, so the engine lane fixes it
+    # days before Monday's upgrade instead of on it. Keep this string in sync with EARLY_WARNING below.
+    - cron: '23 11 * * *'  # every day 11:23 UTC
   workflow_dispatch:
     inputs:
       target:
@@ -30,10 +35,14 @@ on:
       - 'gpt/argentum-weekly-fix-**'
 permissions: {}
 concurrency:
-  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && github.ref || 'live' }}
+  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && github.ref || (github.event.schedule == '23 11 * * *' && 'early-warning' || 'live') }}
   cancel-in-progress: false
 env:
   BASE: gpt/arcana-integration-next
+  # The daily early-warning schedule above. Job `if:`s cannot read env, so they repeat the literal.
+  EARLY_WARNING: ${{ github.event.schedule == '23 11 * * *' }}
+  # The numbered build approved cards go into (main's integration/policy.json `target`) is the "current
+  # build": its engine patches must all be carried here, and its custom cards must pass on the new engine.
   UPSTREAM_URL: https://github.com/wingedsheep/argentum-engine
   # No __pycache__ in the checkout: the candidate is built from it.
   PYTHONDONTWRITEBYTECODE: '1'
@@ -46,6 +55,9 @@ jobs:
     outputs:
       status: ${{ steps.final.outputs.status }}
       green: ${{ steps.report.outputs.green }}
+      failed: ${{ steps.report.outputs.failed }}
+      blocker: ${{ steps.report.outputs.blocker }}
+      current_branch: ${{ steps.current.outputs.branch }}
       base_sha: ${{ steps.base.outputs.sha }}
       upstream_sha: ${{ steps.target.outputs.sha }}
       candidate_sha256: ${{ steps.candidate.outputs.sha256 }}
@@ -77,15 +89,74 @@ jobs:
           python3 -m pip install --quiet pyyaml
           set +e
           python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
-            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py engine-upgrade/tests/test_weekly_retired.py \
+            tools/tests/test_check_android_engine.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
             grep -E '^(FAIL|ERROR):|Error:|^AssertionError' "$RUNNER_TEMP/safety.log" | head -12 \
               | while IFS= read -r line; do echo "::error title=Safety check::${line:0:900}"; done
           fi
           exit "$code"
-      - name: Keep the shipped card data for comparison
-        run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+      - name: Keep the shipped card data and engine jars for comparison
+        run: |
+          cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+          cp -r android/app/libs "$RUNNER_TEMP/old-libs"
+      - name: The current build's engine patches are all carried here
+        # A numbered build branch (B141: gpt/b141-candidate-20261101) once gained eight engine patches that
+        # were never carried to this base, so a "green" upgrade would have dropped them. Every patch in the
+        # current build's MANDATORY list must be in the base's; same-named patches that differ are reported.
+        id: current
+        run: |
+          set -uo pipefail
+          mkdir -p engine-upgrade/weekly
+          repo="https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch -q --no-tags --depth=1 "$repo" main || { echo "::error::Could not read main"; exit 1; }
+          branch=$(git show FETCH_HEAD:integration/policy.json | python3 -c 'import json,sys;print(json.load(sys.stdin)["target"])')
+          [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "::error::Bad current build branch: $branch"; exit 1; }
+          git fetch -q --no-tags --depth=1 "$repo" "$branch" || { echo "::error::Could not read $branch"; exit 1; }
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          python3 - "$branch" "$(git rev-parse FETCH_HEAD)" <<'EOF'
+          import json, os, re, subprocess, sys
+          branch, sha = sys.argv[1], sys.argv[2]
+          def series(src):
+              b = src[src.index("MANDATORY = ["):]
+              return re.findall(r'"([^"]+\.patch)"', b[:b.index("]")])
+          def show(ref, path):
+              r = subprocess.run(["git", "show", f"{ref}:{path}"], capture_output=True, text=True)
+              return r.stdout if r.returncode == 0 else None
+          def body(p):  # the added and removed lines per file: ignores headers, file order, context and line numbers
+              files = re.split(r"^(?=diff --git )", p, flags=re.M)[1:]
+              keep = lambda f: "\n".join(l for l in f.splitlines()[1:] if l[:1] in ("+", "-") and not re.match(r"^-- ?$", l))
+              return sorted(keep(f) for f in files)
+          build = series(show(sha, "engine-upgrade/audit_patches.py") or 'MANDATORY = []')
+          base = series(open("engine-upgrade/audit_patches.py").read())
+          src = open("engine-upgrade/audit_patches.py").read()
+          retired = re.search(r"^RETIRED = \{\n(.*?)^\}", src, re.M | re.S)
+          retired = dict(re.findall(r'"([^"]+\.patch)": "([^"]*)"', retired[1])) if retired else {}
+          missing = [p for p in build if p not in base and p not in retired]
+          gone = [p for p in build if p not in base and p in retired]
+          differs = [p for p in build if p in base and (show(sha, f"argentum-patches/{p}") or "") and
+                     body(show(sha, f"argentum-patches/{p}")) != body(open(f"argentum-patches/{p}").read())]
+          short = branch.split("/")[-1]
+          lines = [f"### Engine patches of the current build (`{short}`)", ""]
+          if missing:
+              lines += [f"❌ **{len(missing)} engine patches the current build uses are not carried here**, so this "
+                        "upgrade would drop them: " + ", ".join(f"`{p}`" for p in missing) + ". Copy each from "
+                        f"`{branch}` into `argentum-patches/` and the MANDATORY list (engine lane)."]
+          else:
+              lines += [f"✅ All {len(build)} engine patches the current build uses are carried here."]
+          if gone:
+              lines += ["", "ℹ️ Retired here on purpose: " + "; ".join(f"`{p}` ({retired[p]})" for p in gone) + "."]
+          if differs:
+              lines += ["", "ℹ️ Same name, different change (check the newer one is carried): " +
+                        ", ".join(f"`{p}`" for p in differs) + "."]
+          json.dump({"branch": branch, "sha": sha, "missing": missing, "differs": differs},
+                    open("engine-upgrade/weekly/current.json", "w"), indent=1)
+          open("engine-upgrade/weekly/current.md", "w").write("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"synced={'false' if missing else 'true'}\n")
+          EOF
       - name: Resolve the upstream target to an exact commit
         id: target
         env:
@@ -117,6 +188,17 @@ jobs:
           echo "status=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['status'])")" >> "$GITHUB_OUTPUT"
           if [ "$code" -eq 2 ]; then exit 0; fi  # 2 = conflict, reported as a status, not a crash
           exit "$code"
+      - name: Find the JDK upstream builds with
+        # Upstream moves its toolchain (21 -> 25 on 2026-10-31); installing a fixed version broke every run.
+        # Read the highest of its Gradle daemon JVM and its jvmToolchain(N) settings; 21 if neither is found.
+        id: jdk
+        run: |
+          set -uo pipefail
+          v=$( { sed -n 's/^toolchainVersion=\([0-9][0-9]*\).*/\1/p' argentum-engine/gradle/gradle-daemon-jvm.properties 2>/dev/null
+                 grep -rhoE 'jvmToolchain\([0-9]+\)' argentum-engine/buildSrc argentum-engine/*.gradle.kts 2>/dev/null | grep -oE '[0-9]+'
+                 echo 21; } | sort -n | tail -1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Upstream builds with JDK $v"
 
       - name: Prove the refreshed patches apply exactly to the target
         id: audit
@@ -130,7 +212,7 @@ jobs:
         if: steps.rebase.outputs.status == 'rebased'
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ steps.jdk.outputs.version }}
       - name: Build the four engine jars and export the card library
         id: build
         if: steps.rebase.outputs.status == 'rebased' && steps.audit.outcome == 'success'
@@ -166,6 +248,11 @@ jobs:
       - name: Install the new engine into the app
         if: steps.final.outputs.status == 'rebased'
         run: python3 engine-upgrade/weekly.py install argentum-engine
+      - name: Raise the app's library versions to the engine's
+        # The jars carry no dependency list: on a phone they get the kotlin / kotlinx versions the app ships.
+        # Only version strings move, only upward (candidate_scope.py enforces both on the publish side).
+        if: steps.final.outputs.status == 'rebased'
+        run: python3 tools/check_android_engine.py align --engine-versions argentum-engine/gradle/libs.versions.toml | tee engine-upgrade/weekly/align.txt
       - name: Refresh agent docs for the new engine (vendored DSL docs, stated pin, SDK index)
         id: docs
         if: steps.final.outputs.status == 'rebased'
@@ -209,7 +296,17 @@ jobs:
           packages: platform-tools
       - name: Android SDK
         if: steps.final.outputs.status == 'rebased'
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        # android-36 builds the app; the minSdk platform's android.jar is the API the oldest supported phone has.
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' "platforms;android-$(python3 tools/check_android_engine.py min-sdk)"
+      - name: The new engine runs on Android (bytecode, Java API at minSdk, app libraries)
+        id: android
+        if: steps.final.outputs.status == 'rebased'
+        continue-on-error: true
+        run: |
+          sdk="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          python3 tools/check_android_engine.py check --jars android/app/libs --baseline-jars "$RUNNER_TEMP/old-libs" \
+            --android-jar "$sdk/platforms/android-$(python3 tools/check_android_engine.py min-sdk)/android.jar" \
+            --engine-versions argentum-engine/gradle/libs.versions.toml --out engine-upgrade/weekly
       - name: Custom cards on the new engine (compile, export, scenario tests; collisions reconciled)
         id: custom
         if: steps.final.outputs.status == 'rebased'
@@ -231,28 +328,38 @@ jobs:
         continue-on-error: true
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
-      - name: B140 cards on the candidate engine (report only, never a merge gate)
-        id: b140
+      - name: The current build's custom cards on the new engine
+        id: currentcards
         if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
-        # Adoption-time compatibility: B140's entire custom-card set (read live from the branch, no card
-        # lists) compiled and scenario-tested on this candidate engine, in a scratch copy of the candidate's
-        # Android tree. Results inform a numbered build (B141 checklist); they never change green or merge.
+        # The numbered build players get next (main's integration/policy.json target, read in the `current`
+        # step) has its own custom cards. Its whole set — read live from the branch, no card lists — is
+        # compiled and scenario-tested on this candidate engine, in a scratch copy of that build's own Android
+        # tree with only the engine swapped in. A merge gate since 2026-11-02 (it was a report-only check of
+        # B140): an upgrade that breaks the build's cards is not green.
         env:
-          B140_BRANCH: gpt/b140-card-request-test-apk-20261028
+          CURRENT_BRANCH: ${{ steps.current.outputs.branch }}
         run: |
-          set -uo pipefail
-          d="$RUNNER_TEMP/b140-overlay"; rm -rf "$d"; mkdir -p "$d"
-          git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$B140_BRANCH" >/dev/null 2>&1 || { echo 'B140 fetch failed'; exit 1; }
-          b140=$(git rev-parse FETCH_HEAD)
-          cp -a android "$d/android" && rm -rf "$d/android/custom-cards/src" "$d/android/custom-cards/build"
-          git archive FETCH_HEAD android/custom-cards/src | tar -x -C "$d"
-          ( cd "$d/android" && ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test \
-              --tests 'com.arcanatable.customcards.*ScenarioTest' ) > "$RUNNER_TEMP/b140.log" 2>&1
+          set +e -uo pipefail  # a failing card must reach the report below, not end the step here
+          d="$RUNNER_TEMP/current-overlay"; rm -rf "$d"; mkdir -p "$d"
+          git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$CURRENT_BRANCH" >/dev/null 2>&1 || { echo "$CURRENT_BRANCH fetch failed"; exit 1; }
+          sha=$(git rev-parse FETCH_HEAD)
+          # The build's own Android tree (its cards, their test helpers and the app code those tests compile
+          # against), with only the engine swapped for the candidate's: the four jars, the exported library and
+          # library versions raised the same way; collisions with the new library are then reconciled.
+          git archive FETCH_HEAD android | tar -x -C "$d" || { echo "$CURRENT_BRANCH archive failed"; exit 1; }
+          a=android/app/src/main/assets/argentum
+          cp android/app/libs/argentum-*.jar "$d/android/app/libs/"
+          for f in all-cards.jsonl por-cards.jsonl all-cards.index.tsv; do cp "$a/$f" "$d/$a/$f"; done
+          python3 tools/check_android_engine.py align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"
+          # Same collision rule as this base's own cards: a card Argentum now also has plays Argentum's version
+          # if it passes the build's scenario tests for it, else the build's own (custom-overrides.txt).
+          python3 engine-upgrade/weekly.py reconcile 4 --android "$d/android" --name currentreconcile \
+            --tests 'com.arcanatable.customcards.*ScenarioTest' > "$RUNNER_TEMP/current.log" 2>&1
           code=$?
-          python3 - "$d/android/custom-cards/build/test-results/test" "$RUNNER_TEMP/b140.log" "$b140" "$code" <<'EOF'
+          python3 - "$d/android/custom-cards/build/test-results/test" "$RUNNER_TEMP/current.log" "$sha" "$code" "$CURRENT_BRANCH" <<'EOF'
           import json, pathlib, re, sys, xml.etree.ElementTree as ET
-          res, log, sha, code = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+          res, log, sha, code, branch = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5]
           cards = {}
           for f in sorted(res.glob('*.xml')) if res.is_dir() else []:
               for tc in ET.parse(f).getroot().iter('testcase'):
@@ -263,21 +370,22 @@ jobs:
                   if bad: c['failed'].append(tc.get('name', '?'))
           errors = [l.strip() for l in log.read_text(errors='replace').splitlines() if l.startswith('e: ')][:15]
           failing = sorted(k for k, v in cards.items() if v['failed'])
+          short = branch.split('/')[-1]
           out = pathlib.Path('engine-upgrade/weekly'); out.mkdir(parents=True, exist_ok=True)
-          (out / 'b140.json').write_text(json.dumps({'b140': sha, 'exit': code, 'cards': cards, 'compileErrors': errors}, indent=1))
-          lines = ['### B140 cards on this engine (report only)', '',
-                   f'B140 `{sha[:10]}` custom-card scenario tests on the candidate engine. Not a merge gate: '
-                   'this informs the next numbered build (B141 checklist in `docs/stabilization/CONTROL-PLAN.md`).', '']
+          (out / 'currentcards.json').write_text(json.dumps({'branch': branch, 'sha': sha, 'exit': code, 'cards': cards, 'compileErrors': errors}, indent=1))
+          lines = [f'### Current build\'s cards on this engine (`{short}`)', '',
+                   f'`{short}` `{sha[:10]}`: its custom-card scenario tests on the candidate engine.', '']
           if errors and not cards:
-              lines += ['❌ **B140 cards do not compile on this engine:**', '', '```', *errors, '```']
+              lines += [f'❌ **{short}\'s cards do not compile on this engine:**', '', '```', *errors, '```']
           elif not cards:
               lines += [f'⚠️ No results (Gradle exit {code}); see the run log.']
           else:
-              lines += [f"{'✅' if not failing else '❌'} {len(cards) - len(failing)} of {len(cards)} B140 cards pass "
+              lines += [f"{'✅' if not failing else '❌'} {len(cards) - len(failing)} of {len(cards)} cards pass "
                         f"({sum(v['tests'] for v in cards.values())} scenarios)."]
               lines += [f"- **{k}**: {', '.join(cards[k]['failed'][:4])}" for k in failing[:30]]
-          (out / 'b140.md').write_text('\n'.join(lines) + '\n')
+          (out / 'currentcards.md').write_text('\n'.join(lines) + '\n')
           print('\n'.join(lines))
+          sys.exit(0 if cards and not failing and code == 0 else 1)
           EOF
       - name: Count test results
         if: steps.final.outputs.status == 'rebased'
@@ -293,6 +401,10 @@ jobs:
           APP: ${{ steps.app.outcome }}
           APK: ${{ steps.apk.outcome }}
           DOCS: ${{ steps.docs.outcome }}
+          ANDROID: ${{ steps.android.outcome }}
+          CURRENTCARDS: ${{ steps.currentcards.outcome }}
+          SYNCED: ${{ steps.current.outputs.synced }}
+          CURRENT_BRANCH: ${{ steps.current.outputs.branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BASE_SHA: ${{ steps.base.outputs.sha }}
         run: |
@@ -301,17 +413,24 @@ jobs:
           w = pathlib.Path('engine-upgrade/weekly')
           r = json.loads((w / 'rebase.json').read_text())
           env = os.environ
+          short = env.get('CURRENT_BRANCH', '').split('/')[-1] or 'current build'
+          synced = env.get('SYNCED') == 'true'
+          current_md = (w / 'current.md').read_text() if (w / 'current.md').is_file() else ''
+          blocker = next((c['patch'] for c in r.get('conflicts', []) if c.get('patch')), '')
+          failed = []
           head = (f"Upstream `{r['old_pin'][:10]}` → `{r['target']}` ({r.get('upstream_commits', '?')} upstream commits), "
                   f"on Arcana `{env['BASE_SHA']}`.")
           if env['REBASE'] == 'conflict':
               green, title = False, 'Weekly Argentum upgrade blocked: patch conflict'
-              body = [head, '', (w / 'rebase.md').read_text()]
+              body = [head, '', (w / 'rebase.md').read_text(), '', current_md]
+              failed = ['patches'] + ([] if synced else ['sync'])
           elif env['REBASE'] == 'build_failed':
               green, title = False, 'Weekly Argentum upgrade blocked: engine build failed'
               errors = (w / 'build-errors.txt').read_text().strip() if (w / 'build-errors.txt').is_file() else '(no output captured)'
               body = [head, '', 'The patches merged as text, but the patched engine does not compile: upstream changed '
                       'code an Arcana patch depends on. Fix the patch (engine lane), record any conflict resolution, '
-                      'and re-run.', '', '```', errors, '```']
+                      'and re-run.', '', '```', errors, '```', '', current_md]
+              failed = ['build'] + ([] if synced else ['sync'])
           else:
               t = json.loads((w / 'tests.json').read_text())
               checks = {
@@ -321,7 +440,12 @@ jobs:
                   'App test suite': env['APP'] == 'success',
                   'Test APK builds': env['APK'] == 'success',
                   'Agent docs and cardkit current on the new engine (SDK index, vendored docs, pin)': env['DOCS'] == 'success',
+                  'The engine runs on Android: Java 17 bytecode, Java API at minSdk, app library versions': env['ANDROID'] == 'success',
+                  f"The current build's custom cards ({short}) pass on the new engine": env['CURRENTCARDS'] == 'success',
+                  f"Carries every engine patch the current build ({short}) uses": synced,
               }
+              keys = dict(zip(checks, ('patches', 'cards', 'custom', 'app', 'apk', 'docs', 'android', 'currentcards', 'sync')))
+              failed = [keys[k] for k, v in checks.items() if not v]
               green = all(checks.values())
               title = f"Weekly Argentum upgrade to {r['target'][:10]}" + ('' if green else ' (needs work)')
               patches = r['patches']
@@ -340,9 +464,13 @@ jobs:
               rec = w / 'reconcile.md'
               if rec.is_file():
                   body += ['', rec.read_text()]
-              b140 = w / 'b140.md'
-              if b140.is_file():
-                  body += ['', b140.read_text()]
+              for extra in ('android.md', 'currentcards.md', 'currentreconcile.md'):
+                  if (w / extra).is_file():
+                      body += ['', (w / extra).read_text()]
+              body += ['', current_md]
+              align = (w / 'align.txt').read_text().strip() if (w / 'align.txt').is_file() else ''
+              if align and 'already match' not in align:
+                  body += ['', "App library versions raised to the engine's: " + '; '.join(align.splitlines()) + '.']
               body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
                        'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. A green PR means the checks above passed, '
                        'not that every card is Oracle-correct. Debug APK: see the run artifacts.']
@@ -359,6 +487,9 @@ jobs:
           (w / 'body.md').write_text('\n'.join(body) + '\n')
           with open(env['GITHUB_OUTPUT'], 'a') as out:
               out.write(f"green={'true' if green else 'false'}\n")
+              # For Arcana Control (verdict job): fixed check keys and a patch file name only, no free text.
+              out.write(f"failed={','.join(failed)}\n")
+              out.write(f"blocker={blocker if __import__('re').fullmatch(r'[0-9]{4}-[a-z0-9-]+[.]patch', blocker) else ''}\n")
           with open(env['GITHUB_STEP_SUMMARY'], 'a') as out:
               out.write(f"## {title}\n\n" + '\n'.join(body) + '\n')
           # The headline also as annotations, readable from the run page and the checks API.
@@ -388,7 +519,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/candidate"
           git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum \
             docs/agents/generated/sdk-api.md docs/agents/generated/sdk-api.json docs/agents/argentum-upstream \
-            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py tools/cardkit/data/verified-support.json
+            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py tools/cardkit/data/verified-support.json \
+            android/build.gradle.kts android/app/build.gradle.kts android/custom-cards/build.gradle.kts
           git reset -q -- engine-upgrade/weekly engine-upgrade/patch-report.json
           git reset -q -- ':(glob)**/__pycache__/**'
           git diff --cached --binary > "$RUNNER_TEMP/candidate/candidate.patch"
@@ -417,8 +549,11 @@ jobs:
             android/custom-cards/build/test-results/
             android/app/build/test-results/
             android/app/build/outputs/apk/debug/app-debug.apk
+            engine-upgrade/weekly/currentcards.json
+            ${{ runner.temp }}/current-overlay/android/custom-cards/build/test-results/
+            ${{ runner.temp }}/current.log
       - name: Fail the dry run when the upgrade is blocked
-        if: always() && github.event_name == 'push' && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
+        if: always() && (github.event_name == 'push' || github.event.schedule == '23 11 * * *') && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
         run: |
           cat engine-upgrade/weekly/body.md
           echo '::error::Upgrade blocked (${{ steps.final.outputs.status }}); see the job summary'
@@ -426,8 +561,8 @@ jobs:
 
   publish:
     needs: validate
-    # Never on a dry run (push); never when already up to date.
-    if: github.event_name != 'push' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
+    # Never on a dry run (push, or the daily early warning); never when already up to date.
+    if: github.event_name != 'push' && github.event.schedule != '23 11 * * *' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -460,7 +595,8 @@ jobs:
                      'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
                      'android/app/src/main/assets/argentum/', 'docs/agents/generated/sdk-api.',
                      'docs/agents/argentum-upstream/', 'AGENTS.md', 'docs/agents/CARD-WORKFLOW.md',
-                     'tools/cardkit/cardkit_lib/repo.py', 'tools/cardkit/data/verified-support.json')
+                     'tools/cardkit/cardkit_lib/repo.py', 'tools/cardkit/data/verified-support.json',
+                     'android/build.gradle.kts', 'android/app/build.gradle.kts', 'android/custom-cards/build.gradle.kts')
           text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
           headers = re.findall(r'^diff --git .*$', text, re.M)
           pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]
@@ -566,14 +702,108 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # issues: write only to post the #81 notice below. This job checks out nothing and runs no repo code.
+    # issues: write only to post the #81 notices and the #78 engine status below. This job checks out
+    # nothing and runs no repo code; validate's outputs reach it only as fixed keys, a patch name and SHAs.
     permissions:
       issues: write
     steps:
+      - name: Publish the engine status for Arcana Control
+        # One github-actions[bot] comment on #78, edited in place (arcana-control-status-v1:engine), that the
+        # owner's Arcana Control dashboard shows in plain words. The daily early warning also tells #81 when
+        # a problem first appears or changes, so the engine lane can fix it before Monday's upgrade.
+        if: always() && github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          STATUS: ${{ needs.validate.outputs.status }}
+          GREEN: ${{ needs.validate.outputs.green }}
+          FAILED: ${{ needs.validate.outputs.failed }}
+          BLOCKER: ${{ needs.validate.outputs.blocker }}
+          UPSTREAM: ${{ needs.validate.outputs.upstream_sha }}
+          CURRENT_BRANCH: ${{ needs.validate.outputs.current_branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e -uo pipefail  # publishing the status is best effort: it never changes the run's verdict
+          marker='<!-- arcana-control-status-v1:engine -->'
+          previous=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/78/comments?per_page=100" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -1)
+          if [ -n "$previous" ]; then gh api "repos/$GITHUB_REPOSITORY/issues/comments/$previous" --jq .body > "$RUNNER_TEMP/previous.md" || true; fi
+          python3 - <<'PY'
+          import datetime, json, os, re
+          e = os.environ
+          ok = lambda pattern, value: value if re.fullmatch(pattern, value or '') else ''
+          upstream = ok(r'[0-9a-f]{40}', e['UPSTREAM'])
+          blocker = ok(r'[0-9]{4}-[a-z0-9-]+\.patch', e['BLOCKER'])
+          build = ok(r'[A-Za-z0-9._/-]+', e['CURRENT_BRANCH']).split('/')[-1] or 'the current build'
+          daily = e['EARLY_WARNING'] == 'true'
+          plain = {
+              'patches': "our engine changes clash with the makers' new code",
+              'build': "the engine does not build with our changes",
+              'cards': "cards in the premade decks or official precons would go missing",
+              'custom': "some of our custom cards fail their tests",
+              'app': "some app tests fail",
+              'apk': "the test app does not build",
+              'docs': "the card-making tools are out of date for it",
+              'android': "the engine would not run safely on phones",
+              'currentcards': f"some of {build}'s cards fail on it",
+              'sync': f"it would drop engine changes {build} depends on",
+          }
+          problems = [k for k in e['FAILED'].split(',') if k in plain]
+          status = e['STATUS'] if e['STATUS'] in ('up_to_date', 'rebased', 'conflict', 'build_failed') else ''
+          if status == 'up_to_date':
+              result, message = 'up_to_date', "The engine already matches the makers' latest version. Nothing to do."
+          elif status == 'rebased' and e['GREEN'] == 'true' and (daily or e['PUBLISH'] == 'success'):
+              result = 'ok'
+              message = ("Checked the makers' latest engine today: it would upgrade cleanly and passed every safety check."
+                         if daily else "The engine was upgraded to the makers' latest version and passed every check. "
+                         "It reaches your phone with the next numbered build.")
+          elif status in ('rebased', 'conflict', 'build_failed'):
+              result = 'blocked'
+              what = {'conflict': "The makers' latest engine clashes with one of our engine changes",
+                      'build_failed': "The makers' latest engine does not build with our engine changes"}.get(
+                          status, "The makers' latest engine was checked, but not everything passed")
+              detail = '; '.join(plain[k] for k in problems) or 'see the run'
+              message = (f"{what} ({detail}{', in ' + blocker if blocker else ''}). Nothing changed in the app. "
+                         "Claude (engine lane) has been told; you don't need to do anything.")
+          else:
+              result = 'broken'
+              message = ("The engine check itself didn't finish (a GitHub or setup problem, not the engine). "
+                         "Nothing changed in the app. Claude has been told; you don't need to do anything.")
+          payload = {'kind': 'engine', 'schema': 1, 'checkedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
+                     'mode': 'daily' if daily else 'weekly', 'result': result, 'message': message, 'problems': problems,
+                     'blocker': blocker, 'upstream': upstream, 'currentBuild': build, 'run': e['RUN_URL'], 'needsOwner': False}
+          before = {}
+          try:
+              m = re.search(r'```json\n(.*?)\n```', open(os.path.join(e['RUNNER_TEMP'], 'previous.md')).read(), re.S)
+              before = json.loads(m.group(1)) if m else {}
+          except (OSError, ValueError):
+              pass
+          body = '\n'.join([
+              '<!-- arcana-control-status-v1:engine -->',
+              '**Arcana Control status — engine** (maintained automatically; edited in place; read by https://aarmou.github.io/arcana_table/control/)',
+              '- ' + message, '', '```json', json.dumps(payload, indent=1), '```'])
+          open(os.path.join(e['RUNNER_TEMP'], 'engine-status.md'), 'w').write(body.replace('@', '＠'))
+          new_problem = daily and result in ('blocked', 'broken') and (
+              before.get('result') != result or before.get('problems') != problems or before.get('blocker') != blocker)
+          if new_problem:
+              open(os.path.join(e['RUNNER_TEMP'], 'alert.md'), 'w').write(
+                  f"**Engine early warning** (daily check of upstream `{upstream[:10]}`): {message.split(' Nothing changed')[0]}. "
+                  f"Engine lane: fix it on a `claude/argentum-weekly-fix-<date>` branch before Monday's upgrade "
+                  f"(`engine-upgrade/HANDOFF.md`; the run summary has the handoff commands). Run: {e['RUN_URL']}")
+          PY
+          if [ -n "$previous" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$previous" -F "body=@$RUNNER_TEMP/engine-status.md" >/dev/null || echo "::warning::Could not update the engine status"
+          else
+            gh issue comment 78 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/engine-status.md" >/dev/null || echo "::warning::Could not post the engine status"
+          fi
+          if [ -f "$RUNNER_TEMP/alert.md" ]; then gh issue comment 81 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/alert.md" >/dev/null || true; fi
+          exit 0
       - name: Tell issue 81 when a live run failed without publishing anything
         # publish already posts to #81 whenever it ran (PR, conflict or build-failure issue). This covers
         # the rest: validation broke (drift check, infrastructure, a crash) or publish itself failed.
-        if: always() && github.event_name != 'push' && (needs.validate.result != 'success' || (needs.publish.result != 'success' && needs.publish.result != 'skipped'))
+        # The daily early warning reports through the engine status below instead (once per new problem).
+        if: always() && github.event_name != 'push' && github.event.schedule != '23 11 * * *' && (needs.validate.result != 'success' || (needs.publish.result != 'success' && needs.publish.result != 'skipped'))
         env:
           GH_TOKEN: ${{ github.token }}
           VALIDATE: ${{ needs.validate.result }}
@@ -589,11 +819,12 @@ jobs:
           GREEN: ${{ needs.validate.outputs.green }}
           EVENT: ${{ github.event_name }}
         run: |
-          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT"
+          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT early_warning=$EARLY_WARNING"
           if [ "$VALIDATE" != success ]; then echo "::error::Validation did not finish successfully ($VALIDATE)"; exit 1; fi
           if [ "$STATUS" = up_to_date ]; then echo 'Already on the latest upstream; nothing to do.'; exit 0; fi
           if [ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on a dry run ($PUBLISH)"; exit 1; fi
-          if [ "$EVENT" != push ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
+          if [ "$EARLY_WARNING" = true ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on the early warning ($PUBLISH)"; exit 1; fi
+          if [ "$EVENT" != push ] && [ "$EARLY_WARNING" != true ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
           if [ "$STATUS" != rebased ] || [ "$GREEN" != true ]; then
             echo "::error::Upgrade not green (status=$STATUS, green=$GREEN); see the validate job summary"; exit 1
           fi
