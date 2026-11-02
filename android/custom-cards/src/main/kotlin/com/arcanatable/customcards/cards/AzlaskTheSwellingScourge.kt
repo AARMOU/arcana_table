@@ -12,16 +12,24 @@ import com.wingedsheep.sdk.scripting.references.Player
 import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 /**
- * CARDKIT-SCAFFOLD: test-first source; do not register until engine scenarios prove exact behavior.
  * Azlask, the Swelling Scourge (M3C #5).
  *
- * Experience counters belong to the player, not the source permanent. The death trigger
- * intentionally includes Azlask itself and uses the dying creature's last-known controller/color.
+ * Experience counters belong to the player, not the source permanent, so the death triggers add
+ * them to [EffectTarget.Controller]. "Azlask or another colorless creature you control" is two
+ * triggers (SELF and OTHER bindings cannot be combined with Triggers.or); each death matches at most
+ * one of them. Azlask's own death counts whatever its color. The OTHER trigger reads the dying
+ * creature's last-known colors and controller (engine patch 0021, `HasExactlyColors` on a
+ * battlefield departure), so devoid and other colorless creatures count and colored or opposing
+ * ones do not.
  *
- * Annihilator N in the pinned SDK is display vocabulary; like Eldrazi Ravager/Artisan of Kozilek
- * its real behavior is an attack trigger. Grant that trigger to each Scion/Spawn present when the
- * ability resolves; granting the Keyword flag also makes the temporary keyword visible.
- * Both grants expire at end of turn. Nothing here creates a perpetual static anthem.
+ * The activated ability reads X once as it resolves (ModifyStats evaluates its DynamicAmount at
+ * resolution) and pumps only the creatures you control at that moment. "Scions and Spawns" are the
+ * creature subtypes Scion and Spawn.
+ *
+ * Annihilator N in the SDK is display vocabulary; like Artisan of Kozilek its behavior is an attack
+ * trigger in which the defending player sacrifices N permanents of their choice. Each Scion/Spawn
+ * you control at resolution gets that trigger (N = 1) plus the ANNIHILATOR keyword flag (so the
+ * granted keyword is visible) and indestructible, all until end of turn.
  */
 val AzlaskTheSwellingScourge = card("Azlask, the Swelling Scourge") {
     manaCost = "{3}"
@@ -29,7 +37,7 @@ val AzlaskTheSwellingScourge = card("Azlask, the Swelling Scourge") {
     typeLine = "Legendary Creature — Eldrazi"
     power = 2
     toughness = 2
-    oracleText = "Whenever Azlask, the Swelling Scourge or another colorless creature you " +
+    oracleText = "Whenever Azlask or another colorless creature you " +
         "control dies, you get an experience counter.\n" +
         "{W}{U}{B}{R}{G}: Creatures you control get +X/+X until end of turn, where X is the " +
         "number of experience counters you have. Scions and Spawns you control gain " +

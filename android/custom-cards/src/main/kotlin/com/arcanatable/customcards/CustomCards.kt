@@ -341,6 +341,10 @@ object CustomCards {
         Entry(DarksteelMonolith, "CMM", "Eldrazi Unbound"),
         // The Ruinous Powers. Needs engine patch 0027 (opponents must attack with at least one creature).
         Entry(SeekerOfSlaanesh, "40K", "The Ruinous Powers"),
+        // Eldrazi Incursion commander. Needs engine patch 0021 (HasExactlyColors on a dies trigger's LKI).
+        Entry(AzlaskTheSwellingScourge, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Incursion. Needs engine patch 0028 (base power/toughness at-most filter).
+        Entry(AngelicAberration, "M3C", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
