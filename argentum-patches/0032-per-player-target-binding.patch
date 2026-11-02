@@ -209,10 +209,10 @@ index 68bc49d8..9802291a 100644
           * and returned between targeting and now (CR 400.7). Ids with no captured stamp (targets
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 new file mode 100644
-index 00000000..82594e7f
+index 00000000..960f62c2
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,121 @@
 +package com.wingedsheep.engine.targeting
 +
 +import com.wingedsheep.engine.state.components.identity.ControllerComponent
@@ -283,6 +283,9 @@ index 00000000..82594e7f
 +        castSpellWithTargets(caster, spell, creatures.map { ChosenTarget.Permanent(it) }).error.shouldBeNull()
 +    }
 +
++    /** Control-changing effects are continuous (layer 2), so read the projected controller. */
++    fun GameTestDriver.controllerOf(creature: EntityId) = state.projectedState.getController(creature)
++
 +    fun GameTestDriver.resolveStack() {
 +        var guard = 0
 +        while (state.stack.isNotEmpty() && guard++ < 10) passPriority(state.priorityPlayerId!!)
@@ -295,8 +298,8 @@ index 00000000..82594e7f
 +        val b = d.putCreatureOnBattlefield(foe2, "Binding Test Bear")
 +        d.castTheftAt(you, listOf(a, b))
 +        d.resolveStack()
-+        d.getController(a) shouldBe you
-+        d.getController(b) shouldBe you
++        d.controllerOf(a) shouldBe you
++        d.controllerOf(b) shouldBe you
 +    }
 +
 +    test("a target moved to the other opponent is illegal, and the other target still resolves") {
@@ -307,9 +310,9 @@ index 00000000..82594e7f
 +        d.moveControl(a, foe2)
 +        d.resolveStack()
 +        withClue("chosen for foe1, now controlled by foe2: illegal, not stolen") {
-+            d.getController(a) shouldBe foe2
++            d.controllerOf(a) shouldBe foe2
 +        }
-+        d.getController(b) shouldBe you
++        d.controllerOf(b) shouldBe you
 +    }
 +
 +    test("a single target moved between opponents makes the spell do nothing") {
@@ -318,7 +321,7 @@ index 00000000..82594e7f
 +        d.castTheftAt(you, listOf(a))
 +        d.moveControl(a, foe2)
 +        d.resolveStack()
-+        d.getController(a) shouldBe foe2
++        d.controllerOf(a) shouldBe foe2
 +    }
 +
 +    test("a target moved away and back to its opponent before resolution is legal again") {
@@ -328,6 +331,6 @@ index 00000000..82594e7f
 +        d.moveControl(a, foe2)
 +        d.moveControl(a, foe1)
 +        d.resolveStack()
-+        d.getController(a) shouldBe you
++        d.controllerOf(a) shouldBe you
 +    }
 +})
