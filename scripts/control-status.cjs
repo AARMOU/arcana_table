@@ -105,9 +105,14 @@ function billingPayload(result, { env = {}, previous = null, now = new Date(), s
       unit: 'ai-credits', excludes: ['premium requests', 'GitHub Actions minutes', 'ChatGPT usage'] };
   }
   // Level and freshness only: no credit counts, allowance or percentages (see PRIVACY above).
-  const current = { measuredAt: s.measuredAt, period: s.period, metric: s.metric, level, band: LEVEL_BANDS[level] || 'unknown' };
-  return { ok: true, source, checkedAt, level, reason: null,
-    action: level === 'paused' ? 'Wait for the monthly reset or an owner budget decision; new paid work is paused at 90%.' : null,
+  // Owner 2026-11-02: a pause from the owner's daily credit limit (scripts/credit-pace.json, a running total) must not
+  // be shown as "90% of the month"; it lifts on its own once the daily allowance catches up.
+  const daily = level === 'paused' && result?.status?.reason === 'daily-credit-limit';
+  const current = { measuredAt: s.measuredAt, period: s.period, metric: s.metric, level,
+    band: daily ? 'daily credit limit reached (running total)' : (LEVEL_BANDS[level] || 'unknown') };
+  return { ok: true, source, checkedAt, level, reason: daily ? 'daily-credit-limit' : null,
+    action: daily ? "Paused by the owner's daily credit limit (a running total since the start date). It resumes on its own once the daily allowance catches up; no action needed."
+      : level === 'paused' ? 'Wait for the monthly reset or an owner budget decision; new paid work is paused at 90%.' : null,
     blocksDispatch: level === 'paused', current, lastSuccess: current, lastSuccessAt: s.measuredAt, notes,
     thresholds: { warn: 0.5, slow: 0.75, paused: 0.9, reserve: '10% of allowance unless ARCANA_AI_CREDIT_RESERVE is set' },
     privateFigures: PRIVATE_BILLING_URL, unit: 'ai-credits', excludes: ['premium requests', 'GitHub Actions minutes', 'ChatGPT usage'] };
