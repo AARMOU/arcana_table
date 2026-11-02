@@ -977,7 +977,7 @@
    ]
   },
   "DynamicAmounts.playerCount": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Company Commander",
@@ -1002,6 +1002,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BronzebeakForagers.kt",
      "lines": 67,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -2321,7 +2327,7 @@
    ]
   },
   "Effects.ForEachTarget": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -2352,6 +2358,23 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BronzebeakForagers.kt",
      "lines": 67,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.GainControl": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -2430,7 +2453,7 @@
    ]
   },
   "Effects.GrantKeyword": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -2506,6 +2529,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SakashimaOfAThousandFaces.kt",
      "lines": 60,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SakashimaOfAThousandFacesScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.GrantTriggeredAbility": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -3021,7 +3055,7 @@
    ]
   },
   "Effects.Sacrifice": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -3197,7 +3231,7 @@
    ]
   },
   "Effects.Untap": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Sword of Feast and Famine",
@@ -3222,6 +3256,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ZacamaPrimalCalamity.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZacamaPrimalCalamityScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -3249,6 +3289,17 @@
   }
  },
  "Keyword": {
+  "Keyword.ANNIHILATOR": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
+    }
+   ]
+  },
   "Keyword.ASCEND": {
    "count": 1,
    "examples": [
@@ -3377,7 +3428,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -3598,7 +3649,7 @@
    ]
   },
   "Keyword.HASTE": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -3854,7 +3905,7 @@
    ]
   },
   "Keyword.TRAMPLE": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -4001,13 +4052,19 @@
    ]
   },
   "KeywordAbility.annihilator": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Ulamog's Crusher",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -4421,7 +4478,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4635,7 +4692,7 @@
    ]
   },
   "Triggers.self.isCast": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Noise Marine",
@@ -4978,7 +5035,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5019,7 +5076,7 @@
    ]
   },
   "keywords()": {
-   "count": 105,
+   "count": 106,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5332,7 +5389,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 158,
+   "count": 159,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5539,7 +5596,7 @@
    ]
   },
   "optional": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -5822,7 +5879,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Silence",
@@ -6865,7 +6922,7 @@
  },
  "targeting": {
   "EffectTarget.ContextTarget": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -7044,7 +7101,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7611,7 +7668,7 @@
    ]
   },
   "GameObjectFilter.Permanent": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -7793,7 +7850,7 @@
    ]
   },
   "Player.DefendingPlayer": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -7818,6 +7875,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziConscription.kt",
      "lines": 55,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziConscriptionScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -7863,7 +7926,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Silence",
@@ -8152,7 +8215,7 @@
    ]
   },
   "TargetFilter.CreatureOpponentControls": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Mawloc",
@@ -8165,6 +8228,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ConstrictingSliver.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ConstrictingSliverScenarioTest.kt"
+    },
+    {
+     "card": "Hideous Taskmaster",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt"
     }
    ]
   },
@@ -8518,7 +8587,7 @@
    ]
   },
   "targets(\u2026)": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Immoral Bargain",
