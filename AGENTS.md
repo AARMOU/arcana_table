@@ -63,6 +63,12 @@ settings; open `[Arcana Queue]` issues or apply `arcana:authorize-once`.
 
 `.github/workflows/argentum-weekly-upgrade.yml` moves Arcana onto upstream Argentum every Monday. When a run is red (patch conflict, engine build failure, collision or failing test), its PR or issue has a **Handoff** section with the exact commands. Follow [`engine-upgrade/HANDOFF.md`](engine-upgrade/HANDOFF.md): work on `gpt/argentum-weekly-fix-<date>` (pushing it runs a read-only dry run), never push to `bot/argentum-weekly`. Engine fixes are Claude's lane; GPT finishes them when Claude is unavailable.
 
+The same workflow runs **every day as a dry-run early warning** and reports in #81 when upstream starts to
+clash. Every upgrade must also pass `tools/check_android_engine.py` (Java 17 bytecode, no new Java calls
+phones at minSdk lack, app library versions ≥ the engine's) and the current numbered build's custom cards.
+**An engine patch added to a numbered build branch must be carried to `argentum-patches/` here the same
+day**; the upgrade blocks while one is missing.
+
 ## Checks to run before asking for review
 
 ```sh
