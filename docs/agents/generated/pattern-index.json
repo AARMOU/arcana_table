@@ -455,7 +455,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -1005,6 +1005,17 @@
     }
    ]
   },
+  "DynamicAmounts.playerCounterCount": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Azlask, the Swelling Scourge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt",
+     "lines": 97,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.powerOf": {
    "count": 1,
    "examples": [
@@ -1292,7 +1303,7 @@
    ]
   },
   "Effects.AddCounters": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -2251,7 +2262,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Mutilate",
@@ -2430,7 +2441,7 @@
    ]
   },
   "Effects.GrantKeyword": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -2506,6 +2517,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SakashimaOfAThousandFaces.kt",
      "lines": 60,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SakashimaOfAThousandFacesScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.GrantTriggeredAbility": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Azlask, the Swelling Scourge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt",
+     "lines": 97,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt"
     }
    ]
   },
@@ -2753,7 +2775,7 @@
    ]
   },
   "Effects.ModifyStats": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Defile",
@@ -3021,7 +3043,7 @@
    ]
   },
   "Effects.Sacrifice": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -3249,6 +3271,17 @@
   }
  },
  "Keyword": {
+  "Keyword.ANNIHILATOR": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Azlask, the Swelling Scourge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt",
+     "lines": 97,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt"
+    }
+   ]
+  },
   "Keyword.ASCEND": {
    "count": 1,
    "examples": [
@@ -3668,7 +3701,7 @@
    ]
   },
   "Keyword.INDESTRUCTIBLE": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Exterminatus",
@@ -4237,7 +4270,7 @@
    ]
   },
   "Triggers.another": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Surge Conductor",
@@ -4421,7 +4454,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4542,7 +4575,7 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Dinosaur Egg",
@@ -4845,7 +4878,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 64,
+   "count": 65,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5332,7 +5365,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 158,
+   "count": 159,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5697,6 +5730,17 @@
     }
    ]
   },
+  "CounterType.EXPERIENCE": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Azlask, the Swelling Scourge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt",
+     "lines": 97,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt"
+    }
+   ]
+  },
   "CounterType.FLYING": {
    "count": 1,
    "examples": [
@@ -5822,7 +5866,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Silence",
@@ -6906,7 +6950,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -6969,7 +7013,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Mutilate",
@@ -7044,7 +7088,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7405,7 +7449,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 114,
+   "count": 115,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7611,7 +7655,7 @@
    ]
   },
   "GameObjectFilter.Permanent": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -7793,7 +7837,7 @@
    ]
   },
   "Player.DefendingPlayer": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -7818,6 +7862,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziConscription.kt",
      "lines": 55,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziConscriptionScenarioTest.kt"
+    },
+    {
+     "card": "Azlask, the Swelling Scourge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt",
+     "lines": 97,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt"
     }
    ]
   },
