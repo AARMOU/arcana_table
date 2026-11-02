@@ -337,6 +337,15 @@ function budgetWithReservations({ snapshot, active, pendingRepairs, recentFinish
   };
   const extra = liabilities.activeUnits + liabilities.pendingRepairs + liabilities.recentlyFinished + liabilities.candidate;
   const fixed = Number.isFinite(snapshot.reserved) ? snapshot.reserved : null;
+  // Owner's daily credit limit (scripts/credit-pace.json via billing-monitor): billed credits plus everything
+  // reserved for active, pending, recent and candidate work must stay under today's running-total limit.
+  if (snapshot.paceLimit !== undefined) {
+    const billed = Number.isFinite(snapshot.reportedUsed) ? snapshot.reportedUsed : NaN;
+    if (!Number.isFinite(snapshot.paceLimit) || !Number.isFinite(billed) || billed + extra >= snapshot.paceLimit)
+      return { level: 'paused', maxNewAssignments: 0, warn: true, reason: 'daily-credit-limit', reserved: extra,
+        liabilities: { ...liabilities, fixedReserve: fixed, total: extra + (fixed || 0), reportedCredits: Number.isFinite(billed) ? billed : null,
+          allowance: snapshot.allowance, paceLimit: snapshot.paceLimit } };
+  }
   return { ...decideBudget({ used: snapshot.used + extra, allowance: snapshot.allowance,
     measuredAt: Date.parse(snapshot.measuredAt), now }), reserved: extra,
     liabilities: { ...liabilities, fixedReserve: fixed, total: extra + (fixed || 0),
