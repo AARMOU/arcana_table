@@ -345,23 +345,17 @@ jobs:
           git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$CURRENT_BRANCH" >/dev/null 2>&1 || { echo "$CURRENT_BRANCH fetch failed"; exit 1; }
           sha=$(git rev-parse FETCH_HEAD)
           # The build's own Android tree (its cards, their test helpers and the app code those tests compile
-          # against), with only the engine swapped for the candidate's: the four jars, the exported library,
-          # library versions raised the same way, and Argentum-vs-Arcana overrides unioned (Arcana kept).
+          # against), with only the engine swapped for the candidate's: the four jars, the exported library and
+          # library versions raised the same way; collisions with the new library are then reconciled.
           git archive FETCH_HEAD android | tar -x -C "$d" || { echo "$CURRENT_BRANCH archive failed"; exit 1; }
           a=android/app/src/main/assets/argentum
           cp android/app/libs/argentum-*.jar "$d/android/app/libs/"
           for f in all-cards.jsonl por-cards.jsonl all-cards.index.tsv; do cp "$a/$f" "$d/$a/$f"; done
-          python3 - "$a/custom-overrides.txt" "$d/$a/custom-overrides.txt" <<'EOF'
-          import pathlib, sys
-          ours, theirs = (pathlib.Path(x) for x in sys.argv[1:])
-          lines = ours.read_text().splitlines() if ours.is_file() else []
-          extra = [l for l in (theirs.read_text().splitlines() if theirs.is_file() else [])
-                   if l.strip() and not l.startswith('#') and l not in lines]
-          theirs.write_text('\n'.join(lines + extra) + '\n')
-          EOF
           python3 tools/check_android_engine.py align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"
-          ( cd "$d/android" && ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test \
-              --tests 'com.arcanatable.customcards.*ScenarioTest' ) > "$RUNNER_TEMP/current.log" 2>&1
+          # Same collision rule as this base's own cards: a card Argentum now also has plays Argentum's version
+          # if it passes the build's scenario tests for it, else the build's own (custom-overrides.txt).
+          python3 engine-upgrade/weekly.py reconcile 4 --android "$d/android" --name currentreconcile \
+            --tests 'com.arcanatable.customcards.*ScenarioTest' > "$RUNNER_TEMP/current.log" 2>&1
           code=$?
           python3 - "$d/android/custom-cards/build/test-results/test" "$RUNNER_TEMP/current.log" "$sha" "$code" "$CURRENT_BRANCH" <<'EOF'
           import json, pathlib, re, sys, xml.etree.ElementTree as ET
@@ -470,7 +464,7 @@ jobs:
               rec = w / 'reconcile.md'
               if rec.is_file():
                   body += ['', rec.read_text()]
-              for extra in ('android.md', 'currentcards.md'):
+              for extra in ('android.md', 'currentcards.md', 'currentreconcile.md'):
                   if (w / extra).is_file():
                       body += ['', (w / extra).read_text()]
               body += ['', current_md]
