@@ -296,6 +296,7 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         cards = next(s for s in self.validate["steps"] if s.get("id") == "currentcards")
         self.assertEqual(cards["env"]["CURRENT_BRANCH"], "${{ steps.current.outputs.branch }}")
         self.assertNotIn("b140", text(self.wf).lower())  # no hard-coded numbered build left
+        self.assertTrue(cards["run"].lstrip().startswith("set +e"), "a failing card must still be reported")
         report = self.step("validate", "Write the report")["run"]
         self.assertIn("env['CURRENTCARDS'] == 'success'", report)
         self.assertIn("synced,", report)
@@ -313,6 +314,8 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         for key in ("FAILED", "BLOCKER", "UPSTREAM", "CURRENT_BRANCH"):
             self.assertTrue(status["env"][key].startswith("${{ needs.validate.outputs."), key)
             self.assertNotIn("${{", status["run"])  # validate's outputs reach the script only through env
+        self.assertTrue(status["run"].lstrip().startswith("set +e"), "status publishing must not turn a run red")
+        self.assertTrue(status["run"].rstrip().endswith("exit 0"))
         self.assertIn("if k in plain", status["run"])  # unknown keys are dropped, never echoed
         self.assertIn(r"[0-9]{4}-[a-z0-9-]+\.patch", status["run"])
         self.assertIn("issues/78/comments", status["run"])
