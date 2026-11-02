@@ -334,9 +334,9 @@ jobs:
         continue-on-error: true
         # The numbered build players get next (main's integration/policy.json target, read in the `current`
         # step) has its own custom cards. Its whole set — read live from the branch, no card lists — is
-        # compiled and scenario-tested on this candidate engine, in a scratch copy of the candidate's Android
-        # tree. A merge gate since 2026-11-02 (it was a report-only check of B140): an upgrade that breaks
-        # the build's cards is not green.
+        # compiled and scenario-tested on this candidate engine, in a scratch copy of that build's own Android
+        # tree with only the engine swapped in. A merge gate since 2026-11-02 (it was a report-only check of
+        # B140): an upgrade that breaks the build's cards is not green.
         env:
           CURRENT_BRANCH: ${{ steps.current.outputs.branch }}
         run: |
@@ -344,8 +344,22 @@ jobs:
           d="$RUNNER_TEMP/current-overlay"; rm -rf "$d"; mkdir -p "$d"
           git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$CURRENT_BRANCH" >/dev/null 2>&1 || { echo "$CURRENT_BRANCH fetch failed"; exit 1; }
           sha=$(git rev-parse FETCH_HEAD)
-          cp -a android "$d/android" && rm -rf "$d/android/custom-cards/src" "$d/android/custom-cards/build"
-          git archive FETCH_HEAD android/custom-cards/src | tar -x -C "$d"
+          # The build's own Android tree (its cards, their test helpers and the app code those tests compile
+          # against), with only the engine swapped for the candidate's: the four jars, the exported library,
+          # library versions raised the same way, and Argentum-vs-Arcana overrides unioned (Arcana kept).
+          git archive FETCH_HEAD android | tar -x -C "$d" || { echo "$CURRENT_BRANCH archive failed"; exit 1; }
+          a=android/app/src/main/assets/argentum
+          cp android/app/libs/argentum-*.jar "$d/android/app/libs/"
+          for f in all-cards.jsonl por-cards.jsonl all-cards.index.tsv; do cp "$a/$f" "$d/$a/$f"; done
+          python3 - "$a/custom-overrides.txt" "$d/$a/custom-overrides.txt" <<'EOF'
+          import pathlib, sys
+          ours, theirs = (pathlib.Path(x) for x in sys.argv[1:])
+          lines = ours.read_text().splitlines() if ours.is_file() else []
+          extra = [l for l in (theirs.read_text().splitlines() if theirs.is_file() else [])
+                   if l.strip() and not l.startswith('#') and l not in lines]
+          theirs.write_text('\n'.join(lines + extra) + '\n')
+          EOF
+          python3 tools/check_android_engine.py align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"
           ( cd "$d/android" && ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test \
               --tests 'com.arcanatable.customcards.*ScenarioTest' ) > "$RUNNER_TEMP/current.log" 2>&1
           code=$?

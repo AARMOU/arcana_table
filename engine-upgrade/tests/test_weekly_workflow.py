@@ -297,6 +297,9 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         self.assertEqual(cards["env"]["CURRENT_BRANCH"], "${{ steps.current.outputs.branch }}")
         self.assertNotIn("b140", text(self.wf).lower())  # no hard-coded numbered build left
         self.assertTrue(cards["run"].lstrip().startswith("set +e"), "a failing card must still be reported")
+        self.assertIn("git archive FETCH_HEAD android |", cards["run"])  # the build's own tree, not ours
+        self.assertIn('cp android/app/libs/argentum-*.jar "$d/android/app/libs/"', cards["run"])
+        self.assertIn('align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"', cards["run"])
         report = self.step("validate", "Write the report")["run"]
         self.assertIn("env['CURRENTCARDS'] == 'success'", report)
         self.assertIn("synced,", report)

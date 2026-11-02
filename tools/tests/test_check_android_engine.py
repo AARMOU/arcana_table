@@ -156,6 +156,18 @@ class LibraryVersionTest(unittest.TestCase):
         self.assertEqual([], cae.version_problems(cae.engine_versions(self.toml), cae.app_versions([self.root, self.app])))
         self.assertEqual([], cae.align({"kotlin": "2.3.0"}, [self.root]))  # never downgrades
 
+    def test_align_can_target_another_android_tree(self):
+        tree = self.tmp / "other-android"
+        (tree / "app").mkdir(parents=True)
+        (tree / "custom-cards").mkdir()
+        (tree / "build.gradle.kts").write_text(self.root.read_text())
+        (tree / "app" / "build.gradle.kts").write_text(self.app.read_text())
+        mine = cae.APP_GRADLE[1].read_text()
+        self.assertEqual(0, cae.main(["align", "--engine-versions", str(self.toml), "--android", str(tree)]))
+        self.assertIn('"2.4.21"', (tree / "build.gradle.kts").read_text())
+        self.assertIn("json:1.12.0", (tree / "app" / "build.gradle.kts").read_text())
+        self.assertEqual(mine, cae.APP_GRADLE[1].read_text())  # this repository's files untouched
+
     def test_version_order(self):
         k = cae.version_key
         self.assertLess(k("1.11.0"), k("1.12.0"))

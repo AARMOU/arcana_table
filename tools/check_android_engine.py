@@ -378,13 +378,17 @@ def main(argv=None) -> int:
     c.add_argument("--out", type=Path)
     a = sub.add_parser("align")
     a.add_argument("--engine-versions", required=True, type=Path)
+    a.add_argument("--android", type=Path, help="another Android tree (default: this repository's)")
     sub.add_parser("min-sdk")
     args = ap.parse_args(argv)
     if args.cmd == "min-sdk":
         print(min_sdk())
         return 0
     if args.cmd == "align":
-        for line in align(engine_versions(args.engine_versions)) or ["app library versions already match the engine"]:
+        files = APP_GRADLE if args.android is None else [args.android / "build.gradle.kts",
+                                                         args.android / "app" / "build.gradle.kts",
+                                                         args.android / "custom-cards" / "build.gradle.kts"]
+        for line in align(engine_versions(args.engine_versions), files) or ["app library versions already match the engine"]:
             print(line)
         return 0
     result = check(engine_jars(args.jars), engine_jars(args.baseline_jars) if args.baseline_jars else None,
