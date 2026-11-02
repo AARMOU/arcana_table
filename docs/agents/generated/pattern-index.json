@@ -692,10 +692,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BoscoJustABearScenarioTest.kt"
     },
     {
-     "card": "Monstrous Onslaught",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
+     "card": "Deny the Witch",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DenyTheWitch.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyTheWitchScenarioTest.kt"
     }
    ]
   },
@@ -705,7 +705,7 @@
     {
      "card": "Monstrous Onslaught",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
-     "lines": 34,
+     "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
@@ -1821,7 +1821,7 @@
     {
      "card": "Monstrous Onslaught",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
-     "lines": 34,
+     "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
@@ -7319,7 +7319,7 @@
     {
      "card": "Monstrous Onslaught",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
-     "lines": 34,
+     "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     },
     {
