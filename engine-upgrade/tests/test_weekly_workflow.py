@@ -134,7 +134,8 @@ class WeeklyWorkflowSafety(unittest.TestCase):
     def test_safety_checks_include_the_scope_tests(self):
         run = self.step("validate", "Workflow safety checks")["run"]
         for name in ("test_weekly_workflow.py", "test_candidate_scope.py", "test_weekly_docs.py",
-                     "test_weekly_handoff.py"):
+                     "test_weekly_handoff.py", "test_weekly_retired.py", "test_weekly_imports.py",
+                     "test_check_android_engine.py"):
             self.assertIn(name, run)
 
     def test_failed_engine_build_gives_a_starting_branch_but_no_pr(self):

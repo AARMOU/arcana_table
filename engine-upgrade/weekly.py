@@ -159,7 +159,10 @@ def rebase(engine_dir, target, *flags):
     rules = json.loads(RULES.read_text()) if RULES.is_file() else {}
     keep_deleted = {entry["path"]: entry for entry in rules.get("keep_deleted", [])}
     report["auto_resolved"] = []
-    step = git("rebase", target, check=False)
+    # After each replayed patch, drop imports the patch adds that upstream now has too (Kotlin rejects a
+    # duplicate import as ambiguous; 0035's TappedComponent/Keyword after upstream added them, 2026-11-02).
+    dedupe = f"{sys.executable} {Path(__file__).resolve()} dedupe-imports"
+    step = git("rebase", "--exec", dedupe, target, check=False)
     while step.returncode:
         unresolved = git("diff", "--name-only", "--diff-filter=U").stdout.split()
         for path in [p for p in unresolved if p.endswith("CHANGELOG.md")]:
@@ -309,6 +312,42 @@ def add_retired(text, name, why):
     if f'    "{name}":' in block[1]:
         return text
     return text[:block.end(1)] + entry + text[block.end(1):]
+
+
+DUPLICABLE = (".kt", ".kts", ".java")
+
+
+def dedupe_import_lines(text):
+    """Remove exact repeats of an `import …` line, keeping the first. Nothing else changes."""
+    seen, out, changed = set(), [], False
+    for line in text.splitlines(keepends=True):
+        key = line.strip()
+        if key.startswith("import ") and key in seen:
+            changed = True
+            continue
+        if key.startswith("import "):
+            seen.add(key)
+        out.append(line)
+    return "".join(out), changed
+
+
+def dedupe_imports():
+    """`git rebase --exec` hook, run in the engine checkout after each replayed patch commit: amend it
+    so the files it touched carry each import once."""
+    files = run("git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.split()
+    fixed = []
+    for name in files:
+        path = Path(name)
+        if path.suffix in DUPLICABLE and path.is_file():
+            text, changed = dedupe_import_lines(path.read_text())
+            if changed:
+                path.write_text(text)
+                fixed.append(name)
+    if fixed:
+        run("git", "add", "--", *fixed)
+        run("git", "commit", "-q", "--amend", "--no-edit", "--allow-empty")
+        print("Removed imports upstream already has from:", ", ".join(fixed))
+    return 0
 
 
 def auto_resolved_markdown(report):
@@ -763,5 +802,5 @@ def summary(results_dir):
 
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
-    sys.exit({"rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
+    sys.exit({"dedupe-imports": dedupe_imports, "rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
               "docs": docs, "cards": cards, "reconcile": reconcile, "summary": summary}[command](*args) or 0)
