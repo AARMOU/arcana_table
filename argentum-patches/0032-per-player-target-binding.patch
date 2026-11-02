@@ -209,7 +209,7 @@ index 68bc49d8..9802291a 100644
           * and returned between targeting and now (CR 400.7). Ids with no captured stamp (targets
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 new file mode 100644
-index 00000000..e3fda513
+index 00000000..82594e7f
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 @@ -0,0 +1,118 @@
@@ -277,7 +277,7 @@ index 00000000..e3fda513
 +    fun GameTestDriver.moveControl(creature: EntityId, to: EntityId) =
 +        replaceState(state.updateEntity(creature) { it.with(ControllerComponent(to)) })
 +
-+    fun GameTestDriver.castTheftAt(caster: EntityId, vararg creatures: EntityId) {
++    fun GameTestDriver.castTheftAt(caster: EntityId, creatures: List<EntityId>) {
 +        val spell = putCardInHand(caster, "Binding Test Theft")
 +        giveMana(caster, Color.BLUE)
 +        castSpellWithTargets(caster, spell, creatures.map { ChosenTarget.Permanent(it) }).error.shouldBeNull()
@@ -293,7 +293,7 @@ index 00000000..e3fda513
 +        val (d, you, foe1, foe2) = table()
 +        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
 +        val b = d.putCreatureOnBattlefield(foe2, "Binding Test Bear")
-+        d.castTheftAt(you, a, b)
++        d.castTheftAt(you, listOf(a, b))
 +        d.resolveStack()
 +        d.getController(a) shouldBe you
 +        d.getController(b) shouldBe you
@@ -303,7 +303,7 @@ index 00000000..e3fda513
 +        val (d, you, foe1, foe2) = table()
 +        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
 +        val b = d.putCreatureOnBattlefield(foe2, "Binding Test Bear")
-+        d.castTheftAt(you, a, b)
++        d.castTheftAt(you, listOf(a, b))
 +        d.moveControl(a, foe2)
 +        d.resolveStack()
 +        withClue("chosen for foe1, now controlled by foe2: illegal, not stolen") {
@@ -315,7 +315,7 @@ index 00000000..e3fda513
 +    test("a single target moved between opponents makes the spell do nothing") {
 +        val (d, you, foe1, foe2) = table()
 +        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
-+        d.castTheftAt(you, a)
++        d.castTheftAt(you, listOf(a))
 +        d.moveControl(a, foe2)
 +        d.resolveStack()
 +        d.getController(a) shouldBe foe2
@@ -324,7 +324,7 @@ index 00000000..e3fda513
 +    test("a target moved away and back to its opponent before resolution is legal again") {
 +        val (d, you, foe1, foe2) = table()
 +        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
-+        d.castTheftAt(you, a)
++        d.castTheftAt(you, listOf(a))
 +        d.moveControl(a, foe2)
 +        d.moveControl(a, foe1)
 +        d.resolveStack()

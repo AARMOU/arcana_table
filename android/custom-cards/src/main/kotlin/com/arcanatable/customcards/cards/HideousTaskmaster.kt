@@ -11,13 +11,6 @@ import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
 import com.wingedsheep.sdk.scripting.references.Player
 import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
-/** Annihilator 1: the numeric keyword is display vocabulary, so its attack trigger is spelled out. */
-private val annihilatorOne = TriggeredAbility.create(
-    trigger = Triggers.self.attacks(),
-    effect = Effects.Sacrifice(GameObjectFilter.Permanent, 1, EffectTarget.PlayerRef(Player.DefendingPlayer)),
-    descriptionOverride = "Annihilator 1",
-)
-
 /**
  * Hideous Taskmaster (M3C #57).
  *
@@ -48,6 +41,13 @@ val HideousTaskmaster = card("Hideous Taskmaster") {
 
     keywords(Keyword.DEVOID, Keyword.TRAMPLE, Keyword.HASTE)
     keywordAbility(KeywordAbility.annihilator(1))
+
+    // Annihilator 1 as a grantable attack trigger (built inside card { } so it gets an ability id).
+    val annihilatorOne = TriggeredAbility.create(
+        trigger = Triggers.self.attacks(),
+        effect = Effects.Sacrifice(GameObjectFilter.Permanent, 1, EffectTarget.PlayerRef(Player.DefendingPlayer)),
+        descriptionOverride = "Annihilator 1",
+    )
 
     triggeredAbility {
         trigger = Triggers.self.isCast()
