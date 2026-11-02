@@ -49,6 +49,7 @@ MANDATORY = [
     "0030-bloodthirst-keyword.patch",
     "0033-property-sum-of-collection.patch",
     "0034-commander-cast-count-counters-rider.patch",
+    "0035-ai-idle-mana-deploy.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
