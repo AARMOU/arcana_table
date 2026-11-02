@@ -29,7 +29,7 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 10,
+   "count": 9,
    "examples": [
     {
      "card": "Endless Atlas",
@@ -56,16 +56,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DefenseOfTheHeartScenarioTest.kt"
     },
     {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
-    },
-    {
      "card": "Purphoros, God of the Forge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
+    },
+    {
+     "card": "Tectonic Edge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
+     "lines": 57,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
     }
    ]
   },
@@ -339,20 +339,26 @@
    ]
   },
   "Conditions.YouHaveCitysBlessing": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Wayward Swordtooth",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WaywardSwordtooth.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WaywardSwordtoothScenarioTest.kt"
+    },
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
     }
    ]
   }
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -449,7 +455,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -639,7 +645,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 44,
+   "count": 45,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -691,7 +697,7 @@
    ]
   },
   "Costs.additional": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -716,13 +722,19 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
+    },
+    {
+     "card": "Anrakyr the Traveller",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AnrakyrTheTraveller.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AnrakyrTheTravellerScenarioTest.kt"
     }
    ]
   }
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Defile",
@@ -802,6 +814,17 @@
     }
    ]
   },
+  "DynamicAmounts.commanderCastsFromCommandZone": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "The Swarmlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheSwarmlord.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheSwarmlordScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.conditional": {
    "count": 2,
    "examples": [
@@ -816,17 +839,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
      "lines": 63,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AkromasWillScenarioTest.kt"
-    }
-   ]
-  },
-  "DynamicAmounts.count": {
-   "count": 1,
-   "examples": [
-    {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -1172,6 +1184,17 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
     }
    ]
+  },
+  "DynamicAmounts.zone": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
+    }
+   ]
   }
  },
  "Effects": {
@@ -1228,7 +1251,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1429,6 +1452,17 @@
     }
    ]
   },
+  "Effects.AttachEquipment": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.AttachTargetEquipmentToCreature": {
    "count": 5,
    "examples": [
@@ -1540,13 +1574,19 @@
    ]
   },
   "Effects.CastFromCollectionByPaying": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Bismuth Mindrender",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
+    },
+    {
+     "card": "Anrakyr the Traveller",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AnrakyrTheTraveller.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AnrakyrTheTravellerScenarioTest.kt"
     }
    ]
   },
@@ -1645,16 +1685,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
     },
     {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
-    },
-    {
      "card": "Warping Wail",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WarpingWail.kt",
      "lines": 64,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WarpingWailScenarioTest.kt"
+    },
+    {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 74,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -1779,7 +1819,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -1906,7 +1946,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Noise Marine",
@@ -1927,6 +1967,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SanguinaryPriestScenarioTest.kt"
     },
     {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
+    },
+    {
      "card": "Bituminous Blast",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BituminousBlast.kt",
      "lines": 35,
@@ -1937,17 +1983,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnightPaladin.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnightPaladinScenarioTest.kt"
-    },
-    {
-     "card": "Keeper of Secrets",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KeeperOfSecrets.kt",
-     "lines": 36,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KeeperOfSecretsScenarioTest.kt"
     }
    ]
   },
   "Effects.Destroy": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -1974,16 +2014,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GreyKnightParagonScenarioTest.kt"
     },
     {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
+    },
+    {
      "card": "Necron Deathmark",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NecronDeathmark.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NecronDeathmarkScenarioTest.kt"
-    },
-    {
-     "card": "Rise of the Eldrazi",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RiseOfTheEldrazi.kt",
-     "lines": 32,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RiseOfTheEldraziScenarioTest.kt"
     }
    ]
   },
@@ -2080,7 +2120,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 36,
+   "count": 38,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2211,7 +2251,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 29,
+   "count": 30,
    "examples": [
     {
      "card": "Mutilate",
@@ -2224,6 +2264,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Exterminatus.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ExterminatusScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     },
     {
      "card": "For the Emperor!",
@@ -2242,12 +2288,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisChaplain.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
-    },
-    {
-     "card": "Bile Blight",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BileBlight.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BileBlightScenarioTest.kt"
     }
    ]
   },
@@ -2356,6 +2396,17 @@
     }
    ]
   },
+  "Effects.GiveControl": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.GrantActivatedAbility": {
    "count": 1,
    "examples": [
@@ -2459,7 +2510,7 @@
    ]
   },
   "Effects.If": {
-   "count": 14,
+   "count": 13,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -2500,8 +2551,14 @@
    ]
   },
   "Effects.IfYouDo": {
-   "count": 4,
+   "count": 5,
    "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
+    },
     {
      "card": "Kozilek's Return",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KozileksReturn.kt",
@@ -2801,7 +2858,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 24,
+   "count": 25,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3140,7 +3197,7 @@
    ]
   },
   "Effects.Untap": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Sword of Feast and Famine",
@@ -3153,6 +3210,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/QuestForRenewal.kt",
      "lines": 47,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/QuestForRenewalScenarioTest.kt"
+    },
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
     },
     {
      "card": "Zacama, Primal Calamity",
@@ -3186,6 +3249,17 @@
   }
  },
  "Keyword": {
+  "Keyword.ASCEND": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
+    }
+   ]
+  },
   "Keyword.CASCADE": {
    "count": 7,
    "examples": [
@@ -3524,7 +3598,7 @@
    ]
   },
   "Keyword.HASTE": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -3594,7 +3668,7 @@
    ]
   },
   "Keyword.INDESTRUCTIBLE": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Exterminatus",
@@ -4118,13 +4192,19 @@
    ]
   },
   "Triggers.anOpponent.beginningOf": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Quest for Renewal",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/QuestForRenewal.kt",
      "lines": 47,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/QuestForRenewalScenarioTest.kt"
+    },
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
     }
    ]
   },
@@ -4157,7 +4237,7 @@
    ]
   },
   "Triggers.another": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Surge Conductor",
@@ -4190,10 +4270,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekSpyderScenarioTest.kt"
     },
     {
-     "card": "Venom, Eddie Brock",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VenomEddieBrock.kt",
-     "lines": 39,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VenomEddieBrockScenarioTest.kt"
+     "card": "The Swarmlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheSwarmlord.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheSwarmlordScenarioTest.kt"
     }
    ]
   },
@@ -4341,7 +4421,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4503,7 +4583,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 49,
+   "count": 50,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4765,7 +4845,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 63,
+   "count": 64,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4834,7 +4914,7 @@
    ]
   },
   "equipAbility()": {
-   "count": 8,
+   "count": 10,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -4939,7 +5019,7 @@
    ]
   },
   "keywords()": {
-   "count": 102,
+   "count": 104,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5054,7 +5134,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5129,7 +5209,7 @@
    ]
   },
   "spell { }": {
-   "count": 51,
+   "count": 52,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5211,7 +5291,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 61,
+   "count": 64,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5252,7 +5332,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 154,
+   "count": 158,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5418,7 +5498,7 @@
    ]
   },
   "manaAbility": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5459,7 +5539,7 @@
    ]
   },
   "optional": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -5511,7 +5591,7 @@
    ]
   },
   "restrictions": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -5532,6 +5612,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt"
     },
     {
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
+    },
+    {
      "card": "Whisperer of the Wilds",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
      "lines": 43,
@@ -5542,17 +5628,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SceptreOfEternalGloryScenarioTest.kt"
-    },
-    {
-     "card": "Reflecting Pool",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ReflectingPool.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ReflectingPoolScenarioTest.kt"
     }
    ]
   },
   "timing": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5673,7 +5753,7 @@
    ]
   },
   "CounterType.PLUS_ONE_PLUS_ONE": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -5706,10 +5786,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FungusSliverScenarioTest.kt"
     },
     {
-     "card": "Thunderwolf Cavalry",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ThunderwolfCavalry.kt",
+     "card": "The Swarmlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheSwarmlord.kt",
      "lines": 37,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ThunderwolfCavalryScenarioTest.kt"
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheSwarmlordScenarioTest.kt"
     }
    ]
   },
@@ -5742,7 +5822,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Silence",
@@ -5775,10 +5855,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldritchImmunityScenarioTest.kt"
     },
     {
-     "card": "The Fantasticar",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
-     "lines": 56,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheFantasticarScenarioTest.kt"
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
     }
    ]
   },
@@ -6074,7 +6154,7 @@
    ]
   },
   "Step.UPKEEP": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Awakening Zone",
@@ -6115,7 +6195,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6284,7 +6364,7 @@
    ]
   },
   "EntersWithDynamicCounters": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -6297,6 +6377,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StonecoilSerpent.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StonecoilSerpentScenarioTest.kt"
+    },
+    {
+     "card": "The Swarmlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheSwarmlord.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheSwarmlordScenarioTest.kt"
     }
    ]
   },
@@ -6379,6 +6465,17 @@
     }
    ]
   },
+  "CantAttackYou": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
+    }
+   ]
+  },
   "CantBeBlockedByFewerThan": {
    "count": 1,
    "examples": [
@@ -6387,6 +6484,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HexmarkDestroyer.kt",
      "lines": 22,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HexmarkDestroyerScenarioTest.kt"
+    }
+   ]
+  },
+  "CantBeSacrificed": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
     }
    ]
   },
@@ -6441,13 +6549,19 @@
    ]
   },
   "GrantDynamicStats": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Cranial Plating",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt"
+    },
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
     }
    ]
   },
@@ -6469,7 +6583,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -6594,6 +6708,17 @@
     }
    ]
   },
+  "MayCastWithoutPayingManaCost": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Darksteel Monolith",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DarksteelMonolith.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DarksteelMonolithScenarioTest.kt"
+    }
+   ]
+  },
   "ModifySpellCost": {
    "count": 6,
    "examples": [
@@ -6636,7 +6761,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -6770,7 +6895,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -6803,10 +6928,21 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GenestealerLocusScenarioTest.kt"
     },
     {
-     "card": "Eldrazi Monument",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziMonument.kt",
+     "card": "Arch of Orazca",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArchOfOrazca.kt",
      "lines": 40,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziMonumentScenarioTest.kt"
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArchOfOrazcaScenarioTest.kt"
+    }
+   ]
+  },
+  "EffectTarget.EquippedCreature": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
     }
    ]
   },
@@ -6822,7 +6958,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 31,
+   "count": 32,
    "examples": [
     {
      "card": "Mutilate",
@@ -6835,6 +6971,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Exterminatus.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ExterminatusScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     },
     {
      "card": "For the Emperor!",
@@ -6853,12 +6995,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisChaplain.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
-    },
-    {
-     "card": "Bile Blight",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BileBlight.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BileBlightScenarioTest.kt"
     }
    ]
   },
@@ -6880,8 +7016,14 @@
    ]
   },
   "EffectTarget.PipelineTarget": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
+    },
     {
      "card": "Ugin, the Ineffable",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
@@ -6891,7 +7033,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 24,
+   "count": 25,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7031,7 +7173,7 @@
    ]
   },
   "Filters.EquippedCreature": {
-   "count": 7,
+   "count": 9,
    "examples": [
     {
      "card": "Sword of Light and Shadow",
@@ -7083,7 +7225,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 18,
+   "count": 20,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -7124,7 +7266,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -7252,7 +7394,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 113,
+   "count": 114,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7300,6 +7442,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BeaconOfUnrest.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BeaconOfUnrestScenarioTest.kt"
+    }
+   ]
+  },
+  "GameObjectFilter.CreatureOrPlaneswalker": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     }
    ]
   },
@@ -7526,6 +7679,17 @@
     }
    ]
   },
+  "Player.ActivePlayer": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Assault Suit",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultSuit.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultSuitScenarioTest.kt"
+    }
+   ]
+  },
   "Player.ActivePlayerFirst": {
    "count": 2,
    "examples": [
@@ -7647,7 +7811,7 @@
    ]
   },
   "Player.Each": {
-   "count": 8,
+   "count": 10,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -7688,7 +7852,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 20,
+   "count": 19,
    "examples": [
     {
      "card": "Silence",
@@ -7804,7 +7968,7 @@
    ]
   },
   "Player.You": {
-   "count": 41,
+   "count": 43,
    "examples": [
     {
      "card": "Defile",
@@ -8074,13 +8238,19 @@
    ]
   },
   "TargetFilter.Land": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Rewind",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    },
+    {
+     "card": "Star of Extinction",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StarOfExtinction.kt",
+     "lines": 31,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StarOfExtinctionScenarioTest.kt"
     }
    ]
   },
@@ -8174,7 +8344,7 @@
     {
      "card": "Ulamog's Nullifier",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
+     "lines": 74,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
@@ -8296,7 +8466,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 77,
+   "count": 78,
    "examples": [
     {
      "card": "Defile",

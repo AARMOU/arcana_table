@@ -26,6 +26,19 @@ index 4edf7aaa..681b0f4b 100644
    restricts *which* spells may be cast for free (card predicates, matched in any zone — default
    `GameObjectFilter.Any` = every spell). `fromZones` restricts the permission to spells cast **from** the listed zones (the zone the
    spell left, CR 601.2a; `null` = any zone): the free cast is offered on each listed zone's cast path
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 54ccb4fc..26c79907 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1962,7 +1962,7 @@ Families:
+ - `MaxCounters(counterType: CounterType, max: Int)` — "This permanent can't have more than max counterType counters on it" (Rasputin Dreamweaver).
+ - `MayCastFromGraveyard(filter: GameObjectFilter, lifeCost: Int, duringYourTurnOnly: Boolean, entersWithCounter: CounterType?, addedSubtypeOnEntry: String?, oncePerTurn: Boolean, exileCastThisWay: CastThisWayExile, fromAnyGraveyard: Boolean, additionalCost: AdditionalCost?, playsLands: Boolean, grantedAbilityOnEntry: TriggeredAbility?)` — You may cast spells matching filter from your graveyard, optionally by paying lifeCost life in addition to their other costs.
+ - `MayCastSelfFromZones(zones: List<Zone>, condition: Condition?, additionalCost: AdditionalCost?, castUsing: Keyword?, alternativeManaCost: ManaCost?, exileCastThisWay: CastThisWayExile)` — You may cast this card from specified zones (e.g., graveyard, exile).
+-- `MayCastWithoutPayingManaCost(controllerOnly: Boolean, firstSpellOfTurnOnly: Boolean, spellFilter: GameObjectFilter, oncePerTurn: Boolean, fromZones: Set<Zone>?)` — Generic "may cast a spell without paying its mana cost" battlefield permission.
++- `MayCastWithoutPayingManaCost(controllerOnly: Boolean, firstSpellOfTurnOnly: Boolean, spellFilter: GameObjectFilter, oncePerTurn: Boolean, fromZones: Set<Zone>?, onAnyTurn: Boolean)` — Generic "may cast a spell without paying its mana cost" battlefield permission.
+ - `MayForetellOnAnyTurn` — "Foretelling cards from your hand … can be done on any player's turn." (Cosmos Charger.) Lifts the "during their turn" clause of the foretell special action (CR 116.2h, 702.143a) for the source's c…
+ - `MayPlayCardsFromExile(filter: GameObjectFilter, condition: Condition?, withAnyManaType: Boolean, withAnyManaColor: Boolean, oncePerTurn: Boolean, spendAsAnyColor: ManaSpentAsAnyColor?)` — You may play cards in exile matching filter — "play", so lands and spells alike (CR 601.3: a permission from an effect is what lets a player cast a card from a zone other than their hand).
+ - `MayPlayLandsFromGraveyard` — You may play lands from your graveyard.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 index f7645a64..f9d69a27 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
