@@ -340,7 +340,7 @@ jobs:
         env:
           CURRENT_BRANCH: ${{ steps.current.outputs.branch }}
         run: |
-          set -uo pipefail
+          set +e -uo pipefail  # a failing card must reach the report below, not end the step here
           d="$RUNNER_TEMP/current-overlay"; rm -rf "$d"; mkdir -p "$d"
           git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$CURRENT_BRANCH" >/dev/null 2>&1 || { echo "$CURRENT_BRANCH fetch failed"; exit 1; }
           sha=$(git rev-parse FETCH_HEAD)
@@ -541,6 +541,9 @@ jobs:
             android/custom-cards/build/test-results/
             android/app/build/test-results/
             android/app/build/outputs/apk/debug/app-debug.apk
+            engine-upgrade/weekly/currentcards.json
+            ${{ runner.temp }}/current-overlay/android/custom-cards/build/test-results/
+            ${{ runner.temp }}/current.log
       - name: Fail the dry run when the upgrade is blocked
         if: always() && (github.event_name == 'push' || github.event.schedule == '23 11 * * *') && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
         run: |
@@ -713,7 +716,7 @@ jobs:
           CURRENT_BRANCH: ${{ needs.validate.outputs.current_branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -uo pipefail
+          set +e -uo pipefail  # publishing the status is best effort: it never changes the run's verdict
           marker='<!-- arcana-control-status-v1:engine -->'
           previous=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/78/comments?per_page=100" \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -1)
@@ -787,6 +790,7 @@ jobs:
             gh issue comment 78 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/engine-status.md" >/dev/null || echo "::warning::Could not post the engine status"
           fi
           if [ -f "$RUNNER_TEMP/alert.md" ]; then gh issue comment 81 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/alert.md" >/dev/null || true; fi
+          exit 0
       - name: Tell issue 81 when a live run failed without publishing anything
         # publish already posts to #81 whenever it ran (PR, conflict or build-failure issue). This covers
         # the rest: validation broke (drift check, infrastructure, a crash) or publish itself failed.
