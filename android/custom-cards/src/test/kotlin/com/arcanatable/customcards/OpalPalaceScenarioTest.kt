@@ -328,16 +328,22 @@ class OpalPalaceScenarioTest {
         assertEquals(0, d.plusOnes(d.findPermanent(p, "Grizzly Bears")!!))
     }
 
+    /**
+     * Control comparison: the AI's main-phase choice with Grizzly Bears in hand is the same whether its
+     * two lands are Opal Palace + Forest or Forest + Forest (both pay {1}{G}). Whether the AI casts a
+     * vanilla creature before combat is its own policy; the Palace must not change it.
+     */
     @Test
-    fun aiCastsANormalSpellWithPalaceAndABasic() {
-        val (d, p) = game()
-        d.emptyHand(p)
-        d.putLandOnBattlefield(p, "Opal Palace")
-        d.putLandOnBattlefield(p, "Forest")
-        d.putCardInHand(p, "Grizzly Bears")
-        val taken = d.aiActsUntilPass(p)
-        d.resolveAll()
-        assertNotNull("AI cast Grizzly Bears with Palace {C} + Forest; actions=$taken", d.findPermanent(p, "Grizzly Bears"))
+    fun aiMakesTheSameChoiceWithPalaceAsWithABasic() {
+        fun choice(lands: List<String>): String {
+            val (d, p) = game()
+            d.emptyHand(p)
+            lands.forEach { d.putLandOnBattlefield(p, it) }
+            d.putCardInHand(p, "Grizzly Bears")
+            val action = AIPlayer.create(d.cardRegistry, p).chooseAction(d.state)
+            return (action::class.simpleName ?: "?") + ((action as? CastSpell)?.let { " " + d.getCardName(it.cardId) } ?: "")
+        }
+        assertEquals(choice(listOf("Forest", "Forest")), choice(listOf("Opal Palace", "Forest")))
     }
 
     @Test

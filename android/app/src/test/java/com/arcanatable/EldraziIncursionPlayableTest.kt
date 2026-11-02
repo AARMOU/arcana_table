@@ -120,7 +120,7 @@ class EldraziIncursionPlayableTest {
             .mapNotNull { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.CardComponent>()?.name }
         "life=$life lib=${state.getZone(p, com.wingedsheep.sdk.core.Zone.LIBRARY).size} " +
             "bf=${names(com.wingedsheep.sdk.core.Zone.BATTLEFIELD)} hand=${names(com.wingedsheep.sdk.core.Zone.HAND)} " +
-            "gy=${names(com.wingedsheep.sdk.core.Zone.GRAVEYARD)} exile=${names(com.wingedsheep.sdk.core.Zone.EXILE).size} " +
+            "gy=${names(com.wingedsheep.sdk.core.Zone.GRAVEYARD)} exile=${names(com.wingedsheep.sdk.core.Zone.EXILE)} " +
             "cz=${names(com.wingedsheep.sdk.core.Zone.COMMAND)}"
     } + " step=${state.step} stack=${state.stack.size} decision=${state.pendingDecision?.let { it::class.simpleName }}"
 
