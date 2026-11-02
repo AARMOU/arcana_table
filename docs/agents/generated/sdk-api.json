@@ -7009,13 +7009,25 @@
     "basePower(Int): GameObjectFilter",
     "basePower(Int): Any"
    ],
+   "basePowerAtMost": [
+    "basePowerAtMost(Int): GameObjectFilter",
+    "basePowerAtMost(Int): Any"
+   ],
    "basePowerOrToughness": [
     "basePowerOrToughness(Int): GameObjectFilter",
     "basePowerOrToughness(Int): Any"
    ],
+   "basePowerOrToughnessAtMost": [
+    "basePowerOrToughnessAtMost(Int): GameObjectFilter",
+    "basePowerOrToughnessAtMost(Int): Any"
+   ],
    "baseToughness": [
     "baseToughness(Int): GameObjectFilter",
     "baseToughness(Int): Any"
+   ],
+   "baseToughnessAtMost": [
+    "baseToughnessAtMost(Int): GameObjectFilter",
+    "baseToughnessAtMost(Int): Any"
    ],
    "becameTappedOnlyOnceThisTurn": [
     "becameTappedOnlyOnceThisTurn(): GameObjectFilter",
