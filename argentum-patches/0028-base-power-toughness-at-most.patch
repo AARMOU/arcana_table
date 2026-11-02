@@ -1,0 +1,344 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 34f1a058..276ffc5f 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -7243,6 +7243,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
+   P/T (as `.powerGreaterThanBase()` does); elsewhere it reads the printed value. Rapid Augmenter ("another creature you
+   control with base power 1 enters"), Sword of the Squeak ("for each creature you control with base power or
+   toughness 1"). `.powerGreaterThanBase()` above compares current power against this same base.
++- `.basePowerAtMost(n)` / `.baseToughnessAtMost(n)` / `.basePowerOrToughnessAtMost(n)` — **base** P/T is `n` or
++  less (`CardPredicate.BasePowerAtMost` / `BaseToughnessAtMost`; the last is their `Or`, so either half
++  qualifies — a base 0/4 or 4/1 matches). Reads the same base value as `.basePower(n)` above (layers 1–7b on the
++  battlefield, last-known on a leaves trigger, printed elsewhere); an object with no power/toughness never
++  matches. Angelic Aberration ("sacrifice any number of creatures each with base power or toughness 1 or less" —
++  `Effects.SacrificeAnyNumber(GameObjectFilter.Creature.basePowerOrToughnessAtMost(1))`).
+ - `.manaValueAtMostEntityManaSpent(ref)` — mana value ≤ the mana **actually spent** to cast a referenced
+   entity. Reads the live `SpellOnStackComponent` buckets while the entity is still a spell, or the
+   `CastRecordComponent` snapshot once it has resolved onto the battlefield (0 if it was never cast).
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index f1ccac8a..ce6415ff 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -175,7 +175,9 @@ Families:
+ 
+ - `CardPredicate.AbilitySourceMatches(subfilter: GameObjectFilter)` — Matches an **activated or triggered ability on the stack** whose *source* (CR 113.7 — the object that generated it) matches subfilter.
+ - `CardPredicate.And(predicates: List<CardPredicate>)`
++- `CardPredicate.BasePowerAtMost(max: Int)` — **Base** power max or less — "base power or toughness 1 or less" (Angelic Aberration).
+ - `CardPredicate.BasePowerEquals(value: Int)` — **Base** power exactly equal to value — "a creature with base power 1" (Rapid Augmenter, Zinnia, Valley's Voice).
++- `CardPredicate.BaseToughnessAtMost(max: Int)` — The toughness sibling of BasePowerAtMost — "base toughness 1 or less" (Angelic Aberration).
+ - `CardPredicate.BaseToughnessEquals(value: Int)` — The toughness sibling of BasePowerEquals — "base toughness 1" (Sword of the Squeak).
+ - `CardPredicate.CardTypeEqualsChosen(variableName: String)` — Matches cards with a **card type** equal to a card type chosen earlier in the pipeline and stored in `chosenValuesvariableName` (via com.wingedsheep.sdk.scripting.effects.OptionType.CARD_TYPE).
+ - `CardPredicate.CardTypeEqualsChosenComponent(slot: ChoiceSlot)` — Matches cards whose **card type** equals a card type **durably chosen by the source permanent** as it entered — read from that permanent's com.wingedsheep.engine.state.components.battlefield.CastCh…
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
+index 88de4209..16919b60 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
+@@ -332,6 +332,20 @@ interface ObjectFilterBuilder<out Self> {
+         CardPredicate.Or(listOf(CardPredicate.BasePowerEquals(value), CardPredicate.BaseToughnessEquals(value)))
+     )
+ 
++    /** "with base power [max] or less" — see [CardPredicate.BasePowerAtMost]. */
++    fun basePowerAtMost(max: Int) = withCardPredicate(CardPredicate.BasePowerAtMost(max))
++
++    /** "with base toughness [max] or less" — see [CardPredicate.BaseToughnessAtMost]. */
++    fun baseToughnessAtMost(max: Int) = withCardPredicate(CardPredicate.BaseToughnessAtMost(max))
++
++    /**
++     * "with base power or toughness [max] or less" (Angelic Aberration) — either half qualifies, so a
++     * base 0/4 or 4/1 matches; counters and anthems don't change it.
++     */
++    fun basePowerOrToughnessAtMost(max: Int) = withCardPredicate(
++        CardPredicate.Or(listOf(CardPredicate.BasePowerAtMost(max), CardPredicate.BaseToughnessAtMost(max)))
++    )
++
+     /** Compares a candidate's numeric property with any late-bound amount. */
+     fun compareNumericProperty(
+         property: CardNumericProperty,
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
+index 6518c850..1703ed5a 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
+@@ -783,6 +783,25 @@ sealed interface CardPredicate : TextReplaceable<CardPredicate> {
+         override val description: String = "with base toughness $value"
+     }
+ 
++    /**
++     * **Base** power [max] or less — "base power or toughness 1 or less" (Angelic Aberration). Base
++     * power is read exactly as [BasePowerEquals] reads it (layers 1–7b on the battlefield, last-known
++     * on a leaves trigger, printed elsewhere), so counters and anthems never disqualify a creature
++     * and a set-base-P/T effect or copy effect does count. An object with no power never matches.
++     */
++    @SerialName("BasePowerAtMost")
++    @Serializable
++    data class BasePowerAtMost(val max: Int) : CardPredicate {
++        override val description: String = "with base power $max or less"
++    }
++
++    /** The toughness sibling of [BasePowerAtMost] — "base toughness 1 or less" (Angelic Aberration). */
++    @SerialName("BaseToughnessAtMost")
++    @Serializable
++    data class BaseToughnessAtMost(val max: Int) : CardPredicate {
++        override val description: String = "with base toughness $max or less"
++    }
++
+     @SerialName("PowerAtMost")
+     @Serializable
+     data class PowerAtMost(val max: Int) : CardPredicate {
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index d05f5d2e..425b22e2 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -81,7 +81,9 @@ CardMeasure.DistinctCardTypes — CardMeasure
+ CardMeasure.ManaValue — CardMeasure
+ CardPredicate.AbilitySourceMatches — CardPredicate
+ CardPredicate.And — CardPredicate
++CardPredicate.BasePowerAtMost — CardPredicate
+ CardPredicate.BasePowerEquals — CardPredicate
++CardPredicate.BaseToughnessAtMost — CardPredicate
+ CardPredicate.BaseToughnessEquals — CardPredicate
+ CardPredicate.CardTypeEqualsChosen — CardPredicate
+ CardPredicate.CardTypeEqualsChosenComponent — CardPredicate
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+index dd68d1a1..53c588f3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1923,6 +1923,16 @@ class TriggerMatcher(
+                     else lastKnownBaseToughness ?: projected.getBaseToughness(entityId) ?: unprojectedStat(isPower = false)
+                 baseToughness == predicate.value
+             }
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.BasePowerAtMost -> {
++                val basePower = if (isFaceDown) 2
++                    else lastKnownBasePower ?: projected.getBasePower(entityId) ?: unprojectedStat(isPower = true)
++                basePower != null && basePower <= predicate.max
++            }
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.BaseToughnessAtMost -> {
++                val baseToughness = if (isFaceDown) 2
++                    else lastKnownBaseToughness ?: projected.getBaseToughness(entityId) ?: unprojectedStat(isPower = false)
++                baseToughness != null && baseToughness <= predicate.max
++            }
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.PowerGreaterThanBase -> {
+                 // Self-relative: last-known/projected power at event time vs the object's own
+                 // effective (layer-7b) base power, printed base once it has no projection entry.
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
+index 0fac8b9a..6f384fb3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
+@@ -565,6 +565,8 @@ class PredicateEvaluator(
+             is CardPredicate.PowerAtMostDynamic,
+             is CardPredicate.BasePowerEquals,
+             is CardPredicate.BaseToughnessEquals,
++            is CardPredicate.BasePowerAtMost,
++            is CardPredicate.BaseToughnessAtMost,
+             is CardPredicate.PowerGreaterThanEntity,
+             is CardPredicate.PowerLessThanEntity,
+             is CardPredicate.CompareNumericProperty,
+@@ -1150,6 +1152,14 @@ class PredicateEvaluator(
+                 val baseToughness = projectedValues?.baseToughness ?: amounts.offBattlefieldStat(state, entityId, isPower = false, projected)
+                 baseToughness == predicate.value
+             }
++            is CardPredicate.BasePowerAtMost -> {
++                val basePower = projectedValues?.basePower ?: amounts.offBattlefieldStat(state, entityId, isPower = true, projected)
++                basePower != null && basePower <= predicate.max
++            }
++            is CardPredicate.BaseToughnessAtMost -> {
++                val baseToughness = projectedValues?.baseToughness ?: amounts.offBattlefieldStat(state, entityId, isPower = false, projected)
++                baseToughness != null && baseToughness <= predicate.max
++            }
+ 
+             // Power/toughness predicates - use projected P/T
+             is CardPredicate.PowerEquals -> {
+@@ -2918,6 +2928,8 @@ class PredicateEvaluator(
+             CardPredicate.PowerGreaterThanBase,
+             is CardPredicate.BasePowerEquals,
+             is CardPredicate.BaseToughnessEquals,
++            is CardPredicate.BasePowerAtMost,
++            is CardPredicate.BaseToughnessAtMost,
+             CardPredicate.ToughnessGreaterThanPower -> false
+ 
+             // Name predicates — matched against the record's card name; a record without a
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+index 11331b8b..5a01a580 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+@@ -1270,6 +1270,8 @@ class CastZoneResolver(
+                 // A card in a zone has no projection, so its base P/T is its printed P/T.
+                 is CardPredicate.BasePowerEquals -> power == predicate.value
+                 is CardPredicate.BaseToughnessEquals -> toughness == predicate.value
++                is CardPredicate.BasePowerAtMost -> power != null && power <= predicate.max
++                is CardPredicate.BaseToughnessAtMost -> toughness != null && toughness <= predicate.max
+                 is CardPredicate.PowerAtMost -> power != null && power <= predicate.max
+                 is CardPredicate.PowerAtLeast -> power != null && power >= predicate.min
+                 is CardPredicate.ToughnessEquals -> toughness == predicate.value
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+index 53904283..e5cd6b4d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+@@ -1071,6 +1071,8 @@ internal class AffectsFilterResolver(
+         // falls back to the printed value, which is what a base P/T is before 7a/7b apply.
+         is CardPredicate.BasePowerEquals -> (projected?.basePower ?: card.baseStats?.basePower) == predicate.value
+         is CardPredicate.BaseToughnessEquals -> (projected?.baseToughness ?: card.baseStats?.baseToughness) == predicate.value
++        is CardPredicate.BasePowerAtMost -> (projected?.basePower ?: card.baseStats?.basePower)?.let { it <= predicate.max } == true
++        is CardPredicate.BaseToughnessAtMost -> (projected?.baseToughness ?: card.baseStats?.baseToughness)?.let { it <= predicate.max } == true
+         is CardPredicate.ToughnessAtMost -> (projected?.toughness ?: card.baseStats?.baseToughness ?: 0) <= predicate.max
+         is CardPredicate.ToughnessAtLeast -> (projected?.toughness ?: card.baseStats?.baseToughness ?: 0) >= predicate.min
+         is CardPredicate.ToughnessEquals -> (projected?.toughness ?: card.baseStats?.baseToughness) == predicate.value
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+index ff4e518e..825c5ca0 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+@@ -1976,6 +1976,8 @@ class CostCalculator(
+             is CardPredicate.PowerEquals -> cardDef.creatureStats?.basePower == predicate.value
+             is CardPredicate.BasePowerEquals -> cardDef.creatureStats?.basePower == predicate.value
+             is CardPredicate.BaseToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
++            is CardPredicate.BasePowerAtMost -> cardDef.creatureStats?.basePower?.let { it <= predicate.max } == true
++            is CardPredicate.BaseToughnessAtMost -> cardDef.creatureStats?.baseToughness?.let { it <= predicate.max } == true
+             is CardPredicate.PowerAtMost -> (cardDef.creatureStats?.basePower ?: 0) <= predicate.max
+             is CardPredicate.PowerAtLeast -> (cardDef.creatureStats?.basePower ?: 0) >= predicate.min
+             is CardPredicate.ToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
+new file mode 100644
+index 00000000..10283a36
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
+@@ -0,0 +1,141 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.SelectCardsDecision
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.CounterType
++import com.wingedsheep.sdk.core.Phase
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.Duration
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
++import io.kotest.assertions.withClue
++import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
++import io.kotest.matchers.shouldBe
++
++/**
++ * `CardPredicate.BasePowerAtMost` / `BaseToughnessAtMost` and their `Or`,
++ * `.basePowerOrToughnessAtMost(n)`: "creatures each with base power or toughness 1 or less"
++ * (Angelic Aberration). Either half qualifies (base 0/2, 1/3, 3/1); base values ignore counters
++ * and pumps, but a set-base-P/T effect changes them. The equality filter `.basePowerOrToughness(1)`
++ * keeps its meaning (base 0/2 is not "base power or toughness 1").
++ */
++class BasePowerOrToughnessAtMostTest : ScenarioTestBase() {
++
++    private val zeroTwo = card("AtMost Zero Two") {
++        manaCost = "{1}"; typeLine = "Creature — Test"; power = 0; toughness = 2
++    }
++    private val oneThree = card("AtMost One Three") {
++        manaCost = "{1}"; typeLine = "Creature — Test"; power = 1; toughness = 3
++    }
++    private val threeOne = card("AtMost Three One") {
++        manaCost = "{1}"; typeLine = "Creature — Test"; power = 3; toughness = 1
++    }
++    private val threeThree = card("AtMost Three Three") {
++        manaCost = "{1}"; typeLine = "Creature — Test"; power = 3; toughness = 3
++    }
++    private val culler = card("AtMost Culler") {
++        manaCost = "{0}"
++        typeLine = "Sorcery"
++        oracleText = "Sacrifice any number of creatures each with base power or toughness 1 or less."
++        spell { effect = Effects.SacrificeAnyNumber(GameObjectFilter.Creature.basePowerOrToughnessAtMost(1)) }
++    }
++    private val equalityCuller = card("Equality Culler") {
++        manaCost = "{0}"
++        typeLine = "Sorcery"
++        oracleText = "Sacrifice any number of creatures each with base power or toughness 1."
++        spell { effect = Effects.SacrificeAnyNumber(GameObjectFilter.Creature.basePowerOrToughness(1)) }
++    }
++    private val powerOnlyCuller = card("Power AtMost Culler") {
++        manaCost = "{0}"
++        typeLine = "Sorcery"
++        oracleText = "Sacrifice any number of creatures each with base power 1 or less."
++        spell { effect = Effects.SacrificeAnyNumber(GameObjectFilter.Creature.basePowerAtMost(1)) }
++    }
++    private val setOneOne = card("AtMost Base 1/1") {
++        manaCost = "{0}"
++        typeLine = "Instant"
++        oracleText = "Target creature has base power and toughness 1/1 until end of turn."
++        spell {
++            val creature = target(TargetFilter.Creature)
++            effect = Effects.SetBasePowerAndToughness(1, 1, creature, Duration.EndOfTurn)
++        }
++    }
++
++    init {
++        cardRegistry.register(listOf(zeroTwo, oneThree, threeOne, threeThree, culler, equalityCuller, powerOnlyCuller, setOneOne))
++
++        fun board(spell: String) = scenario()
++            .withPlayers("P1", "P2")
++            .withCardInHand(1, spell)
++            .withCardInHand(1, "AtMost Base 1/1")
++            .withCardOnBattlefield(1, "AtMost Zero Two")
++            .withCardOnBattlefield(1, "AtMost One Three")
++            .withCardOnBattlefield(1, "AtMost Three One")
++            .withCardOnBattlefield(1, "AtMost Three Three")
++            .withCardOnBattlefield(1, "Grizzly Bears")
++            .withCardOnBattlefield(2, "AtMost Zero Two")
++            .withActivePlayer(1)
++            .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
++            .build()
++
++        fun TestGame.mine(name: String): EntityId =
++            findPermanents(name).single { state.getEntity(it)?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId == player1Id }
++
++        fun TestGame.castAndGetOptions(spell: String): List<EntityId> {
++            withClue("cast $spell") { castSpell(1, spell).error shouldBe null }
++            resolveStack()
++            val decision = getPendingDecision() as SelectCardsDecision
++            decision.minSelections shouldBe 0
++            return decision.options
++        }
++
++        test("either base stat at most 1 qualifies; base 2/2 and 3/3 don't; only your own creatures") {
++            val game = board("AtMost Culler")
++            val options = game.castAndGetOptions("AtMost Culler")
++            options shouldContainExactlyInAnyOrder listOf(
++                game.mine("AtMost Zero Two"), game.mine("AtMost One Three"), game.mine("AtMost Three One"),
++            )
++            game.selectCards(listOf(game.mine("AtMost Zero Two"), game.mine("AtMost Three One"))).error shouldBe null
++            game.isInGraveyard(1, "AtMost Zero Two") shouldBe true
++            game.isInGraveyard(1, "AtMost Three One") shouldBe true
++            withClue("unchosen eligible creature stays") { game.findPermanents("AtMost One Three").size shouldBe 1 }
++        }
++
++        test("counters raise current P/T but not base P/T; a -1/-1 counter doesn't lower base") {
++            val game = board("AtMost Culler")
++            val zero = game.mine("AtMost Zero Two")
++            val bears = game.mine("Grizzly Bears")
++            game.state = game.state
++                .updateEntity(zero) { it.with(CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 3))) }
++                .updateEntity(bears) { it.with(CountersComponent(mapOf(CounterType.MINUS_ONE_MINUS_ONE to 1))) }
++            val options = game.castAndGetOptions("AtMost Culler")
++            withClue("a 3/5 with base 0/2 still qualifies") { (zero in options) shouldBe true }
++            withClue("a 1/1 Grizzly Bears (base 2/2) does not") { (bears in options) shouldBe false }
++        }
++
++        test("a set-base-P/T effect makes a 3/3 qualify") {
++            val game = board("AtMost Culler")
++            val big = game.mine("AtMost Three Three")
++            game.castSpell(1, "AtMost Base 1/1", big).error shouldBe null
++            game.resolveStack()
++            val options = game.castAndGetOptions("AtMost Culler")
++            (big in options) shouldBe true
++        }
++
++        test("basePowerAtMost alone reads only power") {
++            val game = board("Power AtMost Culler")
++            val options = game.castAndGetOptions("Power AtMost Culler")
++            options shouldContainExactlyInAnyOrder listOf(game.mine("AtMost Zero Two"), game.mine("AtMost One Three"))
++        }
++
++        test("the equality filter basePowerOrToughness(1) is unchanged: base 0/2 is excluded") {
++            val game = board("Equality Culler")
++            val options = game.castAndGetOptions("Equality Culler")
++            options shouldContainExactlyInAnyOrder listOf(game.mine("AtMost One Three"), game.mine("AtMost Three One"))
++        }
++    }
++}

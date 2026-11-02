@@ -478,3 +478,32 @@ Test: [`SeekerOfSlaaneshScenarioTest.kt`](../../android/custom-cards/src/test/ko
 (empty attack rejected, one attacker enough, no mandatory creature, controller unbound, lapses with no able creature,
 any defender in multiplayer, AI attacks with one).
 Unlocks among missing six-deck cards: Seeker of Slaanesh.
+
+### "Creatures each with base power or toughness N or less" (patch 0028)
+
+Use `GameObjectFilter.….basePowerOrToughnessAtMost(n)` (or `.basePowerAtMost(n)` / `.baseToughnessAtMost(n)`) for an
+"at most" filter on **base** P/T. Either half qualifies (base 0/2, 1/5 and 5/1 all match "base power or toughness 1 or
+less"). Base is the layer 1–7b value: counters and pumps never change it, a copy or set-base-P/T effect does. The older
+`.basePowerOrToughness(n)` is equality only (Sword of the Squeak) and does **not** match base 0/2. Pair it with
+`SacrificeAnyNumber` + `permanentsSacrificedThisWay()` for "sacrifice any number …, then create that many".
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AngelicAberration.kt -->
+```kotlin
+    triggeredAbility {
+        trigger = Triggers.self.enters()
+        effect = Effects.SacrificeAnyNumber(
+            GameObjectFilter.Creature.basePowerOrToughnessAtMost(1)
+        ) then Effects.CreateToken(
+            count = DynamicAmounts.permanentsSacrificedThisWay(),
+            power = 4,
+            toughness = 4,
+            creatureTypes = setOf("Eldrazi", "Angel"),
+            keywords = setOf(Keyword.FLYING, Keyword.VIGILANCE),
+        )
+    }
+```
+
+Test: [`AngelicAberrationScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationScenarioTest.kt)
+(eligible set incl. base 0/2, 0/8, 3/1; excludes 2/2, 3/3, opponents' and itself; one Angel per creature actually
+sacrificed; zero chosen / none eligible; counters vs base; set-base effect and self-sacrifice; tokens count).
+Unlocks among missing six-deck cards: Angelic Aberration.
