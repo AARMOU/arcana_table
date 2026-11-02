@@ -478,3 +478,26 @@ Test: [`SeekerOfSlaaneshScenarioTest.kt`](../../android/custom-cards/src/test/ko
 (empty attack rejected, one attacker enough, no mandatory creature, controller unbound, lapses with no able creature,
 any defender in multiplayer, AI attacks with one).
 Unlocks among missing six-deck cards: Seeker of Slaanesh.
+
+### "Whenever a colorless (or exactly-N-colored) creature … dies" (patch 0021)
+
+Use for a dies (or other leaves-the-battlefield) trigger whose subject filter counts colors, such as "another colorless
+creature you control". `exactlyColors(0)` on a departure is matched against the creature's last-known colors on the
+battlefield (CR 603.10), so devoid creatures and colorless tokens count and a creature that was colored when it died
+does not. Keep "this creature or another …" as two triggers (`Triggers.self` and `Triggers.another`), because SELF and
+OTHER bindings cannot be combined with `Triggers.or`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt -->
+```kotlin
+    triggeredAbility {
+        // The dying creature's last-known projected color matters, even if it was color-changed.
+        trigger = Triggers.another(GameObjectFilter.Creature.exactlyColors(0).youControl()).dies()
+        effect = Effects.AddCounters(CounterType.EXPERIENCE, 1, EffectTarget.Controller)
+        description = "Whenever another colorless creature you control dies, you get an experience counter."
+    }
+```
+
+Test: [`AzlaskTheSwellingScourgeScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt)
+(own death, colorless and devoid deaths count, colored and opposing deaths do not, counters on the player, X read on
+resolution, granted annihilator 1 really sacrifices, grants expire).
+Unlocks among missing six-deck cards: Azlask, the Swelling Scourge.
