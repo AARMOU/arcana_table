@@ -529,3 +529,28 @@ Test: [`AngelicAberrationScenarioTest.kt`](../../android/custom-cards/src/test/k
 (eligible set incl. base 0/2, 0/8, 3/1; excludes 2/2, 3/3, opponents' and itself; one Angel per creature actually
 sacrificed; zero chosen / none eligible; counters vs base; set-base effect and self-sacrifice; tokens count).
 Unlocks among missing six-deck cards: Angelic Aberration.
+### "For each opponent, … up to one target … that player controls" bound to that player (patch 0032)
+
+Use for the one-per-opponent distribution (`dynamicMaxCount = DynamicAmounts.playerCount(Player.EachOpponent)` +
+`differentControllers = true`, `optional = true` for each "up to one"). With patch 0032 each target is bound to the
+opponent it was chosen for: the engine records its controller as it is targeted (copies inherit it, a retarget keeps it
+for targets that stay), and on resolution a target that player no longer controls is illegal (CR 608.2b), even when
+another opponent now controls it; the other opponents' targets still resolve. No card-side change is needed beyond the
+shape below. For a cast trigger ("When you cast this spell, …") put the requirement on the card's own cast
+trigger (When you cast this spell): it resolves above the spell, even if the spell is countered.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HideousTaskmaster.kt -->
+```kotlin
+        targets(
+            TargetFilter.CreatureOpponentControls,
+            optional = true,
+            dynamicMaxCount = DynamicAmounts.playerCount(Player.EachOpponent),
+            differentControllers = true,
+        )
+```
+
+Test: [`HideousTaskmasterScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HideousTaskmasterScenarioTest.kt)
+(one per opponent in 3-player, same-opponent and own-creature rejection, zero or one of two, target moved to another
+opponent illegal while the other resolves, countered spell, reanimation negative, vanished target, real annihilator
+on the stolen creature and on Taskmaster, end-of-turn expiry, {R} still required under Devoid).
+Unlocks among missing six-deck cards: Hideous Taskmaster (and makes Desecrate Reality's per-opponent targets exact).

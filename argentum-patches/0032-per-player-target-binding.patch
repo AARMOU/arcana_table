@@ -1,0 +1,333 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 34f1a058..b337d515 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -6635,6 +6635,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
+   "**For each other player, exile up to one target creature that player controls**" (Kaya, Spirits'
+   Justice) is `TargetObject(filter = TargetFilter.CreatureOpponentControls, optional = true, dynamicMaxCount = DynamicAmount.PlayerCount(Player.EachOpponent), differentControllers = true, id = "one target creature each other player controls")`. Give it an `id` — the generated description
+   reads "controlled by different players", which is the constraint, not the printed sentence.
++  In this distribution shape each target is bound to the player it was chosen for: the controller of
++  each permanent target is recorded as it is chosen (`TargetsComponent.targetControllers`, inherited by
++  copies, kept for targets that survive a retarget), and on resolution a target that player no longer
++  controls is illegal (CR 608.2b) — even if another opponent now controls it — while the other
++  players' targets still resolve.
+   Without `dynamicMaxCount` it is the plain "**two target creatures controlled by different players**"
+   wording (Run Away Together: `targets(TargetFilter.Creature, count = 2, differentControllers = true)`)
+   — any two controllers, so in multiplayer two different opponents' creatures qualify. That shape is also
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
+index 67d0072b..940d585c 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
+@@ -274,7 +274,8 @@ class CopyTargetSpellOrAbilityExecutor(
+             }.mapTo(mutableSetOf()) { with(SpellCopyTargets) { original.targets[it].entityId() } }
+             return announced.copy(state = announced.state.updateEntity(copyId) { it.with(copyTargets.copy(
+                 targetEntryStamps = copyTargets.targetEntryStamps.filterKeys { it !in kept } + original.targetEntryStamps.filterKeys { it in kept },
+-                targetObjectRefs = copyTargets.targetObjectRefs.filterKeys { it !in kept } + original.targetObjectRefs.filterKeys { it in kept }
++                targetObjectRefs = copyTargets.targetObjectRefs.filterKeys { it !in kept } + original.targetObjectRefs.filterKeys { it in kept },
++                targetControllers = copyTargets.targetControllers.filterKeys { it !in kept } + original.targetControllers.filterKeys { it in kept && it in copyTargets.targetControllers }
+             )) })
+         }
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
+index a759d900..339e9345 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
+@@ -87,6 +87,7 @@ internal class AbilityResolver(
+                 triggeringEntityId = abilityComponent.triggerContext?.triggeringEntityId,
+                 triggeringPlayerId = abilityComponent.triggerContext?.triggeringPlayerId,
+                 targetEntryStamps = targetsComponent.targetEntryStamps,
++                targetControllers = targetsComponent.targetControllers,
+                 storedCollections = com.wingedsheep.engine.event.triggerStoredCollections(abilityComponent.triggerContext, abilityComponent.carriedPipeline),
+                 resolution = context,
+                 targetingAttachmentHost = targetsComponent.targetingAttachmentHost,
+@@ -158,6 +159,7 @@ internal class AbilityResolver(
+                 xValue = abilityComponent.xValue,
+                 targetingSourceType = TargetingSourceType.ACTIVATED_ABILITY,
+                 targetEntryStamps = targetsComponent.targetEntryStamps,
++                targetControllers = targetsComponent.targetControllers,
+                 sourceBattlefieldTimestamp = abilityComponent.sourceBattlefieldTimestamp,
+                 objectReferences = abilityComponent.objectReferences,
+                 lastKnownSourceSnapshot = abilityComponent.lastKnownSourceSnapshot,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
+index 4b172d91..99592310 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
+@@ -63,6 +63,11 @@ internal class ResolutionTargetValidator(
+          * back in the meantime is a different object and no longer a legal target (CR 400.7).
+          */
+         targetEntryStamps: Map<EntityId, Long> = emptyMap(),
++        /**
++         * [TargetsComponent.targetControllers] — who controlled each per-player-distribution target
++         * when it was chosen; such a target that player no longer controls is illegal.
++         */
++        targetControllers: Map<EntityId, EntityId> = emptyMap(),
+         /**
+          * Pipeline collections available at resolution time (e.g. the amassed Army under
+          * `EffectTarget.AmassedArmy`, from a `ReflexiveTriggerEffect`'s carried pipeline) — the
+@@ -123,7 +128,7 @@ internal class ResolutionTargetValidator(
+                         target.spellEntityId in state.stack
+                     }
+                 }
+-        }.toSet()
++        }.toSet() - targetsLeftTheirPlayer(projected, state, targets, targetRequirements, targetControllers)
+         val sharingController = targetsSharingAController(projected, state, targets, individuallyLegal, targetRequirements)
+         val sharingValue = targetsSharingADifferentValue(state, targets, individuallyLegal, targetRequirements) +
+             targetsOverTotalCap(state, targets, individuallyLegal, targetRequirements, predicateContext)
+@@ -212,7 +217,7 @@ internal class ResolutionTargetValidator(
+      *
+      * The per-opponent distribution shape ("for each opponent, up to one target creature that player
+      * controls" — `dynamicMaxCount` set) is excluded: there each target is tied to its own player, so a
+-     * control change makes only the moved creature illegal, and which one moved isn't recorded here.
++     * control change makes only the moved creature illegal ([targetsLeftTheirPlayer]).
+      * A target that already left the battlefield contributes no controller.
+      */
+     private fun targetsSharingAController(
+@@ -241,6 +246,32 @@ internal class ResolutionTargetValidator(
+         }.toSet()
+     }
+ 
++    /**
++     * "For each opponent, … up to one target creature that player controls" ties each target to the
++     * player it was chosen for: a target that player no longer controls is illegal at resolution
++     * (CR 608.2b), and only that one — the other players' targets still resolve. Reads the
++     * controllers recorded as the targets were chosen ([TargetsComponent.targetControllers]); a
++     * target with no recorded controller is left to the other checks.
++     */
++    private fun targetsLeftTheirPlayer(
++        projected: ProjectedState,
++        state: GameState,
++        targets: List<ChosenTarget>,
++        targetRequirements: List<TargetRequirement>,
++        targetControllers: Map<EntityId, EntityId>,
++    ): Set<Int> {
++        if (targetControllers.isEmpty()) return emptySet()
++        return targets.indices.filter { index ->
++            val target = targets[index] as? ChosenTarget.Permanent ?: return@filter false
++            val requirement = getRequirementForTargetIndex(index, targetRequirements) ?: return@filter false
++            if (!TargetsComponent.isPerPlayerDistribution(requirement)) return@filter false
++            val chosenFor = targetControllers[target.entityId] ?: return@filter false
++            val now = projected.getController(target.entityId)
++                ?: state.getEntity(target.entityId)?.get<ControllerComponent>()?.playerId
++            now != chosenFor
++        }.toSet()
++    }
++
+     /** An "any target" slot (CR 115.4) still holds a creature, planeswalker, battle or player its filter accepts. */
+     private fun anyTargetStillMatches(
+         state: GameState,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
+index 4705612f..bbb03bd9 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
+@@ -73,7 +73,8 @@ internal class SpellResolver(
+                 sourceId = spellId,
+                 targetingSourceType = TargetingSourceType.SPELL,
+                 xValue = spellComponent.xValue,
+-                targetEntryStamps = targetsComponent.targetEntryStamps
++                targetEntryStamps = targetsComponent.targetEntryStamps,
++                targetControllers = targetsComponent.targetControllers,
+             )
+             if (validTargets.isEmpty()) {
+                 if (container.has<com.wingedsheep.engine.mechanics.BestowedComponent>()) {
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
+index 180e7115..f557863e 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
+@@ -232,7 +232,8 @@ internal object StackPlacement {
+             } }
+             container = container.with(captured.copy(
+                 targetEntryStamps = captured.targetEntryStamps.filterKeys { it !in ids } + sourceTargets?.targetEntryStamps.orEmpty().filterKeys { it in ids },
+-                targetObjectRefs = captured.targetObjectRefs.filterKeys { it !in ids } + sourceTargets?.targetObjectRefs.orEmpty().filterKeys { it in ids }
++                targetObjectRefs = captured.targetObjectRefs.filterKeys { it !in ids } + sourceTargets?.targetObjectRefs.orEmpty().filterKeys { it in ids },
++                targetControllers = captured.targetControllers.filterKeys { it !in ids } + sourceTargets?.targetControllers.orEmpty().filterKeys { it in ids && it in captured.targetControllers }
+             ))
+         }
+         container = container.with(
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
+index 68bc49d8..9802291a 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
+@@ -599,6 +599,16 @@ data class TargetsComponent(
+     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+     val targetingAttachmentHost: EntityId? = null,
++    /**
++     * Each permanent target's controller when it was chosen, recorded only when a requirement uses
++     * the per-player distribution shape ("for each opponent, … up to one target creature that
++     * player controls": `differentControllers` with a `dynamicMaxCount`). Each such target is tied
++     * to the player it was chosen for, so at resolution a target that player no longer controls is
++     * illegal (CR 608.2b) while the others still resolve. Copies inherit it with the targets.
++     */
++    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
++    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
++    val targetControllers: Map<EntityId, EntityId> = emptyMap(),
+ ) : Component {
+ 
+     /**
+@@ -608,7 +618,13 @@ data class TargetsComponent(
+      * the two differ only when the source was moved after the ability was put on the stack.
+      */
+     fun retargeted(state: GameState, newTargets: List<ChosenTarget>): TargetsComponent =
+-        capture(state, newTargets, targetRequirements).copy(targetingAttachmentHost = targetingAttachmentHost)
++        capture(state, newTargets, targetRequirements).let { recaptured ->
++            recaptured.copy(
++                targetingAttachmentHost = targetingAttachmentHost,
++                // A target kept through the retarget stays bound to the player it was first chosen for.
++                targetControllers = recaptured.targetControllers + targetControllers.filterKeys { it in recaptured.targetControllers },
++            )
++        }
+ 
+     companion object {
+         /**
+@@ -652,9 +668,26 @@ data class TargetsComponent(
+                     is ChosenTarget.Player -> null
+                 }
+                 id?.let { state.objectRef(it) }?.let { it.entityId to it }
+-            }.toMap()
++            }.toMap(),
++            targetControllers = if (targetRequirements.none { isPerPlayerDistribution(it) }) emptyMap()
++            else targets.filterIsInstance<ChosenTarget.Permanent>()
++                .filter { it.entityId in state.getBattlefield() }
++                .mapNotNull { target ->
++                    (state.projectedState.getController(target.entityId)
++                        ?: state.getEntity(target.entityId)
++                            ?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId)
++                        ?.let { target.entityId to it }
++                }.toMap(),
+         )
+ 
++        /**
++         * The per-player distribution shape — "for each opponent, … up to one target … that player
++         * controls" — spelled `differentControllers = true` with a `dynamicMaxCount`.
++         */
++        fun isPerPlayerDistribution(requirement: TargetRequirement): Boolean =
++            requirement is com.wingedsheep.sdk.scripting.targets.TargetObject &&
++                requirement.differentControllers && requirement.dynamicMaxCount != null
++
+         /**
+          * True when [entityId] is no longer the object that was targeted — it left the battlefield
+          * and returned between targeting and now (CR 400.7). Ids with no captured stamp (targets
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
+new file mode 100644
+index 00000000..e3fda513
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
+@@ -0,0 +1,118 @@
++package com.wingedsheep.engine.targeting
++
++import com.wingedsheep.engine.state.components.identity.ControllerComponent
++import com.wingedsheep.engine.state.components.stack.ChosenTarget
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.DynamicAmounts
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.nulls.shouldBeNull
++import io.kotest.matchers.shouldBe
++
++/**
++ * "For each opponent, gain control of up to one target creature that player controls" ties each
++ * target to the opponent it was chosen for. If that opponent no longer controls it when the spell
++ * resolves, that target is illegal (CR 608.2b) and only that one: the other opponents' targets
++ * still resolve. A creature that merely stays opponent-controlled (moved from one opponent to
++ * another) is still illegal, which the filter alone can't see.
++ */
++class PerPlayerTargetBindingTest : FunSpec({
++
++    val bear = card("Binding Test Bear") {
++        manaCost = "{1}{G}"
++        typeLine = "Creature — Bear"
++        power = 2
++        toughness = 2
++    }
++
++    val theft = card("Binding Test Theft") {
++        manaCost = "{U}"
++        typeLine = "Sorcery"
++        spell {
++            targets(
++                TargetFilter.CreatureOpponentControls,
++                optional = true,
++                dynamicMaxCount = DynamicAmounts.playerCount(Player.EachOpponent),
++                differentControllers = true,
++            )
++            effect = Effects.ForEachTarget(Effects.GainControl(EffectTarget.ContextTarget(0)))
++        }
++    }
++
++    data class Table(val driver: GameTestDriver, val you: EntityId, val foe1: EntityId, val foe2: EntityId)
++
++    fun table(): Table {
++        val driver = GameTestDriver()
++        driver.registerCards(TestCards.all + listOf(bear, theft))
++        val (you, foe1, foe2) = driver.initMultiplayer(decks = List(3) { Deck.of("Forest" to 40) })
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = you)
++        return Table(driver, you, foe1, foe2)
++    }
++
++    fun GameTestDriver.moveControl(creature: EntityId, to: EntityId) =
++        replaceState(state.updateEntity(creature) { it.with(ControllerComponent(to)) })
++
++    fun GameTestDriver.castTheftAt(caster: EntityId, vararg creatures: EntityId) {
++        val spell = putCardInHand(caster, "Binding Test Theft")
++        giveMana(caster, Color.BLUE)
++        castSpellWithTargets(caster, spell, creatures.map { ChosenTarget.Permanent(it) }).error.shouldBeNull()
++    }
++
++    fun GameTestDriver.resolveStack() {
++        var guard = 0
++        while (state.stack.isNotEmpty() && guard++ < 10) passPriority(state.priorityPlayerId!!)
++        state.stack.isEmpty() shouldBe true
++    }
++
++    test("both targets still controlled by the opponents they were chosen for: both stolen") {
++        val (d, you, foe1, foe2) = table()
++        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
++        val b = d.putCreatureOnBattlefield(foe2, "Binding Test Bear")
++        d.castTheftAt(you, a, b)
++        d.resolveStack()
++        d.getController(a) shouldBe you
++        d.getController(b) shouldBe you
++    }
++
++    test("a target moved to the other opponent is illegal, and the other target still resolves") {
++        val (d, you, foe1, foe2) = table()
++        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
++        val b = d.putCreatureOnBattlefield(foe2, "Binding Test Bear")
++        d.castTheftAt(you, a, b)
++        d.moveControl(a, foe2)
++        d.resolveStack()
++        withClue("chosen for foe1, now controlled by foe2: illegal, not stolen") {
++            d.getController(a) shouldBe foe2
++        }
++        d.getController(b) shouldBe you
++    }
++
++    test("a single target moved between opponents makes the spell do nothing") {
++        val (d, you, foe1, foe2) = table()
++        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
++        d.castTheftAt(you, a)
++        d.moveControl(a, foe2)
++        d.resolveStack()
++        d.getController(a) shouldBe foe2
++    }
++
++    test("a target moved away and back to its opponent before resolution is legal again") {
++        val (d, you, foe1, foe2) = table()
++        val a = d.putCreatureOnBattlefield(foe1, "Binding Test Bear")
++        d.castTheftAt(you, a)
++        d.moveControl(a, foe2)
++        d.moveControl(a, foe1)
++        d.resolveStack()
++        d.getController(a) shouldBe you
++    }
++})
