@@ -102,8 +102,18 @@ def engine_git(engine):
     return lambda *a, check=True: run("git", *a, cwd=engine, check=check)
 
 
+class PatchDoesNotApply(Exception):
+    """A patch in the series does not apply on the pinned upstream commit (it was made on another engine)."""
+
+    def __init__(self, name, output):
+        super().__init__(f"{name} does not apply on the pinned engine:\n{output}")
+        self.name, self.output = name, output
+        self.files = list(dict.fromkeys(re.findall(r"^error: (?:patch failed: )?([^:\s]+)(?::\d+)?(?:: patch does not apply)?$", output, re.M)))
+
+
 def prepare(engine, pin, mandatory):
-    """The series as commits on the pin (the strict audit proves it applies there), with rerere primed."""
+    """The series as commits on the pin (the strict audit proves it applies there), with rerere primed.
+    Raises PatchDoesNotApply naming the first patch that does not apply."""
     git = engine_git(engine)
     git("config", "user.name", "arcana-weekly-bot")
     git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
@@ -115,7 +125,9 @@ def prepare(engine, pin, mandatory):
         shutil.copytree(RERERE, cache, dirs_exist_ok=True)
     git("checkout", "-q", "-f", "-B", "arcana", pin)
     for name in mandatory:
-        git("apply", "--index", str(patch_file(name)))
+        applied = git("apply", "--index", str(patch_file(name)), check=False)
+        if applied.returncode:
+            raise PatchDoesNotApply(name, (applied.stdout + applied.stderr).strip())
         # Fixed dates: the date goes into each patch file's header, so a patch whose content did not
         # change comes out byte-identical instead of showing up as changed every week.
         run("git", "commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")], cwd=engine,
@@ -141,7 +153,10 @@ def rebase(engine_dir, target, *flags):
             write("rebase.json", report)
             print("Already on upstream", target)
             return 0
-        prepare(engine, pin, mandatory)  # proves the series applies; nothing to rewrite
+        try:
+            prepare(engine, pin, mandatory)  # proves the series applies; nothing to rewrite
+        except PatchDoesNotApply as e:
+            return report_unapplied(report, e)
         report.update(status="rebased", upstream_commits=0, auto_resolved=[],
                       patches=[{"patch": n, "status": "unchanged"} for n in mandatory],
                       engine_head=git("rev-parse", "HEAD").stdout.strip())
@@ -156,7 +171,10 @@ def rebase(engine_dir, target, *flags):
         print(f"Pin {pin[:10]} is already newer than the target {target[:10]}; nothing to do")
         return 0
     report["upstream_commits"] = int(git("rev-list", "--count", f"{pin}..{target}").stdout)
-    prepare(engine, pin, mandatory)
+    try:
+        prepare(engine, pin, mandatory)
+    except PatchDoesNotApply as e:
+        return report_unapplied(report, e)
     save_state(engine, pin=pin, target=target, mode="rebase")
 
     # Three-way rebase onto the new upstream, auto-resolving only the safe cases.
@@ -373,9 +391,26 @@ def auto_resolved_markdown(report):
     return "\n".join(lines) + "\n"
 
 
+def report_unapplied(report, error):
+    """A patch that does not apply even on the pin is reported as a conflict naming it (exit 2), not a crash:
+    it was usually made on another engine (a numbered build's) and has to be re-fitted to this pin."""
+    report["status"] = "conflict"
+    report["conflicts"] = [{"patch": error.name, "file": f, "kind": "does_not_apply_on_pin", "diff": error.output[-5000:]}
+                           for f in (error.files or [""])]
+    write("rebase.json", report)
+    write("rebase.md", conflict_markdown(report))
+    print(f"{error.name} does not apply on the pinned engine {report['old_pin'][:10]}:\n{error.output}")
+    return 2
+
+
 def conflict_markdown(report):
-    lines = [f"Upstream `{report['target'][:10]}` is {report.get('upstream_commits', '?')} commits ahead of the pin "
-             f"`{report['old_pin'][:10]}`. A patch no longer merges on its own; see **Handoff** below.", ""]
+    if any(c.get("kind") == "does_not_apply_on_pin" for c in report["conflicts"]):
+        lines = [f"A patch does not apply even on the pinned engine `{report['old_pin'][:10]}`: it was made on a "
+                 "different engine (often a numbered build's). Re-fit it to the pin first, then the upgrade can run; "
+                 "see **Handoff** below.", ""]
+    else:
+        lines = [f"Upstream `{report['target'][:10]}` is {report.get('upstream_commits', '?')} commits ahead of the pin "
+                 f"`{report['old_pin'][:10]}`. A patch no longer merges on its own; see **Handoff** below.", ""]
     for conflict in report["conflicts"]:
         kind = conflict.get("kind", "content")
         lines += [f"### `{conflict['patch']}` → `{conflict['file']}` ({kind})", "", "```diff",
