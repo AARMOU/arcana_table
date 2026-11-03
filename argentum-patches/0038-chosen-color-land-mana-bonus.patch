@@ -258,25 +258,10 @@ index 0091bd548..2846587f3 100644
      else ExecutionResult.success(tracked, visible)
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 253d117b4..055a99390 100644
+index 253d117b4..84b647a00 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-@@ -2633,6 +2633,14 @@ class ManaSolver private constructor(
-         } else {
-             source
-         }
-+        val (kind, extra) = chosenKindBonus ?: return augmented
-+        val kindAmount = augmented.amountFor(kind) + extra
-+        return augmented.copy(
-+            exactIndependentTap = false,
-+            manaAmount = maxOf(augmented.manaAmount, kindAmount),
-+            colorAmounts = augmented.producesColors.associateWith { augmented.amountFor(it) } + (kind to kindAmount),
-+            colorlessAmount = if (augmented.producesColorless) augmented.amountFor(null) else augmented.colorlessAmount,
-+        )
-     }
- 
-     /**
-@@ -2663,9 +2671,11 @@ class ManaSolver private constructor(
+@@ -2663,9 +2663,11 @@ class ManaSolver private constructor(
          var totalBonus = 0
          var bonusColor: Color? = null
          var totalColorlessBonus = 0
@@ -288,7 +273,7 @@ index 253d117b4..055a99390 100644
  
              // Gate on the produced-mana type. At solve time the produced type is inferred from
              // what the source can supply: COLORLESS applies only to a source that produces {C},
-@@ -2674,6 +2684,7 @@ class ManaSolver private constructor(
+@@ -2674,6 +2676,7 @@ class ManaSolver private constructor(
                  TappedForManaType.ANY -> {}
                  TappedForManaType.COLORLESS -> if (!source.producesColorless) continue
                  TappedForManaType.COLORED -> if (source.producesColors.isEmpty()) continue
@@ -296,7 +281,7 @@ index 253d117b4..055a99390 100644
              }
  
              // Filter from the static-ability controller's perspective — see
-@@ -2695,6 +2706,29 @@ class ManaSolver private constructor(
+@@ -2695,6 +2698,29 @@ class ManaSolver private constructor(
              val amount = dynamicAmountEvaluator.evaluate(state, onSourceTap.amount, effectContext)
              if (amount <= 0) continue
  
@@ -326,7 +311,7 @@ index 253d117b4..055a99390 100644
              // A colorless bonus arises when the ability adds {C}: either it's explicitly gated to
              // colorless taps, or it's a mirror (color = null) over a colorless-only source.
              val isColorlessBonus = onSourceTap.color == null &&
-@@ -2710,7 +2744,7 @@ class ManaSolver private constructor(
+@@ -2710,7 +2736,7 @@ class ManaSolver private constructor(
              bonusColor = bonusColor ?: resolvedColor
          }
  
@@ -335,6 +320,21 @@ index 253d117b4..055a99390 100644
              source.copy(
                  bonusManaPerTap = source.bonusManaPerTap + totalBonus,
                  bonusManaColor = source.bonusManaColor ?: bonusColor,
+@@ -2719,6 +2745,14 @@ class ManaSolver private constructor(
+         } else {
+             source
+         }
++        val (kind, extra) = chosenKindBonus ?: return augmented
++        val kindAmount = augmented.amountFor(kind) + extra
++        return augmented.copy(
++            exactIndependentTap = false,
++            manaAmount = maxOf(augmented.manaAmount, kindAmount),
++            colorAmounts = augmented.producesColors.associateWith { augmented.amountFor(it) } + (kind to kindAmount),
++            colorlessAmount = if (augmented.producesColorless) augmented.amountFor(null) else augmented.colorlessAmount,
++        )
+     }
+ 
+     /**
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 new file mode 100644
 index 000000000..04de5b84a
