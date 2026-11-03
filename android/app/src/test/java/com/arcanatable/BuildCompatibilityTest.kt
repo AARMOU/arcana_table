@@ -11,6 +11,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** Phones on different Arcana builds (different rules engines) are told so, in plain words. */
 @RunWith(RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [34])
 class BuildCompatibilityTest {
     private val me = BuildConfig.VERSION_CODE
     private fun packet(build: Int?) = JSONObject().put("type", "lanHello").also {
