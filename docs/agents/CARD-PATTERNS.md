@@ -689,3 +689,25 @@ that dies after resolution has nothing until a second crew; crewing twice gives 
 crew 2 by total power); engine: `GrantActivatedAbilityToGraveyardCardsTest` (set fixed at resolution, leaving and
 returning to the graveyard drops it, cleanup, battlefield-zone abilities still refused).
 Unlocks among missing six-deck cards: Ghost Ark (Necron Dynasties). Past in Flames was already implemented without it.
+
+### "Whenever one or more artifact cards leave your graveyard" with cross-zone type grants (patch 0039)
+
+Use `Triggers.oneOrMore(filter).leaveYourGraveyard()` as usual (Desecrated Tomb shape). Since 0039 it looks back in
+time (CR 603.10a): a card counts with the card types a cross-zone `GrantCardType` gave it *in the graveyard*.
+Biotransference makes your creature cards artifacts, so a creature card leaving your graveyard is an artifact card
+leaving. `GameState.removeFromZone` records those types on the card as it leaves the graveyard, so the check works
+wherever the card went. `putIntoYourGraveyard()` batches read the card in the graveyard with its grant. Nothing
+changes for a card without such a grant. No new SDK vocabulary; write the card with the existing trigger.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt -->
+```kotlin
+        trigger = Triggers.oneOrMore(GameObjectFilter.Artifact).leaveYourGraveyard()
+```
+
+Test: [`ImotekhTheStormlordScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt)
+(three artifact cards exiled at once give one trigger; a non-artifact card or the opponent's graveyard doesn't
+trigger; with Biotransference a creature card raised from your graveyard triggers it); also
+[`BiotransferenceScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BiotransferenceScenarioTest.kt);
+engine: `GraveyardLookBackCardTypeTest` (granted card leaving fires; ungranted, battlefield-only grant and an
+opponent's grant don't; granted card put into your graveyard fires the arrival batch).
+Unlocks among missing six-deck cards: Imotekh the Stormlord with Biotransference (Necron Dynasties).

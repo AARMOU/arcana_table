@@ -357,6 +357,10 @@ object CustomCards {
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
         // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
         Entry(GhostArk, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Existing SDK; engine patch 0039 lets graveyard batch triggers see its granted types.
+        Entry(Biotransference, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0039 (Phaeron sees creature cards Biotransference made artifacts).
+        Entry(ImotekhTheStormlord, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
