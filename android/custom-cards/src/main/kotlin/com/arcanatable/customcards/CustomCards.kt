@@ -355,6 +355,8 @@ object CustomCards {
         Entry(BenthicAnomaly, "M3C", "Eldrazi Incursion"),
         // Eldrazi Incursion. Needs engine patch 0034 (commander-cast-count counters rider on spent mana).
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
+        // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
+        Entry(GhostArk, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

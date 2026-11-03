@@ -656,3 +656,36 @@ mana on a noncommander; countered first cast + Palace-funded second cast = 2; ha
 colors = combined / single identity; colorless identity and no commander make no mana; {T}: Add {C}; {1} must be paid);
 engine: `CommanderCastCountCountersRiderTest` (own count not pair sum, provenance, two rider mana = twice the count).
 Unlocks among missing six-deck cards: Opal Palace (Eldrazi Incursion, Tyranid Swarm).
+### "Each … card in your graveyard gains <activated ability> until end of turn" (patch 0036)
+
+Use when a resolving effect gives cards *in a graveyard* an activated ability that they then activate from there
+(unearth, embalm, scavenge, any `activateFromZone = Zone.GRAVEYARD` ability). Gather the cards in the pipeline and
+grant to each with `Effects.GrantActivatedAbility(ability, EffectTarget.IterationEntity)`; since 0036 that grant
+lands on a graveyard (or exiled) card whenever the ability activates from the card's zone. The gather fixes the set
+as the effect resolves (CR 611.2c), so a card that reaches the graveyard later gains nothing; the grant ends in
+cleanup, and a card that leaves the graveyard and comes back is a new object without it (CR 400.7). For a static
+"cards in your graveyard have …" use the static `GrantActivatedAbility(recipientZone = GRAVEYARD)` (Dregscape Sliver)
+instead. Cast keywords use their own per-card grants in the same shape: Past in Flames (already implemented) is
+`ForEachInCollection(cards, Effects.GrantFlashback(EffectTarget.IterationEntity))`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GhostArk.kt -->
+```kotlin
+        trigger = Triggers.self.becomesCrewed()
+        effect = Effects.Pipeline {
+            val cards = gather(CardSource.FromZone(Zone.GRAVEYARD, Player.You, GameObjectFilter.ArtifactCreature))
+            run(
+                Effects.ForEachInCollection(
+                    cards,
+                    Effects.GrantActivatedAbility(unearthAbility(ManaCost.parse("{3}")), EffectTarget.IterationEntity),
+                ),
+            )
+        }
+```
+
+Test: [`GhostArkScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GhostArkScenarioTest.kt)
+(only your artifact creature cards, not non-artifact creatures, noncreature artifacts or the opponent's graveyard;
+unearth returns with haste and is exiled at the end step; sorcery speed when crewed on an opponent's turn; a card
+that dies after resolution has nothing until a second crew; crewing twice gives one unearth; gone next turn; flying,
+crew 2 by total power); engine: `GrantActivatedAbilityToGraveyardCardsTest` (set fixed at resolution, leaving and
+returning to the graveyard drops it, cleanup, battlefield-zone abilities still refused).
+Unlocks among missing six-deck cards: Ghost Ark (Necron Dynasties). Past in Flames was already implemented without it.
