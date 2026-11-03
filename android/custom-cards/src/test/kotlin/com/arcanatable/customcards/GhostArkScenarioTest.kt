@@ -30,8 +30,8 @@ class GhostArkScenarioTest {
     private fun GameTestDriver.unearthActions(player: EntityId, card: EntityId) =
         abilityActions(player, card).filter { (it.action as ActivateAbility).abilityId == unearthId }
 
-    private fun GameTestDriver.crew(player: EntityId, ark: EntityId, vararg crew: EntityId) {
-        assertNull(submit(CrewVehicle(player, ark, crew.toList())).error)
+    private fun GameTestDriver.crew(player: EntityId, ark: EntityId, crew: List<EntityId>) {
+        assertNull(submit(CrewVehicle(player, ark, crew)).error)
         resolveAll()
     }
 
@@ -51,7 +51,7 @@ class GhostArkScenarioTest {
         val opponents = d.putCardInGraveyard(d.player2, "Ornithopter")
 
         assertFalse("nothing before it is crewed", d.hasUnearth(ornithopter))
-        d.crew(p, ark, bears)
+        d.crew(p, ark, listOf(bears))
 
         assertTrue(d.hasUnearth(ornithopter))
         assertTrue(d.hasUnearth(walker))
@@ -73,7 +73,7 @@ class GhostArkScenarioTest {
         val ark = d.putPermanentOnBattlefield(p, "Ghost Ark")
         val bears = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val walker = d.putCardInGraveyard(p, "Phyrexian Walker")
-        d.crew(p, ark, bears)
+        d.crew(p, ark, listOf(bears))
 
         assertNotNull("unearth costs {3}", d.unearth(p, walker).error)
         d.giveColorlessMana(p, 3)
@@ -99,7 +99,7 @@ class GhostArkScenarioTest {
         d.passPriority(d.player2)
         assertEquals(p, d.state.priorityPlayerId)
 
-        d.crew(p, ark, bears)
+        d.crew(p, ark, listOf(bears))
         assertTrue(d.hasUnearth(walker))
         d.giveColorlessMana(p, 3)
         assertTrue(d.unearthActions(p, walker).isEmpty())
@@ -115,7 +115,7 @@ class GhostArkScenarioTest {
         val bears2 = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val ornithopter = d.putCreatureOnBattlefield(p, "Ornithopter")
         d.putCardInGraveyard(p, "Phyrexian Walker")
-        d.crew(p, ark, bears)
+        d.crew(p, ark, listOf(bears))
 
         val shock = d.putCardInHand(p, "Shock")
         d.giveMana(p, Color.RED)
@@ -127,7 +127,7 @@ class GhostArkScenarioTest {
         assertTrue(d.unearthActions(p, ornithopter).isEmpty())
 
         // Crewing again (it is already crewed) triggers again and now sees the Ornithopter.
-        d.crew(p, ark, bears2)
+        d.crew(p, ark, listOf(bears2))
         assertTrue(d.hasUnearth(ornithopter))
         assertEquals(1, d.unearthActions(p, ornithopter).size)
     }
@@ -140,8 +140,8 @@ class GhostArkScenarioTest {
         val bears = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val bears2 = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val walker = d.putCardInGraveyard(p, "Phyrexian Walker")
-        d.crew(p, ark, bears)
-        d.crew(p, ark, bears2)
+        d.crew(p, ark, listOf(bears))
+        d.crew(p, ark, listOf(bears2))
 
         d.giveColorlessMana(p, 6)
         assertEquals("one unearth, not two", 1, d.unearthActions(p, walker).size)
@@ -159,7 +159,7 @@ class GhostArkScenarioTest {
         val ark = d.putPermanentOnBattlefield(p, "Ghost Ark")
         val bears = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val walker = d.putCardInGraveyard(p, "Phyrexian Walker")
-        d.crew(p, ark, bears)
+        d.crew(p, ark, listOf(bears))
         assertTrue(d.hasUnearth(walker))
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = d.player2)
@@ -186,7 +186,7 @@ class GhostArkScenarioTest {
         assertFalse(d.projected.isCreature(ark))
         assertFalse(d.isTapped(memnite))
 
-        d.crew(p, ark, memnite, memnite2)
+        d.crew(p, ark, listOf(memnite, memnite2))
         assertTrue(d.isTapped(memnite) && d.isTapped(memnite2))
         assertTrue(d.projected.isCreature(ark))
         assertTrue(d.projected.hasType(ark, "ARTIFACT"))
