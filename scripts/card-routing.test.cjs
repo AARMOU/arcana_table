@@ -119,12 +119,17 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
 });
 
+const PACKET = '## Cardkit starting packet\\nCardkit classify: NEEDS_REVIEW\\nNo close tested custom-card match was found.';
+const oracleFor = name => JSON.stringify({ name, type_line: 'Creature', oracle_text: 'Test rules text',
+  scryfall_uri: 'https://scryfall.com/card/test/1/test' });
+const packetFor = name => PACKET.replace('NEEDS_REVIEW', 'NEEDS_REVIEW <!-- ' + name + ' -->');
+const enrichWork = r => ({ ...r, oracle: r.oracle || oracleFor(r.name), referencePacket: r.referencePacket || packetFor(r.name) });
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
-  workRequests: requests, resolvedRequests: resolved });
-const ULALEK = { name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
-  hint: 'possible-engine-gap', cardkitReasons: ['1 line(s) without a close implemented match (best 0.58)'] };
-const KNUCKLES = { name: 'Knuckles the Echidna', issue: 350, outcome: 'needs-review', readiness: 'NEEDS_REVIEW', route: 'gpt',
-  cardkitReasons: ['no cached Oracle record: run `tools/cardkit/cardkit oracle fetch` (needs Scryfall access)'] };
+  workRequests: requests.map(enrichWork), resolvedRequests: resolved });
+const ULALEK = enrichWork({ name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
+  hint: 'possible-engine-gap', cardkitReasons: ['1 line(s) without a close implemented match (best 0.58)'] });
+const KNUCKLES = enrichWork({ name: 'Knuckles the Echidna', issue: 350, outcome: 'needs-review', readiness: 'NEEDS_REVIEW', route: 'gpt',
+  cardkitReasons: ['no cached Oracle record: run `tools/cardkit/cardkit oracle fetch` (needs Scryfall access)'] });
 const workIssue = (number, r, state = 'open', user = BOT) => ({ number, state, user, title: Q.cardWorkTitle(r),
   body: Q.cardWorkBody(r, { runId: 1, baseSha: SHA, base: BASE }) });
 
@@ -263,7 +268,7 @@ test('demand reorders only Copilot-ready cards, after the owner\'s own requests'
   // Owner decision 2026-10-30: a blocked app request becomes review work, ranked after owner requests.
   assert.deepEqual(r.workRequests.map(w => [w.name, w.source, w.votes, w.issue]), [['Treasure Nabber', 'app', 2, 321]]);
   assert.ok(!r.blockedRequests.some(b => b.name === 'Treasure Nabber'));
-  const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
+  const p = Q.queuePayload({ result: { ...r, workRequests: r.workRequests.map(enrichWork) }, units: [], base: BASE, baseSha: SHA });
   const plan = Q.planCardWork(p, []);
   assert.equal(plan.create.name, 'Treasure Nabber');
   assert.deepEqual(Q.cardWorkLabels(plan.create), ['priority:app', 'lane:review']);
@@ -344,7 +349,7 @@ test('six-precon gaps get card work after owner requests and app votes; recorded
   assert.equal(Q.priorityLabel(precon), 'priority:precon');
   // The issue it opens is a valid, auto-startable card-work item without an owner/app issue number.
   const oracle = JSON.stringify({ name: 'Precon Review Card', oracle_text: 'Flying', type_line: 'Creature', mana_cost: '{1}', scryfall_uri: 'https://scryfall.com/card/x/1/precon-review-card' });
-  const body = Q.cardWorkBody({ ...precon, oracle }, { runId: 5, baseSha: SHA, base: BASE });
+  const body = Q.cardWorkBody({ ...precon, oracle, referencePacket: packetFor(precon.name) }, { runId: 5, baseSha: SHA, base: BASE });
   assert.match(body, /precon-gap:six-precons; priority:0/);
   assert.match(body, /## Precon gap/);
   assert.deepEqual(A.reviewActionable(body), { ok: true, missing: [] });
