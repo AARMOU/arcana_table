@@ -126,6 +126,11 @@
       "reason": "The pinned SDK has no dynamic amount for the number of times this commander was cast from the command zone this game. SpellsCastThisGame counts every spell from any zone, so it cannot supply the exact +1/+1 counter count for the mana-spent commander spell.",
       "source": "AARMOU/arcana_table#671; pinned SDK inventory at c1c04ca3265c61df913af6db65460ad4ce409614 (docs/agents/generated/sdk-api.md DynamicAmount entries and docs/agents/argentum-upstream/sdk-index.md); inspected PathOfAncestry.kt and ManaSpellRider/EntersWithDynamicCounters language reference.",
       "verified": true
+    },
+    "Hatchery Sliver": {
+      "reason": "Missing a static Replicate grant that creates KeywordAbility.replicate using each matching spell's own mana cost. GrantKeywordToOwnSpells does not supply Replicate's optional additional-cost declaration; the cast handler only creates Replicate copies from a declared REPLICATED cost slot. Needed primitive: GrantReplicateToOwnSpells(spellFilter) or equivalent.",
+      "source": "Source review on pinned Argentum b38db9760cbf8c961bc548bf23420a13c763be95: docs/agents/argentum-upstream/card-sdk-language-reference.md (GrantKeywordToOwnSpells and Replicate); upstream HerigastEruptingNullkite.kt uses dedicated GrantEmergeToOwnSpells; ConsignToMemory.kt installs printed KeywordAbility.replicate; rules-engine CastTriggers.kt creates Replicate copies only for declaredCostSlot == REPLICATED. No other cached card uses this Replicate-grant wording.",
+      "verified": false
     }
   },
   "keywords": {
