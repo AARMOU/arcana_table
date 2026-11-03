@@ -955,7 +955,7 @@
     {
      "card": "The War in Heaven",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
-     "lines": 81,
+     "lines": 87,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
@@ -5507,7 +5507,7 @@
     {
      "card": "The War in Heaven",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
-     "lines": 81,
+     "lines": 87,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
@@ -6142,7 +6142,7 @@
     {
      "card": "The War in Heaven",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
-     "lines": 81,
+     "lines": 87,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
@@ -6313,7 +6313,7 @@
     {
      "card": "The War in Heaven",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
-     "lines": 81,
+     "lines": 87,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
@@ -8593,7 +8593,7 @@
     {
      "card": "The War in Heaven",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
-     "lines": 81,
+     "lines": 87,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
