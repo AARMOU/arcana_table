@@ -213,7 +213,7 @@ class WeeklyWorkflowSafety(unittest.TestCase):
 
     def test_live_failures_that_published_nothing_reach_81(self):
         notice = self.step("verdict", "Tell issue 81 when a live run failed without publishing anything")
-        self.assertIn("github.event_name != 'push'", notice["if"])
+        self.assertIn("github.event_name == 'workflow_dispatch'", notice["if"])  # scheduled: the status alert
         self.assertIn("needs.validate.result != 'success'", notice["if"])
         self.assertIn("gh issue comment 81", notice["run"])
         self.assertNotIn("@", notice["run"].replace("$GITHUB", ""))
@@ -239,18 +239,28 @@ class WeeklyWorkflowSafety(unittest.TestCase):
     # --- added 2026-11-02 after upstream's JDK 25 bump blocked every run -----------------------------
     EARLY = "'23 11 * * *'"
 
-    def test_daily_early_warning_is_a_dry_run(self):
+    def test_daily_upgrade_is_live_and_one_day_behind(self):
         crons = [c["cron"] for c in self.wf["on"]["schedule"]]
         self.assertIn("23 11 * * *", crons)
-        self.assertIn(f"github.event.schedule != {self.EARLY}", self.publish["if"])
-        self.assertIn(f"github.event.schedule == {self.EARLY}", self.wf["env"]["EARLY_WARNING"])
-        self.assertIn(f"github.event.schedule == {self.EARLY}", self.wf["concurrency"]["group"])  # never queues a live run
-        dry = self.step("validate", "Fail the dry run when the upgrade is blocked")
-        self.assertIn(f"github.event.schedule == {self.EARLY}", dry["if"])
-        run = self.step("verdict", "Overall result")["run"]
-        self.assertIn('[ "$EARLY_WARNING" = true ] && [ "$PUBLISH" != skipped ]', run)
-        notice = self.step("verdict", "Tell issue 81 when a live run failed without publishing anything")
-        self.assertIn(f"github.event.schedule != {self.EARLY}", notice["if"])
+        self.assertEqual(self.wf["env"]["LAG_HOURS"], "${{ github.event_name == 'schedule' && '24' || inputs.lag_hours || '0' }}")
+        self.assertNotIn("schedule", self.publish["if"])  # scheduled runs publish (and merge when green)
+        self.assertNotIn("EARLY_WARNING", text(self.wf))
+        target = next(s for s in self.validate["steps"] if s.get("id") == "target")["run"]
+        self.assertIn('--before="$LAG_HOURS hours ago"', target)
+        self.assertIn("--filter=tree:0", target)  # commit history only: nothing of upstream is run or checked out
+        self.assertIn("^[0-9]{1,3}$", target)
+
+    def test_scheduled_runs_post_to_81_only_on_a_new_problem(self):
+        for name in ("Open or refresh the draft PR", "Merge a green upgrade into the integration branch", "Report a blocked upgrade"):
+            run = self.step("publish", name)["run"]
+            for line in run.splitlines():
+                # A green run that could not be merged is a problem someone must act on: it always posts.
+                if "gh issue comment 81" in line and "could not be merged" not in line:
+                    self.assertIn('[ "$GITHUB_EVENT_NAME" = schedule ] ||', line, name)
+        status = self.step("verdict", "Publish the engine status for Arcana Control")["run"]
+        self.assertIn("if scheduled and problem and not same:", status)
+        self.assertIn("Goose", status)
+        self.assertIn("held >= 20", status)  # Claude only when the same problem outlives a day
 
     def test_engine_jdk_follows_upstream(self):
         jdk = next(s for s in self.validate["steps"] if s.get("id") == "jdk")

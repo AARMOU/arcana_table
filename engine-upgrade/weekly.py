@@ -415,7 +415,7 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "every check in the table above is green"
     lines = ["### Handoff", "",
-             f"**Who:** engine fixes are Claude's lane; GPT finishes when Claude is unavailable (issue #81). Card "
+             f"**Who:** Goose (GPT) first, Claude if it is still blocked a day later (issue #81). Card "
              f"decisions are GPT's lane. Full runbook: `engine-upgrade/HANDOFF.md`.", "",
              f"**Done when:** {goal}, and the dry run on `{fix}` is green except for anything listed as a card "
              f"decision. Then open a draft PR from `{fix}` into `gpt/arcana-integration-next`, link this run, post on #81. "
