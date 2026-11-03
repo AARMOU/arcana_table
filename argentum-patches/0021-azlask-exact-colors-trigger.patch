@@ -1,8 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0021-azlask-exact-colors-trigger
+
+---
+ .../com/wingedsheep/engine/event/TriggerMatcher.kt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index 661be4c91..dd68d1a1d 100644
+index ca82d06e8c..f64a2bf0e1 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-@@ -1650,6 +1650,17 @@ class TriggerMatcher(
+@@ -1716,6 +1716,17 @@ class TriggerMatcher(
                              entity?.has<com.wingedsheep.engine.state.components.identity.TokenComponent>() == true
                          }
                      }
@@ -20,7 +30,7 @@ index 661be4c91..dd68d1a1d 100644
                      is com.wingedsheep.sdk.scripting.predicates.CardPredicate.Or ->
                          predicate.predicates.any { matchesLkiPredicate(it) }
                      is com.wingedsheep.sdk.scripting.predicates.CardPredicate.And ->
-@@ -1934,6 +1945,9 @@ class TriggerMatcher(
+@@ -2000,6 +2011,9 @@ class TriggerMatcher(
                  !isFaceDown && predicate.color.name in colors()
              is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotColor ->
                  isFaceDown || predicate.color.name !in colors()

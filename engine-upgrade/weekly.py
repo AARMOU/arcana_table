@@ -14,6 +14,8 @@
     weekly.py reconcile [ROUNDS]      custom cards Argentum now also has: keep every one, and choose per
                                       card which version is played (Argentum's if it passes Arcana's
                                       scenario tests for that card, else Arcana's, via custom-overrides.txt)
+              [--android DIR --name NAME --tests PATTERN]   the same in another Android tree (the current
+                                      build's, with the candidate engine swapped in); reports as NAME.*
     weekly.py summary  RESULTS_DIR    test totals from JUnit XML
 
 Conflicts are auto-resolved only where that is safe: CHANGELOG files (upstream wins) and resolutions
@@ -157,7 +159,10 @@ def rebase(engine_dir, target, *flags):
     rules = json.loads(RULES.read_text()) if RULES.is_file() else {}
     keep_deleted = {entry["path"]: entry for entry in rules.get("keep_deleted", [])}
     report["auto_resolved"] = []
-    step = git("rebase", target, check=False)
+    # After each replayed patch, drop imports the patch adds that upstream now has too (Kotlin rejects a
+    # duplicate import as ambiguous; 0035's TappedComponent/Keyword after upstream added them, 2026-11-02).
+    dedupe = f"{sys.executable} {Path(__file__).resolve()} dedupe-imports"
+    step = git("rebase", "--exec", dedupe, target, check=False)
     while step.returncode:
         unresolved = git("diff", "--name-only", "--diff-filter=U").stdout.split()
         for path in [p for p in unresolved if p.endswith("CHANGELOG.md")]:
@@ -283,6 +288,9 @@ def export_series(engine, target, mandatory, text, report):
     listing = "".join(f'    "{n}",\n' for n in kept)
     text = re.sub(r'^TARGET = "[0-9a-f]{40}"', f'TARGET = "{target}"', text, flags=re.M)
     text = re.sub(r"^MANDATORY = \[\n.*?^\]", "MANDATORY = [\n" + listing + "]", text, flags=re.M | re.S)
+    for name in mandatory:
+        if name not in kept:
+            text = add_retired(text, name, f"upstream has it as of {target[:10]}")
     AUDIT.write_text(text)
     config = json.loads(CONFIG.read_text())
     config["upstream"] = target
@@ -292,6 +300,54 @@ def export_series(engine, target, mandatory, text, report):
     write("rebase.json", report)
     write("auto-resolved.md", auto_resolved_markdown(report))
     return kept
+
+
+def add_retired(text, name, why):
+    """Record a patch that left the series in audit_patches.py's RETIRED (created if absent)."""
+    entry = f'    "{name}": "{why}",\n'
+    block = re.search(r"^RETIRED = \{\n(.*?)^\}\n", text, re.M | re.S)
+    if block is None:
+        mandatory = re.search(r"^MANDATORY = \[\n.*?^\]\n", text, re.M | re.S)
+        return text[:mandatory.end()] + "RETIRED = {\n" + entry + "}\n" + text[mandatory.end():]
+    if f'    "{name}":' in block[1]:
+        return text
+    return text[:block.end(1)] + entry + text[block.end(1):]
+
+
+DUPLICABLE = (".kt", ".kts", ".java")
+
+
+def dedupe_import_lines(text):
+    """Remove exact repeats of an `import …` line, keeping the first. Nothing else changes."""
+    seen, out, changed = set(), [], False
+    for line in text.splitlines(keepends=True):
+        key = line.strip()
+        if key.startswith("import ") and key in seen:
+            changed = True
+            continue
+        if key.startswith("import "):
+            seen.add(key)
+        out.append(line)
+    return "".join(out), changed
+
+
+def dedupe_imports():
+    """`git rebase --exec` hook, run in the engine checkout after each replayed patch commit: amend it
+    so the files it touched carry each import once."""
+    files = run("git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.split()
+    fixed = []
+    for name in files:
+        path = Path(name)
+        if path.suffix in DUPLICABLE and path.is_file():
+            text, changed = dedupe_import_lines(path.read_text())
+            if changed:
+                path.write_text(text)
+                fixed.append(name)
+    if fixed:
+        run("git", "add", "--", *fixed)
+        run("git", "commit", "-q", "--amend", "--no-edit", "--allow-empty")
+        print("Removed imports upstream already has from:", ", ".join(fixed))
+    return 0
 
 
 def auto_resolved_markdown(report):
@@ -347,7 +403,9 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "the patched engine compiles and the strict audit passes"
     else:
-        start = "origin/bot/argentum-weekly"
+        # the base, not the bot branch: the bot commits its reconciled override file, which the
+        # clean-header test rejects on a fix branch; the dry run re-reconciles against the target
+        start = "origin/gpt/arcana-integration-next"
         steps = [f"git fetch origin && git checkout -b {fix} {start}",
                  "# custom-card collisions are reconciled automatically (weekly.py reconcile keeps every Arcana card",
                  "#   and picks the version in play from its scenario tests); never delete a custom card to fix a run.",
@@ -636,11 +694,29 @@ def implicated(failing, candidates, identifiers):
     return hit
 
 
-def reconcile(rounds="4"):
+def use_android(root):
+    """Point the reconcile paths at another Android tree (a scratch copy of the current build)."""
+    global ANDROID, ASSETS, CARD_SOURCES, CUSTOM_TESTS, CUSTOM_RESULTS, OVERRIDES
+    ANDROID = Path(root).resolve()
+    ASSETS = ANDROID / "app/src/main/assets/argentum"
+    CARD_SOURCES = ANDROID / "custom-cards/src/main/kotlin/com/arcanatable/customcards/cards"
+    CUSTOM_TESTS = ANDROID / "custom-cards/src/test/kotlin"
+    CUSTOM_RESULTS = ANDROID / "custom-cards/build/test-results/test"
+    OVERRIDES = ASSETS / "custom-overrides.txt"
+
+
+def reconcile(rounds="4", *options):
     """Every Arcana custom card is kept. For each one Argentum now also has, Argentum's version is tried
     first: the card's scenario tests run against it (CardPool.inPlay). A card whose tests then fail
     keeps Arcana's version in play (custom-overrides.txt), and the suite is re-run to confirm. Each run
     starts from a clean list, so a card goes back to Argentum's version once that version passes."""
+    opts = dict(zip(options[::2], options[1::2]))
+    if set(opts) - {"--android", "--name", "--tests"} or len(options) % 2:
+        raise SystemExit(f"reconcile: unknown options {options}")
+    if "--android" in opts:
+        use_android(opts["--android"])
+    name = opts.get("--name", "reconcile")
+    tests = ["--tests", opts["--tests"]] if "--tests" in opts else []
     library = {n.lower() for n in names(ASSETS / "all-cards.index.tsv")}
     custom = names(ASSETS / "custom-cards.index.tsv")
     collisions = sorted(n for n in custom if n.lower() in library)
@@ -652,7 +728,7 @@ def reconcile(rounds="4"):
     for _ in range(int(rounds)):
         shutil.rmtree(CUSTOM_RESULTS, ignore_errors=True)
         result = run("./gradlew", "--no-daemon", "--max-workers=2", ":custom-cards:exportCards",
-                     ":custom-cards:test", "--rerun", cwd=ANDROID, check=False)
+                     ":custom-cards:test", *tests, "--rerun", cwd=ANDROID, check=False)
         log = (result.stdout + result.stderr)[-6000:]
         failing = failing_test_classes()
         if result.returncode == 0:
@@ -671,8 +747,8 @@ def reconcile(rounds="4"):
         "passed": passed,
         "failing_classes": sorted(c.split(".")[-1] for c in failing),
     }
-    write("reconcile.json", report)
-    write("reconcile.md", reconcile_markdown(report))
+    write(f"{name}.json", report)
+    write(f"{name}.md", reconcile_markdown(report))
     print(reconcile_markdown(report))
     if not passed:
         print(log)
@@ -726,5 +802,5 @@ def summary(results_dir):
 
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
-    sys.exit({"rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
+    sys.exit({"dedupe-imports": dedupe_imports, "rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
               "docs": docs, "cards": cards, "reconcile": reconcile, "summary": summary}[command](*args) or 0)

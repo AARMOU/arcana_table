@@ -1,0 +1,224 @@
+name: B142 engine - validate upstream + Arcana patches, stage when green (NO APK)
+# Builds upstream Argentum at engine-upgrade/audit_patches.py TARGET plus every MANDATORY patch in argentum-patches/
+# (the same series the Monday weekly carries), runs the engine's SDK and rules suites, installs the JARs and library
+# export into the app as the weekly does, reconciles custom-card collisions, and runs the custom-card and app suites.
+# With stage=true and everything green, commits the engine, library data, overrides and refreshed agent docs to this
+# B142 candidate branch (a green push run stages too). Never builds an APK.
+on:
+  push:
+    branches: ['claude/b142-candidate-*']
+    paths:
+      - argentum-patches/**
+      - engine-upgrade/audit_patches.py
+      - .github/workflows/b142-engine-validate.yml
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Commit the validated engine and data to this branch
+        type: boolean
+        default: false
+      ai_tests:
+        description: Also run the engine AI suite (:ai:test) and print its summary (report only, not gating)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: b142-engine-validate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upstream pin
+        id: pin
+        run: echo "sha=$(python3 -c "import re;print(re.search(r'^TARGET = \"([0-9a-f]{40})\"',open('engine-upgrade/audit_patches.py').read(),re.M)[1])")" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ steps.pin.outputs.sha }}
+          path: argentum-engine
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Find the JDK upstream builds with (it moved 21 -> 25 on 2026-10-31)
+        id: jdk
+        run: |
+          v=$( { sed -n 's/^toolchainVersion=\([0-9][0-9]*\).*/\1/p' argentum-engine/gradle/gradle-daemon-jvm.properties 2>/dev/null
+                 grep -rhoE 'jvmToolchain\([0-9]+\)' argentum-engine/buildSrc argentum-engine/*.gradle.kts 2>/dev/null | grep -oE '[0-9]+'
+                 echo 21; } | sort -n | tail -1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"; echo "Upstream builds with JDK $v"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.version }}
+      - name: Apply every MANDATORY patch in order (strict audit, fail closed)
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/audit_patches.py
+          git -C argentum-engine status --short | wc -l
+      - name: Engine SDK + rules tests and all four runtime JARs
+        id: enginetests
+        continue-on-error: true
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-engine \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 --continue \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test :rules-engine:test :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Engine test summary (failures listed)
+        id: enginesummary
+        if: always()
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=0; bad=[]
+          for mod in ("mtg-sdk","rules-engine"):
+            for p in Path(f"argentum-engine/{mod}/build/test-results/test").glob("TEST-*.xml"):
+              r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+              for tc in r.iter("testcase"):
+                if tc.find("failure") is not None or tc.find("error") is not None:
+                  f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+          print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
+          assert t>1000 and f==0
+          PY
+      - name: Engine AI tests (opt-in, report only)
+        if: always() && inputs.ai_tests
+        continue-on-error: true
+        timeout-minutes: 75
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-ai \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 --continue \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :ai:test || true
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          t=f=0; bad=[]
+          for p in Path("ai/build/test-results/test").glob("TEST-*.xml"):
+            r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+            for tc in r.iter("testcase"):
+              if tc.find("failure") is not None or tc.find("error") is not None:
+                f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+          print("ai", {"tests":t,"failed":f}); print("\n".join(bad[:300]))
+          PY
+      - name: Keep the shipped card data and engine jars for comparison
+        run: |
+          cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+          cp -r android/app/libs "$RUNNER_TEMP/old-libs"
+      - name: Install the ported engine into the app workspace, as the weekly does
+        run: python3 engine-upgrade/weekly.py install argentum-engine
+      - name: Raise the app's library versions to the engine's (kotlin / kotlinx, upward only)
+        run: python3 tools/check_android_engine.py align --engine-versions argentum-engine/gradle/libs.versions.toml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' "platforms;android-$(python3 tools/check_android_engine.py min-sdk)"
+      - name: The new engine runs on Android (bytecode, Java API at minSdk, app libraries)
+        id: android
+        continue-on-error: true
+        run: |
+          sdk="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          python3 tools/check_android_engine.py check --jars android/app/libs --baseline-jars "$RUNNER_TEMP/old-libs" \
+            --android-jar "$sdk/platforms/android-$(python3 tools/check_android_engine.py min-sdk)/android.jar" \
+            --engine-versions argentum-engine/gradle/libs.versions.toml --out engine-upgrade/weekly
+          cat engine-upgrade/weekly/android.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Imported cards against the new library
+        continue-on-error: true
+        run: python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
+      - name: Custom cards on the ported engine (export, scenario tests, collisions reconciled as the weekly does)
+        id: custom
+        continue-on-error: true
+        run: |
+          python3 engine-upgrade/weekly.py reconcile
+          cat engine-upgrade/weekly/reconcile.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: App unit tests on the ported engine
+        id: app
+        continue-on-error: true
+        working-directory: android
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh port-app \
+            ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest
+      - name: Card and app test summary (failures listed)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          ok=True
+          for label,d,floor in (("cards","android/custom-cards/build/test-results/test",500),
+                                ("app","android/app/build/test-results/testDebugUnitTest",300)):
+            t=f=0; bad=[]
+            for p in Path(d).glob("TEST-*.xml"):
+              r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
+              for tc in r.iter("testcase"):
+                if tc.find("failure") is not None or tc.find("error") is not None:
+                  f+=1; bad.append(f'{tc.get("classname")} :: {tc.get("name")}')
+            print(label,{"tests":t,"failed":f}); print("\n".join(bad[:200]))
+            ok = ok and t>floor and f==0
+          assert ok, "a suite failed or did not run"
+          PY
+      - name: Show the override list and engine diff summary
+        if: always()
+        run: |
+          cat android/app/src/main/assets/argentum/custom-overrides.txt 2>/dev/null || true
+          git status --short | head -40
+      - name: Gate - engine suites green
+        if: always()
+        run: |
+          echo "engine: ${{ steps.enginetests.outcome }}/${{ steps.enginesummary.outcome }} android: ${{ steps.android.outcome }} custom: ${{ steps.custom.outcome }} app: ${{ steps.app.outcome }}"
+          # Every suite must pass. Each line exits on failure: under bash -e a failing command inside an
+          # `a && b` list does not stop the script, so an engine failure used to be ignored (GSD, #81).
+          test "${{ steps.enginetests.outcome }}" = success || exit 1
+          test "${{ steps.enginesummary.outcome }}" = success || exit 1
+          test "${{ steps.custom.outcome }}" = success || exit 1
+          test "${{ steps.app.outcome }}" = success || exit 1
+          test "${{ steps.android.outcome }}" = success || exit 1
+      - name: Stage the validated engine, data and agent docs on this B142 branch
+        # A green push run stages too: this branch exists only to test the new engine (owner, 2026-11-02).
+        if: success() && (inputs.stage || github.event_name == 'push')
+        run: |
+          set -euo pipefail
+          old=$(git show HEAD:engine-upgrade/b141/engine-source.txt | grep -o '[0-9a-f]\{40\}' | head -1)
+          mkdir -p engine-upgrade/b142
+          new=${{ steps.pin.outputs.sha }}
+          mkdir -p engine-upgrade/weekly
+          printf '{"old_pin":"%s","target":"%s"}\n' "$old" "$new" > engine-upgrade/weekly/rebase.json
+          python3 engine-upgrade/weekly.py docs argentum-engine || echo "::warning::weekly.py docs reported gaps"
+          tools/cardkit/cardkit sdk-index
+          tools/cardkit/cardkit docs-check || echo "::warning::cardkit docs-check"
+          { echo "upstream wingedsheep/argentum-engine@$new"
+            echo "series: argentum-patches/ MANDATORY (engine-upgrade/audit_patches.py), validated by run ${{ github.run_id }}"
+            sha256sum android/app/libs/argentum-*.jar; } > engine-upgrade/b142/engine-source.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f android/app/libs/argentum-*.jar android/app/src/main/assets/argentum engine-upgrade/b142/engine-source.txt \
+            android/build.gradle.kts android/app/build.gradle.kts android/custom-cards/build.gradle.kts
+          git add -A AGENTS.md docs tools/cardkit
+          git diff --cached --stat | tail -5
+          git commit -m "B142: upstream Argentum $new + Arcana patches; library, custom-card data, overrides, app library versions and agent docs (run ${{ github.run_id }})"
+          git push origin HEAD:${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b142-engine-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            gradle-logs/
+            argentum-engine/rules-engine/build/test-results/test/*.xml
+            argentum-engine/mtg-sdk/build/test-results/test/*.xml
+            android/custom-cards/build/test-results/test/*.xml
+            android/app/build/test-results/testDebugUnitTest/*.xml
+            engine-upgrade/weekly/

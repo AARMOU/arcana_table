@@ -1,10 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0024-commander-cast-history-amount
+
+---
+ docs/sdk-index.md                             |  1 +
+ .../com/wingedsheep/sdk/dsl/DynamicAmounts.kt |  4 ++
+ .../sdk/scripting/values/DynamicAmount.kt     | 13 ++++
+ .../test/resources/sdk-surface-baseline.txt   |  1 +
+ .../engine/handlers/DynamicAmountEvaluator.kt |  8 +++
+ .../composite/CreateDelayedTriggerExecutor.kt |  1 +
+ .../CommanderCastsFromCommandZoneTest.kt      | 70 +++++++++++++++++++
+ 7 files changed, 98 insertions(+)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
+
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 6d851f4aac..06a03d4dd6 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -645,6 +645,7 @@ Families:
+ - `DynamicAmount.CardsCycledThisGame(player: Player, cardName: String?)` — How many times a player has cycled a card this game — every cycling activation, typecycling included (CR 702.29f), counted when the card is discarded to pay the cost.
+ - `DynamicAmount.CastChoice(slot: ChoiceSlot)` — A *numeric* value locked in for a com.wingedsheep.sdk.scripting.ChoiceSlot as this object was cast, read off the *current object* regardless of zone — the sibling of CastX for the other cast-choice…
+ - `DynamicAmount.CastX` — The value of `{X}` this object was cast with, read off the *current object* regardless of what zone it is in.
++- `DynamicAmount.CommanderCastsFromCommandZone(player: Player)` — How many times player has cast a commander from the command zone this game.
+ - `DynamicAmount.CommanderColorIdentityCount(player: Player)` — The number of colors (0–5) in player's commanders' color identity — the union of the color identities of all their commanders, so a Partner / Background pair counts both (CR 903.4).
+ - `DynamicAmount.Conditional(condition: Condition, ifTrue: DynamicAmount, ifFalse: DynamicAmount)` — Conditional amount: evaluates to one of two amounts based on a condition.
+ - `DynamicAmount.ContextProperty(key: ContextPropertyKey)` — A value pulled from the current resolution context — trigger payload, additional-cost accumulator, target list, or a linked-exile pile attached to the source permanent.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
-index dcc44911ab..9e0d480783 100644
+index 5a333adb18..f717325fae 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
-@@ -1095,6 +1095,10 @@ object DynamicAmounts {
-     fun spellsCastThisGame(player: Player = Player.You): DynamicAmount =
-         DynamicAmount.SpellsCastThisGame(player)
+@@ -1127,6 +1127,10 @@ object DynamicAmounts {
+     fun extraTurnsBegunThisGame(player: Player = Player.You): DynamicAmount =
+         DynamicAmount.ExtraTurnsBegunThisGame(player)
  
 +    /** Commander cards [player] has cast from the command zone this game, including countered casts. */
 +    fun commanderCastsFromCommandZone(player: Player = Player.You): DynamicAmount =
@@ -14,11 +43,11 @@ index dcc44911ab..9e0d480783 100644
      fun spellsCastDuringTheirLastTurn(player: Player): DynamicAmount =
          DynamicAmount.TurnTracking(player, TurnTracker.SPELLS_CAST_DURING_THEIR_LAST_TURN)
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
-index 1419fdb6e6..89e9afbc38 100644
+index 9829dd3906..973428e4bf 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
-@@ -2113,6 +2113,19 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
-             else "the number of spells ${player.description} has cast this game"
+@@ -2160,6 +2160,19 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
+             else "the number of extra turns ${player.description} has begun this game"
      }
  
 +    /**
@@ -37,8 +66,20 @@ index 1419fdb6e6..89e9afbc38 100644
      /**
       * Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
       *
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 6c9515c668..e7e8eec8b2 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1661,6 +1661,7 @@ Duration.WhileAffectedAttachedToSource — Duration — Lion Sash — Duration.W
+ Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duration.WhileSourceAttachedToAffected, Duration.WhileSourceOnBattlefield — an Aura's own 'enchanted creature is …' static follows the Aura to whatever it enchants (CR 611.3a); WhileSourceAttachedToAffected latches off per affected entity and never moves to a new host, and WhileSourceOnBattlefield doesn't end when the source becomes unattached
+ Duration.WhileSourceEncodedOnAffected — Duration — Whispering Madness — Duration.WhileSourceOnBattlefield, Duration.WhileSourceAttachedToAffected — cipher's source is a card in exile, not a permanent, so the battlefield gate is always closed for it; the attachment gate reads AttachedToComponent between two permanents, while 'encoded' (CR 702.99b) is a link from an exiled card to a creature that must also be the same exiled object (CR 702.99c)
+ DynamicAmount.CapturedAtCast — DynamicAmount — Lethal Exploit — DynamicAmount.CastChoice, DynamicAmount.VariableReference — CastChoice reads a number the player chose into a fixed ChoiceSlot enum (a closed set of player decisions), not a card-named game-state snapshot; VariableReference reads a pipeline variable that dies with the resolving effect, while a capture is frozen at cast and outlives the cast. Subsumes and deletes the CastTimeFlagSet condition (now Compare(CapturedAtCast, GT, 0))
++DynamicAmount.CommanderCastsFromCommandZone — DynamicAmount — The Swarmlord — DynamicAmount.CommanderColorIdentityCount, DynamicAmount.SpellsCastThisGame — color identity counts which colors commanders have, while spells-cast history counts every spell; neither records only successful designated commander casts from the command zone.
+ DynamicAmount.CommanderColorIdentityCount — DynamicAmount — War Room — EntityNumericProperty.ColorCount, AggregateBattlefield(DISTINCT_COLORS) — both count colors an object has right now (one entity's projected colors, the distinct colors among matching permanents); a commander's color identity is fixed before the game begins (CR 903.4a), read off its card in any zone and unioned across a Partner pair, and is undefined with no commander (CR 903.4f) — an axis on either would fork what they read
+ DynamicAmount.DungeonsCompleted — DynamicAmount — Nadaar, Selfless Paladin — DynamicAmount.Speed, DynamicAmount.PlayerCounterCount — both read a per-player number the engine keeps, but speed is a 0–4 designation and player counters are counters (CR 122.1); completed dungeons are a game-long record of which dungeon cards left the game (CR 309.7), with a by-name axis neither has
+ DynamicAmount.ExtraTurnsBegunThisGame — DynamicAmount — H.M.S. Bounty, Unlikely Timeship — DynamicAmount.SpellsCastThisGame, DynamicAmount.TurnTracking — game-long per-player counts are sibling variants (SpellsCastThisGame, CardsCycledThisGame) over different actions, and no game-scope tracker enum exists to take a value; TurnTracking's trackers are all per-turn and cleared at every turn boundary
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
-index be880c0390..498cbc534f 100644
+index 536221e27b..2b07e3e37d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 @@ -26,6 +26,7 @@ import com.wingedsheep.engine.state.components.identity.FaceDownComponent
@@ -49,16 +90,16 @@ index be880c0390..498cbc534f 100644
  import com.wingedsheep.engine.state.components.player.ManaPoolComponent
  import com.wingedsheep.engine.state.components.player.PlayerCountersRemovedThisTurnComponent
  import com.wingedsheep.engine.state.components.identity.RoomComponent
-@@ -227,6 +228,7 @@ class DynamicAmountEvaluator(
-         is DynamicAmount.PlayerCounterCount,
+@@ -235,6 +236,7 @@ class DynamicAmountEvaluator(
          is DynamicAmount.CardsCycledThisGame,
          is DynamicAmount.SpellsCastThisGame,
+         is DynamicAmount.ExtraTurnsBegunThisGame,
 +        is DynamicAmount.CommanderCastsFromCommandZone,
          is DynamicAmount.Speed,
          is DynamicAmount.DungeonsCompleted,
          DynamicAmount.SpellsCastLastTurn,
-@@ -464,6 +466,12 @@ class DynamicAmountEvaluator(
-                         ?.count ?: 0
+@@ -479,6 +481,12 @@ class DynamicAmountEvaluator(
+                         ?.begun ?: 0
                  }
  
 +            is DynamicAmount.CommanderCastsFromCommandZone ->
@@ -71,20 +112,20 @@ index be880c0390..498cbc534f 100644
              // state off each Room's RoomComponent — a single Room entity can contribute two
              // doors, so this can't go through the entity-level AggregateBattlefield. Controller
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-index 4c0f14c5cb..314449b5fb 100644
+index 54b7f2f18f..e66cdea39b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-@@ -444,6 +444,7 @@ class CreateDelayedTriggerExecutor(
-         is DynamicAmount.PlayerCounterCount,
+@@ -445,6 +445,7 @@ class CreateDelayedTriggerExecutor(
          is DynamicAmount.CardsCycledThisGame,
          is DynamicAmount.SpellsCastThisGame,
+         is DynamicAmount.ExtraTurnsBegunThisGame,
 +        is DynamicAmount.CommanderCastsFromCommandZone,
          is DynamicAmount.Speed,
          is DynamicAmount.DungeonsCompleted,
          DynamicAmount.SpellsCastLastTurn,
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 new file mode 100644
-index 0000000000..0c0ff91ecd
+index 0000000000..6baffc0e2f
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 @@ -0,0 +1,70 @@
@@ -158,16 +199,3 @@ index 0000000000..0c0ff91ecd
 +        }
 +    }
 +}
-
-diff --git a/docs/sdk-index.md b/docs/sdk-index.md
---- a/docs/sdk-index.md
-+++ b/docs/sdk-index.md
-@@ -645,1 +645,2 @@
-+- `DynamicAmount.CommanderCastsFromCommandZone(player: Player)` — How many times player has cast a commander from the command zone this game.
- - `DynamicAmount.CommanderColorIdentityCount(player: Player)` — The number of colors (0–5) in player's commanders' color identity — the union of the color identities of all their commanders, so a Partner / Background pair counts both (CR 903.4).
-diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
---- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-+++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1661,1 +1661,2 @@
-+DynamicAmount.CommanderCastsFromCommandZone — DynamicAmount — The Swarmlord — DynamicAmount.CommanderColorIdentityCount, DynamicAmount.SpellsCastThisGame — color identity counts which colors commanders have, while spells-cast history counts every spell; neither records only successful designated commander casts from the command zone.
- DynamicAmount.CommanderColorIdentityCount — DynamicAmount — War Room — EntityNumericProperty.ColorCount, AggregateBattlefield(DISTINCT_COLORS) — both count colors an object has right now (one entity's projected colors, the distinct colors among matching permanents); a commander's color identity is fixed before the game begins (CR 903.4a), read off its card in any zone and unioned across a Partner pair, and is undefined with no commander (CR 903.4f) — an axis on either would fork what they read

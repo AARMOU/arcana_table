@@ -1,8 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0015-granted-cascade
+
+---
+ .../handlers/actions/spell/CastTriggers.kt    | 20 +++++++++-
+ .../mechanics/mana/GrantedKeywordResolver.kt  | 39 +++++++++++++++----
+ 2 files changed, 50 insertions(+), 9 deletions(-)
+
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-index 835d974bd..0d4899a65 100644
+index 924f61b91b..9c499c0939 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-@@ -21,6 +21,7 @@ import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
+@@ -22,6 +22,7 @@ import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
  import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
  import com.wingedsheep.sdk.core.Keyword
  import com.wingedsheep.sdk.core.Zone
@@ -10,7 +21,7 @@ index 835d974bd..0d4899a65 100644
  import com.wingedsheep.sdk.dsl.Patterns
  import com.wingedsheep.sdk.model.CardDefinition
  import com.wingedsheep.sdk.scripting.AbilityId
-@@ -162,7 +163,24 @@ internal class CastTriggers(
+@@ -163,7 +164,24 @@ internal class CastTriggers(
          val storm = List(stormInstances(state, action, cardDef)) {
              selfTrigger(state, spell, "storm", copyEffect(spell, spellEffect, stormCount), "Storm — copy $name $stormCount time(s)")
          }
@@ -37,7 +48,7 @@ index 835d974bd..0d4899a65 100644
  
      private fun stormInstances(state: GameState, action: CastSpell, cardDef: CardDefinition): Int {
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
-index c8f8d0af7..f99d04fa7 100644
+index c8f8d0af7b..f99d04fa76 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 @@ -91,6 +91,7 @@ class GrantedKeywordResolver(

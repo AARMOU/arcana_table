@@ -7,6 +7,7 @@ the checker against it.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -33,6 +34,26 @@ def audit(pin: str, names: list[str], extra: str = "") -> str:
     return AUDIT.format(pin=pin, items="".join(f'    "{n}",\n' for n in names)) + extra
 
 
+H1, H2 = "1" * 64, "2" * 64
+VS = {"_about": "x", "cards": {"Idol": {"summary": "s", "runtimeHash": H1, "reviewedLines": [{"line": "l", "primitives": ["p"]}]},
+                               "Other": {"summary": "t", "runtimeHash": H1}}}
+
+
+def restamped(card="Idol", to=H2, **extra):
+    data = json.loads(json.dumps(VS))
+    e = data["cards"][card]
+    e["restamps"] = [{"fromRuntimeHash": e["runtimeHash"], "toRuntimeHash": to, "check": "c"}]
+    e["runtimeHash"] = to
+    e.update(extra)
+    return json.dumps(data, indent=2)
+
+
+ROOT_GRADLE = ('plugins {\n    id("com.android.application") version "8.9.0" apply false\n'
+               '    id("org.jetbrains.kotlin.android") version "2.4.0" apply false\n}\n')
+APP_GRADLE = ('dependencies {\n    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")\n'
+              '    implementation("androidx.core:core-ktx:1.16.0")\n}\n')
+
+
 class CandidateScope(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -53,6 +74,9 @@ class CandidateScope(unittest.TestCase):
         self.write("android/app/libs/argentum-rules-engine.jar", "jar\n")
         self.write("android/app/src/main/assets/argentum/cards.jsonl", "{}\n")
         self.write(".github/workflows/argentum-weekly-upgrade.yml", "on: push\n")
+        self.write("tools/cardkit/data/verified-support.json", json.dumps(VS, indent=2))
+        self.write("android/build.gradle.kts", ROOT_GRADLE)
+        self.write("android/app/build.gradle.kts", APP_GRADLE)
         self.git("add", "-A")
         self.git("commit", "-qm", "base")
 
@@ -97,6 +121,65 @@ class CandidateScope(unittest.TestCase):
         self.stage()
         code, out = self.check()
         self.assertEqual(code, 0, out)
+
+    def test_review_restamp_is_in_scope(self):
+        self.write("tools/cardkit/data/verified-support.json", restamped())
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_review_changes_beyond_a_restamp_are_rejected(self):
+        for bad, needle in ((restamped(summary="rewritten"), "changes beyond a runtime restamp"),
+                            (restamped(to="zz"), "does not match the hash change"),
+                            (json.dumps({**VS, "cards": {"Idol": VS["cards"]["Idol"]}}), "cards added or removed"),
+                            (json.dumps({**VS, "_about": "y"}), "changes outside the card entries")):
+            with self.subTest(needle=needle):
+                self.write("tools/cardkit/data/verified-support.json", bad)
+                self.stage()
+                self.assertRejected(needle)
+        two = json.loads(restamped())
+        two["cards"]["Other"]["restamps"] = [{"fromRuntimeHash": H1, "toRuntimeHash": "3" * 64, "check": "c"}]
+        two["cards"]["Other"]["runtimeHash"] = "3" * 64
+        self.write("tools/cardkit/data/verified-support.json", json.dumps(two))
+        self.stage()
+        self.assertRejected("more than one runtime hash")
+
+    def test_raising_the_engine_library_versions_is_in_scope(self):
+        self.write("android/build.gradle.kts", ROOT_GRADLE.replace('"2.4.0"', '"2.4.21"'))
+        self.write("android/app/build.gradle.kts", APP_GRADLE.replace("json:1.11.0", "json:1.12.0"))
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_app_build_changes_beyond_engine_library_versions_are_rejected(self):
+        for rel, bad, needle in (
+                ("android/app/build.gradle.kts", APP_GRADLE.replace("1.16.0", "1.17.0"), "changes beyond the engine's library versions"),
+                ("android/app/build.gradle.kts", APP_GRADLE + 'implementation("evil:x:1")\n', "changes beyond the engine's library versions"),
+                ("android/build.gradle.kts", ROOT_GRADLE.replace('"8.9.0"', '"9.0.0"'), "changes beyond the engine's library versions"),
+                ("android/build.gradle.kts", ROOT_GRADLE.replace('"2.4.0"', '"2.3.0"'), "version lowered (2.4.0 -> 2.3.0)"),
+                ("android/app/build.gradle.kts", APP_GRADLE.replace("1.11.0", "1.12.0;x"), "changes beyond the engine's library versions")):
+            with self.subTest(needle=needle, bad=bad):
+                self.git("checkout", "-q", "--", ".")
+                self.git("reset", "-q")
+                self.write(rel, bad)
+                self.stage()
+                self.assertRejected(needle)
+
+    def test_other_app_build_files_stay_out_of_scope(self):
+        self.write("android/app/proguard-rules.pro", "-keep class x\n")
+        self.write("android/settings.gradle.kts", "include(\":app\")\n")
+        self.stage()
+        self.assertRejected("android/settings.gradle.kts: outside the upgrade scope")
+
+    def test_recording_a_retired_patch_is_in_scope(self):
+        retired = 'RETIRED = {\n    "0001-a.patch": "upstream has it as of bbbbbbbbbb",\n}\n'
+        self.write("engine-upgrade/audit_patches.py", audit("a" * 40, []).replace("EXPERIMENTAL", retired + "EXPERIMENTAL"))
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+        self.write("engine-upgrade/audit_patches.py", audit("a" * 40, []).replace("EXPERIMENTAL", retired + "EVIL = 1\nEXPERIMENTAL"))
+        self.stage()
+        self.assertRejected("changes beyond the TARGET pin")
 
     def test_empty_candidate_is_rejected(self):
         self.assertRejected("changes nothing")

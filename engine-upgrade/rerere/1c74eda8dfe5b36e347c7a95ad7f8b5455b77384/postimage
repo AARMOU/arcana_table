@@ -1,0 +1,241 @@
+# Engine AI changelog
+
+One line per change to how the built-in engine AI **plays or builds its decks** — the changes whose
+effect you'd expect to see in its record against humans. The admin dashboard's **AI vs humans**
+screen reads this file (baked into the server jar at build time by `game-server`'s
+`generateEngineAiHistory` task): each entry becomes a marker on the win-rate timeline, an item in its
+"Engine AI changes" list, and a count against the first deployed build that carried it.
+
+**When you open a PR that changes the engine AI's behaviour, add a line at the top of the list in the
+same PR.** That's a change under `ai/src/main/kotlin/com/wingedsheep/ai/engine/` that alters a
+decision — what it casts, attacks, blocks, targets, pays, keeps or drafts — or which profile live
+players face. Leave out refactors, performance work, tooling, per-card AI advisors, and set archetype
+data — they'd bury the changes worth correlating with the win rate.
+
+Format — newest first, one bullet each:
+
+```
+- #<pr> <what the AI now does differently, in a sentence>
+```
+
+- Anchor the line with the PR number. Don't know it yet? Write the line without one: the build then
+  ties it to the commit that added the line, which on `main` is the PR's own merge. Add `#<pr>` once
+  the PR exists if you like.
+- A change that landed without a PR is anchored by its commit sha on `main` instead: `- 1a2b3c4d5e6f …`.
+- The date shown is when the change merged; never write one by hand.
+- Describe the behaviour, not the code: "Blocks for survival when facing lethal", not "Add
+  `survivalBlocks` flag".
+
+## Changes
+
+- #4325 Values a creature by what its repeatable mana- or tap-only activations will keep making with the mana its controller has — Kiora of Fire and Ashes' {8} Dragon each turn on nine lands, Unholy Officiant's {4}{W} counter — and counts recurring token triggers as well as +1/+1-counter ones: it aims removal at Kiora over the 5/5 Dragon beside her (but not when her controller is four lands short), and counts that production toward whether a target is worth the removal spell
+- #4324 Builds limited decks in two colours unless a third is fixed and clearly better: a named archetype takes only its two most-tagged colours, three-colour shells need three lands' worth of fixing and a clear gain over every pair, a depth splash takes only single-pip cards of mana value four or more (or removal), and a splash's sources come off the over-served colour instead of the main one
+- #4320 Stops throwing creatures away in combat: reads the swing back with this turn's marked damage and until-end-of-turn effects gone, so it no longer attacks into blockers that eat its creature for free or swings out the blockers it needs when a creature it shrank for the turn makes the crack-back lethal; no longer values its own small creatures below nothing; predicts first strike against deathtouch and double strike when guessing blocks; takes free kills with first strikers and weighs which creature should make a trade
+- #4314 Reads hand disruption ("target player / each opponent discards", reveal-and-exile) as discard aimed at the other side's hand, graveyard-to-battlefield/hand pipelines and granted flashback as recursion, emblems as the ability they grant, and a granted mana ability as ramp — so it hands Emrakul, the Exigent Doom's "{T}: Add {C}{C}" to its own land instead of the opponent's
+- #4315 Builds its draft and sealed lobby decks with the Draftsim autobuilder its quick-game decks already used — archetype ratings, synergy, three-colour and splash builds with fixing — instead of the plain two-colour colour-and-curve heuristic
+- #4312 Builds whole-format constructed decks in every colour pair rather than nearly always white: leads with a colour drawn evenly and pairs it with a partner that keeps the deck within 85% of the best pair
+- #4310 Against a many-set constructed deck on Auto, builds a fresh deck for the format every game instead of picking a built-in starter (which could be a one-set Bloomburrow intro deck)
+- #4298 Builds sealed decks in three colours when the cards a third colour adds outweigh what its mana costs — weighing every spell by how reliably the manabase casts it on curve and reading fixing (duals, basic-land searches, any-colour rocks, Treasure) off the cards on every set — splashes bombs only with two lands' worth of fixing for the colour (a mana rock or dork counts half, a free one a whole land), goes to four or five colours only when the pool fixes them and the deck is clearly better, and values Vivid, domain and converge cards more in wider decks
+- #4304 Reads impulse draw as card draw: cards it may still play from exile after this turn count as cards in hand, so it casts Burning Curiosity, Reckless Impulse and the like with idle mana instead of passing, and values a theft it can cast later (Taster of Wares) as a card gained
+- #4295 Stops casting `{X}` spells for X=0 (Finale of Revelation off its two blue), holds a free-X spell while its mana is still growing into a bigger X instead of firing it the first turn it can (Ajani's Anguish for X=1), stops valuing a noncreature permanent for an enter trigger that has already resolved, and holds an until-end-of-turn base power/toughness change for the fight — Perfected Theory's 1/1 waits until its target is attacking or blocking instead of going off in a main phase
+- #4290 Aims "each creature target player controls" effects at the right player — Ashling's Command's 2 damage at the opponent's team, Trystan's and Grub's Command pumps and Sygg's Command's lifelink at its own — and ranks player targets by side, so a two-sided "target player" slot no longer falls to list order
+- #4289 Reads "becomes prepared" as card advantage, so it spends idle mana at the opponent's end step readying a prepare creature (Hexhaven Dueling Arena) instead of passing, and reads a granted "can't be blocked" as evasion like a granted flying (Eardrum Rattler, Kiora of Salt and Sand)
+- #4287 Chooses modes for budget modal spells (the Bloomburrow Seasons) by simulating every spend of the pawprint budget, instead of repeating the cheapest mode — Season of Loss takes a lethal drain instead of five sacrifice rounds
+- #4280 Builds decks only with cards whose activated abilities it can pay for — a card's activation mana must fit the deck's colours or colours at least three of its pool lands make — so The Wandering Minstrel ({G}{U}, five-colour pump) stays out of a G/U deck without fixing
+- #4254 Proliferates only the recipients that help it — its own counters and an opponent's -1/-1, stun or poison — instead of every permanent and player with a counter, opponents' +1/+1 and loyalty counters included
+- #4253 Reads "creatures your opponents control can't block this turn" and "creatures you control can't be blocked this turn" group effects as team evasion (Rumbling Ruin, Barrage of Boulders, Aragorn), so it values and times them like other evasion grants instead of as a vanilla body
+- Holds a spell that only grants keywords until end of turn (Jump, Leap of Faith, Temur Battle Rage) for a fight instead of casting it at the opponent's end step or after combat
+- #4240 Holds an instant that only grants a protective keyword until end of turn (Ephemeral Shields, Withstand Death, Loran's Escape, Tamiyo's Safekeeping) for removal or a fight instead of casting it in its own main phase or at the opponent's end step, and casts one in response to burn its toughness can't survive
+- #4238 Bites with its best creature: reads the source of a one-sided bite ("target creature you control deals damage equal to its power to target creature you don't control": Rabid Bite, Bite Down, Ram Through) as the creature it lends, and picks its strongest one instead of its weakest
+- #4235 Reads a pump scaled by a creature's power ("double target creature's power", "+X/+X where X is this creature's power": Bulk Up, Unleash Fury, Auriok Bladewarden) as a pump: aims it at its own creature instead of the opponent's, holds it as a combat trick, and reads "-X/-X where X is its power" as removal; drafts a heuristic-rated card with a dynamic +X pump (Wildwood Mentor) a little higher
+- #4232 Casts a protective trick (Fake Your Own Death, Feign Death, Blossoming Defense) in response to removal aimed at its creature instead of holding it for combat, and reads a granted "when this dies, return it to the battlefield" as protection
+- #4230 Reads amass (War of the Spark, Lord of the Rings) as making a creature token: aims removal at a permanent that amasses every turn (Dreadhorde Invasion) over an idle one, and values amass cards in drafts and on the board as token makers
+- #4228 Equips an Equipment that grants a trigger paying its controller (Ceremonial Knife, Spare Dagger, Sunfire Torch, Infantry Shield) onto its best creature rather than its worst, and reads Auras granting such triggers (Sticky Fingers, Cathar's Call) as gifts for its own creatures
+- #4224 Stops paying to animate a manland (Restless Spire, Mishra's Factory, Crawling Barrens) once it has no fight left this turn — in its own postcombat main or the opponent's end step — while still animating one to attack
+- #4210 Values a creature by the growth its recurring +1/+1-counter triggers still have to give (Ouroboroid, Victory's Envoy, Myr Prototype, Herald of War), not only its current body: it aims removal at an opposing Ouroboroid over the bigger creature beside it, and prices keeping its own growers alive accordingly
+- #4208 Builds generated decks without cards that fight the rest of the deck: no wipe of its own creatures in a creature deck (Unstable Glyphbridge's enters-the-battlefield wipe, Bane of the Living's -X/-X beside a Goblin swarm, Famine in Highlander), no Aura payoff without Auras (Hateful Eidolon), no 8+-mana spell it can't pay down (Emrakul in an aggro Highlander list); gives a deck's second colour the sources its cards need (seven of seventeen in sealed, nine Swamps for four black cards in constructed); and fills Commander decks from each slot's best cards instead of the whole colour's long tail of filler commons. Also reads per-player wipes and edicts (Winnowing, Archfiend of Depravity, Imperial Edict, Crackling Doom) as removal.
+- #4206 Reads a delayed trigger as the effect it schedules: "draw a card at the next upkeep" (Mishra's Bauble, Glimpse of Nature) is card draw, "destroy that creature at end of combat" (Cockatrice, the Basilisks, Venom) is removal, an end-step token or return is what it makes — so it cracks Mishra's Bauble at the opponent's end step instead of never using it; the "sacrifice it at end step" price of Through the Breach or Wake to Slaughter is not mistaken for removal; a draw it has scheduled for the next upkeep counts as a card it already holds
+- Weighs deck synergy by how strong the payoff is: a Goblin is worth more beside a +2/+2 lord than a +1/+0 one, a strong engine more once fed, and a creature counts against a card that shrinks its type ("all Goblins get -1/-1"). Narrow hosers (Execute, Slay, Choking Sands, and one-colour sweepers like Perish) rate lower, and they, one-damage pingers and graveyard hate no longer fill a constructed or Commander deck's removal slots.
+- #4205 Hate-drafts once its colors are set: takes a bomb it won't play over a pick that barely helps its deck, more readily in small pods where the next drafter is likely an opponent
+- Values cards by what it reads them doing, in drafts, deckbuilding and on the board: a card no rating table covers now counts its removal (a -N/-N or variable -X/-X, a "destroy all", a mode of a charm, a Pacifism), card draw and digging, tutors, tappers, scry and surveil, Aura and Equipment bonuses, anthems, granted keywords and mana abilities, where before it saw only its body; on the battlefield, a Spellbomb, Bauble or similar artifact still holding its one-shot payoff is worth more than an unread permanent
+- Reads the payoff of a pipeline's "if those cards include … / otherwise …" step (Planar Genesis, Thrasios, learn and connive cards, Vendilion Clique, Gleeful Demolition) instead of treating it as an effect it can't place: it casts such an instant at the opponent's end step rather than letting it rot in hand, and values the draw, tokens or counters behind the condition in drafts, deckbuilding and playouts
+- Builds better generated decks. Constructed: no off-colour devoid cards or Rooms, unrated cards judged by what they do rather than their rarity (removal over random rares), a land count and curve that follow the deck's spells instead of a fixed 24 and one template, on-colour dual lands, and no dead cards (an Auratog with no enchantments, a Wrath in a creature deck). Commander: only a commander its pool can fill a library for (no more 46-land decks), and no Bazaar of Baghdad as a utility land. Sealed: no mana rocks that make none of its colours, and a colour only two cards need gets a splash's lands, not a main colour's.
+- #4195 Reads "destroy all" and "sacrifice all" wraths (Day of Judgment, Damnation, Supreme Verdict, Pernicious Deed, Child of Alara) as sweepers: it answers an opposing one with an "until end of turn" indestructible or protection ability instead of letting it resolve, and values them as removal in drafts, deckbuilding and playouts
+- #4192 Reads surveil as card selection, like scry: it uses instant-speed surveil abilities (Surveillance Phantasm, Larder Zombie, Emergent Haunting) at the opponent's end step with mana it would otherwise waste, and holds them in its main phase while an instant wants the mana; a look at the top that costs life or a sacrifice (Doom Whisperer, Zahur) — scry or surveil — no longer gets that end-step nudge.
+- #4190 Holds "prevent the next damage this turn" abilities (Samite Healer, Abuna Acolyte, Benevolent Ancestor, Circle of Protection activations) until damage can still come — an attack, a fight its creature is in, or a spell on the stack — instead of tapping them in its own main phase for a shield nothing will hit.
+- #4188 Reads a variable "-X/-X" on another creature (Death Wind, Defile, Flunk, Bloodtithe Harvester, Olivia's Wrath) as removal: it keeps such a card over a filler creature when it must discard, holds it for a response or the opponent's end step like other instant removal, and values it as removal in drafts, deckbuilding and playouts
+- #4185 Reads "look at the top cards and put one into your hand" (Impulse, Sleight of Hand, Fact or Fiction, Ancient Stirrings, Duskwatch Recruiter) as card draw: it cashes such instants and abilities at the opponent's end step, holds them in its own main phase while a counterspell or trick wants the mana, and values them as card draw in drafts and playouts
+- #4184 Reads "copy a card and cast the copy" (God-Eternal Kefnet, Isochron Scepter, Spellweaver Helix, Arcane Bombardment) as card advantage instead of an effect it can't place.
+- #4183 Uses instant-speed scry abilities (Crystal Ball, Castle Vantress, the Strixhaven campuses, Theros Omens) at the opponent's end step with mana it would otherwise waste, and holds them in its own main phase while an instant in hand wants that mana — as it already did for draw abilities
+- #4175 Drafts and builds limited decks for payoffs that name a kind of card, read from the payoff's own filter (noncreature, artifact and enchantment spells, high-power creatures, colours, mana values). Artifacts and enchantments now count as fuel for prowess. Removal with a synergy rider is no longer cut as an unfed payoff.
+- #4169 Throws Chaos Orb and Falling Star as a flick, with a human's error in speed, direction and spin instead of a timed release — it still usually hits what it aims at, but misses a little more often
+- #4171 Drafts and builds limited decks for creature types: beside a lord or tribal payoff (Goblin King, "whenever another Elf enters") a creature of that type, a changeling or a maker of its tokens is worth more, and a tribal payoff with too few members is worth less; Commander decks also find their tribe in the commander's abilities, not only its text
+- #4158 Values power and toughness by what they do against the board: huge stats taper off (a 1000/1000 is worth under twice a 20/20), and a creature is worth more for each opposing creature it would beat in a fight (kill and survive) or survive, and when it is out of reach of the burn they've shown
+- #4163 Drafts and builds limited decks for synergy: a pick or a slot is worth more when it feeds a payoff already taken, a payoff with too little fuel is worth less, and the deck score counts payoffs the deck keeps fed
+- #4162 Equips the creature an Equipment helps most: equip, fortify, reconfigure and "attach it to target creature" triggers read what the Equipment does to the creature it equips, so the cheap target pick and the simulated shortlist start from our best creature instead of our worst
+- #4159 Values a payoff by the fuel beside it — Blood Artist next to a sacrifice outlet and bodies, Ajani's Pridemate beside lifelinkers, a prowess creature with instants in hand — so it kills a fed engine over the 1/1s feeding it, counts the engine toward whether a removal spell is worth spending, and values its own engine the same way; Commander decks find their theme cards by what they feed or cash in rather than by matching rules-text words
+- #4157 Reads the payoff behind "you may pay/discard/sacrifice … If you do, …": aims those pumps and counters at its own creatures, and sees the tutors, draws and removal they unlock; reads a base-0/0 shrink as removal and a loyalty counter as a gift
+- #4155 Generated 60-card constructed decks are built the constructed way — playsets of the best two-colour cards on a low curve (6/12/9/6/2/1 by mana value), eight interaction and sixteen creature copies first, tilted towards a build-around's tribe or theme when the top cards share one — and a format-matched AI seat plays a format-legal built-in starter when one qualifies instead of a generated deck
+- #4151 Generated Commander decks now fill role quotas — about ten ramp (fixing ramp first for three-plus colours), eight interaction, seven card draw — and 25 cards on the commander's tribe, keywords or theme, and play 36 lands with the pool's on-colour duals instead of 38 basics split by pips
+- #4150 Reads "choose one" spells (charms, commands): in hand a charm is worth what any of its modes does, and a cast is judged by the modes it chose — it no longer spends a charm's team pump at the opponent's end step or its counter mode on an empty stack, and sees a tax-counter mode's tax
+- #4150 Reads +1/+1 counters put on another creature as a pump and -1/-1 counters on an opponent's creature as removal, so it flashes in a creature like Little Bear before combat when the counter makes its attack lethal; still holds a flash creature in its own upkeep, and one whose ETB only taps a blocker when it has nothing to attack with
+- #4150 Returns the best card from its graveyard ("return target card from your graveyard"), not the cheapest, and prices graveyard cards by what they would be on the battlefield
+- #4149 Limited decks run a non-basic land only when it makes nothing but deck colours (splash included) or fixes two of them — no more off-colour tapped duals — and at most one colourless utility land, only when the deck has something for it to do
+- #4147 Limited decks whose two colours can't fill the spell slots now splash a few single-pip cards in a third colour instead of padding the gap with basics, running 18 lands rather than 21–22
+- #4144 When removal ("destroy target land" and the like) would leave the board looking the same whichever side it hits, it hits the opponent's permanent, not its own
+- #4143 Values a Treasure (and any permanent that sacrifices itself for mana: Gold, Eldrazi Spawn) as mana — half a land drop, a full one when it is the mana a spell in hand is one short of — so it takes the Treasure mode when that casts its next spell a turn early, and charges an opponent's Treasures the same
+- #4138 Counts a land in hand that no coming land drop needs (its other lands already cover next turn and no spell in hand wants more mana) as a tenth of a card, so it stops trading spells, fights or draws for lands it has no use for; replaces #4113's landcycling-only floor
+- #4136 Reconsiders a block that looks like a free kill on paper once the attacker's visible pump would win the fight (a 2/3 in front of a first-striking Skilled Battlecarver with {1}{R} open), instead of only second-guessing blocks by creatures worth more than the attacker
+- #4128 Kills an attacker with a free double block (two blockers it can't kill) before trading for it, and no longer attacks a creature into two blockers that can do that to it
+- #4127 Stops in its own upkeep when its library is empty, so it can refill the library before the losing draw (Paradox Shaper putting a graveyard card on the bottom) instead of auto-passing into a decking loss
+- #4122 Answers no to an optional "Pay {1}?" it would then decline to pay (only a tap-another-permanent source like Gene Pollinator could pay), instead of yes followed by an empty payment
+- #4120 Prices how close each library is to running out: no longer plays a land that exiles its whole library (Territorial Bruntar in Momir) or mills itself out, and values milling an opponent out
+- #4119 Plays its land drop before activating the Momir avatar or casting an already-affordable X spell, so the activation or spell gets the land's extra point of X
+- #4118 Sees an opponent's on-board +1/+1-counter pumps (Tenured Tethermage) and abilities with tap or sacrifice costs as combat answers, so it no longer attacks into a blocker the defender can grow before blocks
+- #4116 Picks a "choose two" modal spell's modes by simulating each combination, aiming each mode by what it does (Ashling's Command draws for itself), instead of taking the first modes in printed order at the opponent
+- #4115 Aims a granted "draw a card" trigger, "becomes prepared" and "target player draws" at its own side, and when it cannot tell which side an effect is for, simulates its best target on each side instead of only the opponent's
+- #4114 Scry and surveil send a spell away to dig for a land when a spell in hand costs more than the lands in play and in hand, keeping a looked-at card only when it beats an average library draw
+- #4113 Keeps a spell instead of landcycling it when the lands already in hand cover this turn's and next turn's land drops and no other spell in hand needs the extra land
+- #4111 Mulligans a seven-card opening hand whose lands cannot cast any of its spells, and a two-lander with too few early plays (fewer than two spells castable off its two lands on the play; none, or no second three-drop, on the draw)
+- #4110 Attacks with a creature it stole until end of turn instead of keeping it home as if it were its own, and no longer casts a steal once the turn has no combat left for the borrowed creature
+- #4108 Holds an until-end-of-turn shrink spell instead of casting it on a creature that can no longer fight this turn (a tapped attacker on its own turn), and holds a flash creature when the other instant in hand costs more than all its mana
+- #4105 Stops passing main phases with castable creatures when a single lost rollout outvotes the board: each candidate's playouts are read with its static evaluation counted as one more playout
+- #4102 In Commander games, counts commander damage as lethal: chump-blocks a commander about to reach the commander-damage threshold, keeps home the blocker that stops it next turn, and aims at a seat its own commander can finish
+- #4100 In multiplayer, attacks the opponent it can kill, else the one with the biggest board, instead of always the lowest life total
+- #4099 Won't attack away blockers when one activated ability visible on the opponent's board (removal on a blocker, a pump) would make the swing back lethal, and counts idle blockers ganging up on a trampler instead of reading every crack-back past one as lethal
+- #4097 Keeps its blockers home when only they stop a lethal swing back: the crack-back no longer counts an opposing creature that won't untap, an attack plan the simulator can't score is no longer submitted unscored, and a plan whose crack-back is lethal earns no credit for our next swing
+- #4094 Crews Vehicles and saddles Mounts when the attack it buys beats the attack without it, tapping the creatures that give up least (summoning-sick ones first), instead of never riding at all
+- #4092 Facing a 60-card deck it matches to a set, builds from all of that set's legal cards instead of only the set's reprints, and when that build would still be thin (under 4/5 of the spell slots or under 8 creatures in 60) builds a constructed deck for the deck's format instead, rather than seating a 44-land pile with no creatures
+- #4085 Returning its own permanent to hand (Rescue Girl, First Responder) now picks the permanent worth recasting, like an enters-trigger creature, instead of a land or a token, and counts that recast as the reason to activate
+- #4019 Facing a constructed deck with no single-set identity (a Standard deck spread over many sets), builds a fresh deck for the format that deck was built for — the one its saved or starter deck declares, else the narrowest of Standard to Vintage it is legal in — instead of a 40-card sealed pool from a random set; a deck from one or a few sets is still answered out of those sets, now to its declared format
+- #3967 Drafts with the Draftsim scorer and set ratings its deckbuilder already uses, instead of a rarity-and-keyword heuristic that took weak rares over premium common removal; cards of a set with no ratings file are rated from their abilities rather than by rarity alone, for picks and for the Draftsim deckbuild
+- #3968 Builds a 100-card singleton deck for Highlander and Canadian Highlander lobbies (leaving points-list cards out of the Canadian build) instead of a 60-card four-of list
+- Trims its attack to fit a cap on how many creatures may attack a player (a tapped Mirri, Weatherlight Duelist, Dueling Grounds) instead of declaring too many, being rejected and skipping combat
+- The sealed deckbuilder now plays the basic snow lands it opened (Kaldheim packs open one) instead of discarding them with the free basics.
+- #3805 Makes a combat declaration handed to it from another seat (Master Warcraft, Brutal Hordechief) for that seat, honouring its must-block requirements, instead of submitting it as its own and conceding after the rejections
+- #3678 Sees a blocker whose block trigger destroys the attacker (Alaborn Zealot) as a killer, the way it sees deathtouch: it no longer attacks a big creature into one, and as the defender it blocks with one to trade up
+- #3674 No longer casts an end-of-combat sweep over what a creature blocked (Glyph of Doom) when that creature can't block before it fires, or a spells-only mana grant (Piracy) when nothing it could then cast would spend the mana
+- #3662 In a multiplayer game, makes a lethal attack with only the creatures the kill needs (two fliers past a ground-only board, say) and keeps the rest home to block the opponents still in the game, instead of tapping out for an overkill alpha strike; in 1v1 it still sends everything
+- #3594 Waits for the opponent's end step to use a creature's "{T}: put a counter on this creature" (Clockwork Hydra), instead of tapping it away from attacking and blocking
+- #3494 Knows when desertwalk, nonbasic landwalk and legendary landwalk make an attacker unblockable, so it no longer plans blocks the rules forbid against those creatures (it only modelled the five basic landwalks)
+- #3478 Holds "target creature can't attack this turn" for the opponent's turn and "can't block" for its own: no longer spends Edifice of Authority on its own turn (where it restrains nothing) just for the brick counter, keeping it untapped to stop the opponent's attacker before combat
+- #3477 Holds an end-of-turn lifelink grant until blockers are declared, so it no longer pays (e.g. discards) for lifelink on a creature that then doesn't block, or for two life at 20 before blocks
+- #3476 Puts mana and other gift Auras on its own permanents and steal/strip Auras on the opponent's: reads land-mana bonuses (Overgrowth, Wild Growth), granted activated abilities, protection, unblockability, dynamic stat boosts, "you control enchanted permanent", "loses all abilities" and conditional statics, so Overgrowth no longer ramps the opponent's Swamp
+- #3421 Presses a winning position instead of sitting on it: when the board it would leave still dominates (creatures and cards in hand, and the race each way), an attack is credited for the damage it deals, so a team of four Bears swings past a lone Hill Giant and trades a Bear for six damage, and a bigger army trades evenly rather than waiting; behind, at parity, or facing a lethal crack-back it attacks exactly as before.
+- #3420 Expects the opponent to use its board in a fight: every attack and block it weighs is played out with the opponent using the activated abilities its permanents can afford (a team pump like Leonin Sun Standard, a pinger like Prodigal Sorcerer, keyword granters, regeneration, token blockers) when that wins them the combat, so it stops attacking or blocking into a pump the opponent has mana for, and still makes the play when they are tapped out or the trick can't win.
+- Stops casting an Aura whose only effect is an "if enchanted creature …" entry trigger onto a creature that fails the check (Earthbind on a creature without flying), since it would enter and do nothing.
+- #3319 Flips Chaos Orb: aims at the spot that destroys the most opponent value (the seam between two cards when that pays) and throws it off the table rather than hit its own board; its release is a human's, a little early or late and off-centre, so it sometimes misses or clips a neighbour.
+- #3282 Aims an until-end-of-turn pump at a creature that can still fight: when a beneficial target choice ties (a beginning-of-combat +2/+2 on creatures not yet attacking), it no longer gives it to a bigger creature cast this turn over the one that will attack (Ezekiel Sims, Spider-Totem pumps itself, not a summoning-sick Spider-Man). Permanent payoffs like +1/+1 counters are unaffected.
+- #3274 Landcycles for the land it is missing: stuck short on lands with its land drop unused, a line that puts a land in hand (Plainscycling Noble Templar) is scored as playing that land the same turn, so it cycles and plays the land instead of passing with a hand of uncastable spells.
+- #3258 Builds limited decks it can cast: basics follow how hard each color's cards press (double and triple pips and early drops count extra, and each color gets at least the sources its most demanding card needs), cards whose pips the mana base can't support are cut, off-color `{2/C}`-heavy cards like Karn, Gilded Guardian stay out, planeswalker tutors and sacrifice-a-planeswalker spells stay out of decks without planeswalkers to find, it runs at least 14 creatures when the pool has them (cutting tricks and Auras first), and no longer splashes a fourth color or a double-pip card.
+- #3253 Reads a "counter unless they pay {N}" against the mana the caster has left: it no longer throws one at a spell whose caster can pay every tax it can stack, and it stacks two when the first drains their mana and the second counters; and it stops casting a Banishing Light-style permanent into a board with nothing to exile, or discarding a -3/-1 onto a creature that has no fight left this turn.
+- #3252 Attacks by the race: an attack that brings its next-turn kill closer counts for it (so a team that leaves the opponent dead on board next turn swings past a lone blocker), a tapped attacker is charged only for the block it can't make on the swing back, and an attack that only looks safe because the defender would trade a creature away is also checked with the defender taking the hit and keeping its creatures for the crack-back.
+- #3249 Reads whose cards a choice moves: when it picks an opponent's discard or exile it takes the card most valuable to *them* (not the one it couldn't cast itself), a discard asked as a bare "choose a card" pitches its least useful card instead of its only land, an "up to one" look takes the land a land-short hand needs, and a "top or bottom of your library" choice bottoms a spell to dig for a land when the hand is short of lands.
+- #3248 Stacks several chump blockers behind a trampler when one body would still let lethal spill over, and counts double strike as two hits when adding up incoming damage; pays convoke spells with lands first, tapping only the cheapest creatures for whatever mana can't cover instead of tapping its would-be blockers and attackers.
+- #3245 Prices planeswalkers as engines: attacks and burns the opposing walker climbing to its ultimate rather than a minus-only Jace token, and counts loyalty abilities granted by other permanents
+- #3242 Spends minus-only planeswalkers like the empower-Jace token instead of sitting on them: −3 to draw whenever it can, otherwise −1 to surveil, last counters included — holding the token only when the next attack would be lethal and it is the only other thing to hit — and uses loyalty abilities the "Way of the X" enchantments grant (a granted +1 makes the token an engine worth keeping).
+- Leaves an "up to one/up to N target" slot empty rather than aim it at the wrong side: Tam's Resistance with only an opposing creature is cast for its Empower Jace alone instead of buffing their creature, an "up to two" destroy or an optional harmful trigger never hits our own permanents, and when the effect's side can't be read the AI simulates leaving the slot empty and takes that when it scores strictly better.
+- Casts enablers before the spells they discount: a spell is scored as at least the best spell in hand it makes cheaper or castable, so a noncreature spell goes down before a "costs {2} less if you've cast a noncreature spell this turn" creature instead of the creature being cast at full price.
+- Casts a pump before combat when it changes who attacks: a combat trick or pump ability that lets a creature make an attack it otherwise wouldn't is priced by what that attack is worth over the unpumped one, instead of being deferred to a beginning-of-combat window the AI never stops in.
+
+- Holds instant-speed deploys for the opponent's turn: a flash creature is judged by what it can do the turn it lands (an attack-trigger loot no longer gets it jammed in its own main phase), an instant that only makes no-haste tokens or empowers a walker it lets act at instant speed waits for their turn too, and either is cast into idle mana when holding it would leave another instant in hand without mana.
+
+- Deck building for sets without rating data values planeswalkers as the engines they are instead of as filler (an on-color rare walker no longer loses its slot to a vanilla 3/9), and counts a legend's second copy at a discount for the legend rule, so it stops running doubles of filler legends.
+
+- Defends its own planeswalkers: a walker is priced by the loyalty the next attack leaves it, so one about to die spends its loyalty first (the biggest useful minus) instead of dying with counters unspent, a blocker kept home for it counts, and blocks on attackers aimed at it are worth the walker they save — a chump or trade for a valuable walker, nothing for a near-dead token.
+
+- On Auto against a deck the human brought, plays from that deck's set(s) — another built-in starter from them when one exists (Boros Mice meets another Bloomburrow tribe), else a deck built from those sets in the same 60-card or 40-card shape — instead of a sealed pool from an unrelated set.
+
+- Attacks opposing planeswalkers: each attacker that will connect goes at the walker its damage hurts most — killing it, or knocking it below its biggest ability — when that is worth more than the life it would take, while a lethal or nearly-won race keeps its damage on the player; attack search also tries retargeting each attacker and runs when a walker is in reach and nothing can block.
+
+- Chump-blocks to stay out of the opponent's next-attack range when one body now saves more bodies next turn (menace needs two blockers), instead of only when this hit alone is lethal.
+
+- Stops paying for until-end-of-turn pumps nothing spends: a temporary +X/+X counts only on a creature already attacking or blocking, a precombat pump activation needs an attack plan that uses it, and an action that merely ties passing no longer wins on rounding.
+
+- Casts wishes (Extrapolate the Impossible, Burning Wish) with idle mana in its last main phase instead of holding them all game, unless nothing outside the game is fetchable.
+
+- Allocates the full required counter payment across permanents, including several counters on one, and compares paying against declining.
+
+- The AI spreads required graveyard targets across owners instead of selecting several cards from one graveyard.
+
+- #3182 AI puts shield counters, pumps and protection from triggered abilities and from modal or tiered spells (Proud Pack-Rhino, Restoration Magic) on its own permanents instead of an opponent's
+- #3180 Chooses targets for the face being cast — a split half, both fused halves, an Adventure, Room or prepare face — avoiding beneficial enemy targets and harmful friendly targets.
+
+- #3181 Scry and surveil no longer keep a surplus land on top just because this turn's land drop is unspent — a card left in the library is drawn next turn at the earliest
+
+- #3174 Chooses compatible groups for spells and abilities whose targets must have equal toughness or another numeric value.
+
+- #3170 Values every token payoff in a mixed token-creation batch when assessing cards for play and deckbuilding.
+
+- Keeps ranked secret bids at their floor, chooses matching numbers independently, and casts creature ballots from the visible board without reading unrevealed answers.
+
+- #3137 AI plays its land before a cheaper spell when the land makes a bigger spell castable — hard-casting Shriekmaw instead of casting a 2-drop and then evoking it
+- #3135 AI seats on a random deck now own the rest of their sealed pool (or a fifteen-card wishboard) outside the game, so their Learn and wish cards fetch a card instead of whiffing
+- #3132 AI puts helpful Role tokens and Auras like Strands of Undeath on its own creatures, and no longer pays to regenerate an opponent's creature
+- #3129 AI pays sacrifice, discard, bounce and tap costs with its least valuable candidates (the source included) instead of the first legal ones
+- #3128 In multiplayer the AI sends each attacker at a defender it may legally attack (skipping a seat behind Blazing Archon, routing Goblin Rock Sled to a seat with a Mountain) instead of aiming everything at the lowest-life opponent and getting the whole attack rejected
+- #3120 AI holds flash creatures for the opponent's turn and no longer releases them for its own triggers on the stack
+- #3114 AI keeps modal double-faced spells instead of playing them as lands it doesn't need, prices surplus lands in hand near zero, and won't bounce its own land into a hand that already holds the next land drops
+- #3079 AI divides multi-block combat damage to kill what it can
+- #3078 AI treats its own stack objects as never threats; block-only grants need a blocker
+- #3065 A draw or tutor while tapped out no longer forfeits the idle-land refund
+- #3063 AI spends idle mana on drawing in the last window that can
+- #3046 AI refuses precombat Equipment moves onto no better an attacker
+- #3042 AI activates sacrifice-mana sources before a cast auto-pay can't cover
+- #3040 AI spends a minus-only planeswalker's loyalty (the empower-Jace token)
+- #3037 AI refuses activations whose payoff lands on nothing
+- #3032 A library search's pick knows what it searches for and where it goes
+- #3030 A beginning-of-combat pump counts only on creatures the attack plan sends
+- #3027 AI refuses a fetch whose library holds nothing it can find
+- #3025 AI holds end-of-turn pumps nothing this turn can use
+- #3024 The pending land drop counts as mana in the idle-mana refund
+- #3023 AI fills "up to N targets" decisions past one target while each helps
+- #3021 Selection counts are picked by value: searches take, scry and surveil sift
+- #3020 An optional sacrifice is asked once: pick the permanent or decline
+- #2992 AI attacks price the crack-back as life and keep evasion after attacking
+- #2988 AI deploys castable permanents instead of hoarding them
+- #2986 AI blocks seed legal menace and protection plans; no high-life chump blocks
+- #2984 AI aims targets by the polarity the effect implies
+- #2981 AI refuses end-of-turn payoffs nothing can spend
+- #2979 AI answers colour, land-type, card-name and skip-a-draw choices by what they are for
+- #2976 AiProfile.LIVE becomes the one profile real players face
+- #2975 Castability-aware card selection (keep, take, discard) behind a profile flag
+- #2526 AI targeting fixed for beneficial activated stat boosts
+- #2319 AI stops paying to re-equip where its Equipment already is
+- #1982 AI stops looping on a free redundant Equip activation
+- #1833 AI stops livelocking on a combat tax it cannot pay
+- #1821 Momir: never flips a creature with no mana cost, never activates for X=0
+- #1799 AI chooses a value for {X}
+- #1791 AI blocks for survival when facing lethal
+- #1715 AI stops paying for expiring grants in windows that can't spend them
+- #1711 AI holds flash creatures for the ambush window instead of jamming them
+- #1709 AI holds a counterspell for a spell worth the card
+- f62a05ddfa34 AI prices a land in hand as mana, on a curve, and values the cantrip window
+- 427daa8dcef8 AI prices a creature by what it can still do
+- 32742ee91787 AI holds removal for a target worth a card
+- #1692 AI scores its race in urgency instead of turns
+- #1690 AI spends a combat trick in the window that decides the fight
+- 6cf4f514151d AI plays lands in the order its hand can actually use
+- 1cd9c5d3309a A combat trick must earn its response window
+- #1687 A land drop no longer counts as card loss
+- #1686 The rollout AI goes to production, with two evaluation fixes
+- #1665 AI understands what a Room's two halves do
+- #1663 AI stops going in circles
+- #1605 AI seats build and play their own Commander decks
+- #1559 Resource-backed AI evaluation weights
+- #1531 Fair hidden-information determinization for the engine AI
+- #1511 Engine AI phase 7: the rollout evaluator
+- #1508 AI constructed decks are built with Draftsim
+- #1504 Engine AI phase 6: CardIntent — card knowledge that generalizes
+- #1493 Engine AI phase 4: branching factor and decision budget
+- #1487 Engine AI phase 3: multiplayer evaluation
+- #761 AI stops mulliganing every Momir Basic opening hand
+- ebdbcba38671 Better Momir Basic activation strategy
+- #737 AI no longer loops casting a "target spell" instant
+- #658 Quick Game AI decks are built with the Draftsim autobuilder
+- #624 AI stops aiming two "can't block" effects at the same creature
+- #613 AI fills targets for activated abilities, not just spells
+- #338 AI skips attack simulation when the opponent has no creatures
+- 0dfce8d95fd2 AI no longer freezes when only Treasures can pay
+- 5917a66bff8d AI sealed deck building fixed for Lorwyn Eclipsed
+- 8891a5f4189b AI gang-block cost miscalculation fixed
