@@ -186,7 +186,7 @@ async function registeredOn({github,owner,repo,ref,symbol,cache={}}) {
 // incomplete or unavailable evidence must never suppress a card.
 function relevantDestinationPath(path, plan) {
   const own = [REGISTRY,...GENERATED,plan.paths.source,plan.paths.scenario,plan.suite.source,
-    `certification/suites/${plan.suite.key}.json`];
+    `certification/suites/${plan.suite.key}.json`,'android/app/src/main/assets/argentum/all-cards.index.tsv'];
   if (own.includes(path) || path.startsWith('android/app/libs/')) return true;
   if (path === 'android/gradle.properties' || path === 'android/settings.gradle.kts' ||
       path === 'android/gradle/libs.versions.toml' || /(^|\/)build.gradle.kts$/.test(path)) return true;
