@@ -357,6 +357,8 @@ object CustomCards {
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
         // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
         Entry(GhostArk, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0038 (chosen-color land mana bonus: AdditionalManaOnSourceTap CHOSEN_COLOR).
+        Entry(CagedSun, "CM2", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

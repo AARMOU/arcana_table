@@ -5359,7 +5359,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5516,7 +5516,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 66,
+   "count": 67,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -6560,7 +6560,7 @@
    ]
   },
   "EntersWithChoice": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Unclaimed Territory",
@@ -6573,6 +6573,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
+    },
+    {
+     "card": "Caged Sun",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt",
+     "lines": 74,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt"
     }
    ]
   },
@@ -6680,13 +6686,19 @@
  },
  "static": {
   "AdditionalManaOnSourceTap": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Forsaken Monument",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ForsakenMonument.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ForsakenMonumentScenarioTest.kt"
+    },
+    {
+     "card": "Caged Sun",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt",
+     "lines": 74,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt"
     }
    ]
   },
@@ -6997,7 +7009,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -7647,7 +7659,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 118,
+   "count": 119,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7755,7 +7767,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Defile",

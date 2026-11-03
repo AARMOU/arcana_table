@@ -689,3 +689,34 @@ that dies after resolution has nothing until a second crew; crewing twice gives 
 crew 2 by total power); engine: `GrantActivatedAbilityToGraveyardCardsTest` (set fixed at resolution, leaving and
 returning to the graveyard drops it, cleanup, battlefield-zone abilities still refused).
 Unlocks among missing six-deck cards: Ghost Ark (Necron Dynasties). Past in Flames was already implemented without it.
+### "Whenever a land's ability causes you to add … mana of the chosen color, add an additional one" (patch 0038)
+
+Use for a triggered mana ability keyed to the source's chosen color rather than to a fixed color or to "tapped for
+mana". `AdditionalManaOnSourceTap(whenProducing = TappedForManaType.CHOSEN_COLOR, color = null)` fires only when the
+land's ability added at least one mana of the color stored by `EntersWithChoice(ChoiceType.COLOR)` (a dual tapped for
+its other color doesn't), and adds exactly one of it however much the land made. `anyManaAbility = true` is "a land's
+ability" (a mana ability without {T} counts); leave it false for "is tapped for mana". `onlyWhenYouAdd = true` is
+"causes **you** to add": keep the filter at plain `GameObjectFilter.Land` so a land you don't control whose mana you
+add counts, while an opponent adding their own mana never does. A chosen-color anthem reads the same choice through
+`withChosenColor()`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt -->
+```kotlin
+    staticAbility {
+        ability = AdditionalManaOnSourceTap(
+            sourceFilter = GameObjectFilter.Land,
+            color = null,
+            whenProducing = TappedForManaType.CHOSEN_COLOR,
+            anyManaAbility = true,
+            onlyWhenYouAdd = true,
+        )
+    }
+```
+
+Test: [`CagedSunScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt)
+(color chosen on cast; anthem only on your creatures of the color, multicolor included; basic of the color = 2, other
+color = 1; Tundra for {W} vs {U}; Orzhov Basilica +1 {W}; Gaea's Cradle {G}{G} +1 only; Marble Diamond none; two Suns
++2, two colors each their own; opponent's land none; auto-pay with a basic and with a dual, none for another color);
+engine: `ChosenColorLandManaBonusTest` (gate, dual, two-of-a-color, composite, untapped land ability vs the default
+tapped-only form, nonland source, two instances, opponent, no color chosen, auto-pay).
+Unlocks among missing six-deck cards: Caged Sun (Necron Dynasties).
