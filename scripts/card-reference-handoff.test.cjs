@@ -1,3 +1,4 @@
+const fs = require('node:fs');
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -58,4 +59,15 @@ test('recipe selection only links the cookbook section that contains the matched
     heading: '4. Dies trigger', link: 'https://github.com/AARMOU/arcana_table/blob/gpt/arcana-integration-next/docs/agents/CARD-PATTERNS.md#4-dies-trigger',
   });
   assert.equal(recipeFor(COOKBOOK, 'android/custom-cards/Other.kt'), null);
+});
+
+test('trusted read-only feeder generates and attaches the Cardkit packet before publish', () => {
+  const workflow = fs.readFileSync('.github/workflows/arcana-queue-feeder.yml', 'utf8');
+  const suggest = workflow.slice(workflow.indexOf('  suggest:'), workflow.indexOf('  publish:'));
+  assert.match(suggest, /cardkit\.py classify --json/);
+  assert.match(suggest, /cardkit\.py similar/);
+  assert.match(suggest, /card-reference-handoff\.cjs append/);
+  assert.match(suggest, /card-reference-handoff\.cjs packet/);
+  assert.match(suggest, /CARD-PATTERNS\.md/);
+  assert.match(suggest, /referencePacket:packetFor\.get/);
 });
