@@ -52,6 +52,7 @@ MANDATORY = [
     "0035-ai-idle-mana-deploy.patch",
     "0036-graveyard-card-activated-grant.patch",
     "0037-static-attacking-chosen-player.patch",
+    "0038-chosen-color-land-mana-bonus.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

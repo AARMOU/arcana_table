@@ -369,6 +369,8 @@ object CustomCards {
         Entry(NecronMonolith, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (exile target player's graveyard, ArtifactOrLand count of the exiled cards -> Insect tokens).
         Entry(CanoptekScarabSwarm, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0038 (chosen-color land mana bonus: AdditionalManaOnSourceTap CHOSEN_COLOR).
+        Entry(CagedSun, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
