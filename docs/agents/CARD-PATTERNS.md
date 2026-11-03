@@ -689,3 +689,38 @@ that dies after resolution has nothing until a second crew; crewing twice gives 
 crew 2 by total power); engine: `GrantActivatedAbilityToGraveyardCardsTest` (set fixed at resolution, leaving and
 returning to the graveyard drops it, cleanup, battlefield-zone abilities still refused).
 Unlocks among missing six-deck cards: Ghost Ark (Necron Dynasties). Past in Flames was already implemented without it.
+### "Creatures attacking the chosen player have <keyword>" (patch 0037)
+
+Use when a static ability affects creatures (any controller's) attacking a player the source has stored: "choose an
+opponent … creatures attacking the last chosen player have menace". Record the player with `Effects.ChooseOpponent()`
+(it replaces the previous pick, so the stored one is "the last chosen"), then filter with
+`GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))`; since 0037 that filter
+projects in a static against the source's stored choice (also `ChosenPlayer`, `You`, `Controller`). Only an attacker
+whose declared defender is that player matches: one attacking their planeswalker or battle doesn't (use
+`attackingDefenderOf` for the whole defending side). The choice is forgotten when the source changes zones (CR 400.7).
+For "creatures attacking enchanted player" use `attackingEnchantedPlayer()` (Curse of Hospitality).
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt -->
+```kotlin
+    triggeredAbility {
+        trigger = Triggers.you.beginningOf(Step.BEGIN_COMBAT)
+        effect = Effects.ChooseOpponent("Targeting Relay — choose an opponent")
+        description = "Targeting Relay — At the beginning of combat on your turn, choose an opponent."
+    }
+
+    staticAbility {
+        ability = GrantKeyword(
+            Keyword.MENACE,
+            GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))),
+        )
+    }
+```
+
+Test: [`TriarchStalkerScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt)
+(trigger only at the beginning of combat on your turn, with a choice among two opponents; one blocker refused, two
+allowed; an attacker of the other opponent and of the chosen player's planeswalker have no menace; tokens entering
+attacking the chosen player have it; re-choosing next turn switches; the choice holds on another opponent's turn
+when they attack the chosen player; bounce ends it and the recast Stalker has no chosen player); engine:
+`AttackingChosenPlayerStaticTest` (any controller's attackers, planeswalker excluded, no choice / re-choice,
+trigger-bound references still fail closed).
+Unlocks among missing six-deck cards: Triarch Stalker (Necron Dynasties).

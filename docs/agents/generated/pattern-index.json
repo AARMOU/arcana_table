@@ -1696,6 +1696,17 @@
     }
    ]
   },
+  "Effects.ChooseOpponent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.CopyControlledStackObjects": {
    "count": 1,
    "examples": [
@@ -3936,7 +3947,7 @@
    ]
   },
   "Keyword.MENACE": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4964,7 +4975,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5516,7 +5527,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 66,
+   "count": 67,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5557,7 +5568,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 165,
+   "count": 166,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6275,7 +6286,7 @@
    ]
   },
   "Step.BEGIN_COMBAT": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6300,6 +6311,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BarretAvalancheLeader.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BarretAvalancheLeaderScenarioTest.kt"
+    },
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
     }
    ]
   },
@@ -6819,7 +6836,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -7280,7 +7297,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7647,7 +7664,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 118,
+   "count": 119,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7992,6 +8009,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfBodyAndMind.kt",
      "lines": 51,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfBodyAndMindScenarioTest.kt"
+    }
+   ]
+  },
+  "Player.ChosenOpponent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
     }
    ]
   },

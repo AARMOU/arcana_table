@@ -357,6 +357,8 @@ object CustomCards {
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
         // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
         Entry(GhostArk, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0037 (static "attacking <chosen player>" filter in projection).
+        Entry(TriarchStalker, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
