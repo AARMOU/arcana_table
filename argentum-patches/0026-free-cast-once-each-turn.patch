@@ -105,7 +105,7 @@ index f1b41102c4..ff4e518ee1 100644
 +                // and only while this specific source hasn't already been used this turn.
                  if (ability.oncePerTurn) {
 -                    if (!state.isActiveTurnFor(casterId)) continue
-+                    if (!ability.onAnyTurn && !state.isActiveTurnFor(casterId)) continue
++                    if (!ability.onAnyTurn && !state.isActivePlayersTurn(casterId)) continue
                      if (container.has<com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent>()) continue
                  }
                  // The permission may be scoped to a spell type (e.g. Dracogenesis — Dragons only).
