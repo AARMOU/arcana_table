@@ -11,8 +11,10 @@ const { claimedAtOf } = require('./units.cjs');
 const SHA = 'a'.repeat(40);
 const ORACLE = JSON.stringify({ name: 'Knuckles the Echidna', type_line: 'Legendary Creature — Echidna', oracle_text: 'Double strike',
   scryfall_uri: 'https://scryfall.com/card/sld/2082/knuckles' });
+const PACKET = '## Cardkit starting packet\\nCardkit classify: `NEEDS_REVIEW`.\\nNo close, tested custom-card match was found by `cardkit similar`; no recipe or example is guessed.';
 const workRequest = (extra = {}) => ({ name: 'Knuckles the Echidna', issue: 350, source: 'owner', requests: 1, outcome: 'engine-work',
-  readiness: 'NEEDS_REVIEW', route: 'claude', cardkitReasons: ['1 line(s) without a close implemented match (best 0.77)'], oracle: ORACLE, ...extra });
+  readiness: 'NEEDS_REVIEW', route: 'claude', cardkitReasons: ['1 line(s) without a close implemented match (best 0.77)'], oracle: ORACLE,
+  referencePacket: PACKET, ...extra });
 const body = r => Q.cardWorkBody(r, { runId: 7, baseSha: SHA, base: 'gpt/arcana-integration-next' });
 const HOUR = 3600e3;
 const review = (n, b, extra = {}) => ({
@@ -69,7 +71,7 @@ test('claim detection: only trusted people, comment must start with CLAIM', () =
   assert.equal(claimedAtOf([c('CLAIM', 'OWNER', 'Bot')]), null);
 });
 
-test('legacy card-work items without an Oracle record are superseded so they can be reopened', () => {
+test('legacy card-work items without Oracle or Cardkit references are superseded so they can be reopened', () => {
   const legacy = { number: 369, state: 'open', title: '[Card Work] Knuckles the Echidna — needs engine work',
     body: Q.CARD_WORK_MARKER + '\nold body', user: { login: 'github-actions[bot]', type: 'Bot' } };
   const payload = { ok: true, requestedClassified: true, resolvedRequests: [], workRequests: [workRequest()] };
@@ -79,5 +81,5 @@ test('legacy card-work items without an Oracle record are superseded so they can
   const renamed = { ...legacy, state: 'closed', title: Q.SUPERSEDED_PREFIX + 'Knuckles the Echidna' };
   assert.equal(Q.planCardWork(payload, [renamed]).create.name, 'Knuckles the Echidna');
   const current = { ...legacy, body: body(workRequest()) };
-  assert.deepEqual(Q.planCardWork(payload, [current]).supersede, [], 'an item with a record stays');
+  assert.deepEqual(Q.planCardWork(payload, [current]).supersede, [], 'an item with Oracle and Cardkit references stays');
 });
