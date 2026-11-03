@@ -67,7 +67,7 @@ class TechnomancerScenarioTest {
     }
 
     @Test
-    fun aSelectionTotallingSevenIsCutBackToTheCap() {
+    fun aSelectionTotallingSevenIsRefused() {
         val d = game()
         val p = d.player1
         val gnomes = d.putCardInGraveyard(p, "Bottle Gnomes")
@@ -75,11 +75,14 @@ class TechnomancerScenarioTest {
 
         val decision = d.castUntilChoice(p)
         assertEquals(setOf(gnomes, juggernaut), decision.options.toSet())
+        assertEquals("only one of {3} and {4} fits under 6", 1, decision.maxSelections)
 
-        d.select(p, listOf(gnomes, juggernaut))
-        assertEquals("3 fits", 1, d.onBattlefield(p, "Bottle Gnomes"))
-        assertEquals("3 + 4 = 7 is over the cap, so Juggernaut stays", 0, d.onBattlefield(p, "Juggernaut"))
-        assertTrue(juggernaut in d.getGraveyard(p))
+        assertNotNull("3 + 4 = 7 is over the cap", d.submitCardSelection(p, listOf(gnomes, juggernaut)).error)
+        assertTrue("the choice is still pending", d.state.pendingDecision is SelectCardsDecision)
+        d.select(p, listOf(juggernaut))
+        assertEquals(1, d.onBattlefield(p, "Juggernaut"))
+        assertEquals(0, d.onBattlefield(p, "Bottle Gnomes"))
+        assertTrue(gnomes in d.getGraveyard(p))
     }
 
     @Test
