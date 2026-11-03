@@ -25,7 +25,8 @@ const SHARED_VALIDATION_FILES = new Set([
 ]);
 const SHARED_VALIDATION_PREFIXES = [
   'tools/cardkit/','android/app/src/test/','android/app/src/androidTest/',
-  'android/custom-cards/src/test/'
+  'android/app/src/main/java/','android/app/src/main/kotlin/',
+  'android/custom-cards/src/test/','android/custom-cards/src/main/kotlin/'
 ];
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
