@@ -26,7 +26,7 @@ class OpalPalaceIndependentCertificationTest {
         power = 2,
         toughness = 2,
         supertypes = setOf(Supertype.LEGENDARY),
-    )
+    ).copy(colorIdentityOverride = setOf(Color.GREEN, Color.BLUE))
 
     private fun commanderScenario(vararg libraryCards: String): GameTestDriver =
         customScenario(OpalPalace, *libraryCards).apply {
