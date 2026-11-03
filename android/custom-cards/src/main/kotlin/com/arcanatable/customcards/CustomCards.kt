@@ -357,6 +357,12 @@ object CustomCards {
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
         // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
         Entry(GhostArk, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (sacrifice-self cost; gather legendary creature cards and move to hand).
+        Entry(Lychguard, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (Port of Karfell's mill-then-choose with an exile-self cost, sorcery timing).
+        Entry(TombFortress, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (WasCast intervening-if; DrainLife of half the target opponent's life, rounded up).
+        Entry(ShardOfTheNightbringer, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
