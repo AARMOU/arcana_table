@@ -371,6 +371,10 @@ object CustomCards {
         Entry(CanoptekScarabSwarm, "40K", "Necron Dynasties"),
         // Necron Dynasties. Needs engine patch 0038 (chosen-color land mana bonus: AdditionalManaOnSourceTap CHOSEN_COLOR).
         Entry(CagedSun, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Existing SDK; engine patch 0039 lets graveyard batch triggers see its granted types.
+        Entry(Biotransference, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0039 (Phaeron sees creature cards Biotransference made artifacts).
+        Entry(ImotekhTheStormlord, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
