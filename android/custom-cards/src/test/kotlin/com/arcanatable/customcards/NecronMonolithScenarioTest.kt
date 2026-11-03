@@ -93,7 +93,7 @@ class NecronMonolithScenarioTest {
         for (t in tokens) {
             assertEquals(2, d.projected.getPower(t))
             assertEquals(2, d.projected.getToughness(t))
-            assertEquals(setOf(Color.BLACK), d.projected.getColors(t).toSet())
+            assertEquals("black only", listOf(Color.BLACK), Color.values().filter { d.projected.hasColor(t, it) })
             assertTrue(d.projected.isCreature(t))
             assertTrue(d.projected.hasType(t, "ARTIFACT"))
             assertTrue(d.projected.hasSubtype(t, "Necron") && d.projected.hasSubtype(t, "Warrior"))
