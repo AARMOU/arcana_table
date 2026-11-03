@@ -363,6 +363,10 @@ object CustomCards {
         Entry(TombFortress, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (WasCast intervening-if; DrainLife of half the target opponent's life, rounded up).
         Entry(ShardOfTheNightbringer, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (attack trigger: mill three, filtered count of the milled cards -> Warrior tokens; Crew 4).
+        Entry(NecronMonolith, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (exile target player's graveyard, ArtifactOrLand count of the exiled cards -> Insect tokens).
+        Entry(CanoptekScarabSwarm, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
