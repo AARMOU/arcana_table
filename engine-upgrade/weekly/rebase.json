@@ -1,0 +1,15 @@
+{
+  "old_pin": "b38db9760cbf8c961bc548bf23420a13c763be95",
+  "target": "16a2f5e1844dca7524a56c82ca7cd10e529be6aa",
+  "status": "conflict",
+  "patches": [],
+  "conflicts": [
+    {
+      "patch": "0038-chosen-color-land-mana-bonus.patch",
+      "file": "docs/sdk-index.md",
+      "kind": "does_not_apply_on_pin",
+      "diff": "error: patch failed: docs/sdk-index.md:1831\nerror: docs/sdk-index.md: patch does not apply"
+    }
+  ],
+  "upstream_commits": 31
+}
