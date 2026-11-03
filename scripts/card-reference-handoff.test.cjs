@@ -54,6 +54,23 @@ test('rejects absent oracle handoff, repeated packet, and oversized request body
   assert.throws(() => appendReferencePacket(BODY + '\\n\\n## Cardkit starting packet', inputs), /already-attached/);
 });
 
+test('nearest cookbook-backed custom example wins over a closer example with no recipe', () => {
+  const secondFile = 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Other.kt';
+  const secondTest = 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OtherScenarioTest.kt';
+  const similar = [
+    'line one',
+    '  ~0.99 Unlisted [custom]',
+    '        Effects.destroy(target)',
+    '        android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Unlisted.kt (test: android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UnlistedScenarioTest.kt)',
+    'line two',
+    '  ~0.81 Other [custom]',
+    '        Effects.destroy(target)',
+    '        ' + secondFile + ' (test: ' + secondTest + ')',
+  ].join('\\n');
+  const cookbook = COOKBOOK + '\\n<!-- excerpt: ' + secondFile + ' -->';
+  assert.equal(closestCustom(similar, cookbook).card, 'Other');
+});
+
 test('recipe selection only links the cookbook section that contains the matched implementation', () => {
   assert.deepEqual(recipeFor(COOKBOOK, IMPLEMENTATION), {
     heading: '4. Dies trigger', link: 'https://github.com/AARMOU/arcana_table/blob/gpt/arcana-integration-next/docs/agents/CARD-PATTERNS.md#4-dies-trigger',
