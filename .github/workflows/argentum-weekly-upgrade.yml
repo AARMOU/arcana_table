@@ -762,7 +762,7 @@ jobs:
           problems = [k for k in e['FAILED'].split(',') if k in plain]
           status = e['STATUS'] if e['STATUS'] in ('up_to_date', 'rebased', 'conflict', 'build_failed') else ''
           if status == 'up_to_date':
-              result, message = 'up_to_date', "The engine already matches the makers' latest version. Nothing to do."
+              result, message = 'up_to_date', "The engine is already up to date. Nothing to do."
           elif status == 'rebased' and e['GREEN'] == 'true' and e['PUBLISH'] == 'success':
               result = 'ok'
               message = (("The engine was upgraded to the makers' version from a day ago" if scheduled else
