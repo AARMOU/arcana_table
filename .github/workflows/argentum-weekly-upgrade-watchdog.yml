@@ -1,14 +1,15 @@
 name: Weekly Argentum upgrade watchdog
-# Owner (2026-11-02): the weekly engine upgrade must run early Monday morning.
-# GitHub drops or delays scheduled runs in this repo under load: the Monday 09:17 UTC schedule has
-# never fired (Oct 26, Nov 2), and the backups started 1.5 h and 5 h late. This watchdog retries
-# every 20 minutes from 08:00 to 16:40 UTC on Mondays (01:00/02:00 Denver onward). If no live
-# (non-push) upgrade run has started in the last 20 hours, it starts one via workflow_dispatch.
-# It never runs upstream code and never changes anything except starting that one workflow; the
-# upgrade itself keeps all of its own safeguards (draft PR only, nothing merges on its own).
+# The engine upgrade runs every day at 11:23 UTC (one day behind upstream). GitHub drops or delays scheduled
+# runs in this repo under load: the Monday 09:17 UTC schedule never fired (Oct 26, Nov 2), and the daily
+# 11:23 UTC run never started on Nov 3. Every day from 12:07 to 19:47 UTC this watchdog checks every 20
+# minutes whether a live (non-push) upgrade run has started since 11:00 UTC that day; if not, it starts one
+# as the daily run (daily=true: 24 h behind, alerts exactly like a scheduled run).
+# It never runs upstream code and never changes anything except starting that one workflow; the upgrade
+# itself keeps all of its own safeguards. A scheduled run that GitHub merely delayed and that starts later
+# anyway finds the work done ("up to date") or refreshes the same PR: the live runs share one queue.
 on:
   schedule:
-    - cron: '7,27,47 8-16 * * 1'
+    - cron: '7,27,47 12-19 * * *'
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -21,20 +22,20 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Start the weekly upgrade if it has not run yet
+      - name: Start today's daily upgrade if it has not run yet
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          since=$(date -u -d '20 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          since=$(date -u +%Y-%m-%dT11:00:00Z)
           recent=$(gh api "repos/$REPO/actions/workflows/argentum-weekly-upgrade.yml/runs?per_page=30" \
             --jq "[.workflow_runs[] | select(.event != \"push\" and .created_at >= \"$since\")] | length")
           if [ "$recent" -gt 0 ]; then
-            echo "Weekly upgrade already started since $since ($recent run(s)); nothing to do."
+            echo "Today's upgrade already started since $since ($recent run(s)); nothing to do."
             exit 0
           fi
-          echo "No live weekly upgrade run since $since: starting one now."
+          echo "No live upgrade run since $since: starting today's daily run now."
           gh api -X POST "repos/$REPO/actions/workflows/argentum-weekly-upgrade.yml/dispatches" \
-            -f ref=main -f 'inputs[target]=main'
-          echo "Dispatched argentum-weekly-upgrade.yml on main (target=main)."
+            -f ref=main -f 'inputs[target]=main' -f 'inputs[daily]=true'
+          echo "Dispatched argentum-weekly-upgrade.yml on main as the daily run (24 h behind)."
