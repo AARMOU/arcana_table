@@ -242,7 +242,9 @@ class WeeklyWorkflowSafety(unittest.TestCase):
     def test_daily_upgrade_is_live_and_one_day_behind(self):
         crons = [c["cron"] for c in self.wf["on"]["schedule"]]
         self.assertIn("23 11 * * *", crons)
-        self.assertEqual(self.wf["env"]["LAG_HOURS"], "${{ github.event_name == 'schedule' && '24' || inputs.lag_hours || '0' }}")
+        self.assertEqual(self.wf["env"]["LAG_HOURS"],
+                         "${{ (github.event_name == 'schedule' || inputs.daily == 'true') && '24' || inputs.lag_hours || '0' }}")
+        self.assertEqual(self.wf["env"]["DAILY"], "${{ github.event_name == 'schedule' || inputs.daily == 'true' }}")
         self.assertNotIn("schedule", self.publish["if"])  # scheduled runs publish (and merge when green)
         self.assertNotIn("EARLY_WARNING", text(self.wf))
         target = next(s for s in self.validate["steps"] if s.get("id") == "target")["run"]
@@ -256,11 +258,33 @@ class WeeklyWorkflowSafety(unittest.TestCase):
             for line in run.splitlines():
                 # A green run that could not be merged is a problem someone must act on: it always posts.
                 if "gh issue comment 81" in line and "could not be merged" not in line:
-                    self.assertIn('[ "$GITHUB_EVENT_NAME" = schedule ] ||', line, name)
+                    self.assertIn('[ "$DAILY" = true ] ||', line, name)
         status = self.step("verdict", "Publish the engine status for Arcana Control")["run"]
         self.assertIn("if scheduled and problem and not same:", status)
         self.assertIn("Goose", status)
         self.assertIn("held >= 20", status)  # Claude only when the same problem outlives a day
+        self.assertIn("scheduled = e.get('DAILY') == 'true'", status)  # a watchdog restart alerts like a scheduled run
+        self.assertIn("Safe to touch:", status)  # the alert says what a fix branch can and cannot affect (drill, 2026-11-03)
+
+    # --- added 2026-11-03: the 11:23 UTC daily run never started; 0036 found missing only by hand ------
+    def test_daily_watchdog_restart_counts_as_the_daily_run(self):
+        inputs = self.wf["on"]["workflow_dispatch"]["inputs"]
+        self.assertEqual("false", inputs["daily"]["default"])
+        infra = self.step("verdict", "Tell issue 81 when a live run failed without publishing anything")["if"]
+        self.assertIn("env.DAILY != 'true'", infra)  # the daily run reports through the engine status instead
+
+    def test_up_to_date_days_still_check_the_current_builds_patches(self):
+        for key in ("synced", "unsynced"):
+            self.assertIn(key, self.validate["outputs"])
+        status = self.step("verdict", "Publish the engine status for Arcana Control")["run"]
+        self.assertIn("status == 'up_to_date' and e.get('SYNCED') == 'false'", status)
+        overall = self.step("verdict", "Overall result")["run"]
+        self.assertLess(overall.index('[ "$SYNCED" = false ]'), overall.index("Already on the latest upstream"))
+
+    def test_build_error_annotations_lead_with_the_compiler_error(self):
+        collect = self.step("validate", "Collect engine build errors")["run"]
+        self.assertIn("grep -E '^e: '", collect)
+        self.assertIn("^> Task ", collect)  # Gradle progress lines are filtered out
 
     def test_engine_jdk_follows_upstream(self):
         jdk = next(s for s in self.validate["steps"] if s.get("id") == "jdk")

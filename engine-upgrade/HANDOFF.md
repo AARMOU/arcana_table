@@ -2,7 +2,13 @@
 
 **Daily, one day behind.** The upgrade runs every day at 11:23 UTC against upstream main as it stood 24 hours
 earlier, and merges into `gpt/arcana-integration-next` by itself when every check is green (the Monday crons
-are backups). Upstream lands ~75 changes a day, so most days a red run is one small clash.
+are backups). If GitHub drops the 11:23 UTC run, the watchdog on `main` restarts it as the daily run
+(`daily: true`: 24 h behind, alerts the same way). Upstream lands ~75 changes a day, so most days a red run is
+one small clash.
+
+**A fix branch is safe to push.** A push to `gpt/argentum-weekly-fix-*` or `claude/argentum-weekly-fix-*` runs
+only this workflow's checks: `validate` has a read-only token, and `publish` and the status step are skipped on
+push. Nothing merges, no app is built for release, nothing is spent.
 
 **Who fixes a red run (owner, 2026-11-02, for cost):** 🪿 **Goose first** — the run posts on #81 once, when the
 problem first appears. If the same problem is still there on the next daily run (~a day later), the run asks
@@ -126,7 +132,12 @@ The `android` check (`tools/check_android_engine.py`) reads the new jars themsel
 - **"engine patches the current build uses are not carried here"**: a numbered build branch (main's
   `integration/policy.json` `target`) gained an engine patch directly. Copy each named patch from that
   branch into `argentum-patches/` and the MANDATORY list here, the same day (byte-identical when the pins
-  match). The daily early warning reports this within a day.
+  match). Checked on every daily run, up-to-date days included: an up-to-date day with an uncarried patch is
+  reported as blocked and asks Goose to carry it.
+- **"does not apply even on the pinned engine"**: the patch was made on a different engine (usually a
+  numbered build's, which pins an older upstream). Apply it with `git apply --reject` on the pin, re-fit the
+  rejected hunks to the current wording, and regenerate it the way `weekly.py` writes series patches
+  (2026-11-03, 0036).
 - **The current build's cards fail on the new engine**: tested in a scratch copy of that build's own
   Android tree with only the engine swapped in. Cards Argentum now also has are reconciled first, exactly
   like this base's (Arcana's version kept where Argentum's fails its tests). What still fails is a card

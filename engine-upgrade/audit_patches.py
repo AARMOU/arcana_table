@@ -50,6 +50,9 @@ MANDATORY = [
     "0034-commander-cast-count-counters-rider.patch",
     "0035-ai-idle-mana-deploy.patch",
     "0036-graveyard-card-activated-grant.patch",
+    "0037-static-attacking-chosen-player.patch",
+    "0038-chosen-color-land-mana-bonus.patch",
+    "0039-graveyard-lookback-granted-types.patch",
 ]
 # Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
 # numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.

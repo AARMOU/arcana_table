@@ -1,0 +1,390 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0039-graveyard-lookback-granted-types
+
+---
+ docs/card-sdk-language-reference.md           |   9 +-
+ .../wingedsheep/engine/core/Serialization.kt  |   1 +
+ .../engine/event/TriggerDetector.kt           |  43 ++++-
+ .../com/wingedsheep/engine/state/GameState.kt |  23 ++-
+ .../components/identity/CardComponents.kt     |  10 +
+ .../layers/GraveyardLookBackCardTypeTest.kt   | 181 ++++++++++++++++++
+ 6 files changed, 258 insertions(+), 9 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
+
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 81534cd79..7ec5a247c 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -9208,7 +9208,11 @@ in the repo today):
+   etc.), regardless of how many or where they went. For the common "leave your graveyard
+   **during your turn**" wording, add `triggerRestriction = Conditions.IsYourTurn`; for "this
+   ability triggers only once each turn", add `oncePerTurn = true`. (Attuned Hunter, Kishla
+-  Skimmer, Kheru Goldkeeper.)
++  Skimmer, Kheru Goldkeeper.) Looks back in time (CR 603.10a): a card matches with the card types a
++  cross-zone `GrantCardType` gave it *in the graveyard* (Biotransference makes your creature cards
++  artifacts, so Imotekh the Stormlord's "artifact cards leave your graveyard" sees them), frozen onto it
++  as it leaves (`GraveyardLookBackTypesComponent`, stamped by `GameState.removeFromZone`).
++  `putIntoYourGraveyard()` reads the card as it is in the graveyard, grant included.
+ - `Triggers.oneOrMore(filter).putIntoExile(from, includeTokens)` — batching trigger; fires once per event
+   batch when one or more matching **cards** are put into exile from any of `fromZones` (default:
+   graveyard and battlefield). Left unfiltered it is **not** scoped to one player's zones —
+@@ -11087,7 +11091,8 @@ staticAbility {
+   battlefield only `filter`'s **card predicates** qualify an object (read against printed characteristics); its
+   controller half is replaced by "spells the source's controller controls" / "cards that player owns". Honored by the
+   `ProjectedState.crossZoneGrantedCardTypes` overlay, which `PredicateEvaluator`'s type predicates, cast triggers,
+-  cast history (`CastSpellRecord.typeLine`) and the client type line read. Spell cost modifiers
++  cast history (`CastSpellRecord.typeLine`), the graveyard batch triggers (`leaveYourGraveyard` with look-back,
++  `putIntoYourGraveyard`) and the client type line read. Spell cost modifiers
+   (`ModifySpellCost`'s spell filter) match the `CardDefinition`, not the entity, so they don't see the grant yet.
+ - `GrantSubtype(subtype, filter)` — Layer 4 type-changing static that adds a **fixed** creature subtype to the group,
+   in addition to their other types ("is a Knight in addition to its other types"). (Dub, Angelic Destiny)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+index 769ca4756..4e10a95ac 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+@@ -599,6 +599,7 @@ val engineSerializersModule = SerializersModule {
+         subclass(CantBeCounteredComponent::class)
+         subclass(CantBeCopiedComponent::class)
+         subclass(PutIntoGraveyardThisTurnComponent::class)
++        subclass(GraveyardLookBackTypesComponent::class)
+         subclass(DrawnThisTurnComponent::class)
+         subclass(EmblemSourceComponent::class)
+         subclass(EmblemActivatedAbilityComponent::class)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
+index e3cdbc1e0..7a1450980 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
+@@ -3023,7 +3023,12 @@ class TriggerDetector(
+ 
+                 // Which of the moved cards match the filter
+                 val matchingIds = ownerEvents
+-                    .filter { event -> cardMatchesGraveyardBatchFilter(state, event.entityId, trigger.filter) }
++                    .filter { event ->
++                        cardMatchesGraveyardBatchFilter(
++                            state, event.entityId, trigger.filter,
++                            grantedTypes = state.projectedState.crossZoneGrantedCardTypes(event.entityId)
++                        )
++                    }
+                     .map { it.entityId }
+                 val hasMatch = matchingIds.isNotEmpty()
+                 if (hasMatch && trigger.firstTimeEachTurn &&
+@@ -3080,8 +3085,13 @@ class TriggerDetector(
+                 val ownerEvents = fromGravByOwner[controllerId] ?: continue
+ 
+                 // Check if any of the departed cards match the filter
++                // Looks back in time (CR 603.10a): a card counts with the types a cross-zone grant
++                // gave it in the graveyard, frozen as it left (GraveyardLookBackTypesComponent).
+                 val hasMatch = ownerEvents.any { event ->
+-                    cardMatchesGraveyardBatchFilter(state, event.entityId, trigger.filter)
++                    cardMatchesGraveyardBatchFilter(
++                        state, event.entityId, trigger.filter,
++                        grantedTypes = graveyardLookBackTypes(state, event.entityId)
++                    )
+                 }
+ 
+                 if (hasMatch) {
+@@ -3138,7 +3148,12 @@ class TriggerDetector(
+                             state = state,
+                             entityId = event.entityId,
+                             filter = trigger.filter,
+-                            includeTokens = trigger.includeTokens
++                            includeTokens = trigger.includeTokens,
++                            // A card exiled from a graveyard left that graveyard: look back (CR
++                            // 603.10a). The battlefield half keeps its printed-type reading.
++                            grantedTypes = if (event.fromZone == Zone.GRAVEYARD) {
++                                graveyardLookBackTypes(state, event.entityId)
++                            } else emptySet()
+                         )
+                 }.map { it.entityId }
+                 if (matchingIds.isEmpty()) continue
+@@ -3189,6 +3204,12 @@ class TriggerDetector(
+      * matches [filter] for graveyard batching triggers. Card-characteristic predicates are
+      * evaluated against the card's base [CardComponent]; [GameObjectFilter.Any] always matches.
+      */
++    /** The card types frozen onto [entityId] as it last left a graveyard ([GraveyardLookBackTypesComponent]). */
++    private fun graveyardLookBackTypes(state: GameState, entityId: EntityId): Set<String> =
++        state.getEntity(entityId)
++            ?.get<com.wingedsheep.engine.state.components.identity.GraveyardLookBackTypesComponent>()
++            ?.cardTypes.orEmpty()
++
+     /**
+      * "For the first time each turn": did a card matching [filter] reach [ownerId]'s graveyard this
+      * turn *before* the current batch? The owner's [CardsPutIntoGraveyardThisTurnComponent] already
+@@ -3208,14 +3229,19 @@ class TriggerDetector(
+             val at = earlier.lastIndexOf(event.entityId)
+             if (at >= 0) earlier.removeAt(at)
+         }
+-        return earlier.any { cardMatchesGraveyardBatchFilter(state, it, filter) }
++        return earlier.any {
++            cardMatchesGraveyardBatchFilter(
++                state, it, filter, grantedTypes = state.projectedState.crossZoneGrantedCardTypes(it)
++            )
++        }
+     }
+ 
+     private fun cardMatchesGraveyardBatchFilter(
+         state: GameState,
+         entityId: EntityId,
+         filter: GameObjectFilter,
+-        includeTokens: Boolean = false
++        includeTokens: Boolean = false,
++        grantedTypes: Set<String> = emptySet()
+     ): Boolean {
+         // Tokens aren't cards (CR 111.6), so a token put into a graveyard never satisfies a
+         // "one or more [permanent] cards are put into your graveyard" trigger — even though it
+@@ -3226,7 +3252,12 @@ class TriggerDetector(
+         val entity = state.getEntity(entityId) ?: return false
+         if (!includeTokens && entity.has<TokenComponent>()) return false
+         if (filter == GameObjectFilter.Any) return true
+-        val cardComponent = entity.get<CardComponent>() ?: return false
++        val printed = entity.get<CardComponent>() ?: return false
++        // Card types a cross-zone grant gives the card (Encroaching Mycosynth, Biotransference) count
++        // as its own; with none — every card without such a grant — this is the printed type line.
++        val granted = grantedTypes.mapNotNull { name -> com.wingedsheep.sdk.core.CardType.entries.firstOrNull { it.name == name } }
++        val cardComponent = if (granted.isEmpty()) printed
++            else printed.copy(typeLine = printed.typeLine.copy(cardTypes = printed.typeLine.cardTypes + granted))
+         return filter.cardPredicates.all { predicate ->
+             when (predicate) {
+                 is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsCreature ->
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
+index efafde757..30a03f7d2 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
+@@ -888,7 +888,28 @@ data class GameState(
+     fun removeFromZone(key: ZoneKey, entityId: EntityId): GameState {
+         val current = zones[key] ?: return this
+         val unlinked = if (key.zoneType == Zone.EXILE && entityId in current) forgetExileLinks(entityId) else this
+-        return unlinked.copy(zones = unlinked.zones + (key to current - entityId))
++        val removed = unlinked.copy(zones = unlinked.zones + (key to current - entityId))
++        return if (key.zoneType == Zone.GRAVEYARD && entityId in current) {
++            removed.stampGraveyardLookBackTypes(entityId, projectedState.crossZoneGrantedCardTypes(entityId))
++        } else removed
++    }
++
++    /**
++     * "Whenever one or more artifact cards leave your graveyard" looks back in time (CR 603.10a):
++     * a card counts as the card it was *in the graveyard*, including card types a cross-zone grant
++     * gave it there (Biotransference: "creature cards you own that aren't on the battlefield" are
++     * artifacts). By trigger time the card is elsewhere, so [removeFromZone] freezes those types
++     * onto it as it leaves; the leave-graveyard batch detector reads them. Every graveyard
++     * departure restamps, so a stale stamp from an earlier departure is never read, and a card with
++     * no such grant (the overwhelming case) gets no component at all.
++     */
++    private fun stampGraveyardLookBackTypes(entityId: EntityId, granted: Set<String>): GameState {
++        val had = entities[entityId]?.has<com.wingedsheep.engine.state.components.identity.GraveyardLookBackTypesComponent>() == true
++        if (granted.isEmpty() && !had) return this
++        return updateEntity(entityId) { c ->
++            if (granted.isEmpty()) c.without<com.wingedsheep.engine.state.components.identity.GraveyardLookBackTypesComponent>()
++            else c.with(com.wingedsheep.engine.state.components.identity.GraveyardLookBackTypesComponent(granted))
++        }
+     }
+ 
+     /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
+index a4120e429..da1ffc40e 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
+@@ -322,3 +322,13 @@ data class PutIntoGraveyardThisTurnComponent(
+      */
+     val duringCombat: Boolean = false
+ ) : Component
++
++/**
++ * The card types a cross-zone grant gave this card while it was in a graveyard, frozen as it left
++ * (CR 603.10a look-back for "whenever one or more artifact cards leave your graveyard" —
++ * Imotekh the Stormlord with Biotransference). Stamped by `GameState.removeFromZone` on every
++ * graveyard departure that has such types (and cleared on one that has none); read only by the
++ * leave-graveyard batch trigger detector. Card type names as in [CardType.name].
++ */
++@Serializable
++data class GraveyardLookBackTypesComponent(val cardTypes: Set<String>) : Component
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
+new file mode 100644
+index 000000000..41e0f894d
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
+@@ -0,0 +1,181 @@
++package com.wingedsheep.engine.mechanics.layers
++
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.core.PaymentStrategy
++import com.wingedsheep.engine.state.components.stack.ChosenTarget
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.Triggers
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.GrantCardType
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/**
++ * "Whenever one or more artifact cards leave your graveyard" looks back in time (CR 603.10a), so a
++ * creature card that a cross-zone [GrantCardType] made an artifact *in the graveyard* (Biotransference:
++ * "creature cards you own that aren't on the battlefield" are artifacts) counts, wherever it went.
++ * `GameState.removeFromZone` freezes the granted types onto the card as it leaves the graveyard and
++ * the leave-graveyard batch detector reads them. "Put into your graveyard" batches read the card
++ * as it now is in the graveyard, grant included.
++ *
++ * Pins: granted creature card leaving fires; the same card without a grant doesn't; a
++ * battlefield-only grant doesn't reach the graveyard; an opponent's grant doesn't reach your
++ * cards; a granted creature card put into your graveyard fires the arrival batch.
++ */
++class GraveyardLookBackCardTypeTest : FunSpec({
++
++    val creatureGrant = card("Test Biotransference") {
++        manaCost = "{2}{B}{B}"
++        typeLine = "Enchantment"
++        staticAbility {
++            ability = GrantCardType(
++                cardType = "ARTIFACT",
++                filter = GroupFilter(GameObjectFilter.Creature.youControl()),
++                includeControlledSpells = true,
++                includeOwnedCardsOutsideBattlefield = true
++            )
++        }
++    }
++
++    val battlefieldOnlyGrant = card("Test Battlefield Biotransference") {
++        manaCost = "{2}{B}{B}"
++        typeLine = "Enchantment"
++        staticAbility {
++            ability = GrantCardType(
++                cardType = "ARTIFACT",
++                filter = GroupFilter(GameObjectFilter.Creature.youControl())
++            )
++        }
++    }
++
++    val leaveWatcher = card("Test Artifact Leave Watcher") {
++        manaCost = "{1}"
++        typeLine = "Enchantment"
++        triggeredAbility {
++            trigger = Triggers.oneOrMore(GameObjectFilter.Artifact).leaveYourGraveyard()
++            effect = Effects.GainLife(1)
++        }
++    }
++
++    val arrivalWatcher = card("Test Artifact Arrival Watcher") {
++        manaCost = "{1}"
++        typeLine = "Enchantment"
++        triggeredAbility {
++            trigger = Triggers.oneOrMore(GameObjectFilter.Artifact).putIntoYourGraveyard()
++            effect = Effects.GainLife(1)
++        }
++    }
++
++    val raise = card("Test Raise") {
++        manaCost = "{B}"
++        typeLine = "Sorcery"
++        spell {
++            val target = target(TargetFilter.CreatureInYourGraveyard)
++            effect = Effects.Move(target, Zone.HAND)
++        }
++    }
++
++    fun newDriver(): GameTestDriver {
++        val driver = GameTestDriver()
++        driver.registerCards(
++            TestCards.all + listOf(creatureGrant, battlefieldOnlyGrant, leaveWatcher, arrivalWatcher, raise)
++        )
++        driver.initMirrorMatch(deck = Deck.of("Forest" to 40), skipMulligans = true, startingPlayer = 0)
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return driver
++    }
++
++    fun GameTestDriver.raise(player: EntityId, target: EntityId) {
++        val spell = putCardInHand(player, "Test Raise")
++        giveMana(player, Color.BLACK, 1)
++        submit(
++            CastSpell(
++                playerId = player,
++                cardId = spell,
++                targets = listOf(ChosenTarget.Card(target, player, Zone.GRAVEYARD)),
++                paymentStrategy = PaymentStrategy.FromPool,
++            )
++        ).error shouldBe null
++        bothPass()
++        // Resolve the watcher's trigger, if any.
++        bothPass()
++    }
++
++    test("a granted-artifact creature card leaving your graveyard fires a leave-graveyard artifact watcher") {
++        val driver = newDriver()
++        val me = driver.player1
++        driver.putPermanentOnBattlefield(me, "Test Biotransference")
++        driver.putPermanentOnBattlefield(me, "Test Artifact Leave Watcher")
++        val corpse = driver.putCardInGraveyard(me, "Centaur Courser")
++        val life = driver.getLifeTotal(me)
++
++        driver.raise(me, corpse)
++
++        driver.getLifeTotal(me) shouldBe life + 1
++    }
++
++    test("without a grant a creature card leaving your graveyard is not an artifact card") {
++        val driver = newDriver()
++        val me = driver.player1
++        driver.putPermanentOnBattlefield(me, "Test Artifact Leave Watcher")
++        val corpse = driver.putCardInGraveyard(me, "Centaur Courser")
++        val life = driver.getLifeTotal(me)
++
++        driver.raise(me, corpse)
++
++        driver.getLifeTotal(me) shouldBe life
++    }
++
++    test("a battlefield-only grant does not reach the card in the graveyard") {
++        val driver = newDriver()
++        val me = driver.player1
++        driver.putPermanentOnBattlefield(me, "Test Battlefield Biotransference")
++        driver.putPermanentOnBattlefield(me, "Test Artifact Leave Watcher")
++        val corpse = driver.putCardInGraveyard(me, "Centaur Courser")
++        val life = driver.getLifeTotal(me)
++
++        driver.raise(me, corpse)
++
++        driver.getLifeTotal(me) shouldBe life
++    }
++
++    test("an opponent's grant does not make your creature cards artifacts") {
++        val driver = newDriver()
++        val me = driver.player1
++        driver.putPermanentOnBattlefield(driver.player2, "Test Biotransference")
++        driver.putPermanentOnBattlefield(me, "Test Artifact Leave Watcher")
++        val corpse = driver.putCardInGraveyard(me, "Centaur Courser")
++        val life = driver.getLifeTotal(me)
++
++        driver.raise(me, corpse)
++
++        driver.getLifeTotal(me) shouldBe life
++    }
++
++    test("a granted-artifact creature card put into your graveyard fires a put-into-graveyard artifact watcher") {
++        val driver = newDriver()
++        val me = driver.player1
++        driver.putPermanentOnBattlefield(me, "Test Biotransference")
++        driver.putPermanentOnBattlefield(me, "Test Artifact Arrival Watcher")
++        val courser = driver.putPermanentOnBattlefield(me, "Centaur Courser")
++        val life = driver.getLifeTotal(me)
++
++        val bolt = driver.putCardInHand(me, "Lightning Bolt")
++        driver.giveMana(me, Color.RED, 1)
++        driver.castSpell(me, bolt, listOf(courser)).error shouldBe null
++        driver.bothPass()
++        driver.bothPass()
++
++        driver.getLifeTotal(me) shouldBe life + 1
++    }
++})
