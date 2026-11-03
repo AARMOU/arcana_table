@@ -318,7 +318,7 @@ index 0acc0e501e..0992cd8ff8 100644
      /**
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 new file mode 100644
-index 0000000000..5cd7ebd9b4
+index 0000000000..04de5b84af
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 @@ -0,0 +1,242 @@
@@ -356,7 +356,7 @@ index 0000000000..5cd7ebd9b4
 +class ChosenColorLandManaBonusTest : ScenarioTestBase() {
 +
 +    init {
-+        cardRegistry.register(listOf(Sun, TapOnlySun, Grove, Isle, Dual, Pit, Rock, GreenTwin, Twinned))
++        cardRegistry.register(listOf(Sun, TapOnlySun, Grove, Isle, Dual, Pit, Rock, GreenTwin, Twinned, GreenPair, BluePair))
 +
 +        fun board(vararg mine: String, opp: List<String> = emptyList(), active: Int = 1, spell: String? = null) = scenario()
 +            .withPlayers("Player", "Opponent")
