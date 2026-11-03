@@ -1,5 +1,5 @@
-const fs = require('node:fs');
 'use strict';
+const fs = require('node:fs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { appendReferencePacket, closestCustom, referencePacket, recipeFor } = require('./card-reference-handoff.cjs');
