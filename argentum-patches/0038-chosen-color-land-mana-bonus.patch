@@ -1,0 +1,585 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0038-chosen-color-land-mana-bonus
+
+---
+ docs/card-sdk-language-reference.md           |  14 +-
+ docs/sdk-index.md                             |   2 +-
+ .../sdk/scripting/MiscStaticAbilities.kt      |  23 +-
+ .../ability/ActivatedManaAbilityResolver.kt   |   6 +-
+ .../ColorChoiceContinuationResumer.kt         |   6 +-
+ .../mana/ManaAbilityResolutionPipeline.kt     |  34 ++-
+ .../effects/mana/ScopedManaProduction.kt      |   1 +
+ .../engine/mechanics/mana/ManaSolver.kt       |  36 ++-
+ .../mana/ChosenColorLandManaBonusTest.kt      | 242 ++++++++++++++++++
+ 9 files changed, 354 insertions(+), 10 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
+
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index ff3228a79..81534cd79 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -12837,7 +12837,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   `{S}` spent. When auto-pay taps a snow land for a `{S}` pip, it also spends that land's any-color
+   snow-aura bonus on a further `{S}` pip (a fixed-color bonus floats instead). (Elvish Guidance = fixed `{G}`; **Fertile
+   Ground** = `anyColor`; **Glittering Frost** = `anyColor` + `GrantSupertype("SNOW")` on a snow Aura)
+-- `AdditionalManaOnSourceTap(sourceFilter, color = null, amount = 1, rider = null, whenProducing = TappedForManaType.ANY)` — global: "Whenever
++- `AdditionalManaOnSourceTap(sourceFilter, color = null, amount = 1, rider = null, whenProducing = TappedForManaType.ANY, anyManaAbility = false, onlyWhenYouAdd = false)` — global: "Whenever
+   a `<sourceFilter>` is tapped for mana, that player adds …". `color = null` mirrors the produced color.
+   `rider` is an optional non-mana `Effect` resolved inline, controlled by the tapping player
+   (`EffectTarget.Controller` = tapper, `EffectTarget.Self` = the static's source). (Lavaleaper = basic-land
+@@ -12852,6 +12852,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   Oblivion** = `GameObjectFilter.Land.youControl()`, `color = null`, `whenProducing = COLORLESS`. Gated
+   on all three mana paths (manual tap, color-choice-resume mirror, and the auto-pay `ManaSolver`, whose
+   colorless bonus floats as a colorless `BonusManaEntry`).
++  `whenProducing = CHOSEN_COLOR` fires only when the ability added at least one mana of the static
++  source's chosen color (`EntersWithChoice(ChoiceType.COLOR)`; none chosen → never), and with
++  `color = null` adds exactly one of that color however much the land made. `anyManaAbility = true`
++  also fires on the source's mana abilities **without {T}** in their cost ("Whenever a land's ability
++  causes you to add …"; default `false` keeps "is tapped for mana"); `onlyWhenYouAdd = true` fires only
++  when the mana went to the static's controller ("causes **you** to add"), whoever controls the land.
++  **Caged Sun** = `GameObjectFilter.Land`, `color = null`, `whenProducing = CHOSEN_COLOR`,
++  `anyManaAbility = true`, `onlyWhenYouAdd = true`. Auto-pay credits it per tap for a source whose
++  every tap adds the chosen color (a basic, a bounce land); a source that makes it as one of several
++  kinds (a dual) yields one more *when tapped for that color* (`ManaSource.colorAmounts`), except on
++  snow, restricted or ridered mana or with a `MultiplyManaOnSourceTap` in play, where only the manual
++  tap credits it.
+ - `MultiplyManaOnSourceTap(sourceFilter, multiplier)` — global: "If you tap a `<sourceFilter>` for mana, it
+   produces `<multiplier>` times as much of that mana instead." The **multiplicative** sibling of
+   `AdditionalManaOnSourceTap`, sharing its filter convention (the filter is evaluated from the static's own
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 1f6651223..0732f234f 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1843,7 +1843,7 @@ Families:
+ - `AdditionalETBOrLTBTriggers(filter: GameObjectFilter, mustBeYouControl: Boolean, directions: Set<BattlefieldDirection>, description: String)` — When a permanent matching filter crosses the battlefield boundary in one of directions, triggered abilities of permanents controlled by this ability's controller that fired from that event trigger…
+ - `AdditionalLifeGainTriggers` — If you gaining life causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time (CR 603.2d) — Dr.
+ - `AdditionalManaForEntryCounters(spellFilter: GameObjectFilter, counterType: CounterType)` — "As an additional cost to cast spellFilter spells, you may pay any amount of mana.
+-- `AdditionalManaOnSourceTap(sourceFilter: GameObjectFilter, color: Color?, amount: DynamicAmount, rider: Effect?, whenProducing: TappedForManaType)` — Whenever a permanent matching sourceFilter is tapped for mana, the tapping player adds amount additional mana to their pool.
++- `AdditionalManaOnSourceTap(sourceFilter: GameObjectFilter, color: Color?, amount: DynamicAmount, rider: Effect?, whenProducing: TappedForManaType, anyManaAbility: Boolean, onlyWhenYouAdd: Boolean)` — Whenever a permanent matching sourceFilter is tapped for mana, the tapping player adds amount additional mana to their pool.
+ - `AdditionalManaOnTap(color: Color?, amount: DynamicAmount, anyColor: Boolean)` — Whenever enchanted land is tapped for mana, its controller adds additional mana.
+ - `AdditionalSourceTriggers(sourceFilter: GameObjectFilter, excludeSelf: Boolean, alsoSource: Boolean, condition: Condition?, description: String)` — If a triggered ability of a permanent matching sourceFilter you control triggers, it triggers an additional time.
+ - `AnimateLandGroup(filter: GroupFilter, power: Int, toughness: Int, creatureSubtypes: List<String>, colors: Set<Color>)` — Animates a group of lands into creatures while keeping them as lands.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
+index 9148795d3..aa9b9258e 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
+@@ -325,7 +325,14 @@ data class OverrideEnchantedLandManaColor(
+  *   side effects (e.g. City of Brass's damage) during automatic payment.
+  * @property whenProducing Restricts which produced-mana types cause the bonus to fire (default
+  *   [TappedForManaType.ANY] — the historical behavior). [TappedForManaType.COLORLESS] models
+- *   "tap a land for {C}" (Ultima); [TappedForManaType.COLORED] models "tap … for colored mana".
++ *   "tap a land for {C}" (Ultima); [TappedForManaType.COLORED] models "tap … for colored mana";
++ *   [TappedForManaType.CHOSEN_COLOR] models "causes you to add one or more mana of the chosen color"
++ *   (Caged Sun).
++ * @property anyManaAbility When true the bonus also follows a matching source's mana abilities
++ *   without {T} in their cost — "Whenever a land's ability causes you to add …" (Caged Sun) rather
++ *   than "is tapped for mana". Default false: only a {T} mana ability fires it.
++ * @property onlyWhenYouAdd When true the bonus fires only when the mana goes to this static's
++ *   controller ("causes **you** to add"), whoever controls the source. Default false.
+  */
+ @SerialName("AdditionalManaOnSourceTap")
+ @Serializable
+@@ -334,7 +341,9 @@ data class AdditionalManaOnSourceTap(
+     val color: Color? = null,
+     val amount: DynamicAmount = DynamicAmount.Fixed(1),
+     val rider: Effect? = null,
+-    val whenProducing: TappedForManaType = TappedForManaType.ANY
++    val whenProducing: TappedForManaType = TappedForManaType.ANY,
++    val anyManaAbility: Boolean = false,
++    val onlyWhenYouAdd: Boolean = false
+ ) : StaticAbility {
+     override val description: String = buildString {
+         append("Whenever a ")
+@@ -345,12 +354,15 @@ data class AdditionalManaOnSourceTap(
+                 TappedForManaType.ANY -> "mana"
+                 TappedForManaType.COLORLESS -> "{C}"
+                 TappedForManaType.COLORED -> "colored mana"
++                TappedForManaType.CHOSEN_COLOR -> "mana of the chosen color"
+             }
+         )
+         append(", ")
+         when {
+             color == null && whenProducing == TappedForManaType.COLORLESS ->
+                 append("add an additional {C}.")
++            color == null && whenProducing == TappedForManaType.CHOSEN_COLOR ->
++                append("add an additional one mana of that color.")
+             color == null ->
+                 append("that player adds one mana of any type that source produced.")
+             else ->
+@@ -386,6 +398,13 @@ enum class TappedForManaType {
+ 
+     /** Only a tap that produced colored mana fires the bonus. */
+     COLORED,
++
++    /**
++     * Only an ability that added at least one mana of this static source's chosen color fires the
++     * bonus, and with `color = null` the bonus is one mana of that color (Caged Sun). No chosen color,
++     * no bonus.
++     */
++    CHOSEN_COLOR,
+ }
+ 
+ /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
+index bf566d238..eca290c73 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
+@@ -296,7 +296,11 @@ internal class ActivatedManaAbilityResolver(
+         // All of these key on the source being *tapped* for mana, so a mana ability without {T}
+         // in its cost (Ashnod's Altar, a Gold token) gets none of them — Kinnan's ruling — the
+         // same gate the scoped-production path applies.
+-        if (!costsTap) return ExecutionResult.success(currentState, eventsWithMana + effectResult.events)
++        // (Except "a land's ability causes you to add" — Caged Sun — which follows any mana ability.)
++        if (!costsTap) return manaPipeline.finishUntappedManaAbility(
++            currentState, action.sourceId, action.playerId,
++            manaEvent, eventsWithMana + effectResult.events, producedColors
++        )
+         return manaPipeline.finishTapBonuses(
+             currentState, action.sourceId, cardComponent, action.playerId,
+             manaEvent, eventsWithMana + effectResult.events, producedColors
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
+index 034dc01fa..bed42ef33 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
+@@ -253,7 +253,11 @@ class ColorChoiceContinuationResumer(
+             else snowMarked
+         // Tap bonuses only follow a mana ability with {T} in its cost (see ActivatedManaAbilityResolver).
+         val costsTap = continuation.baseContext.activatedAbility?.cost?.hasTapCost() ?: true
+-        if (!costsTap) return checkForMore(tracked, events)
++        if (!costsTap) {
++            val untapped = manaPipeline.finishUntappedManaAbility(tracked, sourceId, tapperId, producedMana, events,
++                if (dampening.dampened) emptySet() else manaColorsAdded(state, dampening.state, tapperId))
++            return checkForMore(untapped.newState, untapped.events.toList())
++        }
+         val finished = manaPipeline.finishTapBonuses(
+             tracked,
+             sourceId, sourceCard, tapperId, producedMana, events,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
+index 412ca98c8..4b22a290a 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
+@@ -127,7 +127,7 @@ class ManaAbilityResolutionPipeline(
+     ): ExecutionResult {
+         val onTap = resolveAdditionalManaOnTap(state, sourceId, tapperId, carriedEvents)
+         val onSourceTap = resolveAdditionalManaOnSourceTap(
+-            onTap.state, sourceId, tapperId, manaEvent, onTap.events
++            onTap.state, sourceId, tapperId, manaEvent, onTap.events, producedColors
+         )
+         var allManaEvents = onSourceTap.events
+ 
+@@ -144,6 +144,25 @@ class ManaAbilityResolutionPipeline(
+         return tappedForManaBonusResolver.drive(onSourceTap.state, anyColorBonuses, allManaEvents)
+     }
+ 
++    /**
++     * A mana ability without {T} in its cost gets none of the tap payoffs except the
++     * [AdditionalManaOnSourceTap] statics with `anyManaAbility` ("Whenever a land's ability causes
++     * you to add …", Caged Sun).
++     */
++    fun finishUntappedManaAbility(
++        state: GameState,
++        sourceId: EntityId,
++        tapperId: EntityId,
++        manaEvent: ManaAddedEvent?,
++        carriedEvents: List<GameEvent>,
++        producedColors: Set<Color> = manaEvent.producedColors(),
++    ): ExecutionResult {
++        val result = resolveAdditionalManaOnSourceTap(
++            state, sourceId, tapperId, manaEvent, carriedEvents, producedColors, untappedOnly = true
++        )
++        return ExecutionResult.success(result.state, result.events)
++    }
++
+     /**
+      * After a mana ability resolves on a permanent, check for auras attached to it
+      * that have [AdditionalManaOnTap] (e.g., Elvish Guidance). These are triggered mana
+@@ -241,7 +260,9 @@ class ManaAbilityResolutionPipeline(
+         sourceId: EntityId,
+         tappingPlayerId: EntityId,
+         manaEvent: ManaAddedEvent?,
+-        existingEvents: List<GameEvent>
++        existingEvents: List<GameEvent>,
++        producedColors: Set<Color> = manaEvent.producedColors(),
++        untappedOnly: Boolean = false
+     ): AdditionalManaResult {
+         state.getEntity(sourceId) ?: return AdditionalManaResult(state, existingEvents)
+ 
+@@ -279,15 +300,21 @@ class ManaAbilityResolutionPipeline(
+             val container = currentState.getEntity(entityId)
+             val card = container?.get<CardComponent>()
+             run {
++                if (untappedOnly && !onSourceTap.anyManaAbility) continue
+ 
+                 // Gate on the produced-mana type ("tap a land for {C}" only fires on a colorless tap).
+                 if (!producedManaMatches(onSourceTap.whenProducing, producedColor, producedColorless)) continue
++                // Caged Sun: the ability must have added this static's chosen color, among whatever else.
++                val chosenColor = if (onSourceTap.whenProducing == TappedForManaType.CHOSEN_COLOR)
++                    container?.chosenColor()?.takeIf { it in producedColors } ?: continue
++                    else null
+ 
+                 // A grant held by a player entity has no controller of its own; the holder *is*
+                 // the player, which is the right "you" for any controller predicate in the filter.
+                 val staticController = currentState.projectedState.getController(entityId)
+                     ?: entityId.takeIf { currentState.turnOrder.contains(it) }
+                     ?: continue
++                if (onSourceTap.onlyWhenYouAdd && tappingPlayerId != staticController) continue
+ 
+                 // Filter is evaluated from the static-ability controller's perspective so
+                 // `youControl` on the source filter means "controlled by you, the static
+@@ -309,7 +336,7 @@ class ManaAbilityResolutionPipeline(
+                 if (bonusAmount <= 0) continue
+ 
+                 // Resolve the bonus color: explicit color wins; null means mirror the produced color.
+-                val bonusColor: Color? = onSourceTap.color ?: producedColor
++                val bonusColor: Color? = onSourceTap.color ?: chosenColor ?: producedColor
+                 val bonusColorless = onSourceTap.color == null && bonusColor == null && producedColorless
+                 if (bonusColor == null && !bonusColorless) continue
+ 
+@@ -369,6 +396,7 @@ class ManaAbilityResolutionPipeline(
+         TappedForManaType.ANY -> true
+         TappedForManaType.COLORLESS -> producedColorless
+         TappedForManaType.COLORED -> producedColor != null
++        TappedForManaType.CHOSEN_COLOR -> true // gated on the chosen color by the caller
+     }
+ 
+     /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
+index 0091bd548..2846587f3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
+@@ -36,5 +36,6 @@ fun finishScopedManaProduction(
+     val tracked = tagManaObligationProduction(before, dampening.state, frame.playerId, frame.sourceId, frame.sourceTag)
+     return if (frame.costsTap && produced > 0)
+         pipeline.finishTapBonuses(tracked, frame.sourceId, frame.sourceCard, frame.playerId, production, visible)
++    else if (produced > 0) pipeline.finishUntappedManaAbility(tracked, frame.sourceId, frame.playerId, production, visible)
+     else ExecutionResult.success(tracked, visible)
+ }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+index 253d117b4..84b647a00 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+@@ -2663,9 +2663,11 @@ class ManaSolver private constructor(
+         var totalBonus = 0
+         var bonusColor: Color? = null
+         var totalColorlessBonus = 0
++        var chosenKindBonus: Pair<Color, Int>? = null
+ 
+         for (entry in manaStatics.sourceTapBonuses) {
+             val onSourceTap = entry.static
++            if (onSourceTap.onlyWhenYouAdd && tappingPlayerId != entry.sourceControllerId) continue
+ 
+             // Gate on the produced-mana type. At solve time the produced type is inferred from
+             // what the source can supply: COLORLESS applies only to a source that produces {C},
+@@ -2674,6 +2676,7 @@ class ManaSolver private constructor(
+                 TappedForManaType.ANY -> {}
+                 TappedForManaType.COLORLESS -> if (!source.producesColorless) continue
+                 TappedForManaType.COLORED -> if (source.producesColors.isEmpty()) continue
++                TappedForManaType.CHOSEN_COLOR -> if (source.producesColors.isEmpty()) continue
+             }
+ 
+             // Filter from the static-ability controller's perspective — see
+@@ -2695,6 +2698,29 @@ class ManaSolver private constructor(
+             val amount = dynamicAmountEvaluator.evaluate(state, onSourceTap.amount, effectContext)
+             if (amount <= 0) continue
+ 
++            // Caged Sun: only a tap that adds the chosen color fires it. A source whose every tap adds
++            // that color (a basic, a bounce land) gets a plain per-tap bonus. A source that adds it
++            // only as one of several kinds (a dual) instead yields that much more *when tapped for
++            // that color* — skipped where that would misreport the bonus (snow, restricted or
++            // ridered mana, a multiplier that would scale it).
++            if (onSourceTap.whenProducing == TappedForManaType.CHOSEN_COLOR) {
++                val chosen = state.getEntity(entry.sourceId)?.chosenColor() ?: continue
++                if (chosen !in source.producesColors) continue
++                val resolved = onSourceTap.color ?: chosen
++                val everyTapAddsChosen = !source.producesColorless && (source.producesColors.size == 1 ||
++                    source.compositeBonusMana.isNotEmpty() && source.producesColors.size == source.compositeBonusMana.size + 1)
++                if (everyTapAddsChosen) {
++                    totalBonus += amount
++                    bonusColor = bonusColor ?: resolved
++                } else if (resolved == chosen && !source.isSnow && source.restriction == null &&
++                    chosen !in source.colorRestrictions && source.colorRiders[chosen].isNullOrEmpty() &&
++                    source.compositeBonusMana.isEmpty() && manaStatics.sourceTapMultipliers.isEmpty()
++                ) {
++                    chosenKindBonus = chosen to (chosenKindBonus?.second ?: 0) + amount
++                }
++                continue
++            }
++
+             // A colorless bonus arises when the ability adds {C}: either it's explicitly gated to
+             // colorless taps, or it's a mirror (color = null) over a colorless-only source.
+             val isColorlessBonus = onSourceTap.color == null &&
+@@ -2710,7 +2736,7 @@ class ManaSolver private constructor(
+             bonusColor = bonusColor ?: resolvedColor
+         }
+ 
+-        return if (totalBonus > 0 || totalColorlessBonus > 0) {
++        val augmented = if (totalBonus > 0 || totalColorlessBonus > 0) {
+             source.copy(
+                 bonusManaPerTap = source.bonusManaPerTap + totalBonus,
+                 bonusManaColor = source.bonusManaColor ?: bonusColor,
+@@ -2719,6 +2745,14 @@ class ManaSolver private constructor(
+         } else {
+             source
+         }
++        val (kind, extra) = chosenKindBonus ?: return augmented
++        val kindAmount = augmented.amountFor(kind) + extra
++        return augmented.copy(
++            exactIndependentTap = false,
++            manaAmount = maxOf(augmented.manaAmount, kindAmount),
++            colorAmounts = augmented.producesColors.associateWith { augmented.amountFor(it) } + (kind to kindAmount),
++            colorlessAmount = if (augmented.producesColorless) augmented.amountFor(null) else augmented.colorlessAmount,
++        )
+     }
+ 
+     /**
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
+new file mode 100644
+index 000000000..04de5b84a
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
+@@ -0,0 +1,242 @@
++package com.wingedsheep.engine.mana
++
++import com.wingedsheep.engine.core.ActivateAbility
++import com.wingedsheep.engine.state.components.battlefield.CastChoicesComponent
++import com.wingedsheep.engine.state.components.battlefield.ChoiceValue
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.player.ManaPoolComponent
++import com.wingedsheep.engine.support.ScenarioTestBase
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Phase
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.Costs
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.AdditionalManaOnSourceTap
++import com.wingedsheep.sdk.scripting.ChoiceSlot
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.TappedForManaType
++import io.kotest.assertions.withClue
++import io.kotest.matchers.shouldBe
++import io.kotest.matchers.shouldNotBe
++
++/**
++ * `AdditionalManaOnSourceTap(whenProducing = CHOSEN_COLOR, anyManaAbility = true, onlyWhenYouAdd = true)`:
++ * Caged Sun's "Whenever a land's ability causes you to add one or more mana of the chosen color, add
++ * an additional one mana of that color." A triggered mana ability (CR 605.1b) — fires on a land's mana
++ * ability with or without {T}, only when that ability added the static's chosen color, adds exactly one
++ * of it, and only when the mana went to the static's controller. Manual and auto-pay paths.
++ */
++class ChosenColorLandManaBonusTest : ScenarioTestBase() {
++
++    init {
++        cardRegistry.register(listOf(Sun, TapOnlySun, Grove, Isle, Dual, Pit, Rock, GreenTwin, Twinned, GreenPair, BluePair))
++
++        fun board(vararg mine: String, opp: List<String> = emptyList(), active: Int = 1, spell: String? = null) = scenario()
++            .withPlayers("Player", "Opponent")
++            .apply { mine.forEach { withCardOnBattlefield(1, it) } }
++            .apply { opp.forEach { withCardOnBattlefield(2, it) } }
++            .apply { if (spell != null) withCardInHand(1, spell) }
++            .withActivePlayer(active)
++            .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
++            .build()
++
++        fun TestGame.nameOf(id: EntityId) = state.getEntity(id)?.get<CardComponent>()?.name
++
++        fun TestGame.choose(name: String, color: Color) {
++            state.getBattlefield().filter { nameOf(it) == name }.forEach { id ->
++                state = state.updateEntity(id) { c ->
++                    c.with(CastChoicesComponent(chosen = mapOf(ChoiceSlot.COLOR to ChoiceValue.ColorChoice(color))))
++                }
++            }
++        }
++
++        fun TestGame.idOf(player: EntityId, name: String): EntityId =
++            state.getBattlefield().first { nameOf(it) == name && state.projectedState.getController(it) == player }
++
++        fun TestGame.mana(player: EntityId, name: String, def: CardDefinition, index: Int = 0) {
++            val ability = def.activatedAbilities.filter { it.isManaAbility }[index]
++            execute(ActivateAbility(player, idOf(player, name), ability.id)).error shouldBe null
++        }
++
++        fun TestGame.pool(player: EntityId = player1Id) = state.getEntity(player)?.get<ManaPoolComponent>()!!
++
++        test("a land tapped for the chosen color adds one more of it") {
++            val game = board("Sun", "Grove")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Grove", Grove)
++            game.pool().green shouldBe 2
++        }
++
++        test("a land tapped for another color gets nothing") {
++            val game = board("Sun", "Isle")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Isle", Isle)
++            game.pool().blue shouldBe 1
++            game.pool().green shouldBe 0
++        }
++
++        test("a dual fires only when its ability added the chosen color") {
++            val game = board("Sun", "Dual")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Dual", Dual, index = 1) // {T}: Add {U}
++            withClue("tapped for {U}") { (game.pool().blue to game.pool().green) shouldBe (1 to 0) }
++            val other = board("Sun", "Dual")
++            other.choose("Sun", Color.GREEN)
++            other.mana(other.player1Id, "Dual", Dual, index = 0) // {T}: Add {G}
++            withClue("tapped for {G}") { (other.pool().green to other.pool().blue) shouldBe (2 to 0) }
++        }
++
++        test("an ability adding two of the color still adds exactly one more") {
++            val game = board("Sun", "Green Twin")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Green Twin", GreenTwin)
++            game.pool().green shouldBe 3
++        }
++
++        test("an ability adding the chosen color among others fires once") {
++            val game = board("Sun", "Twinned")
++            game.choose("Sun", Color.BLUE)
++            game.mana(game.player1Id, "Twinned", Twinned) // {T}: Add {G}{U}
++            (game.pool().green to game.pool().blue) shouldBe (1 to 2)
++        }
++
++        test("a land's mana ability without {T} fires it; the default tapped-only form does not") {
++            val game = board("Sun", "Pit")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Pit", Pit)
++            withClue("anyManaAbility") { game.pool().green shouldBe 2 }
++
++            val tapOnly = board("Tap Only Sun", "Pit")
++            tapOnly.choose("Tap Only Sun", Color.GREEN)
++            tapOnly.mana(tapOnly.player1Id, "Pit", Pit)
++            withClue("default: a sacrifice-only mana ability is not a tap") { tapOnly.pool().green shouldBe 1 }
++        }
++
++        test("a nonland source of the chosen color does not fire it") {
++            val game = board("Sun", "Rock")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Rock", Rock)
++            game.pool().green shouldBe 1
++        }
++
++        test("two instances add one each") {
++            val game = board("Sun", "Sun", "Grove")
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player1Id, "Grove", Grove)
++            game.pool().green shouldBe 3
++        }
++
++        test("mana an opponent adds from their land is not yours") {
++            val game = board("Sun", opp = listOf("Grove"), active = 2)
++            game.choose("Sun", Color.GREEN)
++            game.mana(game.player2Id, "Grove", Grove)
++            game.pool(game.player2Id).green shouldBe 1
++            game.pool(game.player1Id).green shouldBe 0
++        }
++
++        test("no chosen color, no bonus") {
++            val game = board("Sun", "Grove")
++            game.mana(game.player1Id, "Grove", Grove)
++            game.pool().green shouldBe 1
++        }
++
++        test("auto-pay counts the bonus: one land pays {G}{G}") {
++            val game = board("Sun", "Grove", spell = "Green Pair")
++            game.choose("Sun", Color.GREEN)
++            game.castSpell(1, "Green Pair").error shouldBe null
++        }
++
++        test("auto-pay counts a dual's bonus only for the chosen color") {
++            val game = board("Sun", "Dual", spell = "Green Pair")
++            game.choose("Sun", Color.GREEN)
++            game.castSpell(1, "Green Pair").error shouldBe null
++            val blue = board("Sun", "Dual", spell = "Blue Pair")
++            blue.choose("Sun", Color.GREEN)
++            withClue("a dual tapped for {U} gets no bonus, so one dual can't pay {U}{U}") {
++                blue.castSpell(1, "Blue Pair").error shouldNotBe null
++            }
++        }
++
++        test("auto-pay without the chosen color gets no bonus") {
++            val game = board("Sun", "Isle", spell = "Blue Pair")
++            game.choose("Sun", Color.GREEN)
++            game.castSpell(1, "Blue Pair").error shouldNotBe null
++        }
++    }
++
++    companion object {
++        private fun sun(name: String, anyAbility: Boolean) = card(name) {
++            typeLine = "Artifact"
++            staticAbility {
++                ability = AdditionalManaOnSourceTap(
++                    sourceFilter = GameObjectFilter.Land,
++                    color = null,
++                    whenProducing = TappedForManaType.CHOSEN_COLOR,
++                    anyManaAbility = anyAbility,
++                    onlyWhenYouAdd = true,
++                )
++            }
++        }
++        private val Sun = sun("Sun", anyAbility = true)
++        private val TapOnlySun = sun("Tap Only Sun", anyAbility = false)
++
++        private fun land(name: String, vararg colors: Color) = card(name) {
++            typeLine = "Land"
++            colors.forEach { c ->
++                activatedAbility {
++                    manaAbility = true
++                    cost = Costs.Tap
++                    effect = Effects.AddMana(c)
++                }
++            }
++        }
++        private val Grove = land("Grove", Color.GREEN)
++        private val Isle = land("Isle", Color.BLUE)
++        private val Dual = land("Dual", Color.GREEN, Color.BLUE)
++        private val GreenTwin = card("Green Twin") {
++            typeLine = "Land"
++            activatedAbility {
++                manaAbility = true
++                cost = Costs.Tap
++                effect = Effects.AddMana(Color.GREEN, 2)
++            }
++        }
++        private val Twinned = card("Twinned") {
++            typeLine = "Land"
++            activatedAbility {
++                manaAbility = true
++                cost = Costs.Tap
++                effect = Effects.AddMana(Color.GREEN).then(Effects.AddMana(Color.BLUE))
++            }
++        }
++        private val Pit = card("Pit") {
++            typeLine = "Land"
++            activatedAbility {
++                manaAbility = true
++                cost = Costs.SacrificeSelf
++                effect = Effects.AddMana(Color.GREEN)
++            }
++        }
++        private val Rock = card("Rock") {
++            typeLine = "Artifact"
++            activatedAbility {
++                manaAbility = true
++                cost = Costs.Tap
++                effect = Effects.AddMana(Color.GREEN)
++            }
++        }
++        private val GreenPair = card("Green Pair") {
++            manaCost = "{G}{G}"
++            typeLine = "Sorcery"
++            spell { effect = Effects.GainLife(1) }
++        }
++        private val BluePair = card("Blue Pair") {
++            manaCost = "{U}{U}"
++            typeLine = "Sorcery"
++            spell { effect = Effects.GainLife(1) }
++        }
++    }
++}

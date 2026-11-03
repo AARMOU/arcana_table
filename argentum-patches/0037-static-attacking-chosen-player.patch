@@ -1,0 +1,228 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index 7099656bd0..6807dead3c 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -7828,8 +7828,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
+   `attackingDefenderOf(reference)`, which takes the whole defending side. Pairs with
+   `Triggers.you.attacksAPlayer()`: Echoing Assault's "target nontoken creature that's attacking that
+   player" is `TargetFilter(GameObjectFilter.Creature.nontoken().attackingPlayer(EffectTarget.PlayerRef(Player.TriggeringPlayer)))`.
+-  Fails closed when the reference resolves to nothing, and during projection (no trigger context);
+-  no last-known fallback.
++  Fails closed when the reference resolves to nothing; no last-known fallback. In a **static
++  ability's group filter** (layer projection, no trigger context) only source-bound references
++  resolve — `PlayerRef(Player.ChosenOpponent)` / `PlayerRef(Player.ChosenPlayer)` (the player stored
++  on the static's source by `Effects.ChooseOpponent()` / an enters-with choice), `PlayerRef(Player.You)`
++  and `EffectTarget.Controller`; trigger-bound ones (`TriggeringPlayer`, …) fail closed. Triarch
++  Stalker's "at the beginning of combat on your turn, choose an opponent. Creatures attacking the last
++  chosen player have menace" is a `Triggers.you.beginningOf(Step.BEGIN_COMBAT)` →
++  `Effects.ChooseOpponent()` trigger plus `GrantKeyword(Keyword.MENACE,
++  GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))))`;
++  the choice lives on the source and is forgotten when it changes zones (CR 400.7).
+ - `IsAttackingEnchantedPlayer` (filter builder `attackingEnchantedPlayer()`) — attacking the player the
+   filtering ability's **source Aura is attached to** (CR 303 enchant player). The attachment-scoped third
+   of the trio above: `IsAttackingAnOpponent` and `IsAttackingYouOrYourPlaneswalkers` both scope the
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
+index 9386e4f422..c3913e897f 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
+@@ -246,6 +246,11 @@ sealed interface StatePredicate {
+      * reference-parameterised form of [IsAttackingEnchantedPlayer], which resolves its player from
+      * the source's attachment during projection (where no trigger context exists).
+      *
++     * In a static ability's group filter (layer projection, no trigger context) only the
++     * source-bound references resolve: `PlayerRef(Player.ChosenOpponent)` / `ChosenPlayer` (the
++     * player stored on the source — Triarch Stalker's "creatures attacking the last chosen player
++     * have menace"), `PlayerRef(Player.You)` and [com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller].
++     *
+      * No last-known fallback, for [IsAttackingAnOpponent]'s reason. Fails closed when [player]
+      * resolves to nothing.
+      */
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+index e5cd6b4d5f..f776474aa1 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+@@ -1,6 +1,8 @@
+ package com.wingedsheep.engine.mechanics.layers
+ 
+ import com.wingedsheep.engine.state.components.battlefield.chosenColor
++import com.wingedsheep.engine.state.components.battlefield.chosenOpponent
++import com.wingedsheep.engine.state.components.battlefield.chosenPlayer
+ import com.wingedsheep.engine.state.components.battlefield.chosenSubtype
+ import com.wingedsheep.engine.state.components.battlefield.CastChoicesComponent
+ import com.wingedsheep.engine.state.components.battlefield.chosenCreatureOf
+@@ -532,9 +534,29 @@ internal class AffectsFilterResolver(
+             }
+             player != null && defendingPlayer != null && player in state.sharedTurnTeam(defendingPlayer)
+         }
+-        // A referenced player ("that player") needs a trigger or effect context that projection
+-        // doesn't carry; no static uses it today, so fail closed rather than guess.
+-        is StatePredicate.IsAttackingPlayer -> false
++        // "Creatures attacking the last chosen player" (Triarch Stalker): during projection only the
++        // references the *source* itself pins down can resolve — the player stored in its
++        // OPPONENT / PLAYER choice slot, or its controller. A trigger-bound reference ("that
++        // player") has no context here and fails closed. The declared defender must be that player
++        // themself: an attacker aimed at a planeswalker or battle they control is a different
++        // defender and doesn't match. The choice lives on the source's CastChoicesComponent, which a
++        // zone change strips (CR 400.7), so a returned source has no chosen player until it chooses
++        // again; a player who has left the game is never a declared defender, so nothing matches.
++        is StatePredicate.IsAttackingPlayer -> {
++            val source = sourceId?.let { state.getEntity(it) }
++            val player = when (val ref = predicate.player) {
++                is EffectTarget.PlayerRef -> when (ref.player) {
++                    com.wingedsheep.sdk.scripting.references.Player.ChosenOpponent -> source?.chosenOpponent()
++                    com.wingedsheep.sdk.scripting.references.Player.ChosenPlayer -> source?.chosenPlayer()
++                    com.wingedsheep.sdk.scripting.references.Player.You -> sourceController
++                    else -> null
++                }
++                EffectTarget.Controller -> sourceController
++                else -> null
++            }
++            val defenderId = container.get<AttackingComponent>()?.defenderId
++            player != null && defenderId == player && player in state.turnOrder
++        }
+         StatePredicate.IsAttackingYouOrYourPlaneswalkers -> {
+             val defenderId = container.get<AttackingComponent>()?.defenderId
+             sourceController != null && defenderId != null && (
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/AttackingChosenPlayerStaticTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/AttackingChosenPlayerStaticTest.kt
+new file mode 100644
+index 0000000000..a21e23055c
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/AttackingChosenPlayerStaticTest.kt
+@@ -0,0 +1,137 @@
++package com.wingedsheep.engine.mechanics.layers
++
++import com.wingedsheep.engine.state.components.battlefield.ChoiceValue
++import com.wingedsheep.engine.state.components.battlefield.withCastChoice
++import com.wingedsheep.engine.state.components.combat.AttackingComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.ChoiceSlot
++import com.wingedsheep.sdk.scripting.GameObjectFilter
++import com.wingedsheep.sdk.scripting.GrantKeyword
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++import com.wingedsheep.sdk.scripting.references.Player
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import io.kotest.assertions.withClue
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/**
++ * `StatePredicate.IsAttackingPlayer` inside a static ability's group filter: during projection the
++ * player reference resolves against the static's *source* — its stored chosen opponent / chosen
++ * player, or its controller — so "creatures attacking the last chosen player have menace" (Triarch
++ * Stalker) projects. Only an attacker whose declared defender is that player matches: a
++ * planeswalker that player controls is a different defender. Trigger-bound references still fail
++ * closed here (no trigger context during projection).
++ */
++class AttackingChosenPlayerStaticTest : FunSpec({
++
++    val relay = card("Test Targeting Relay") {
++        manaCost = "{3}"
++        typeLine = "Artifact"
++        oracleText = "Creatures attacking the chosen player have menace."
++        staticAbility {
++            ability = GrantKeyword(
++                Keyword.MENACE,
++                GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent)))
++            )
++        }
++    }
++
++    val triggerBound = card("Test Trigger-Bound Relay") {
++        manaCost = "{3}"
++        typeLine = "Artifact"
++        oracleText = "Creatures attacking that player have menace."
++        staticAbility {
++            ability = GrantKeyword(
++                Keyword.MENACE,
++                GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.TriggeringPlayer)))
++            )
++        }
++    }
++
++    val walker = card("Test Relay Walker") {
++        manaCost = "{3}"
++        typeLine = "Legendary Planeswalker — Test"
++        startingLoyalty = 3
++        oracleText = ""
++    }
++
++    data class Table(val d: GameTestDriver, val p1: EntityId, val p2: EntityId, val p3: EntityId)
++
++    fun table(): Table {
++        val d = GameTestDriver()
++        d.registerCards(TestCards.all)
++        d.registerCards(listOf(relay, triggerBound, walker))
++        val (p1, p2, p3) = d.initMultiplayer(decks = List(3) { Deck.of("Forest" to 40) })
++        return Table(d, p1, p2, p3)
++    }
++
++    fun GameTestDriver.choose(source: EntityId, player: EntityId) =
++        replaceState(state.updateEntity(source) { it.withCastChoice(ChoiceSlot.OPPONENT, ChoiceValue.EntityChoice(player)) })
++
++    fun GameTestDriver.attack(creature: EntityId, defender: EntityId) =
++        replaceState(state.updateEntity(creature) { it.with(AttackingComponent(defenderId = defender)) })
++
++    fun GameTestDriver.menace(id: EntityId) = state.projectedState.hasKeyword(id, Keyword.MENACE)
++
++    test("attackers of the chosen player have it, whoever controls them; others don't") {
++        val (d, p1, p2, p3) = table()
++        val source = d.putPermanentOnBattlefield(p1, "Test Targeting Relay")
++        d.choose(source, p2)
++        val mine = d.putCreatureOnBattlefield(p1, "Centaur Courser")
++        val theirs = d.putCreatureOnBattlefield(p3, "Centaur Courser")
++        val atP3 = d.putCreatureOnBattlefield(p1, "Goblin Guide")
++        val idle = d.putCreatureOnBattlefield(p1, "Savannah Lions")
++        d.attack(mine, p2)
++        d.attack(theirs, p2)
++        d.attack(atP3, p3)
++
++        withClue("controller's attacker of the chosen player") { d.menace(mine) shouldBe true }
++        withClue("another opponent's attacker of the chosen player") { d.menace(theirs) shouldBe true }
++        withClue("attacker of a different player") { d.menace(atP3) shouldBe false }
++        withClue("non-attacker") { d.menace(idle) shouldBe false }
++    }
++
++    test("an attacker of the chosen player's planeswalker doesn't match") {
++        val (d, p1, p2, _) = table()
++        val source = d.putPermanentOnBattlefield(p1, "Test Targeting Relay")
++        d.choose(source, p2)
++        val pw = d.putPermanentOnBattlefield(p2, "Test Relay Walker")
++        val bear = d.putCreatureOnBattlefield(p1, "Goblin Guide")
++        d.attack(bear, pw)
++        d.menace(bear) shouldBe false
++    }
++
++    test("no chosen player — nothing matches; re-choosing moves it") {
++        val (d, p1, p2, p3) = table()
++        val source = d.putPermanentOnBattlefield(p1, "Test Targeting Relay")
++        val a = d.putCreatureOnBattlefield(p1, "Goblin Guide")
++        val b = d.putCreatureOnBattlefield(p1, "Centaur Courser")
++        d.attack(a, p2)
++        d.attack(b, p3)
++        withClue("nothing chosen yet") {
++            d.menace(a) shouldBe false
++            d.menace(b) shouldBe false
++        }
++        d.choose(source, p2)
++        d.menace(a) shouldBe true
++        d.menace(b) shouldBe false
++        d.choose(source, p3)
++        withClue("the last choice replaces the previous one") {
++            d.menace(a) shouldBe false
++            d.menace(b) shouldBe true
++        }
++    }
++
++    test("a trigger-bound player reference still fails closed in projection") {
++        val (d, p1, p2, _) = table()
++        d.putPermanentOnBattlefield(p1, "Test Trigger-Bound Relay")
++        val bear = d.putCreatureOnBattlefield(p1, "Goblin Guide")
++        d.attack(bear, p2)
++        d.menace(bear) shouldBe false
++    }
++})
