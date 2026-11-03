@@ -116,6 +116,11 @@ private suspend fun TableController.acceptMultiWifiGuest(
         server.rejectGuest(id, "This game is no longer accepting guests.")
         return
     }
+    BuildCompatibility.guestProblem(hello)?.let { problem ->
+        recordDiagnostic("Wi-Fi guest refused: different Arcana build (${hello.optInt(BuildCompatibility.FIELD, -1)})", DiagnosticCategory.CONNECTION)
+        server.rejectGuest(id, problem)
+        return
+    }
     val name = hello.optString("name").ifBlank { "Friend" }.take(32)
     val deck = hello.optJSONArray("deck") ?: JSONArray()
     val names = (0 until deck.length()).map(deck::optString)
@@ -285,6 +290,12 @@ private suspend fun TableController.acceptMultiOnlineGuest(
     registry: com.wingedsheep.engine.registry.CardRegistry,
 ) {
     if (wifiServer !== host || wifiMultiLobby !== room) return
+    BuildCompatibility.guestProblem(hello)?.let { problem ->
+        recordDiagnostic("Online guest refused: different Arcana build (${hello.optInt(BuildCompatibility.FIELD, -1)})", DiagnosticCategory.CONNECTION)
+        host.sendTo(id, JSONObject().put("type", "error").put("code", "WIFI").put("message", problem))
+        host.rejectGuest(id)
+        return
+    }
     val guestName = hello.optString("name").ifBlank { "Friend" }.take(32)
     val deck = hello.optJSONArray("deck") ?: JSONArray()
     val cards = (0 until deck.length()).map(deck::optString)
@@ -371,7 +382,7 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
     }
     val hello = JSONObject().put("type", "lanHello")
         .put("name", friendlyName(commander)).put("deck", JSONArray(names))
-        .put("commander", commander)
+        .put("commander", commander).put(BuildCompatibility.FIELD, BuildCompatibility.current)
     val guest = ArgentumCloudMultiGuest(lobbyCloudEndpoint, clean, friendlyName(commander))
     argentumSocket.attachLanGuest(guest)
     guest.connect { failure -> scope.launch {
@@ -457,6 +468,7 @@ internal fun TableController.joinWifiGame(address: String) {
             if (commander == null) { message = "Wi-Fi games use Commander decks. Pick a Commander deck on the home screen first."; return@launch }
             val hello = JSONObject().put("type", "lanHello").put("name", friendlyName(commander))
                 .put("deck", JSONArray(names)).put("commander", commander)
+                .put(BuildCompatibility.FIELD, BuildCompatibility.current)
             argentumSocket.attachLanGuest(guest)
             withContext(Dispatchers.IO) { guest.connect(address, hello) }
             wifiJoinOpen = false
