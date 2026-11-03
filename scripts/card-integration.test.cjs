@@ -449,6 +449,7 @@ test('B9 each relevant destination change allows one full attempt, then stays qu
     m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
     m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[{filename:path,status:'modified'}]}});
     const next=await P.planNext({...common,github:m.github,controlSha:control});
+    assert.ok(next,`expected changed input to trigger one attempt: ${path}`);
     assert.equal(next.baseSha,destination,path);assert.equal(next.autoRetry,undefined);
     const blocked=result(next).report;blocked.status='blocked';blocked.reason='scenario mismatch';
     await P.publish({...common,github:m.github,plan:next,report:blocked,files:[],expectedSources:{}});
