@@ -1,0 +1,9 @@
+{
+  "key": "benthic-anomaly",
+  "name": "Benthic Anomaly",
+  "issue": 922,
+  "source": "certification/BenthicAnomalyIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BenthicAnomalyIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
