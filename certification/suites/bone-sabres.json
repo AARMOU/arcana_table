@@ -1,0 +1,9 @@
+{
+  "key": "bone-sabres",
+  "name": "Bone Sabres",
+  "issue": 811,
+  "source": "certification/BoneSabresIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BoneSabresIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
