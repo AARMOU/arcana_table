@@ -35,8 +35,8 @@ class TechnomancerScenarioTest {
         return decision as SelectCardsDecision
     }
 
-    private fun GameTestDriver.select(p: EntityId, vararg cards: EntityId) {
-        assertNull(submitCardSelection(p, cards.toList()).error)
+    private fun GameTestDriver.select(p: EntityId, cards: List<EntityId>) {
+        assertNull(submitCardSelection(p, cards).error)
         resolveAll()
     }
 
@@ -59,7 +59,7 @@ class TechnomancerScenarioTest {
         assertEquals("only artifact creature cards are offered", setOf(gnomes, myr), decision.options.toSet())
         assertEquals("any number includes zero", 0, decision.minSelections)
 
-        d.select(p, gnomes, myr)
+        d.select(p, listOf(gnomes, myr))
         assertEquals(1, d.onBattlefield(p, "Bottle Gnomes"))
         assertEquals(1, d.onBattlefield(p, "Palladium Myr"))
         assertEquals(1, d.onBattlefield(p, "Technomancer"))
@@ -76,7 +76,7 @@ class TechnomancerScenarioTest {
         val decision = d.castUntilChoice(p)
         assertEquals(setOf(gnomes, juggernaut), decision.options.toSet())
 
-        d.select(p, gnomes, juggernaut)
+        d.select(p, listOf(gnomes, juggernaut))
         assertEquals("3 fits", 1, d.onBattlefield(p, "Bottle Gnomes"))
         assertEquals("3 + 4 = 7 is over the cap, so Juggernaut stays", 0, d.onBattlefield(p, "Juggernaut"))
         assertTrue(juggernaut in d.getGraveyard(p))
@@ -89,7 +89,7 @@ class TechnomancerScenarioTest {
         val gnomes = d.putCardInGraveyard(p, "Bottle Gnomes")
 
         d.castUntilChoice(p)
-        d.select(p)
+        d.select(p, emptyList())
         assertEquals(0, d.onBattlefield(p, "Bottle Gnomes"))
         assertTrue(gnomes in d.getGraveyard(p))
         assertEquals(1, d.onBattlefield(p, "Technomancer"))
