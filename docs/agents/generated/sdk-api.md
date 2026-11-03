@@ -96,6 +96,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `HATCHING: String`
 - `HATCHLING: String`
 - `HEXPROOF: String`
+- `HIT: String`
 - `HONE: String`
 - `HOOFPRINT: String`
 - `HOPE: String`
@@ -140,6 +141,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `OIL: String`
 - `OMEN: String`
 - `PAGE: String`
+- `PHYLACTERY: String`
 - `PHYRESIS: String`
 - `PIN: String`
 - `PLAGUE: String`
@@ -248,7 +250,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 
 ## dsl.BatchTriggerSubject
 
-- `becomeTapped(TapReason): TriggerSpec`*
+- `becomeTapped(TapReason, TapReason): TriggerSpec`*
 - `becomeUntapped(): TriggerSpec`
 - `block(): TriggerSpec`
 - `dealCombatDamageToAnOpponent(): TriggerSpec`
@@ -435,6 +437,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `AdditionalCostWasPaid: Condition`
 - `AfterCombat: Condition`
 - `All(Condition...): Condition`
+- `AllInCollectionShareCardType(String): Condition`
 - `AmountIsEven(DynamicAmount): Condition`
 - `AmountIsMultipleOf(DynamicAmount, Int): Condition`
 - `AmountIsOdd(DynamicAmount): Condition`
@@ -565,8 +568,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `OpponentWasDealtNoncombatDamageThisTurn: Condition`
 - `PermanentEnteredFaceDownThisTurn: Condition`
 - `PermanentPutIntoYourHandFromBattlefieldThisTurn: Condition`
+- `PermanentPutIntoZoneFromBattlefieldThisTurn(Zone, CardType, Player): Condition`*
 - `PermanentTypeEnteredBattlefieldThisTurn(CardType, Player): Condition`*
-- `PermanentTypePutIntoGraveyardFromBattlefieldThisTurn(CardType, Player): Condition`*
 - `PermanentWithCounterPutIntoGraveyardThisTurn(String): Condition`
 - `PlayedLandThisTurn: Condition`
 - `PlayerAttackedPlayerThisTurn(Player, Player): Condition`*
@@ -628,6 +631,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `SourcesYouControlledDealtDamageThisTurn(Int): Condition`
 - `SpeedBelowMax(Player): Condition`*
 - `SubtypeCreatureDiedThisTurn(String, Player): Condition`*
+- `SurveiledThisTurn: Condition`
 - `TargetHasCounter(String, Int): Condition`*
 - `TargetHasCounter(String, EffectTarget.SingleEntity): Condition`*
 - `TargetIsCreatureCard(Int): Condition`*
@@ -645,6 +649,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `TeamworkWasPaid: Condition`
 - `ThisAbilityActivatedThisTurnAtLeast(Int): Condition`
 - `TriggeringAttackersAttackedPlayer(Player): Condition`*
+- `TriggeringEntityEnteredOrWasCastFrom(Zone): Condition`
 - `TriggeringEntityEnteredOrWasCastFromGraveyard: Condition`
 - `TriggeringEntityHadCounters: Condition`
 - `TriggeringEntityHadMinusOneMinusOneCounter: Condition`
@@ -694,6 +699,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `YouDiscardedACardThisTurn: Condition`
 - `YouDiscardedThisCardThisTurn: Condition`
 - `YouDrewCardsThisTurn(Int): Condition`*
+- `YouFacedADilemmaThisTurn(Int, Player): Condition`*
 - `YouGainedAndLostLifeThisTurn: Condition`
 - `YouGainedLifeThisTurn: Condition`
 - `YouGainedLifeThisTurnAtLeast(Int): Condition`
@@ -763,6 +769,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `PayXLife: AbilityCost`*
 - `PutCounterOnSelf(String, Int): AbilityCost`*
 - `PutFromHandOnTopOfLibrary(Int, GameObjectFilter): AbilityCost`*
+- `PutSelfOnBottomOfLibrary: AbilityCost`
+- `PutSelfOnTopOfLibrary: AbilityCost`
 - `RemoveAllCountersFromGrantingPermanent(String): AbilityCost`
 - `RemoveAllCountersFromSelf(String): AbilityCost`
 - `RemoveCounterFromSelf(String, Int): AbilityCost`*
@@ -991,6 +999,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `creaturesWithSubtype(String): DynamicAmount`
 - `creaturesWithSubtypeDiedThisTurn(String, Player): DynamicAmount`*
 - `creaturesYouControl(): DynamicAmount`
+- `creatureTypesAmong(GameObjectFilter, Player): DynamicAmount`*
 - `cursesAttachedToEnchantedPlayer(): DynamicAmount`
 - `damageDealtBySourceThisTurn(Player): DynamicAmount`*
 - `damageDealtToTargetPlayerThisTurn(Int): DynamicAmount`*
@@ -1001,6 +1010,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `devotionToChosenColor(): DynamicAmount`
 - `diedBatchTotalPower(): DynamicAmount`
 - `differentlyNamedLandsYouControl(Player): DynamicAmount`*
+- `dilemmasFacedThisTurn(Player): DynamicAmount`*
 - `distinctBendsThisTurn(Player): DynamicAmount`*
 - `distinctCardTypesIn(String...): DynamicAmount`
 - `distinctCardTypesIn(String): DynamicAmount`
@@ -1017,6 +1027,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `equipmentAttachedToSelf(): DynamicAmount`
 - `equipmentYouControl(Player): DynamicAmount`*
 - `equippedCreaturesYouControl(Player): DynamicAmount`*
+- `extraTurnsBegunThisGame(Player): DynamicAmount`*
+- `federation(Player): DynamicAmount`*
 - `fewestControlledBySinglePlayer(GameObjectFilter, Player): DynamicAmount`*
 - `fixed(Int): DynamicAmount`
 - `greatestAmongPlayers(DynamicAmount, Player): DynamicAmount`*
@@ -1213,7 +1225,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `AddManaOfColorAmongGraveyard(GameObjectFilter, ManaRestriction): Effect`*
 - `AddManaOfColorAmongLinkedExile(ManaRestriction): Effect`*
 - `AddManaOfColorInCommanderColorIdentity(ManaRestriction, Set<? extends ManaSpellRider>): Effect`*
-- `AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction): Effect`*
+- `AddManaOfColorLandsCouldProduce(LandControllerScope, ManaRestriction, GameObjectFilter): Effect`*
+- `AddManaOfDifferentColors(Int, ManaRestriction): Effect`*
 - `AddOneManaOfEachColorAmong(GameObjectFilter, ManaRestriction): Effect`*
 - `AddOneManaOfEachCraftedMaterialColor(ManaRestriction): Effect`*
 - `AddSubtype(String, EffectTarget, Duration): Effect`*
@@ -1228,6 +1241,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `AmplifyDamageThisTurn(DynamicAmount, EventPattern.DamageEvent): Effect`
 - `AnimateLand(EffectTarget, Int, Int, Duration): Effect`*
 - `AnyPlayerMayPay(PayCost, Effect, Player): Effect`*
+- `Assimilate(EffectTarget, Zone): Effect`*
 - `AttachEquipment(EffectTarget): Effect`
 - `AttachTargetEquipmentToCreature(EffectTarget, EffectTarget): Effect`
 - `AttachToChosenHost(EffectTarget, GameObjectFilter): Effect`*
@@ -1320,6 +1334,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `CopyControlledStackObjects(Set<? extends StackObjectKind>, Player): Effect`*
 - `CopyEachSpellCast(Int, GameObjectFilter): Effect`*
 - `CopyEachTargetSpell(List<? extends Keyword>, Boolean): Effect`*
+- `CopyForChosenOtherPossibleTarget(GameObjectFilter, EffectTarget, Player): Effect`*
 - `CopyForEachOtherPossibleTarget(GameObjectFilter, EffectTarget, Player): Effect`*
 - `CopyNextSpellCast(Int, GameObjectFilter): Effect`*
 - `CopyTargetSpell(EffectTarget, List<? extends Keyword>, Boolean, Set<? extends Keyword>, Step, Boolean, DynamicAmount, CopyExceptions, Boolean): Effect`*
@@ -1423,7 +1438,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `DoubleAllCounters(EffectTarget): Effect`
 - `DoubleCounters(String, EffectTarget): Effect`*
 - `DoubleDamageToPlayer(EffectTarget, Duration): Effect`*
-- `DrainLife(DynamicAmount, EffectTarget, EffectTarget): Effect`*
+- `DrainLife(DynamicAmount, EffectTarget, EffectTarget, Boolean): Effect`*
 - `DrainLife(Int, EffectTarget, EffectTarget): Effect`*
 - `DrawCards(Int, EffectTarget): Effect`*
 - `DrawCards(DynamicAmount, EffectTarget): Effect`*
@@ -1469,7 +1484,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `Flip(EffectTarget): Effect`*
 - `FlipCoin(Effect, Effect): Effect`*
 - `FlipCoins(Int, String): Effect`*
-- `FlipCoinsUntilLoss(String): Effect`*
+- `FlipCoinsUntilLoss(String, Boolean): Effect`*
 - `FlipTwoCoins(Effect, Effect, Effect): Effect`*
 - `Foraged(): Effect`
 - `ForceBlock(EffectTarget, EffectTarget): Effect`*
@@ -1508,7 +1523,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `GrantCantBeBlockedExceptByCollection(EffectTarget, String, GameObjectFilter, Duration): Effect`
 - `GrantCantBeBlockedExceptByColor(GroupFilter, Color, Duration): Effect`*
 - `GrantCastCreaturesFromGraveyardWithForage(Duration): Effect`*
-- `GrantCounterPlacementModifier(Int, Duration, String, Recipient): Effect`*
+- `GrantCounterPlacementModifier(Int, Duration, String, Recipient, Player): Effect`*
 - `GrantDamageBonus(Int, GameObjectFilter, EffectTarget, Duration): Effect`*
 - `GrantEmbalm(EffectTarget, ManaCost, Duration): Effect`*
 - `GrantEscape(EffectTarget, ManaCost, AdditionalCost, Duration): Effect`*
@@ -1526,8 +1541,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `GrantKeyword(AbilityFlag, EffectTarget, Duration): Effect`*
 - `GrantKeywordToAttackersBlockedBy(Keyword, EffectTarget, Duration): Effect`*
 - `GrantKeywordToSpell(Keyword, EffectTarget, Duration): Effect`*
-- `GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Integer, ManaSpentAsAnyColor, Boolean): Effect`*
-- `GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, EffectTarget, Boolean, Integer, ManaSpentAsAnyColor, Boolean): Effect`*
+- `GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Set<? extends CardType>, Integer, ManaSpentAsAnyColor, Boolean): Effect`*
+- `GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, GameObjectFilter, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Set<? extends CardType>, EffectTarget, Boolean, Integer, ManaSpentAsAnyColor, Boolean): Effect`*
 - `GrantNextSpellAffinity(GameObjectFilter, CardType): Effect`*
 - `GrantNextSpellFreeCast(GameObjectFilter): Effect`*
 - `GrantNextSpellKeyword(Keyword, GameObjectFilter): Effect`*
@@ -1552,6 +1567,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `GrantToEnchantedCreatureTypeGroup(Int, Int, Keyword, Set<? extends Color>, Duration): Effect`*
 - `GrantToxic(Int, EffectTarget, Duration): Effect`*
 - `GrantTriggeredAbility(TriggeredAbility, EffectTarget, Duration): Effect`*
+- `HealDamage(EffectTarget): Effect`
 - `HijackNextCombatPhase(EffectTarget): Effect`*
 - `HijackNextTurn(EffectTarget): Effect`*
 - `If(Condition, Effect, Effect, String): GatedEffect`*
@@ -1568,6 +1584,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `LockLifeGain(EffectTarget, Duration): Effect`*
 - `LockLifeLoss(EffectTarget, Duration): Effect`*
 - `LockOrUnlockDoor(EffectTarget): Effect`
+- `LockPlayerCounters(EffectTarget, Duration): Effect`*
 - `LookAtFaceDown(EffectTarget, FaceDownLookScope): Effect`
 - `LookAtHand(EffectTarget): Effect`
 - `LoseAllCreatureTypes(EffectTarget, Duration): Effect`*
@@ -1585,8 +1602,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `MarkMustAttackThisTurn(EffectTarget): Effect`
 - `MarkMustAttackThisTurn(EffectTarget, EffectTarget): Effect`
 - `MarkMustBlockThisTurn(EffectTarget): Effect`
+- `MarkSpellExileOnResolve(ExiledSpellRider, EffectTarget): Effect`*
 - `MarkSpellExileWithCounters(EffectTarget, String, Int): Effect`*
-- `MarkSpellPlotOnResolve(EffectTarget): Effect`*
 - `MassAnimate(GameObjectFilter, DynamicAmount, DynamicAmount, Boolean, Duration): Effect`*
 - `May(Effect, Effect, String, EffectTarget, Zone, Boolean, String, DynamicHint, FeasibilityCheck, String, ChoiceLabels): GatedEffect`*
 - `MayPay(Effect, Effect, Effect, EffectTarget, String): GatedEffect`*
@@ -1690,13 +1707,14 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `RemoveCounterOfAnyKind(EffectTarget, DynamicAmount): Effect`*
 - `RemoveCounters(String, Int, EffectTarget): Effect`*
 - `RemoveCounters(String, DynamicAmount, EffectTarget): Effect`*
+- `RemoveCountersFromAmong(String, GameObjectFilter, String): Effect`
 - `RemoveCountersOfIteratedKind(EffectTarget, Int): Effect`*
 - `RemoveCountersUpTo(Int, EffectTarget): Effect`
 - `RemoveDamageShield(EffectTarget): Effect`
 - `RemoveFromCombat(EffectTarget, Boolean): Effect`*
 - `RemoveKeyword(Keyword, EffectTarget, Duration): Effect`*
 - `RemoveKeyword(AbilityFlag, EffectTarget, Duration): Effect`*
-- `RemoveMaximumHandSize(EffectTarget): Effect`*
+- `RemoveMaximumHandSize(EffectTarget, Duration): Effect`*
 - `Repeat(DynamicAmount, Effect): Effect`
 - `RepeatWhile(Effect, RepeatCondition): Effect`
 - `ReplaceNextDraw(Effect, EffectTarget): Effect`*
@@ -1752,7 +1770,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `SkipNextStepOrPhase(TurnPart, EffectTarget): Effect`*
 - `SkipNextTurn(EffectTarget, DynamicAmount): Effect`*
 - `SkipStepOrPhaseThisTurn(TurnPart, EffectTarget): Effect`*
-- `SkipUntap(EffectTarget, GameObjectFilter): Effect`*
+- `SkipUntap(EffectTarget, GameObjectFilter, Boolean): Effect`*
 - `SpendAnyManaTypeForOneSpell(GameObjectFilter): Effect`*
 - `StoreCardName(String, String): Effect`*
 - `StoreNumber(String, DynamicAmount): Effect`
@@ -2190,7 +2208,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `becomesPlotted(): TriggerSpec`
 - `becomesRenowned(): TriggerSpec`
 - `becomesSaddled(Boolean): TriggerSpec`*
-- `becomesTapped(TapReason, Boolean): TriggerSpec`*
+- `becomesTapped(TapReason, Boolean, TapReason): TriggerSpec`*
 - `becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Player, Boolean, Boolean, Boolean): TriggerSpec`*
 - `becomesUnattached(GameObjectFilter, Player): TriggerSpec`*
 - `becomesUntapped(): TriggerSpec`
@@ -2307,6 +2325,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `flipOntoBattlefield(GameObjectFilter, String): String`*
 - `forEachCaptured--M2-hSY(String, String, String, String, Function2<? super PipelineBuilder, ? super NumberSlot, Unit>): Unit`*
 - `forEachCounterKindAmong(GroupFilter, Function1<? super PipelineBuilder, Unit>): Unit`
+- `forEachInGroupCollecting(GroupFilter, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>`
 - `forEachPlayerCollecting(Player, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>`
 - `gather(CardSource, Boolean, String, Boolean, LookAudience, Player): String`*
 - `gather(GameObjectFilter, Player, Boolean, Boolean, Boolean, Boolean, String): String`*
@@ -2334,6 +2353,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `selectAllSplit(String, GameObjectFilter, Boolean, String, String): SelectionSlots`*
 - `selectTarget(TargetRequirement, Boolean, String, String, List<CollectionSlot>, Boolean): String`*
 - `storeCardName(String, String): String`*
+- `storeEntity-fH4-G1E(EffectTarget.SingleEntity, Condition, String): String`*
 - `storeNumber(DynamicAmount, String): String`*
 - `storePlayer-fH4-G1E(Player, Condition, String): String`*
 - `toGraveyard(String, Player): Unit`*
@@ -2397,6 +2417,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `drawsNth(Int): TriggerSpec`
 - `expends(Int): TriggerSpec`
 - `exploits(Boolean): TriggerSpec`*
+- `facesADilemma(): TriggerSpec`
 - `finalSagaChapterTriggers(): TriggerSpec`
 - `forages(): TriggerSpec`
 - `foretells(): TriggerSpec`
@@ -2405,7 +2426,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `getsCounters(String): TriggerSpec`*
 - `givesAGift(): TriggerSpec`
 - `investigates(Boolean): TriggerSpec`*
-- `isAttacked(Int, Boolean, Boolean): TriggerSpec`*
+- `isAttacked(Int, AttackedDefenders, Boolean): TriggerSpec`*
 - `isDealtDamage(GameObjectFilter, DamageType): TriggerSpec`*
 - `isTemptedByTheRing(Boolean): TriggerSpec`*
 - `losesGame(): TriggerSpec`
@@ -2430,7 +2451,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `searchesLibrary(): TriggerSpec`
 - `shufflesLibrary(): TriggerSpec`
 - `solvesACase(): TriggerSpec`
-- `surveils(): TriggerSpec`
+- `surveils(Boolean): TriggerSpec`*
 - `takesTheInitiative(): TriggerSpec`
 - `taps(GameObjectFilter, Boolean): TriggerSpec`*
 - `tapsLandForMana(GameObjectFilter): TriggerSpec`*
@@ -3040,6 +3061,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `notNamed(String): Any`
 - `notOfSourceChosenType(): GameObjectFilter`
 - `notOfSourceChosenType(): Any`
+- `notPutIntoGraveyardThisCombat(): GameObjectFilter`
+- `notPutIntoGraveyardThisCombat(): Any`
 - `notSharingCreatureTypeWithPermanentYouControl(GameObjectFilter): GameObjectFilter`
 - `notSharingCreatureTypeWithPermanentYouControl(GameObjectFilter): Any`
 - `notSharingLandTypeWithPermanentYouControl(GameObjectFilter): GameObjectFilter`
@@ -3107,6 +3130,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `protectedBy(ControllerPredicate): Any`
 - `putIntoGraveyardFromBattlefieldThisTurn(): GameObjectFilter`
 - `putIntoGraveyardFromBattlefieldThisTurn(): Any`
+- `putIntoGraveyardThisCombat(): GameObjectFilter`
+- `putIntoGraveyardThisCombat(): Any`
 - `putIntoGraveyardThisTurn(): GameObjectFilter`
 - `putIntoGraveyardThisTurn(): Any`
 - `receivedCounterThisTurn(String, Boolean): GameObjectFilter`
@@ -3145,6 +3170,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `sharingNameWithLinkedExile(): Any`
 - `sharingNameWithPermanentYouControl(GameObjectFilter): GameObjectFilter`
 - `sharingNameWithPermanentYouControl(GameObjectFilter): Any`
+- `singularPermanentDescription: String`
 - `snow(): GameObjectFilter`
 - `snow(): Any`
 - `solved(): GameObjectFilter`
