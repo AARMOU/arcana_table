@@ -149,7 +149,7 @@ class AzlaskTheSwellingScourgeIndependentCertificationTest {
         d.giveMana(player, Color.GREEN)
         assertNull(d.castSpell(player, summoner).error)
         d.resolveAll()
-        val scion = d.permanentsNamed(player, "Eldrazi Scion").single()
+        val scion = d.getCreatures(player).single { d.projected.hasSubtype(it, "SCION") }
 
         val azlask = d.putCreatureOnBattlefield(player, name)
         val bear = d.putCreatureOnBattlefield(player, "Grizzly Bears")
