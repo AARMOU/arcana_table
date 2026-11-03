@@ -149,6 +149,12 @@ def rebase(engine_dir, target, *flags):
         write("auto-resolved.md", "")
         print(f"Validating this branch's {len(mandatory)} patches as-is on {target}")
         return 0
+    if pin_is_newer(git, target, pin):
+        # A one-day-behind target can be older than a pin a manual run moved forward: never step back.
+        report.update(status="up_to_date", note="the pinned upstream commit is already newer than the target")
+        write("rebase.json", report)
+        print(f"Pin {pin[:10]} is already newer than the target {target[:10]}; nothing to do")
+        return 0
     report["upstream_commits"] = int(git("rev-list", "--count", f"{pin}..{target}").stdout)
     prepare(engine, pin, mandatory)
     save_state(engine, pin=pin, target=target, mode="rebase")
@@ -202,6 +208,11 @@ def rebase(engine_dir, target, *flags):
     print(f"Rebased {len([p for p in report['patches'] if p['status'] == 'refreshed'])} patches onto {target} "
           f"({report['upstream_commits']} upstream commits)")
     return 0
+
+
+def pin_is_newer(git, target, pin):
+    """True when TARGET is an ancestor of the pin (an upgrade there would be a downgrade)."""
+    return target != pin and git("merge-base", "--is-ancestor", target, pin, check=False).returncode == 0
 
 
 def checkout(engine_dir):
