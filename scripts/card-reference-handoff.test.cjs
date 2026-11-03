@@ -66,8 +66,8 @@ test('nearest cookbook-backed custom example wins over a closer example with no 
     '  ~0.81 Other [custom]',
     '        Effects.destroy(target)',
     '        ' + secondFile + ' (test: ' + secondTest + ')',
-  ].join('\\n');
-  const cookbook = COOKBOOK + '\\n<!-- excerpt: ' + secondFile + ' -->';
+  ].join('\n');
+  const cookbook = COOKBOOK + '\n<!-- excerpt: ' + secondFile + ' -->';
   assert.equal(closestCustom(similar, cookbook).card, 'Other');
 });
 
