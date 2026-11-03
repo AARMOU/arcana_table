@@ -1914,7 +1914,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 37,
+   "count": 39,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3016,7 +3016,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 30,
+   "count": 32,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3777,7 +3777,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 38,
+   "count": 40,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3888,7 +3888,7 @@
    ]
   },
   "Keyword.INDESTRUCTIBLE": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Exterminatus",
@@ -4238,7 +4238,7 @@
    ]
   },
   "KeywordAbility.crew": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Knight Paladin",
@@ -4658,7 +4658,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4831,7 +4831,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -5237,7 +5237,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 28,
+   "count": 29,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5278,7 +5278,7 @@
    ]
   },
   "keywords()": {
-   "count": 111,
+   "count": 113,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5591,7 +5591,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 166,
+   "count": 168,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7651,6 +7651,17 @@
     }
    ]
   },
+  "GameObjectFilter.ArtifactOrLand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Canoptek Scarab Swarm",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CanoptekScarabSwarm.kt",
+     "lines": 68,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekScarabSwarmScenarioTest.kt"
+    }
+   ]
+  },
   "GameObjectFilter.BasicLand": {
    "count": 5,
    "examples": [
@@ -7687,7 +7698,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 120,
+   "count": 121,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -8220,7 +8231,7 @@
    ]
   },
   "Player.TargetPlayer": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Suffer the Past",
@@ -8239,6 +8250,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
      "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
+    },
+    {
+     "card": "Canoptek Scarab Swarm",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CanoptekScarabSwarm.kt",
+     "lines": 68,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekScarabSwarmScenarioTest.kt"
     }
    ]
   },
@@ -8753,7 +8770,7 @@
    ]
   },
   "Targets.Player": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -8794,7 +8811,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 80,
+   "count": 81,
    "examples": [
     {
      "card": "Defile",
