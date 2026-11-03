@@ -14,7 +14,7 @@ function classifyResult(raw) {
   if (!v || typeof v.readiness !== 'string' || !v.readiness) throw Error('missing-cardkit-classification');
   return v;
 }
-function closestCustom(similar) {
+function closestCustom(similar, cookbook = '') {
   const lines = String(similar || '').split(/\r?\n/);
   const found = [];
   for (let i = 0; i < lines.length; i++) {
@@ -29,7 +29,8 @@ function closestCustom(similar) {
     if (!Number.isFinite(score) || score < MIN_SIMILARITY) continue;
     found.push({ score, card: m[2], codeLine, implementation: paths[1], scenarioTest: paths[2] });
   }
-  return found.sort((a, b) => b.score - a.score || a.card.localeCompare(b.card))[0] || null;
+  const ranked = found.sort((a, b) => b.score - a.score || a.card.localeCompare(b.card));
+  return ranked.find(m => recipeFor(cookbook, m.implementation)) || ranked[0] || null;
 }
 function recipeFor(cookbook, implementation) {
   const source = String(cookbook || '');
@@ -46,7 +47,7 @@ function recipeFor(cookbook, implementation) {
 }
 function referencePacket({ classification, similar, cookbook, base = 'gpt/arcana-integration-next' }) {
   const v = classifyResult(classification);
-  const best = closestCustom(similar);
+  const best = closestCustom(similar, cookbook);
   const out = [
     '## Cardkit starting packet',
     '',
