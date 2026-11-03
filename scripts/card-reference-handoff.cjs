@@ -42,7 +42,7 @@ function recipeFor(cookbook, implementation) {
   if (!heading) return null;
   const slug = heading.replace(new RegExp(T, 'g'), '').toLowerCase().replace(/[^a-z0-9\s-]/g, '')
     .trim().replace(/\s+/g, '-');
-  return { heading, link: RECIPE_DOC + '#' + slug };
+  return { heading, link: 'https://github.com/AARMOU/arcana_table/blob/gpt/arcana-integration-next/' + RECIPE_DOC + '#' + slug };
 }
 function referencePacket({ classification, similar, cookbook, base = 'gpt/arcana-integration-next' }) {
   const v = classifyResult(classification);
