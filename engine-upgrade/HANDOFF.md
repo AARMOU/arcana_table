@@ -1,11 +1,13 @@
 # Finishing a red weekly Argentum upgrade
 
-**Daily early warning.** The same workflow also runs every day at 11:23 UTC as a dry run against upstream's
-latest main (never publishes or merges). When it turns red it posts to #81 once, with the problem; fix it
-the same way (below) before Monday. Arcana Control shows the owner the engine status in plain words.
+**Daily, one day behind.** The upgrade runs every day at 11:23 UTC against upstream main as it stood 24 hours
+earlier, and merges into `gpt/arcana-integration-next` by itself when every check is green (the Monday crons
+are backups). Upstream lands ~75 changes a day, so most days a red run is one small clash.
 
-For whoever picks up a weekly upgrade that did not come back green: Claude (engine lane) or GPT (covering
-when Claude is unavailable, and always for card decisions). Coordination is issue #81. The owner merges.
+**Who fixes a red run (owner, 2026-11-02, for cost):** 🪿 **Goose first** — the run posts on #81 once, when the
+problem first appears. If the same problem is still there on the next daily run (~a day later), the run asks
+**Claude** to take over. Card decisions stay GPT's. A green fix merges through a draft PR into the base;
+Arcana Control shows the owner the engine status in plain words.
 
 Every red run already contains a **Handoff** section (in the draft PR or the issue, and in the run summary)
 with these commands filled in for that run: the upstream commit, the branch to start from and a fix-branch
