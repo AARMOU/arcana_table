@@ -180,6 +180,7 @@ class BoneSabresIndependentCertificationTest {
         d.giveColorlessMana(player, 3)
         assertNull(equip(d, player, sabres, bear).error)
         d.resolveAll()
+        d.removeSummoningSickness(bear)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
 
         assertNull(d.declareAttackers(player, emptyList(), d.player2).error)
