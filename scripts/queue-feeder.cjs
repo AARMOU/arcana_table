@@ -463,7 +463,7 @@ function planCardWork(payload, botIssues = []) {
   const seen = new Set(existing.map(i => F.normName(cardWorkName(i))));
   const create = openWork.length - close.length >= MAX_OPEN_CARD_WORK ? null :
     [...(payload.workRequests || [])].sort((a, b) => priorityScore(b) - priorityScore(a))
-      .find(r => r.referencePacket && !seen.has(F.normName(r.name)) && (Number.isSafeInteger(r.issue) || r.source === 'precon')) || null;
+      .find(r => !seen.has(F.normName(r.name)) && (Number.isSafeInteger(r.issue) || r.source === 'precon')) || null;
   return { create, close, supersede, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
 }
 
@@ -473,7 +473,10 @@ async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || ''))) return { reason: 'cardkit-suggestions-unavailable' };
   const botIssues = await github.paginate(github.rest.issues.listForRepo,
     { owner, repo, state: 'all', creator: 'github-actions[bot]', per_page: 100 });
-  const plan = planCardWork(payload, botIssues);
+  // Missing Oracle or reference context is never auto-started. Existing legacy items can be retired only
+  // when a complete replacement packet is available for the same card.
+  const completePayload = { ...payload, workRequests: (payload.workRequests || []).filter(r => r.oracle && r.referencePacket) };
+  const plan = planCardWork(completePayload, botIssues);
   const out = { reason: plan.reason, closed: [] };
   for (const c of plan.close) {
     await github.rest.issues.createComment({ owner, repo, issue_number: c.issue, body: [CARD_WORK_MARKER,
