@@ -72,9 +72,9 @@ class TriarchStalkerScenarioTest {
         assertTrue("no trigger in the main phase", d.state.stack.isEmpty())
 
         d.passPriorityUntil(Step.BEGIN_COMBAT)
-        assertEquals(listOf("Triarch Stalker"), d.getStackSpellNames())
         while (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) d.passPriority(d.state.priorityPlayerId!!)
         val decision = d.state.pendingDecision as ChooseOptionDecision
+        assertEquals("the Stalker's trigger asks", stalker, decision.context.sourceId)
         assertEquals("p1 chooses between its two opponents", p1, decision.playerId)
         assertEquals(2, decision.options.size)
         d.settle(choose = p3)
