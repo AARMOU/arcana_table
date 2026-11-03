@@ -76,8 +76,12 @@ function appendReferencePacket(body, inputs) {
   return result;
 }
 if (require.main === module) {
-  const [mode, bodyPath, oraclePath, classifyPath, similarPath, cookbookPath, name] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const mode = args[0];
   try {
+    const append = mode === 'append';
+    const bodyPath = append ? args[1] : null;
+    const [oraclePath, classifyPath, similarPath, cookbookPath, name] = args.slice(append ? 2 : 1);
     if (!mode || !oraclePath || !classifyPath || !similarPath || !cookbookPath || !name)
       throw Error('usage: card-reference-handoff append BODY ORACLE CLASSIFY SIMILAR COOKBOOK NAME | packet ORACLE CLASSIFY SIMILAR COOKBOOK NAME');
     oracleSnapshot(fs.readFileSync(oraclePath, 'utf8'), name);
