@@ -28,6 +28,8 @@ test('card-work body carries the trusted Oracle record and priority, and is revi
   assert.equal(A.CARD_WORK_MARKER, Q.CARD_WORK_MARKER);
   assert.equal(A.CARD_WORK_TITLE, Q.CARD_WORK_PREFIX);
   assert.match(b, /^ {4}\{.*"oracle_text"/m);
+  assert.match(b, /## Cardkit starting packet/);
+  assert.ok(b.length <= 7000);
   assert.match(b, /priority:1001/);
   assert.deepEqual(A.reviewActionable(b), { ok: true, missing: [] });
   // No Oracle record (or a mismatched one): never auto-started.
