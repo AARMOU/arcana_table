@@ -32,6 +32,12 @@ import com.wingedsheep.sdk.scripting.targets.TotalCap
  * graveyard by resolution, only the others return (CR 608.2b). A necrodermis counter has no rules meaning
  * of its own.
  *
+ * "As they enter" reading (coordinator decision, 2026-11-03): the type change is part of the same effect
+ * that returns the cards, so they are artifacts as they enter. Entry replacements ("artifacts enter
+ * tapped") and "whenever an artifact enters" triggers therefore see them. Upstream Argentum reads Relive
+ * the Past's identical "They are ... in addition to their other types" the same way (`entersWith`). No
+ * published ruling for this card addresses it.
+ *
  * Official ruling (2022-10-07, Scryfall): "If a card in your graveyard has an {X} in its cost, X is zero."
  */
 val TheWarInHeaven = card("The War in Heaven") {

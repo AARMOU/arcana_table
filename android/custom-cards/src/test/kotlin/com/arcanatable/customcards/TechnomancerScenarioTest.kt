@@ -14,13 +14,16 @@ import org.junit.Test
  * cards with total mana value 6 or less from your graveyard to the battlefield. Rulings (2022-10-07) quoted
  * in [Technomancer]: the returned cards don't need to be ones just milled.
  *
- * Library cards: Bottle Gnomes {3}, Palladium Myr {3}, Juggernaut {4} (artifact creatures); Grizzly Bears
+ * Library cards: Bottle Gnomes {3}, Palladium Myr {3}, Juggernaut {4}, Steel Wall {1}, Coal Golem {5}
+ * (artifact creatures); Grizzly Bears
  * (not an artifact). Technomancer itself is on the battlefield when its trigger resolves, so it is never
  * among the choices here.
  */
 class TechnomancerScenarioTest {
 
-    private fun game() = customScenario(Technomancer, "Bottle Gnomes", "Palladium Myr", "Juggernaut", "Grizzly Bears")
+    private fun game() = customScenario(
+        Technomancer, "Bottle Gnomes", "Palladium Myr", "Juggernaut", "Grizzly Bears", "Steel Wall", "Coal Golem",
+    )
 
     /** Casts Technomancer and resolves until its enters trigger asks which cards to return. */
     private fun GameTestDriver.castUntilChoice(p: EntityId): SelectCardsDecision {
@@ -115,5 +118,63 @@ class TechnomancerScenarioTest {
         assertEquals("still milled three", library - 3, d.state.getZone(p, Zone.LIBRARY).size)
         assertEquals(0, d.onBattlefield(p, "Grizzly Bears"))
         assertEquals(2, d.zoneNames(p, Zone.GRAVEYARD).count { it == "Grizzly Bears" })
+    }
+
+    /**
+     * Steel Wall {1} and two Coal Golems {5}: two cards "fit" (1 + 5), so a two-card pick is allowed by
+     * count, but 5 + 5 = 10 is still over the cap. The engine checks the actual sum when the choice is
+     * applied, keeping cards in the order picked while the running total stays at 6 or less
+     * (LibraryAndZoneContinuationResumer, TotalManaValueAtMost), so only the first Golem returns.
+     */
+    private fun GameTestDriver.oneFiveFive(p: EntityId): Triple<EntityId, EntityId, EntityId> {
+        val wall = putCardInGraveyard(p, "Steel Wall")
+        val golem = putCardInGraveyard(p, "Coal Golem")
+        val golem2 = putCardInGraveyard(p, "Coal Golem")
+        val decision = castUntilChoice(p)
+        assertEquals(setOf(wall, golem, golem2), decision.options.toSet())
+        assertEquals("1 + 5 is the most cards that fit", 2, decision.maxSelections)
+        return Triple(wall, golem, golem2)
+    }
+
+    private fun GameTestDriver.returnedManaValue(p: EntityId) =
+        permanentsNamed(p, "Steel Wall").size * 1 + permanentsNamed(p, "Coal Golem").size * 5
+
+    @Test
+    fun fivePlusFiveIsNeverReturnedTogether() {
+        val d = game()
+        val p = d.player1
+        val (wall, golem, golem2) = d.oneFiveFive(p)
+        d.select(p, listOf(golem, golem2))
+        assertEquals("only the first Golem picked returns", listOf(golem), d.permanentsNamed(p, "Coal Golem"))
+        assertTrue(golem2 in d.getGraveyard(p) && wall in d.getGraveyard(p))
+        assertTrue(d.returnedManaValue(p) <= 6)
+    }
+
+    @Test
+    fun onePlusFiveIsAccepted() {
+        val d = game()
+        val p = d.player1
+        val (wall, golem, golem2) = d.oneFiveFive(p)
+        d.select(p, listOf(wall, golem))
+        assertTrue(wall in d.getPermanents(p) && golem in d.getPermanents(p))
+        assertTrue(golem2 in d.getGraveyard(p))
+        assertEquals(6, d.returnedManaValue(p))
+    }
+
+    @Test
+    fun oneAloneAndZeroAreAccepted() {
+        val d = game()
+        val p = d.player1
+        val (wall, _, _) = d.oneFiveFive(p)
+        d.select(p, listOf(wall))
+        assertEquals(listOf(wall), d.permanentsNamed(p, "Steel Wall"))
+        assertTrue(d.permanentsNamed(p, "Coal Golem").isEmpty())
+
+        val d2 = game()
+        val p2 = d2.player1
+        d2.oneFiveFive(p2)
+        d2.select(p2, emptyList())
+        assertEquals(0, d2.returnedManaValue(p2))
+        assertEquals(3, d2.zoneNames(p2, Zone.GRAVEYARD).count { it == "Steel Wall" || it == "Coal Golem" })
     }
 }
