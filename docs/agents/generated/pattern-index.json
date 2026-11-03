@@ -949,6 +949,17 @@
     }
    ]
   },
+  "DynamicAmounts.fixed": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "The War in Heaven",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.lastKnownPlusOneCounters": {
    "count": 1,
    "examples": [
@@ -2243,7 +2254,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 38,
+   "count": 39,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2777,7 +2788,7 @@
    ]
   },
   "Effects.LoseLife": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -3027,7 +3038,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 32,
+   "count": 34,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3550,7 +3561,7 @@
    ]
   },
   "Keyword.DEATHTOUCH": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3575,6 +3586,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
+    },
+    {
+     "card": "Trazyn the Infinite",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TrazynTheInfinite.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TrazynTheInfiniteScenarioTest.kt"
     },
     {
      "card": "Mutated Cultist",
@@ -4848,7 +4865,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 53,
+   "count": 54,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -5295,7 +5312,7 @@
    ]
   },
   "keywords()": {
-   "count": 113,
+   "count": 114,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5484,6 +5501,17 @@
     }
    ]
   },
+  "sagaChapter()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "The War in Heaven",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
+    }
+   ]
+  },
   "spell { }": {
    "count": 52,
    "examples": [
@@ -5567,7 +5595,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 69,
+   "count": 70,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5608,7 +5636,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 171,
+   "count": 172,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5815,7 +5843,7 @@
    ]
   },
   "optional": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -5867,7 +5895,7 @@
    ]
   },
   "restrictions": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -6108,6 +6136,17 @@
     }
    ]
   },
+  "CounterType.of": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "The War in Heaven",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
+    }
+   ]
+  },
   "Duration.EndOfTurn": {
    "count": 15,
    "examples": [
@@ -6251,7 +6290,7 @@
    ]
   },
   "Patterns.Library.mill": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Flayed One",
@@ -6270,6 +6309,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfBodyAndMind.kt",
      "lines": 51,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfBodyAndMindScenarioTest.kt"
+    },
+    {
+     "card": "The War in Heaven",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
   },
@@ -7014,6 +7059,17 @@
     }
    ]
   },
+  "HasAllActivatedAbilitiesOfCards": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Trazyn the Infinite",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TrazynTheInfinite.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TrazynTheInfiniteScenarioTest.kt"
+    }
+   ]
+  },
   "LegendRuleDoesNotApplyTo": {
    "count": 1,
    "examples": [
@@ -7234,7 +7290,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -7605,7 +7661,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -7646,7 +7702,7 @@
    ]
   },
   "GameObjectFilter.ArtifactCreature": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Cryptothrall",
@@ -8364,7 +8420,7 @@
    ]
   },
   "Player.You": {
-   "count": 47,
+   "count": 49,
    "examples": [
     {
      "card": "Defile",
@@ -8520,7 +8576,7 @@
    ]
   },
   "TargetFilter.CreatureInYourGraveyard": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -8533,6 +8589,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfLightAndShadow.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfLightAndShadowScenarioTest.kt"
+    },
+    {
+     "card": "The War in Heaven",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheWarInHeaven.kt",
+     "lines": 87,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheWarInHeavenScenarioTest.kt"
     }
    ]
   },
@@ -8915,7 +8977,7 @@
    ]
   },
   "targets(\u2026)": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Immoral Bargain",
