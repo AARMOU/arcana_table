@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.AzlaskTheSwellingScourge
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -43,7 +44,13 @@ class AzlaskTheSwellingScourgeIndependentCertificationTest {
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains(name))
         val reanimate = d.putCardInHand(player, "Reanimate")
         d.giveMana(player, Color.BLACK)
-        assertNull(d.castSpell(player, reanimate, listOf(azlask)).error)
+        assertNull(
+            d.castSpellWithTargets(
+                player,
+                reanimate,
+                listOf(ChosenTarget.Card(azlask, player, Zone.GRAVEYARD)),
+            ).error,
+        )
         d.resolveAll()
         assertTrue(d.permanentsNamed(player, name).contains(azlask))
 
@@ -134,12 +141,18 @@ class AzlaskTheSwellingScourgeIndependentCertificationTest {
 
     @Test
     fun scionsAndSpawnsGainIndestructibleAndAnnihilatorOneUntilEndOfTurn() {
-        val d = customScenario(AzlaskTheSwellingScourge, "Grizzly Bears")
+        val d = customScenario(AzlaskTheSwellingScourge, "Scion Summoner", "Grizzly Bears")
         val player = d.player1
         val opponent = d.player2
+        val summoner = d.putCardInHand(player, "Scion Summoner")
+        d.giveColorlessMana(player, 2)
+        d.giveMana(player, Color.GREEN)
+        assertNull(d.castSpell(player, summoner).error)
+        d.resolveAll()
+        val scion = d.permanentsNamed(player, "Eldrazi Scion").single()
+
         val azlask = d.putCreatureOnBattlefield(player, name)
         val bear = d.putCreatureOnBattlefield(player, "Grizzly Bears")
-        val scion = d.putToken(player, "Eldrazi Scion")
         val spawn = d.putToken(player, "Eldrazi Spawn")
         val opposingSpawn = d.putToken(opponent, "Eldrazi Spawn")
         repeat(3) { d.putPermanentOnBattlefield(opponent, "Plains") }
