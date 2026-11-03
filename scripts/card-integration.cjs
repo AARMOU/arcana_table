@@ -14,6 +14,20 @@ const GENERATED = ['android/app/src/main/assets/argentum/custom-cards.jsonl',
   'docs/agents/generated/pattern-index.json', 'docs/agents/generated/pattern-index.md'];
 const GATES = ['engine-pins','export','patterns','cardkit','scenario','independent',
   'custom-and-android','release-safety','scope'];
+const SHARED_VALIDATION_FILES = new Set([
+  '.github/workflows/arcana-approved-card-integration.yml',
+  '.github/workflows/arcana-card-certification-premerge.yml',
+  '.github/workflows/arcana-card-destination-preflight.yml',
+  '.github/workflows/arcana-independent-card-certification.yml',
+  'certification/policy.cjs','certification/runner.py',
+  'integration/policy.json','integration/runner.py',
+  'scripts/card-checks.cjs','scripts/card-integration.cjs','scripts/verified-certification.cjs'
+]);
+const SHARED_VALIDATION_PREFIXES = [
+  'tools/cardkit/','android/app/src/test/','android/app/src/androidTest/',
+  'android/custom-cards/src/test/'
+];
+
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const RETRY_CLASS = 'lan-multi-host-address-in-use-v1';
 const RETRY_REF = 'tags/arcana-integration-retry/';
@@ -170,26 +184,47 @@ async function registeredOn({github,owner,repo,ref,symbol,cache={}}) {
 }
 // Compare exact snapshots, not branch activity. GitHub caps compare.files at 300;
 // incomplete or unavailable evidence must never suppress a card.
+function relevantDestinationPath(path, plan) {
+  const own = [REGISTRY,...GENERATED,plan.paths.source,plan.paths.scenario,plan.suite.source,
+    `certification/suites/${plan.suite.key}.json`];
+  if (own.includes(path) || path.startsWith('android/app/libs/')) return true;
+  if (path === 'android/gradle.properties' || path === 'android/settings.gradle.kts' ||
+      path === 'android/gradle/libs.versions.toml' || /(^|\/)build.gradle.kts$/.test(path)) return true;
+  return SHARED_VALIDATION_FILES.has(path) || SHARED_VALIDATION_PREFIXES.some(prefix=>path.startsWith(prefix));
+}
 async function blockedInputsUnchanged({github,owner,repo,receipt,plan}) {
   if (receipt?.status !== 'blocked' || receipt.target !== plan.target || receipt.sourceSha !== plan.sourceSha) return false;
   if (receipt.retryInputHash ? receipt.retryInputHash !== plan.retryInputHash : receipt.policyHash !== plan.policyHash) return false;
   if (receipt.baseSha === plan.baseSha) return true;
-  // Preserve the existing engine-specific hold after checking this card's suite/policy identity.
-  if (await require('./destination-preflight.cjs').engineUnchangedSince({github,owner,repo,receipt,baseSha:plan.baseSha})) return true;
   const d = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,
     basehead:receipt.baseSha+'...'+plan.baseSha})).data;
   if (d.status !== 'ahead' || !Array.isArray(d.files) || d.files.length >= 300) return false;
-  const own = [REGISTRY,plan.paths.source,plan.paths.scenario,
-    'android/app/src/main/assets/argentum/all-cards.index.tsv'];
-  return !d.files.some(f=>[f.filename,f.previous_filename].some(p=>p && (own.includes(p) ||
-    p.startsWith('android/app/libs/') || /(^|\/)build.gradle.kts$/.test(p) ||
-    ['android/gradle.properties','android/settings.gradle.kts'].includes(p))));
+  // A registry/scenario or shared-gate change must get one full validation before any engine-only hold.
+  const relevantChanged = d.files.some(f=>[f.filename,f.previous_filename].some(p=>p && relevantDestinationPath(p,plan)));
+  if (relevantChanged) return false;
+  const preflight = require('./destination-preflight.cjs');
+  // Non-engine blockers stay quiet on unrelated commits. Engine blockers stay quiet only while the
+  // engine fingerprint is unchanged; uncertain fingerprints conservatively trigger validation.
+  if (preflight.engineBound(receipt.primaryCause || receipt.reason))
+    return preflight.engineUnchangedSince({github,owner,repo,receipt,baseSha:plan.baseSha});
+  return true;
+}
+const GENERIC_CAUSES = new Set([
+  'blocked','failed','validation failed','validation did not pass','checks failed','check failed',
+  'tests failed','not run','not run after earlier blocker','not executed','skipped',
+  'unknown','n/a','none','no cause provided'
+]);
+function concreteCause(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const detail = value.trim(), normalized = detail.toLowerCase().replace(/\s+/g,' ').replace(/[.!?]+$/,'');
+  if (GENERIC_CAUSES.has(normalized) || /^(not run|not executed|skipped)\b/.test(normalized)) return null;
+  return detail;
 }
 function primaryCause(report) {
-  if (typeof report.reason === 'string' && report.reason.trim()) return report.reason.trim();
-  const gate = report.gates?.find(g=>!g.ok && typeof g.detail === 'string' && g.detail.trim() &&
-    g.detail !== 'Not run after earlier blocker');
-  return gate ? gate.name+': '+gate.detail.trim() : null;
+  const reason = concreteCause(report.reason);
+  if (reason) return reason;
+  const gate = report.gates?.find(g=>!g.ok && concreteCause(g.detail));
+  return gate ? gate.name+': '+concreteCause(gate.detail) : null;
 }
 async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
   if (!cfg.policy.enabled || !SHA.test(controlSha)) return null;

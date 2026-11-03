@@ -456,13 +456,63 @@ test('B9 each relevant destination change allows one full attempt, then stays qu
   }
 });
 
-test('B9 missing primary cause fails before any receipt or target write',async()=>{
+test('B9 generic reasons and gate placeholders cannot satisfy primary-cause validation',async()=>{
   const p=plan(), m=githubMock();
-  for(const detail of [undefined,'','   ','Not run after earlier blocker']){
-    const r=result(p).report;r.status='blocked';r.gates[4].ok=false;r.gates[4].detail=detail;
+  for(const text of [undefined,'','   ','Not run after earlier blocker','Validation did not pass','Checks failed','N/A']){
+    const r=result(p).report;r.status='blocked';r.gates[4].ok=false;r.gates[4].detail=text;
+    if(text)r.reason=text;
     await assert.rejects(P.publish({...common,github:m.github,plan:p,report:r,files:[],expectedSources:{}}),/primary cause/);
   }
-  assert.equal(m.writes.length,0);
+  const concrete=result(p).report;concrete.status='blocked';concrete.reason='Validation did not pass';
+  concrete.gates[4].ok=false;concrete.gates[4].detail='scenario assertion: expected counter was missing';
+  assert.equal(P.primaryCause(concrete),'scenario: scenario assertion: expected counter was missing');
+  assert.ok(await P.publish({...common,github:m.github,plan:p,report:concrete,files:[],expectedSources:{}}));
+  assert.equal(m.writes.length,2);
+});
+test('B9 checks changed registry and scenario paths before the engine-only hold',async()=>{
+  const D=require('./destination-preflight.cjs'), original=D.engineUnchangedSince;
+  try {
+    D.engineUnchangedSince=async()=>{throw Error('engine hold ran before relevant-path comparison');};
+    for(const path of [P.REGISTRY,paths.scenario]){
+      const m=githubMock(), receipt={status:'blocked',target:P.TARGET,sourceSha:source,
+        baseSha:'e'.repeat(40),policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],
+        reason:'export: missing engine ability',primaryCause:'export: missing engine ability'};
+      m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[{filename:path,status:'modified'}]}});
+      assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:plan()}),false,path);
+    }
+    const m=githubMock(), receipt={status:'blocked',target:P.TARGET,sourceSha:source,
+      baseSha:'e'.repeat(40),policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],
+      reason:'export: missing engine ability',primaryCause:'export: missing engine ability'};
+    let compared=false;
+    m.github.rest.repos.compareCommitsWithBasehead=async()=>{compared=true;return {data:{status:'ahead',files:[{filename:'control/index.html'}]}};};
+    D.engineUnchangedSince=async()=>{assert.equal(compared,true);return true;};
+    assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:plan()}),true);
+  } finally {D.engineUnchangedSince=original;}
+});
+
+test('B9 changes to shared validation inputs retry; unrelated card suites stay quiet',async()=>{
+  const D=require('./destination-preflight.cjs'), original=D.engineUnchangedSince;
+  D.engineUnchangedSince=async()=>false;
+  try {
+    const shared=['tools/cardkit/cardkit_lib/check.py','scripts/card-checks.cjs',
+      '.github/workflows/arcana-card-certification-premerge.yml',
+      'android/app/src/test/java/com/arcanatable/GameRulesTest.kt','certification/runner.py',
+      'certification/suites/'+suite.key+'.json',suite.source];
+    for(const path of shared){
+      const m=githubMock(), receipt={status:'blocked',target:P.TARGET,sourceSha:source,
+        baseSha:'e'.repeat(40),policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],
+        reason:'scenario: failed'};
+      m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[{filename:path,status:'modified'}]}});
+      assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:plan()}),false,path);
+    }
+    for(const path of ['certification/OtherIndependentCertificationTest.kt','certification/suites/other-card.json']){
+      const m=githubMock(), receipt={status:'blocked',target:P.TARGET,sourceSha:source,
+        baseSha:'e'.repeat(40),policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],
+        reason:'scenario: failed'};
+      m.github.rest.repos.compareCommitsWithBasehead=async()=>({data:{status:'ahead',files:[{filename:path,status:'modified'}]}});
+      assert.equal(await P.blockedInputsUnchanged({...common,github:m.github,receipt,plan:plan()}),true,path);
+    }
+  } finally {D.engineUnchangedSince=original;}
 });
 
 test('B9 incomplete comparisons and renamed relevant inputs never suppress validation',async()=>{
