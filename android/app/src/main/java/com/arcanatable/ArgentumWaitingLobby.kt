@@ -143,6 +143,7 @@ internal class ArgentumWaitingLobby(
     /** A snapshot for *every* waiting phone; decks and other private data never leave the host. */
     fun lobbyMessage(): JSONObject = JSONObject()
         .put("type", "lanLobby")
+        .put(com.arcanatable.BuildCompatibility.FIELD, com.arcanatable.BuildCompatibility.current)
         .put("seatCount", seatCount)
         .put("canStart", canStart())
         .put("openSeats", openFriendSeats())

@@ -326,7 +326,18 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         }
         "lanLobby" -> {
             // Wi-Fi and online guests both show the host's roster.
-            if (wifiRole == "guest" || wifiRole == "online-guest") wifiGuestLobbyState = incoming
+            if (wifiRole == "guest" || wifiRole == "online-guest") {
+                val problem = BuildCompatibility.hostProblem(incoming)
+                if (problem != null) {
+                    recordDiagnostic("Left host's room: different Arcana build (${incoming.optInt(BuildCompatibility.FIELD, -1)})", DiagnosticCategory.CONNECTION)
+                    // Same as the lobby's LEAVE LOBBY button, then say why.
+                    argentumSocket.close()
+                    stopWifi()
+                    argentumEnabled = false
+                    homeOpen = true
+                    message = problem
+                } else wifiGuestLobbyState = incoming
+            }
         }
         "offlineCheckpoint" -> {
             if (argentumOffline && !tutorialPracticeActive && wifiRole == null) {
