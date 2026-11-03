@@ -55,7 +55,7 @@ test('rejects absent oracle handoff, repeated packet, and oversized request body
 
 test('recipe selection only links the cookbook section that contains the matched implementation', () => {
   assert.deepEqual(recipeFor(COOKBOOK, IMPLEMENTATION), {
-    heading: '4. Dies trigger', link: 'docs/agents/CARD-PATTERNS.md#4-dies-trigger',
+    heading: '4. Dies trigger', link: 'https://github.com/AARMOU/arcana_table/blob/gpt/arcana-integration-next/docs/agents/CARD-PATTERNS.md#4-dies-trigger',
   });
   assert.equal(recipeFor(COOKBOOK, 'android/custom-cards/Other.kt'), null);
 });
