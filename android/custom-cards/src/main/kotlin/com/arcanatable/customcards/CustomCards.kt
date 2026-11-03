@@ -375,6 +375,12 @@ object CustomCards {
         Entry(Biotransference, "40K", "Necron Dynasties"),
         // Necron Dynasties. Needs engine patch 0039 (Phaeron sees creature cards Biotransference made artifacts).
         Entry(ImotekhTheStormlord, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (HasAllActivatedAbilitiesOfCards over YOUR_GRAVEYARD, artifact cards, to itself).
+        Entry(TrazynTheInfinite, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (ETB: mill three, then chooseAnyNumber artifact creature cards with TotalManaValueAtMost(6) -> battlefield).
+        Entry(Technomancer, "40K", "Necron Dynasties"),
+        // Necron Dynasties. No engine patch (Saga; III: up to three graveyard targets with TotalCap mana value 8, enter with a counter and as artifacts).
+        Entry(TheWarInHeaven, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
