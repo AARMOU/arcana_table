@@ -497,8 +497,11 @@ test('B9 changes to shared validation inputs retry; unrelated card suites stay q
   try {
     const shared=['tools/cardkit/cardkit_lib/check.py','scripts/card-checks.cjs',
       '.github/workflows/arcana-card-certification-premerge.yml',
-      'android/app/src/test/java/com/arcanatable/GameRulesTest.kt','certification/runner.py',
-      'certification/suites/'+suite.key+'.json',suite.source];
+      'android/app/src/test/java/com/arcanatable/GameRulesTest.kt',
+      'android/app/src/main/java/com/arcanatable/SharedGameRules.kt',
+      'android/app/src/main/kotlin/com/arcanatable/SharedGameRules.kt',
+      'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CardRules.kt',
+      'certification/runner.py','certification/suites/'+suite.key+'.json',suite.source];
     for(const path of shared){
       const m=githubMock(), receipt={status:'blocked',target:P.TARGET,sourceSha:source,
         baseSha:'e'.repeat(40),policyHash:cfg.policyHash,retryInputHash:cfg.retryHashes[suite.key],
