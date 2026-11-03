@@ -71,6 +71,12 @@ test('claim detection: only trusted people, comment must start with CLAIM', () =
   assert.equal(claimedAtOf([c('CLAIM', 'OWNER', 'Bot')]), null);
 });
 
+test('new card-work requests are not selected without a Cardkit starting packet', () => {
+  const missing = workRequest({ referencePacket: null });
+  const plan = Q.planCardWork({ ok: true, requestedClassified: true, resolvedRequests: [], workRequests: [missing] }, []);
+  assert.equal(plan.create, null);
+});
+
 test('legacy card-work items without Oracle or Cardkit references are superseded so they can be reopened', () => {
   const legacy = { number: 369, state: 'open', title: '[Card Work] Knuckles the Echidna — needs engine work',
     body: Q.CARD_WORK_MARKER + '\nold body', user: { login: 'github-actions[bot]', type: 'Bot' } };
