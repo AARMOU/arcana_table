@@ -1,5 +1,5 @@
 name: Weekly Argentum upgrade
-# Every Monday: move Arcana onto upstream Argentum's latest main, rebuild the engine, check every
+# Every day (since 2026-11-02; Mondays before): move Arcana onto upstream Argentum's main as it stood a day earlier, rebuild the engine, check every
 # imported card (custom cards, premade decks, the six official precons) and the full app test suite,
 # then open or refresh one draft PR into development. Nothing merges on its own.
 #
@@ -16,16 +16,19 @@ on:
     # already merged stops at "up to date"; one that finds it still open refreshes the same PR.
     - cron: '47 14 * * 1'  # Mondays 14:47 UTC
     - cron: '47 14 * * 2'  # Tuesdays 14:47 UTC
-    # Daily early warning (2026-11-02, owner: "proactive checking of the Argentum engine"): the same full
-    # validation against upstream's latest main as a dry run — never publishes or merges. It records the
-    # result for Arcana Control and tells #81 when upstream starts clashing, so the engine lane fixes it
-    # days before Monday's upgrade instead of on it. Keep this string in sync with EARLY_WARNING below.
+    # Daily upgrade (owner, 2026-11-02: keep pace with upstream, one day behind). Upstream lands ~75 changes a
+    # day; a daily step keeps each clash small. Every scheduled run targets upstream main as it stood
+    # LAG_HOURS earlier (upstream often fixes its own breakage the same day), publishes and, when green,
+    # merges into BASE like the Monday run. The Monday crons stay as backups for a dropped daily run.
     - cron: '23 11 * * *'  # every day 11:23 UTC
   workflow_dispatch:
     inputs:
       target:
         description: 'Upstream commit (40 hex) or branch to upgrade to'
         default: main
+      lag_hours:
+        description: 'For a branch target: use its commit from this many hours ago (scheduled runs use 24)'
+        default: '0'
   push:
     # A push to the automation's own branch, or to a fix branch someone (Claude, or GPT covering) made
     # from a red run's handoff notes, is a dry run: validate only, nothing published.
@@ -35,12 +38,12 @@ on:
       - 'gpt/argentum-weekly-fix-**'
 permissions: {}
 concurrency:
-  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && github.ref || (github.event.schedule == '23 11 * * *' && 'early-warning' || 'live') }}
+  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && github.ref || 'live' }}
   cancel-in-progress: false
 env:
   BASE: gpt/arcana-integration-next
-  # The daily early-warning schedule above. Job `if:`s cannot read env, so they repeat the literal.
-  EARLY_WARNING: ${{ github.event.schedule == '23 11 * * *' }}
+  # Scheduled runs stay one day behind upstream (see the daily cron above).
+  LAG_HOURS: ${{ github.event_name == 'schedule' && '24' || inputs.lag_hours || '0' }}
   # The numbered build approved cards go into (main's integration/policy.json `target`) is the "current
   # build": its engine patches must all be carried here, and its custom cards must pass on the new engine.
   UPSTREAM_URL: https://github.com/wingedsheep/argentum-engine
@@ -163,11 +166,16 @@ jobs:
           REQUESTED: ${{ inputs.target || 'main' }}
         run: |
           set -euo pipefail
+          [[ "$LAG_HOURS" =~ ^[0-9]{1,3}$ ]] || { echo "::error::Bad lag_hours: $LAG_HOURS"; exit 1; }
           if [[ "$REQUESTED" =~ ^[0-9a-f]{40}$ ]]; then sha="$REQUESTED"
+          elif [ "$LAG_HOURS" -gt 0 ]; then
+            # The branch as it stood LAG_HOURS ago: commit history only (no trees or files), newest first.
+            git clone -q --bare --filter=tree:0 --single-branch --branch "$REQUESTED" "$UPSTREAM_URL" "$RUNNER_TEMP/upstream-history.git"
+            sha=$(git -C "$RUNNER_TEMP/upstream-history.git" rev-list -1 --first-parent --before="$LAG_HOURS hours ago" "refs/heads/$REQUESTED")
           else sha=$(git ls-remote "$UPSTREAM_URL" "refs/heads/$REQUESTED" | cut -f1); fi
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve upstream $REQUESTED"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Upstream target: $sha ($REQUESTED)"
+          echo "Upstream target: $sha ($REQUESTED, ${LAG_HOURS}h behind)"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: wingedsheep/argentum-engine
@@ -481,8 +489,8 @@ jobs:
                              check=True, capture_output=True)
               body += ['', (w / 'handoff.md').read_text()]
           body += ['', f"Run: {env['RUN_URL']}", '',
-                   'Owner approves the merge. Engine conflicts and failing engine-facing tests go to Claude\'s lane; '
-                   'card regressions to GPT (issue #81).']
+                   'A green upgrade merges into the base automatically. Engine conflicts and failing engine-facing '
+                   'tests go to Goose first, Claude as backup; card regressions to GPT (issue #81).']
           (w / 'title.txt').write_text(title)
           (w / 'body.md').write_text('\n'.join(body) + '\n')
           with open(env['GITHUB_OUTPUT'], 'a') as out:
@@ -553,7 +561,7 @@ jobs:
             ${{ runner.temp }}/current-overlay/android/custom-cards/build/test-results/
             ${{ runner.temp }}/current.log
       - name: Fail the dry run when the upgrade is blocked
-        if: always() && (github.event_name == 'push' || github.event.schedule == '23 11 * * *') && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
+        if: always() && github.event_name == 'push' && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
         run: |
           cat engine-upgrade/weekly/body.md
           echo '::error::Upgrade blocked (${{ steps.final.outputs.status }}); see the job summary'
@@ -561,8 +569,8 @@ jobs:
 
   publish:
     needs: validate
-    # Never on a dry run (push, or the daily early warning); never when already up to date.
-    if: github.event_name != 'push' && github.event.schedule != '23 11 * * *' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
+    # Never on a dry run (push); never when already up to date.
+    if: github.event_name != 'push' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -659,9 +667,10 @@ jobs:
           fi
           note=""
           if [ "${{ needs.validate.outputs.green }}" != true ]; then
-            note=" Not green: handoff notes in the PR (Claude's engine lane; GPT finishes if Claude is unavailable; card decisions are GPT's)."
+            note=" Not green: handoff notes in the PR (Goose first, Claude as backup; card decisions are GPT's)."
           fi
-          gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).$note" || true
+          # Scheduled runs report through the engine status in the verdict job (#81 only on a new problem).
+          [ "$GITHUB_EVENT_NAME" = schedule ] || gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).$note" || true
           echo "number=$number" >> "$GITHUB_OUTPUT"
         id: pr
       - name: Merge a green upgrade into the integration branch
@@ -676,7 +685,7 @@ jobs:
           title=$(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
           if gh api -X POST "repos/$GITHUB_REPOSITORY/merges" -f base="$BASE" -f head="$BOT_BRANCH" \
                -f commit_message="Merge $title (run $GITHUB_RUN_ID)" >/dev/null; then
-            gh issue comment 81 --body "**$title** was green and has been merged into \`$BASE\` automatically ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)." || true
+            [ "$GITHUB_EVENT_NAME" = schedule ] || gh issue comment 81 --body "**$title** was green and has been merged into \`$BASE\` automatically ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)." || true
             if [ -n "$NUMBER" ]; then gh issue close "$NUMBER" --comment "Merged automatically into \`$BASE\`." || true; fi
           else
             echo "::warning title=Auto-merge::Could not merge $BOT_BRANCH into $BASE; it stays for a manual merge."
@@ -690,9 +699,10 @@ jobs:
           w="$RUNNER_TEMP/candidate/weekly"
           title=$(cat "$w/title.txt")
           number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
-          if [ -n "$number" ]; then gh issue comment "$number" --body-file "$w/body.md"
-          else gh issue create --title "$title" --body-file "$w/body.md"; fi
-          gh issue comment 81 --body "**$title** ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Handoff notes in the issue: Claude's engine lane; GPT finishes if Claude is unavailable." || true
+          # One issue per blocker title; a daily run adds to it only when it was opened by a manual run.
+          if [ -z "$number" ]; then gh issue create --title "$title" --body-file "$w/body.md"
+          elif [ "$GITHUB_EVENT_NAME" != schedule ]; then gh issue comment "$number" --body-file "$w/body.md"; fi
+          [ "$GITHUB_EVENT_NAME" = schedule ] || gh issue comment 81 --body "**$title** ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Handoff notes in the issue: Goose first, Claude as backup." || true
 
   verdict:
     # The run's own result: green only when the upgrade is green (or there was nothing to do). A dry run
@@ -709,8 +719,8 @@ jobs:
     steps:
       - name: Publish the engine status for Arcana Control
         # One github-actions[bot] comment on #78, edited in place (arcana-control-status-v1:engine), that the
-        # owner's Arcana Control dashboard shows in plain words. The daily early warning also tells #81 when
-        # a problem first appears or changes, so the engine lane can fix it before Monday's upgrade.
+        # owner's Arcana Control dashboard shows in plain words. A scheduled (daily) run also asks Goose on #81
+        # when a problem first appears or changes, and Claude when the same problem is still there ~a day later.
         if: always() && github.event_name != 'push'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -736,7 +746,7 @@ jobs:
           upstream = ok(r'[0-9a-f]{40}', e['UPSTREAM'])
           blocker = ok(r'[0-9]{4}-[a-z0-9-]+\.patch', e['BLOCKER'])
           build = ok(r'[A-Za-z0-9._/-]+', e['CURRENT_BRANCH']).split('/')[-1] or 'the current build'
-          daily = e['EARLY_WARNING'] == 'true'
+          scheduled = e.get('GITHUB_EVENT_NAME') == 'schedule'  # daily, one day behind upstream
           plain = {
               'patches': "our engine changes clash with the makers' new code",
               'build': "the engine does not build with our changes",
@@ -752,26 +762,26 @@ jobs:
           problems = [k for k in e['FAILED'].split(',') if k in plain]
           status = e['STATUS'] if e['STATUS'] in ('up_to_date', 'rebased', 'conflict', 'build_failed') else ''
           if status == 'up_to_date':
-              result, message = 'up_to_date', "The engine already matches the makers' latest version. Nothing to do."
-          elif status == 'rebased' and e['GREEN'] == 'true' and (daily or e['PUBLISH'] == 'success'):
+              result, message = 'up_to_date', "The engine is already up to date. Nothing to do."
+          elif status == 'rebased' and e['GREEN'] == 'true' and e['PUBLISH'] == 'success':
               result = 'ok'
-              message = ("Checked the makers' latest engine today: it would upgrade cleanly and passed every safety check."
-                         if daily else "The engine was upgraded to the makers' latest version and passed every check. "
-                         "It reaches your phone with the next numbered build.")
+              message = (("The engine was upgraded to the makers' version from a day ago" if scheduled else
+                          "The engine was upgraded to the makers' latest version") +
+                         " and passed every check. It reaches your phone with the next numbered build.")
           elif status in ('rebased', 'conflict', 'build_failed'):
               result = 'blocked'
-              what = {'conflict': "The makers' latest engine clashes with one of our engine changes",
-                      'build_failed': "The makers' latest engine does not build with our engine changes"}.get(
-                          status, "The makers' latest engine was checked, but not everything passed")
+              what = {'conflict': "The makers' newer engine clashes with one of our engine changes",
+                      'build_failed': "The makers' newer engine does not build with our engine changes"}.get(
+                          status, "The makers' newer engine was checked, but not everything passed")
               detail = '; '.join(plain[k] for k in problems) or 'see the run'
               message = (f"{what} ({detail}{', in ' + blocker if blocker else ''}). Nothing changed in the app. "
-                         "Claude (engine lane) has been told; you don't need to do anything.")
+                         "Goose has been asked to fix it, with Claude as backup; you don't need to do anything.")
           else:
               result = 'broken'
               message = ("The engine check itself didn't finish (a GitHub or setup problem, not the engine). "
-                         "Nothing changed in the app. Claude has been told; you don't need to do anything.")
+                         "Nothing changed in the app. Goose and Claude have been told; you don't need to do anything.")
           payload = {'kind': 'engine', 'schema': 1, 'checkedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
-                     'mode': 'daily' if daily else 'weekly', 'result': result, 'message': message, 'problems': problems,
+                     'mode': 'daily' if scheduled else 'manual', 'result': result, 'message': message, 'problems': problems,
                      'blocker': blocker, 'upstream': upstream, 'currentBuild': build, 'run': e['RUN_URL'], 'needsOwner': False}
           before = {}
           try:
@@ -779,18 +789,36 @@ jobs:
               before = json.loads(m.group(1)) if m else {}
           except (OSError, ValueError):
               pass
+          problem = result in ('blocked', 'broken')
+          same = problem and before.get('result') == result and before.get('problems') == problems and before.get('blocker') == blocker
+          now = datetime.datetime.now(datetime.timezone.utc)
+          if problem:
+              payload['blockedSince'] = before.get('blockedSince') if same and before.get('blockedSince') else payload['checkedAt']
+              payload['escalated'] = bool(same and before.get('escalated'))
+          try:
+              held = (now - datetime.datetime.fromisoformat(payload.get('blockedSince', payload['checkedAt']))).total_seconds() / 3600
+          except ValueError:
+              held = 0
+          what_happened = message.split(' Nothing changed')[0]
+          alert = None
+          if scheduled and problem and not same:
+              # Goose first (flat-rate ChatGPT, owner 2026-11-02); Claude only if it is still blocked a day later.
+              alert = (f"**🪿 Goose: engine upgrade blocked** (upstream `{upstream[:10]}`, one day behind): {what_happened}. "
+                       "Please fix it on a `gpt/argentum-weekly-fix-<date>` branch following `engine-upgrade/HANDOFF.md` "
+                       "(pushing it runs a dry run; when that is green, open a draft PR into `gpt/arcana-integration-next` "
+                       "and post it here). The run summary has the exact commands. If it is still blocked on the next daily "
+                       f"run, Claude takes over. Run: {e['RUN_URL']}")
+          elif scheduled and same and not payload['escalated'] and held >= 20:
+              payload['escalated'] = True
+              alert = (f"**🤖 Claude: engine upgrade still blocked after {held:.0f} hours** (upstream `{upstream[:10]}`): "
+                       f"{what_happened}. Goose was asked first; please take it over (`engine-upgrade/HANDOFF.md`). Run: {e['RUN_URL']}")
+          if alert:
+              open(os.path.join(e['RUNNER_TEMP'], 'alert.md'), 'w').write(alert)
           body = '\n'.join([
               '<!-- arcana-control-status-v1:engine -->',
               '**Arcana Control status — engine** (maintained automatically; edited in place; read by https://aarmou.github.io/arcana_table/control/)',
               '- ' + message, '', '```json', json.dumps(payload, indent=1), '```'])
           open(os.path.join(e['RUNNER_TEMP'], 'engine-status.md'), 'w').write(body.replace('@', '＠'))
-          new_problem = daily and result in ('blocked', 'broken') and (
-              before.get('result') != result or before.get('problems') != problems or before.get('blocker') != blocker)
-          if new_problem:
-              open(os.path.join(e['RUNNER_TEMP'], 'alert.md'), 'w').write(
-                  f"**Engine early warning** (daily check of upstream `{upstream[:10]}`): {message.split(' Nothing changed')[0]}. "
-                  f"Engine lane: fix it on a `claude/argentum-weekly-fix-<date>` branch before Monday's upgrade "
-                  f"(`engine-upgrade/HANDOFF.md`; the run summary has the handoff commands). Run: {e['RUN_URL']}")
           PY
           if [ -n "$previous" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$previous" -F "body=@$RUNNER_TEMP/engine-status.md" >/dev/null || echo "::warning::Could not update the engine status"
@@ -802,8 +830,8 @@ jobs:
       - name: Tell issue 81 when a live run failed without publishing anything
         # publish already posts to #81 whenever it ran (PR, conflict or build-failure issue). This covers
         # the rest: validation broke (drift check, infrastructure, a crash) or publish itself failed.
-        # The daily early warning reports through the engine status below instead (once per new problem).
-        if: always() && github.event_name != 'push' && github.event.schedule != '23 11 * * *' && (needs.validate.result != 'success' || (needs.publish.result != 'success' && needs.publish.result != 'skipped'))
+        # Scheduled runs report through the engine status below instead (once per new problem).
+        if: always() && github.event_name == 'workflow_dispatch' && (needs.validate.result != 'success' || (needs.publish.result != 'success' && needs.publish.result != 'skipped'))
         env:
           GH_TOKEN: ${{ github.token }}
           VALIDATE: ${{ needs.validate.result }}
@@ -819,12 +847,11 @@ jobs:
           GREEN: ${{ needs.validate.outputs.green }}
           EVENT: ${{ github.event_name }}
         run: |
-          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT early_warning=$EARLY_WARNING"
+          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT lag_hours=$LAG_HOURS"
           if [ "$VALIDATE" != success ]; then echo "::error::Validation did not finish successfully ($VALIDATE)"; exit 1; fi
           if [ "$STATUS" = up_to_date ]; then echo 'Already on the latest upstream; nothing to do.'; exit 0; fi
           if [ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on a dry run ($PUBLISH)"; exit 1; fi
-          if [ "$EARLY_WARNING" = true ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on the early warning ($PUBLISH)"; exit 1; fi
-          if [ "$EVENT" != push ] && [ "$EARLY_WARNING" != true ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
+          if [ "$EVENT" != push ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
           if [ "$STATUS" != rebased ] || [ "$GREEN" != true ]; then
             echo "::error::Upgrade not green (status=$STATUS, green=$GREEN); see the validate job summary"; exit 1
           fi

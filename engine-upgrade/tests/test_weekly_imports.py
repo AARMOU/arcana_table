@@ -50,3 +50,24 @@ class DedupeImports(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NeverBackwards(unittest.TestCase):
+    """A one-day-behind target older than the current pin is not an upgrade (2026-11-02: the pin was moved
+    to the newest upstream by hand the evening before the first daily run)."""
+
+    def test_older_target_is_detected_and_newer_or_diverged_is_not(self):
+        repo = Path(tempfile.mkdtemp())
+        git = lambda *a, check=True: subprocess.run(["git", *a], cwd=repo, check=check, capture_output=True, text=True)
+        git("init", "-q", "-b", "main"); git("config", "user.email", "t@example.com"); git("config", "user.name", "t")
+        shas = []
+        for i in range(3):
+            (repo / "f").write_text(str(i)); git("add", "-A"); git("commit", "-qm", f"c{i}")
+            shas.append(git("rev-parse", "HEAD").stdout.strip())
+        old, mid, new = shas
+        self.assertTrue(weekly.pin_is_newer(git, old, new))     # target older than the pin: skip
+        self.assertFalse(weekly.pin_is_newer(git, new, old))    # a real upgrade
+        self.assertFalse(weekly.pin_is_newer(git, new, new))    # same commit: handled as up to date elsewhere
+        git("checkout", "-q", "-b", "side", old); (repo / "g").write_text("x"); git("add", "-A"); git("commit", "-qm", "side")
+        side = git("rev-parse", "HEAD").stdout.strip()
+        self.assertFalse(weekly.pin_is_newer(git, side, new))   # diverged history is rebased, not skipped
