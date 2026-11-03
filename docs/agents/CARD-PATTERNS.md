@@ -689,3 +689,92 @@ that dies after resolution has nothing until a second crew; crewing twice gives 
 crew 2 by total power); engine: `GrantActivatedAbilityToGraveyardCardsTest` (set fixed at resolution, leaving and
 returning to the graveyard drops it, cleanup, battlefield-zone abilities still refused).
 Unlocks among missing six-deck cards: Ghost Ark (Necron Dynasties). Past in Flames was already implemented without it.
+### "Creatures attacking the chosen player have <keyword>" (patch 0037)
+
+Use when a static ability affects creatures (any controller's) attacking a player the source has stored: "choose an
+opponent … creatures attacking the last chosen player have menace". Record the player with `Effects.ChooseOpponent()`
+(it replaces the previous pick, so the stored one is "the last chosen"), then filter with
+`GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))`; since 0037 that filter
+projects in a static against the source's stored choice (also `ChosenPlayer`, `You`, `Controller`). Only an attacker
+whose declared defender is that player matches: one attacking their planeswalker or battle doesn't (use
+`attackingDefenderOf` for the whole defending side). The choice is forgotten when the source changes zones (CR 400.7).
+For "creatures attacking enchanted player" use `attackingEnchantedPlayer()` (Curse of Hospitality).
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt -->
+```kotlin
+    triggeredAbility {
+        trigger = Triggers.you.beginningOf(Step.BEGIN_COMBAT)
+        effect = Effects.ChooseOpponent("Targeting Relay — choose an opponent")
+        description = "Targeting Relay — At the beginning of combat on your turn, choose an opponent."
+    }
+
+    staticAbility {
+        ability = GrantKeyword(
+            Keyword.MENACE,
+            GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))),
+        )
+    }
+```
+
+Test: [`TriarchStalkerScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt)
+(trigger only at the beginning of combat on your turn, with a choice among two opponents; one blocker refused, two
+allowed; an attacker of the other opponent and of the chosen player's planeswalker have no menace; tokens entering
+attacking the chosen player have it; re-choosing next turn switches; the choice holds on another opponent's turn
+when they attack the chosen player; bounce ends it and the recast Stalker has no chosen player); engine:
+`AttackingChosenPlayerStaticTest` (any controller's attackers, planeswalker excluded, no choice / re-choice,
+trigger-bound references still fail closed).
+Unlocks among missing six-deck cards: Triarch Stalker (Necron Dynasties).
+
+### "Whenever a land's ability causes you to add … mana of the chosen color, add an additional one" (patch 0038)
+
+Use for a triggered mana ability keyed to the source's chosen color rather than to a fixed color or to "tapped for
+mana". `AdditionalManaOnSourceTap(whenProducing = TappedForManaType.CHOSEN_COLOR, color = null)` fires only when the
+land's ability added at least one mana of the color stored by `EntersWithChoice(ChoiceType.COLOR)` (a dual tapped for
+its other color doesn't), and adds exactly one of it however much the land made. `anyManaAbility = true` is "a land's
+ability" (a mana ability without {T} counts); leave it false for "is tapped for mana". `onlyWhenYouAdd = true` is
+"causes **you** to add": keep the filter at plain `GameObjectFilter.Land` so a land you don't control whose mana you
+add counts, while an opponent adding their own mana never does. A chosen-color anthem reads the same choice through
+`withChosenColor()`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt -->
+```kotlin
+    staticAbility {
+        ability = AdditionalManaOnSourceTap(
+            sourceFilter = GameObjectFilter.Land,
+            color = null,
+            whenProducing = TappedForManaType.CHOSEN_COLOR,
+            anyManaAbility = true,
+            onlyWhenYouAdd = true,
+        )
+    }
+```
+
+Test: [`CagedSunScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt)
+(color chosen on cast; anthem only on your creatures of the color, multicolor included; basic of the color = 2, other
+color = 1; Tundra for {W} vs {U}; Orzhov Basilica +1 {W}; Gaea's Cradle {G}{G} +1 only; Marble Diamond none; two Suns
++2, two colors each their own; opponent's land none; auto-pay with a basic and with a dual, none for another color);
+engine: `ChosenColorLandManaBonusTest` (gate, dual, two-of-a-color, composite, untapped land ability vs the default
+tapped-only form, nonland source, two instances, opponent, no color chosen, auto-pay).
+Unlocks among missing six-deck cards: Caged Sun (Necron Dynasties).
+
+### "Whenever one or more artifact cards leave your graveyard" with cross-zone type grants (patch 0039)
+
+Use `Triggers.oneOrMore(filter).leaveYourGraveyard()` as usual (Desecrated Tomb shape). Since 0039 it looks back in
+time (CR 603.10a): a card counts with the card types a cross-zone `GrantCardType` gave it *in the graveyard*.
+Biotransference makes your creature cards artifacts, so a creature card leaving your graveyard is an artifact card
+leaving. `GameState.removeFromZone` records those types on the card as it leaves the graveyard, so the check works
+wherever the card went. `putIntoYourGraveyard()` batches read the card in the graveyard with its grant. Nothing
+changes for a card without such a grant. No new SDK vocabulary; write the card with the existing trigger.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt -->
+```kotlin
+        trigger = Triggers.oneOrMore(GameObjectFilter.Artifact).leaveYourGraveyard()
+```
+
+Test: [`ImotekhTheStormlordScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt)
+(three artifact cards exiled at once give one trigger; a non-artifact card or the opponent's graveyard doesn't
+trigger; with Biotransference a creature card raised from your graveyard triggers it); also
+[`BiotransferenceScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BiotransferenceScenarioTest.kt);
+engine: `GraveyardLookBackCardTypeTest` (granted card leaving fires; ungranted, battlefield-only grant and an
+opponent's grant don't; granted card put into your graveyard fires the arrival batch).
+Unlocks among missing six-deck cards: Imotekh the Stormlord with Biotransference (Necron Dynasties).

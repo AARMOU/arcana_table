@@ -1719,6 +1719,17 @@
     }
    ]
   },
+  "Effects.ChooseOpponent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.CopyControlledStackObjects": {
    "count": 1,
    "examples": [
@@ -1914,7 +1925,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 39,
+   "count": 41,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -2571,7 +2582,7 @@
    ]
   },
   "Effects.GrantKeyword": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -2766,7 +2777,7 @@
    ]
   },
   "Effects.LoseLife": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -2911,7 +2922,7 @@
    ]
   },
   "Effects.ModifyStats": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Defile",
@@ -3970,7 +3981,7 @@
    ]
   },
   "Keyword.MENACE": {
-   "count": 7,
+   "count": 9,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4606,7 +4617,7 @@
    ]
   },
   "Triggers.oneOrMore": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Knuckles the Echidna",
@@ -4619,6 +4630,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MarneusCalgar.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MarneusCalgarScenarioTest.kt"
+    },
+    {
+     "card": "Imotekh the Stormlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt",
+     "lines": 69,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt"
     }
    ]
   },
@@ -4998,7 +5015,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 22,
+   "count": 24,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5039,7 +5056,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -5393,7 +5410,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5550,7 +5567,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 66,
+   "count": 69,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5591,7 +5608,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 168,
+   "count": 171,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6092,7 +6109,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Silence",
@@ -6309,7 +6326,7 @@
    ]
   },
   "Step.BEGIN_COMBAT": {
-   "count": 4,
+   "count": 6,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6334,6 +6351,18 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BarretAvalancheLeader.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BarretAvalancheLeaderScenarioTest.kt"
+    },
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
+    },
+    {
+     "card": "Imotekh the Stormlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt",
+     "lines": 69,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt"
     }
    ]
   },
@@ -6600,7 +6629,7 @@
    ]
   },
   "EntersWithChoice": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Unclaimed Territory",
@@ -6613,6 +6642,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
+    },
+    {
+     "card": "Caged Sun",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt",
+     "lines": 74,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt"
     }
    ]
   },
@@ -6720,13 +6755,19 @@
  },
  "static": {
   "AdditionalManaOnSourceTap": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Forsaken Monument",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ForsakenMonument.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ForsakenMonumentScenarioTest.kt"
+    },
+    {
+     "card": "Caged Sun",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CagedSun.kt",
+     "lines": 74,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt"
     }
    ]
   },
@@ -6824,6 +6865,17 @@
     }
    ]
   },
+  "GrantCardType": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Biotransference",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Biotransference.kt",
+     "lines": 72,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BiotransferenceScenarioTest.kt"
+    }
+   ]
+  },
   "GrantDynamicStats": {
    "count": 2,
    "examples": [
@@ -6859,7 +6911,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -7037,7 +7089,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -7182,7 +7234,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -7320,7 +7372,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7553,7 +7605,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 24,
+   "count": 26,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -7594,7 +7646,7 @@
    ]
   },
   "GameObjectFilter.ArtifactCreature": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Cryptothrall",
@@ -7698,7 +7750,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 121,
+   "count": 124,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7806,7 +7858,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Defile",
@@ -8043,6 +8095,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfBodyAndMind.kt",
      "lines": 51,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfBodyAndMindScenarioTest.kt"
+    }
+   ]
+  },
+  "Player.ChosenOpponent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Triarch Stalker",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
+     "lines": 65,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
     }
    ]
   },
@@ -8811,7 +8874,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 81,
+   "count": 82,
    "examples": [
     {
      "card": "Defile",

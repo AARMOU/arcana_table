@@ -51,6 +51,9 @@ MANDATORY = [
     "0034-commander-cast-count-counters-rider.patch",
     "0035-ai-idle-mana-deploy.patch",
     "0036-graveyard-card-activated-grant.patch",
+    "0037-static-attacking-chosen-player.patch",
+    "0038-chosen-color-land-mana-bonus.patch",
+    "0039-graveyard-lookback-granted-types.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

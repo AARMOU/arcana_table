@@ -357,6 +357,8 @@ object CustomCards {
         Entry(OpalPalace, "SOC", "Eldrazi Incursion"),
         // Necron Dynasties. Needs engine patch 0036 (activated-ability grants onto graveyard cards).
         Entry(GhostArk, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0037 (static "attacking <chosen player>" filter in projection).
+        Entry(TriarchStalker, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (sacrifice-self cost; gather legendary creature cards and move to hand).
         Entry(Lychguard, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (Port of Karfell's mill-then-choose with an exile-self cost, sorcery timing).
@@ -367,6 +369,12 @@ object CustomCards {
         Entry(NecronMonolith, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (exile target player's graveyard, ArtifactOrLand count of the exiled cards -> Insect tokens).
         Entry(CanoptekScarabSwarm, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0038 (chosen-color land mana bonus: AdditionalManaOnSourceTap CHOSEN_COLOR).
+        Entry(CagedSun, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Existing SDK; engine patch 0039 lets graveyard batch triggers see its granted types.
+        Entry(Biotransference, "40K", "Necron Dynasties"),
+        // Necron Dynasties. Needs engine patch 0039 (Phaeron sees creature cards Biotransference made artifacts).
+        Entry(ImotekhTheStormlord, "40K", "Necron Dynasties"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
