@@ -1,0 +1,9 @@
+{
+  "key": "azlask-the-swelling-scourge",
+  "name": "Azlask, the Swelling Scourge",
+  "issue": 918,
+  "source": "certification/AzlaskTheSwellingScourgeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AzlaskTheSwellingScourgeIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
