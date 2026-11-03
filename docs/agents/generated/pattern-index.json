@@ -2318,13 +2318,19 @@
    ]
   },
   "Effects.ForEachInCollection": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Past in Flames",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
+    },
+    {
+     "card": "Ghost Ark",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GhostArk.kt",
+     "lines": 64,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GhostArkScenarioTest.kt"
     }
    ]
   },
@@ -2503,8 +2509,14 @@
    ]
   },
   "Effects.GrantActivatedAbility": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Ghost Ark",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GhostArk.kt",
+     "lines": 64,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GhostArkScenarioTest.kt"
+    },
     {
      "card": "Urza's Saga",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UrzasSaga.kt",
@@ -2970,7 +2982,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3731,7 +3743,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 36,
+   "count": 37,
    "examples": [
     {
      "card": "Venomthrope",
@@ -4192,7 +4204,7 @@
    ]
   },
   "KeywordAbility.crew": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Knight Paladin",
@@ -4649,6 +4661,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingBrontodon.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingBrontodonScenarioTest.kt"
+    }
+   ]
+  },
+  "Triggers.self.becomesCrewed": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ghost Ark",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GhostArk.kt",
+     "lines": 64,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GhostArkScenarioTest.kt"
     }
    ]
   },
@@ -5180,7 +5203,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5221,7 +5244,7 @@
    ]
   },
   "keywords()": {
-   "count": 109,
+   "count": 110,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5534,7 +5557,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 164,
+   "count": 165,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7182,7 +7205,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Mutilate",
@@ -7531,7 +7554,7 @@
    ]
   },
   "GameObjectFilter.ArtifactCreature": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Cryptothrall",
@@ -7562,6 +7585,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
+    },
+    {
+     "card": "Ghost Ark",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GhostArk.kt",
+     "lines": 64,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GhostArkScenarioTest.kt"
     }
    ]
   },
@@ -8204,7 +8233,7 @@
    ]
   },
   "Player.You": {
-   "count": 44,
+   "count": 45,
    "examples": [
     {
      "card": "Defile",
