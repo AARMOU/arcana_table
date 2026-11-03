@@ -26,7 +26,7 @@ const SHARED_VALIDATION_FILES = new Set([
 const SHARED_VALIDATION_PREFIXES = [
   'tools/cardkit/','android/app/src/test/','android/app/src/androidTest/',
   'android/app/src/main/java/','android/app/src/main/kotlin/',
-  'android/custom-cards/src/test/','android/custom-cards/src/main/kotlin/'
+  'android/custom-cards/src/test/'
 ];
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -189,6 +189,9 @@ function relevantDestinationPath(path, plan) {
   const own = [REGISTRY,...GENERATED,plan.paths.source,plan.paths.scenario,plan.suite.source,
     `certification/suites/${plan.suite.key}.json`,'android/app/src/main/assets/argentum/all-cards.index.tsv'];
   if (own.includes(path) || path.startsWith('android/app/libs/')) return true;
+  // Shared custom-card Kotlin sources can change compilation or validation outcomes; another
+  // card's isolated definition is unrelated unless its own suite/registry input also changes.
+  if (path.startsWith('android/custom-cards/src/main/kotlin/') && !path.includes('/cards/')) return true;
   if (path === 'android/gradle.properties' || path === 'android/settings.gradle.kts' ||
       path === 'android/gradle/libs.versions.toml' || /(^|\/)build.gradle.kts$/.test(path)) return true;
   return SHARED_VALIDATION_FILES.has(path) || SHARED_VALIDATION_PREFIXES.some(prefix=>path.startsWith(prefix));
