@@ -399,6 +399,7 @@ class LocalArgentumHost(
         val checkpoint = JSONObject()
             .put("schema", OfflineCheckpointStore.FORMAT)
             .put("mode", "local-ai")
+            .put(com.arcanatable.BuildCompatibility.FIELD, com.arcanatable.BuildCompatibility.current)
             .put("seats", org.json.JSONArray(allSeats.map { OfflineCheckpointStore.seatToJson(seatOf(it)) }))
             .put("gameState", JSONObject(json.encodeToString(GameState.serializer(), current)))
             .put("version", version)
@@ -428,7 +429,18 @@ class LocalArgentumHost(
             record.optString("mode") == "local-ai") { "Unsupported checkpoint format." }
         val savedSeats = OfflineCheckpointStore.savedSeats(record)
         require(savedSeats == allSeats.map(::seatOf)) { "Checkpoint seats or decks differ from the saved game." }
-        val restored = json.decodeFromString(GameState.serializer(), record.getJSONObject("gameState").toString())
+        // A save from a build with a different engine may not decode; say so plainly instead of an engine error.
+        val restored = try {
+            json.decodeFromString(GameState.serializer(), record.getJSONObject("gameState").toString())
+        } catch (error: kotlinx.serialization.SerializationException) {
+            emitTo(humanId, JSONObject().put("type", "error").put("code", "SAVE_FROM_OTHER_BUILD")
+                .put("message", com.arcanatable.BuildCompatibility.savedGameProblem(record)))
+            return
+        } catch (error: IllegalArgumentException) {
+            emitTo(humanId, JSONObject().put("type", "error").put("code", "SAVE_FROM_OTHER_BUILD")
+                .put("message", com.arcanatable.BuildCompatibility.savedGameProblem(record)))
+            return
+        }
         require(!restored.gameOver) { "Completed games cannot be resumed." }
         fun decodeUndo(field: String): Checkpoint? = record.optJSONObject(field)?.let { jsonObject ->
             val sizes = jsonObject.optJSONObject("logSizes") ?: JSONObject()
