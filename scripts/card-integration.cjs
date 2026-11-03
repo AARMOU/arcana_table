@@ -14,6 +14,21 @@ const GENERATED = ['android/app/src/main/assets/argentum/custom-cards.jsonl',
   'docs/agents/generated/pattern-index.json', 'docs/agents/generated/pattern-index.md'];
 const GATES = ['engine-pins','export','patterns','cardkit','scenario','independent',
   'custom-and-android','release-safety','scope'];
+const SHARED_VALIDATION_FILES = new Set([
+  '.github/workflows/arcana-approved-card-integration.yml',
+  '.github/workflows/arcana-card-certification-premerge.yml',
+  '.github/workflows/arcana-card-destination-preflight.yml',
+  '.github/workflows/arcana-independent-card-certification.yml',
+  'certification/policy.cjs','certification/runner.py',
+  'integration/policy.json','integration/runner.py',
+  'scripts/card-checks.cjs','scripts/card-integration.cjs','scripts/verified-certification.cjs'
+]);
+const SHARED_VALIDATION_PREFIXES = [
+  'tools/cardkit/','android/app/src/test/','android/app/src/androidTest/',
+  'android/app/src/main/java/','android/app/src/main/kotlin/',
+  'android/custom-cards/src/test/'
+];
+
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const RETRY_CLASS = 'lan-multi-host-address-in-use-v1';
 const RETRY_REF = 'tags/arcana-integration-retry/';
@@ -69,7 +84,12 @@ function config(root = '.') {
   const trustedInputs = [policyBytes,suitesBytes,fs.readFileSync(root+'/scripts/card-integration.cjs'),
     fs.readFileSync(root+'/integration/runner.py'),fs.readFileSync(root+'/certification/runner.py'),
     ...manifest.suites.map(s=>fs.readFileSync(root+'/'+s.source))];
-  return {policy:validatePolicy(JSON.parse(policyBytes)), manifest, policyHash:hash(Buffer.concat(trustedInputs))};
+  // Retry identity excludes other cards' suite data; publication still uses the full policyHash.
+  const shared = [policyBytes, ...['scripts/card-integration.cjs','integration/runner.py',
+    'certification/runner.py','certification/policy.cjs'].map(p=>fs.readFileSync(root+'/'+p))];
+  const retryHashes = Object.fromEntries(manifest.suites.map(s=>[s.key, hash(Buffer.concat([
+    ...shared, Buffer.from(JSON.stringify({...manifest,suites:[s]})), fs.readFileSync(root+'/'+s.source)]))]));
+  return {policy:validatePolicy(JSON.parse(policyBytes)), manifest, policyHash:hash(Buffer.concat(trustedInputs)), retryHashes};
 }
 function paths(suite) {
   const symbol = suite.source.split('/').pop().replace('IndependentCertificationTest.kt','');
@@ -163,6 +183,53 @@ async function registeredOn({github,owner,repo,ref,symbol,cache={}}) {
   }
   return new RegExp('\\bEntry\\(\\s*' + symbol + '\\s*,').test(cache.text);
 }
+// Compare exact snapshots, not branch activity. GitHub caps compare.files at 300;
+// incomplete or unavailable evidence must never suppress a card.
+function relevantDestinationPath(path, plan) {
+  const own = [REGISTRY,...GENERATED,plan.paths.source,plan.paths.scenario,plan.suite.source,
+    `certification/suites/${plan.suite.key}.json`,'android/app/src/main/assets/argentum/all-cards.index.tsv'];
+  if (own.includes(path) || path.startsWith('android/app/libs/')) return true;
+  // Shared custom-card Kotlin sources can change compilation or validation outcomes; another
+  // card's isolated definition is unrelated unless its own suite/registry input also changes.
+  if (path.startsWith('android/custom-cards/src/main/kotlin/') && !path.includes('/cards/')) return true;
+  if (path === 'android/gradle.properties' || path === 'android/settings.gradle.kts' ||
+      path === 'android/gradle/libs.versions.toml' || /(^|\/)build.gradle.kts$/.test(path)) return true;
+  return SHARED_VALIDATION_FILES.has(path) || SHARED_VALIDATION_PREFIXES.some(prefix=>path.startsWith(prefix));
+}
+async function blockedInputsUnchanged({github,owner,repo,receipt,plan}) {
+  if (receipt?.status !== 'blocked' || receipt.target !== plan.target || receipt.sourceSha !== plan.sourceSha) return false;
+  if (receipt.retryInputHash ? receipt.retryInputHash !== plan.retryInputHash : receipt.policyHash !== plan.policyHash) return false;
+  if (receipt.baseSha === plan.baseSha) return true;
+  const d = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,
+    basehead:receipt.baseSha+'...'+plan.baseSha})).data;
+  if (d.status !== 'ahead' || !Array.isArray(d.files) || d.files.length >= 300) return false;
+  // A registry/scenario or shared-gate change must get one full validation before any engine-only hold.
+  const relevantChanged = d.files.some(f=>[f.filename,f.previous_filename].some(p=>p && relevantDestinationPath(p,plan)));
+  if (relevantChanged) return false;
+  const preflight = require('./destination-preflight.cjs');
+  // Non-engine blockers stay quiet on unrelated commits. Engine blockers stay quiet only while the
+  // engine fingerprint is unchanged; uncertain fingerprints conservatively trigger validation.
+  if (preflight.engineBound(receipt.primaryCause || receipt.reason))
+    return preflight.engineUnchangedSince({github,owner,repo,receipt,baseSha:plan.baseSha});
+  return true;
+}
+const GENERIC_CAUSES = new Set([
+  'blocked','failed','validation failed','validation did not pass','checks failed','check failed',
+  'tests failed','not run','not run after earlier blocker','not executed','skipped',
+  'unknown','n/a','none','no cause provided'
+]);
+function concreteCause(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const detail = value.trim(), normalized = detail.toLowerCase().replace(/\s+/g,' ').replace(/[.!?]+$/,'');
+  if (GENERIC_CAUSES.has(normalized) || /^(not run|not executed|skipped)\b/.test(normalized)) return null;
+  return detail;
+}
+function primaryCause(report) {
+  const reason = concreteCause(report.reason);
+  if (reason) return reason;
+  const gate = report.gates?.find(g=>!g.ok && concreteCause(g.detail));
+  return gate ? gate.name+': '+concreteCause(gate.detail) : null;
+}
 async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
   if (!cfg.policy.enabled || !SHA.test(controlSha)) return null;
   const baseSha = (await github.rest.git.getRef({owner,repo,ref:'heads/'+cfg.policy.target})).data.object.sha;
@@ -184,14 +251,12 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     // nothing is suppressed before it exists.
     if (receipt?.status === 'blocked' && /already registered/i.test(String(receipt.reason || '')) &&
         await registeredOn({github,owner,repo,ref:baseSha,symbol:paths(suite).symbol,cache:registryCache})) continue;
-    // Blocked by the target's engine (e.g. #662 `encore`, #690 registry cards): re-run only when that engine changes,
-    // not on every card-only target commit. Non-engine blocks keep re-running when the target moves.
-    if (!retry && await require('./destination-preflight.cjs').engineUnchangedSince({github,owner,repo,receipt,baseSha})) continue;
     const plan = {schema:1,pr:pr.number,sourceSha:snap.pr.head.sha,sourceBase:snap.pr.base.sha,
       sourceBaseRef:snap.pr.base.ref,baseSha,target:cfg.policy.target,controlSha,policyHash:cfg.policyHash,
+      retryInputHash:cfg.retryHashes?.[suite.key] || cfg.policyHash,
       reviewId:ownerDecision(snap.reviews,snap.pr.head.sha,cfg.policy).id,
       suite,paths:paths(suite),sourceFiles:snap.files.map(f=>f.filename)};
-    if (!retry && receipt?.status === 'blocked' && receipt.baseSha === baseSha && receipt.policyHash === cfg.policyHash) {
+    if (!retry && await blockedInputsUnchanged({github,owner,repo,receipt,plan})) {
       if (!retryAvailable(receipt,plan) || !await trustedRetryReceipt({github,owner,repo,receipt}) ||
           await retryConsumed({github,owner,repo,key:retryKey(plan)})) continue;
       plan.autoRetry = {classification:RETRY_CLASS,key:retryKey(plan)};
@@ -206,6 +271,7 @@ function validateOutcome(plan, report) {
       report.gates.length !== GATES.length || new Set(report.gates.map(g=>g.name)).size !== GATES.length ||
       report.gates.some(g=>!GATES.includes(g.name)||typeof g.ok!=='boolean'))
     throw Error('Missing, malformed or wrong-plan destination evidence');
+  if (report.status === 'blocked' && !primaryCause(report)) throw Error('Blocked destination evidence requires a primary cause');
 }
 function validateReport(plan, report, files) {
   validateOutcome(plan,report);
@@ -299,7 +365,7 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   const ref = (await github.rest.git.getRef({owner,repo,ref:'heads/'+plan.target})).data.object.sha;
   if (ref !== plan.baseSha) throw Error('Android target advanced; revalidate on next pass');
   const receipt = {schema:1,pr:plan.pr,card:suite.name,sourceSha:plan.sourceSha,baseSha:plan.baseSha,
-    target:plan.target,policyHash:plan.policyHash,controlSha:plan.controlSha,status:'blocked',runUrl,at:new Date().toISOString()};
+    target:plan.target,policyHash:plan.policyHash,retryInputHash:plan.retryInputHash,controlSha:plan.controlSha,status:'blocked',runUrl,at:new Date().toISOString()};
   if (plan.autoRetry && (plan.autoRetry.classification!==RETRY_CLASS || plan.autoRetry.key!==retryKey(plan) ||
       !await retryConsumed({github,owner,repo,key:retryKey(plan)}))) throw Error('Automatic retry has no durable reservation');
   if (report.status === 'passed') {
@@ -321,6 +387,7 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   const reason = ([report.reason,...(report.gates || []).filter(g=>!g.ok).map(g=>g.name+': '+g.detail)].filter(Boolean).join('\n') || 'Validation did not pass')+
     '\n'+(report.failures||[]).slice(0,4).join('\n');
   if (receipt.status==='blocked') {
+    receipt.primaryCause=primaryCause(report).slice(0,2000);
     receipt.reason=String(reason).slice(0,2000);
     if (plan.autoRetry || retryClassification(report)) receipt.recovery={classification:RETRY_CLASS,key:retryKey(plan),
       state:plan.autoRetry || await retryConsumed({github,owner,repo,key:retryKey(plan)}) ? 'exhausted' : 'available'};
@@ -329,7 +396,7 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   // Dedupe blocked notifications for unchanged source/base/policy. Integrated receipts
   // remain permanent source-PR evidence even if the source PR targets a legacy branch.
   if (!previous || previous.sourceSha!==receipt.sourceSha || previous.baseSha!==receipt.baseSha ||
-      previous.policyHash!==receipt.policyHash || previous.status!==receipt.status) {
+      previous.policyHash!==receipt.policyHash || previous.retryInputHash!==receipt.retryInputHash || previous.status!==receipt.status) {
     await github.rest.issues.createComment({owner,repo,issue_number:plan.pr,body});
     await github.rest.issues.createComment({owner,repo,issue_number:81,body});
   } else if (receipt.status==='blocked' && receipt.recovery) {
@@ -373,5 +440,5 @@ async function reportIntegrationSkips({github,owner,repo,root='.',issue=78}) {
   return 'posted ' + skipped.length;
 }
 module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,registeredOn,otherSuiteData,
-  RETRY_CLASS,RETRY_REF,retryKey,retryClassification,retryConsumed,retryAvailable,trustedRetryReceipt,reserveRetry,
+  blockedInputsUnchanged,primaryCause,RETRY_CLASS,RETRY_REF,retryKey,retryClassification,retryConsumed,retryAvailable,trustedRetryReceipt,reserveRetry,
   integrationBlockers,reportIntegrationSkips,SKIP_MARKER,sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};
