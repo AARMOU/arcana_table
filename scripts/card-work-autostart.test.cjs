@@ -73,10 +73,18 @@ test('claim detection: only trusted people, comment must start with CLAIM', () =
   assert.equal(claimedAtOf([c('CLAIM', 'OWNER', 'Bot')]), null);
 });
 
-test('new card-work requests are not selected without a Cardkit starting packet', () => {
+test('card-work requests without a Cardkit packet are never published', async () => {
+  const calls = [];
+  const github = { paginate: async () => [], rest: { issues: {
+    create: async args => { calls.push(args); return { data: { number: 99 } }; },
+    createComment: async () => {}, update: async () => {},
+  } } };
   const missing = workRequest({ referencePacket: null });
-  const plan = Q.planCardWork({ ok: true, requestedClassified: true, resolvedRequests: [], workRequests: [missing] }, []);
-  assert.equal(plan.create, null);
+  const out = await Q.syncCardWork({ github, owner: 'AARMOU', repo: 'arcana_table',
+    payload: { ok: true, requestedClassified: true, baseSha: SHA, resolvedRequests: [], workRequests: [missing] },
+    runId: 7, enabled: true });
+  assert.equal(out.created, undefined);
+  assert.equal(calls.length, 0);
 });
 
 test('legacy card-work items without Oracle or Cardkit references are superseded so they can be reopened', () => {
