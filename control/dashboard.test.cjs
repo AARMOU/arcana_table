@@ -622,7 +622,7 @@ test('engine status reads in plain words, flags problems and an overdue daily ch
   const now=Date.parse('2026-11-03T12:00:00Z');
   const base={kind:'engine',schema:1,checkedAt:'2026-11-03T11:40:00Z',mode:'daily',run:'https://github.com/AARMOU/arcana_table/actions/runs/1'};
   const ok=view({...base,result:'ok',message:"Checked the makers' latest engine today: it would upgrade cleanly."},now);
-  assert.equal(ok.tag,'green');assert.match(ok.title,/ready to upgrade/);assert.match(ok.detail,/upgrade cleanly/);
+  assert.equal(ok.tag,'green');assert.match(ok.title,/from a day ago/);assert.match(ok.detail,/upgrade cleanly/);
   const held=view({...base,result:'blocked',message:'clash in 0011-stack-object-copying.patch. Nothing changed in the app.'},now);
   assert.equal(held.tag,'amber');assert.match(held.title,/nothing needed from you/);assert.match(held.detail,/0011/);
   const old=view({...base,result:'ok',checkedAt:'2026-11-01T11:40:00Z'},now);
