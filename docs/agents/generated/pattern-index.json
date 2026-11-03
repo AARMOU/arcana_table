@@ -287,6 +287,17 @@
     }
    ]
   },
+  "Conditions.WasCast": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Shard of the Nightbringer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShardOfTheNightbringer.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShardOfTheNightbringerScenarioTest.kt"
+    }
+   ]
+  },
   "Conditions.WasCastFromHand": {
    "count": 1,
    "examples": [
@@ -358,7 +369,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 34,
+   "count": 36,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -432,7 +443,7 @@
    ]
   },
   "Costs.ExileSelf": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Soul of New Phyrexia",
@@ -447,6 +458,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MotherBearScenarioTest.kt"
     },
     {
+     "card": "Tomb Fortress",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TombFortress.kt",
+     "lines": 67,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TombFortressScenarioTest.kt"
+    },
+    {
      "card": "Sliver Gravemother",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SliverGravemother.kt",
      "lines": 74,
@@ -455,7 +472,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 43,
+   "count": 45,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -604,7 +621,7 @@
    ]
   },
   "Costs.SacrificeSelf": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -631,21 +648,21 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
     },
     {
+     "card": "Lychguard",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Lychguard.kt",
+     "lines": 48,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LychguardScenarioTest.kt"
+    },
+    {
      "card": "Spawning Bed",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpawningBed.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SpawningBedScenarioTest.kt"
-    },
-    {
-     "card": "Ninja Pizza",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NinjaPizza.kt",
-     "lines": 49,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NinjaPizzaScenarioTest.kt"
     }
    ]
   },
   "Costs.Tap": {
-   "count": 46,
+   "count": 47,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -955,8 +972,14 @@
    ]
   },
   "DynamicAmounts.lifeTotal": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Shard of the Nightbringer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShardOfTheNightbringer.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShardOfTheNightbringerScenarioTest.kt"
+    },
     {
      "card": "Great Unclean One",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GreatUncleanOne.kt",
@@ -1412,7 +1435,7 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1902,7 +1925,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 37,
+   "count": 41,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -2205,6 +2228,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.DrainLife": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Shard of the Nightbringer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShardOfTheNightbringer.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShardOfTheNightbringerScenarioTest.kt"
     }
    ]
   },
@@ -2548,7 +2582,7 @@
    ]
   },
   "Effects.GrantKeyword": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -2743,7 +2777,7 @@
    ]
   },
   "Effects.LoseLife": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -2888,7 +2922,7 @@
    ]
   },
   "Effects.ModifyStats": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Defile",
@@ -2993,7 +3027,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 28,
+   "count": 32,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3754,7 +3788,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 37,
+   "count": 40,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3865,7 +3899,7 @@
    ]
   },
   "Keyword.INDESTRUCTIBLE": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Exterminatus",
@@ -3947,7 +3981,7 @@
    ]
   },
   "Keyword.MENACE": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4215,7 +4249,7 @@
    ]
   },
   "KeywordAbility.crew": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Knight Paladin",
@@ -4583,7 +4617,7 @@
    ]
   },
   "Triggers.oneOrMore": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Knuckles the Echidna",
@@ -4596,6 +4630,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MarneusCalgar.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MarneusCalgarScenarioTest.kt"
+    },
+    {
+     "card": "Imotekh the Stormlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt",
+     "lines": 69,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt"
     }
    ]
   },
@@ -4635,7 +4675,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4808,7 +4848,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 51,
+   "count": 53,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4975,7 +5015,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5016,7 +5056,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -5081,7 +5121,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 66,
+   "count": 68,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5214,7 +5254,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 28,
+   "count": 29,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5255,7 +5295,7 @@
    ]
   },
   "keywords()": {
-   "count": 110,
+   "count": 113,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5370,7 +5410,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5527,7 +5567,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 67,
+   "count": 69,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5568,7 +5608,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 166,
+   "count": 171,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5693,7 +5733,7 @@
    ]
   },
   "interveningIf": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -5734,7 +5774,7 @@
    ]
   },
   "manaAbility": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5868,7 +5908,7 @@
    ]
   },
   "timing": {
-   "count": 37,
+   "count": 38,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6069,7 +6109,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Silence",
@@ -6286,7 +6326,7 @@
    ]
   },
   "Step.BEGIN_COMBAT": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6317,6 +6357,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TriarchStalker.kt",
      "lines": 65,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt"
+    },
+    {
+     "card": "Imotekh the Stormlord",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ImotekhTheStormlord.kt",
+     "lines": 69,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ImotekhTheStormlordScenarioTest.kt"
     }
    ]
   },
@@ -6489,7 +6535,7 @@
    ]
   },
   "TimingRule.SorcerySpeed": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Mother Bear",
@@ -6502,6 +6548,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TransmogrifyingWand.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TransmogrifyingWandScenarioTest.kt"
+    },
+    {
+     "card": "Tomb Fortress",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TombFortress.kt",
+     "lines": 67,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TombFortressScenarioTest.kt"
     },
     {
      "card": "Sliver Gravemother",
@@ -6536,7 +6588,7 @@
    ]
   },
   "EntersTapped": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6810,6 +6862,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
+    }
+   ]
+  },
+  "GrantCardType": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Biotransference",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Biotransference.kt",
+     "lines": 72,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BiotransferenceScenarioTest.kt"
     }
    ]
   },
@@ -7171,7 +7234,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -7542,7 +7605,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 24,
+   "count": 26,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -7583,7 +7646,7 @@
    ]
   },
   "GameObjectFilter.ArtifactCreature": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Cryptothrall",
@@ -7640,6 +7703,17 @@
     }
    ]
   },
+  "GameObjectFilter.ArtifactOrLand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Canoptek Scarab Swarm",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CanoptekScarabSwarm.kt",
+     "lines": 68,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekScarabSwarmScenarioTest.kt"
+    }
+   ]
+  },
   "GameObjectFilter.BasicLand": {
    "count": 5,
    "examples": [
@@ -7676,7 +7750,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 119,
+   "count": 124,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -8208,8 +8282,19 @@
     }
    ]
   },
+  "Player.TargetOpponent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Shard of the Nightbringer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShardOfTheNightbringer.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShardOfTheNightbringerScenarioTest.kt"
+    }
+   ]
+  },
   "Player.TargetPlayer": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Suffer the Past",
@@ -8228,6 +8313,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
      "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
+    },
+    {
+     "card": "Canoptek Scarab Swarm",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CanoptekScarabSwarm.kt",
+     "lines": 68,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekScarabSwarmScenarioTest.kt"
     }
    ]
   },
@@ -8273,7 +8364,7 @@
    ]
   },
   "Player.You": {
-   "count": 45,
+   "count": 47,
    "examples": [
     {
      "card": "Defile",
@@ -8707,7 +8798,7 @@
    ]
   },
   "Targets.Opponent": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Keeper of Secrets",
@@ -8732,11 +8823,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TataruTaru.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TataruTaruScenarioTest.kt"
+    },
+    {
+     "card": "Shard of the Nightbringer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShardOfTheNightbringer.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShardOfTheNightbringerScenarioTest.kt"
     }
    ]
   },
   "Targets.Player": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -8777,7 +8874,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 79,
+   "count": 82,
    "examples": [
     {
      "card": "Defile",

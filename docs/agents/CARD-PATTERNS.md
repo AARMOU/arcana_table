@@ -712,6 +712,19 @@ For "creatures attacking enchanted player" use `attackingEnchantedPlayer()` (Cur
         ability = GrantKeyword(
             Keyword.MENACE,
             GroupFilter(GameObjectFilter.Creature.attackingPlayer(EffectTarget.PlayerRef(Player.ChosenOpponent))),
+        )
+    }
+```
+
+Test: [`TriarchStalkerScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt)
+(trigger only at the beginning of combat on your turn, with a choice among two opponents; one blocker refused, two
+allowed; an attacker of the other opponent and of the chosen player's planeswalker have no menace; tokens entering
+attacking the chosen player have it; re-choosing next turn switches; the choice holds on another opponent's turn
+when they attack the chosen player; bounce ends it and the recast Stalker has no chosen player); engine:
+`AttackingChosenPlayerStaticTest` (any controller's attackers, planeswalker excluded, no choice / re-choice,
+trigger-bound references still fail closed).
+Unlocks among missing six-deck cards: Triarch Stalker (Necron Dynasties).
+
 ### "Whenever a land's ability causes you to add … mana of the chosen color, add an additional one" (patch 0038)
 
 Use for a triggered mana ability keyed to the source's chosen color rather than to a fixed color or to "tapped for
@@ -736,14 +749,6 @@ add counts, while an opponent adding their own mana never does. A chosen-color a
     }
 ```
 
-Test: [`TriarchStalkerScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TriarchStalkerScenarioTest.kt)
-(trigger only at the beginning of combat on your turn, with a choice among two opponents; one blocker refused, two
-allowed; an attacker of the other opponent and of the chosen player's planeswalker have no menace; tokens entering
-attacking the chosen player have it; re-choosing next turn switches; the choice holds on another opponent's turn
-when they attack the chosen player; bounce ends it and the recast Stalker has no chosen player); engine:
-`AttackingChosenPlayerStaticTest` (any controller's attackers, planeswalker excluded, no choice / re-choice,
-trigger-bound references still fail closed).
-Unlocks among missing six-deck cards: Triarch Stalker (Necron Dynasties).
 Test: [`CagedSunScenarioTest.kt`](../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CagedSunScenarioTest.kt)
 (color chosen on cast; anthem only on your creatures of the color, multicolor included; basic of the color = 2, other
 color = 1; Tundra for {W} vs {U}; Orzhov Basilica +1 {W}; Gaea's Cradle {G}{G} +1 only; Marble Diamond none; two Suns
