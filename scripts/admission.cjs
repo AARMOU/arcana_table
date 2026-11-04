@@ -263,6 +263,20 @@ function suiteActionable(body) {
   return { ok: missing.length === 0, missing };
 }
 
+function hasCardkitStartingPacket(body) {
+  const text = String(body || '');
+  const heading = /^## Cardkit starting packet\\s*$/im.exec(text);
+  if (!heading) return false;
+  const rest = text.slice(heading.index + heading[0].length).split(/^##\\s+/m)[0];
+  return rest.trim().length > 0;
+}
+
+function queueUnitActionable(body, base) {
+  const result = unitActionable(body, base);
+  if (!hasCardkitStartingPacket(body)) result.missing.push('cardkit-starting-packet');
+  return { ok: result.missing.length === 0, missing: result.missing };
+}
+
 function reviewActionable(body) {
   const text = String(body || ''), missing = [];
   if (!text.startsWith(CARD_WORK_MARKER + '\n')) missing.push('card-work-marker');
@@ -270,6 +284,7 @@ function reviewActionable(body) {
   const cards = (text.split(/^## Card\s*$/m)[1] || '').split(/^## /m)[0].split('\n').filter(l => /^- \S/.test(l));
   if (cards.length !== 1) missing.push('one-card');
   if (!/^ {4}\{.*"oracle_text"/m.test(text)) missing.push('oracle-record');
+  if (!hasCardkitStartingPacket(text)) missing.push('cardkit-starting-packet');
   return { ok: missing.length === 0, missing };
 }
 
@@ -423,5 +438,5 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
 
 module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, isIntegratedSuite, CARD_WORK_TITLE, CARD_WORK_MARKER, reviewActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   SESSION_STALE_MS, AUTO_RELEASE_MS, INTERRUPT_AUTO_RESOLVE_MS, DEFAULT_BILLING_LAG_HOURS,
-  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot, scaledCapacity, laneDenial,
+  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, queueUnitActionable, hasCardkitStartingPacket, budgetWithReservations, admit, isBot, scaledCapacity, laneDenial,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };
