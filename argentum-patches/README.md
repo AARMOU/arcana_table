@@ -11,3 +11,10 @@ These are kept here (not pushed to Argentum). They could be offered upstream lat
   `jvmTarget 17`) so the jars run on Android, and adds a local `:arcana-export` module that writes
   Portal as card data (`por-cards.jsonl`) with a round-trip check. The PC build runs
   `:mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run`.
+
+### 0040 — intrinsic zone-cast X selection
+
+Intrinsic `MayCastSelfFromZones` offers now expose the X picker and affordable ceiling, as
+ordinary hand casts do. Uses the actual origin zone and eligible spell-payment mana context.
+The casting handler remains authoritative for payment, ownership and timing. No SDK surface
+change. Regression: `IntrinsicZoneCastXTest`; first consumer: Their Number Is Legion.

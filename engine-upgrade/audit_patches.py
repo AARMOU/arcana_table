@@ -54,6 +54,7 @@ MANDATORY = [
     "0037-static-attacking-chosen-player.patch",
     "0038-chosen-color-land-mana-bonus.patch",
     "0039-graveyard-lookback-granted-types.patch",
+    "0040-intrinsic-zone-cast-x.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
