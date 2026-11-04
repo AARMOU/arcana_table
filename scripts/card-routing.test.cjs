@@ -120,7 +120,7 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
 });
 
-const PACKET = '## Cardkit starting packet\\nCardkit classify: NEEDS_REVIEW\\nNo close tested custom-card match was found.';
+const PACKET = ['## Cardkit starting packet', 'Cardkit classify: NEEDS_REVIEW', 'No close tested custom-card match was found.'].join('\n');
 const oracleFor = name => JSON.stringify({ name, type_line: 'Creature', oracle_text: 'Test rules text',
   scryfall_uri: 'https://scryfall.com/card/test/1/test' });
 const packetFor = name => PACKET.replace('NEEDS_REVIEW', 'NEEDS_REVIEW <!-- ' + name + ' -->');
@@ -128,7 +128,7 @@ const enrichWork = r => ({ ...r, oracle: r.oracle || oracleFor(r.name), referenc
 test('packet-less queue units fail closed before chooseAutoQueue', () => {
   const name = 'Celestine, the Living Saint';
   const r = Q.candidates({ gaps: PRECONS, openIssues: [] });
-  const body = unitBody(name).replace(/## Cardkit starting packet[\\s\\S]*?## Acceptance\\n/, '## Acceptance\\n');
+  const body = unitBody(name).replace(['## Cardkit starting packet', 'Cardkit classify: SUPPORTED', 'No close tested custom-card match.', '', ''].join('\n'), '');
   const p = Q.queuePayload({ result: r, units: [{ name, body }], base: BASE, baseSha: SHA });
   assert.equal(p.suggestions[0].ready, false);
   assert.ok(p.suggestions[0].missing.includes('cardkit-starting-packet'));
