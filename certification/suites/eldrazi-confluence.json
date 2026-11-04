@@ -1,0 +1,9 @@
+{
+  "key": "eldrazi-confluence",
+  "name": "Eldrazi Confluence",
+  "issue": 945,
+  "source": "certification/EldraziConfluenceIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldraziConfluenceIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
