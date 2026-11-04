@@ -3,6 +3,7 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.DesertOfTheGlorified
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.core.CycleCard
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -19,19 +20,17 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         assertNull(d.playLand(p, land).error)
         d.resolveAll()
         assertTrue(d.isTapped(land))
-        assertTrue(d.abilityActions(p, land).isEmpty())
+        assertNotNull(d.activate(p, land).error)
 
         d.untapPermanent(land)
-        val abilities = d.abilityActions(p, land)
-        assertEquals(1, abilities.size)
-        assertTrue(abilities.single().action is ActivateAbility)
-        assertNull(d.submit(abilities.single().action as ActivateAbility).error)
+        val manaAbility = d.abilityActions(p, land).single().action as ActivateAbility
+        assertNull(d.submit(manaAbility).error)
         d.resolveAll()
 
         assertEquals(1, d.manaPool(p).black)
         assertEquals(0, d.manaPool(p).colorless)
         assertTrue(d.isTapped(land))
-        assertTrue(d.abilityActions(p, land).isEmpty())
+        assertNotNull(d.activate(p, land).error)
     }
 
     @Test
@@ -47,10 +46,10 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertNull(d.passPriority(opponent).error)
 
-        val abilities = d.abilityActions(p, land)
-        assertEquals(1, abilities.size)
-        assertTrue(abilities.single().action is ActivateAbility)
-        assertNull(d.submit(abilities.single().action as ActivateAbility).error)
+        val cycleActions = d.legalActions(p).filter { (it.action as? CycleCard)?.cardId == land }
+        assertEquals(1, cycleActions.size)
+        assertTrue(cycleActions.single().affordable)
+        assertNull(d.submit(cycleActions.single().action as CycleCard).error)
 
         assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("Desert of the Glorified"))
         assertFalse(d.zoneNames(p, Zone.HAND).contains("Desert of the Glorified"))
@@ -73,7 +72,10 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
         d.giveMana(p, Color.BLACK)
 
-        assertTrue(d.abilityActions(p, land).isEmpty())
+        val cycleActions = d.legalActions(p).filter { (it.action as? CycleCard)?.cardId == land }
+        assertEquals(1, cycleActions.size)
+        assertFalse(cycleActions.single().affordable)
+        assertNotNull(d.submit(cycleActions.single().action as CycleCard).error)
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Desert of the Glorified"))
         assertFalse(d.zoneNames(p, Zone.GRAVEYARD).contains("Desert of the Glorified"))
         assertEquals(handBefore, d.getHandSize(p))
@@ -91,7 +93,10 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
         d.giveColorlessMana(p, 1)
 
-        assertTrue(d.abilityActions(p, land).isEmpty())
+        val cycleActions = d.legalActions(p).filter { (it.action as? CycleCard)?.cardId == land }
+        assertEquals(1, cycleActions.size)
+        assertFalse(cycleActions.single().affordable)
+        assertNotNull(d.submit(cycleActions.single().action as CycleCard).error)
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Desert of the Glorified"))
         assertFalse(d.zoneNames(p, Zone.GRAVEYARD).contains("Desert of the Glorified"))
         assertEquals(handBefore, d.getHandSize(p))
