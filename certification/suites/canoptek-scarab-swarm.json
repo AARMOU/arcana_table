@@ -1,0 +1,9 @@
+{
+  "key": "canoptek-scarab-swarm",
+  "name": "Canoptek Scarab Swarm",
+  "issue": 939,
+  "source": "certification/CanoptekScarabSwarmIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CanoptekScarabSwarmIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
