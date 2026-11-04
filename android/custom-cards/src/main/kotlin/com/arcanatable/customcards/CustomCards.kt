@@ -379,6 +379,8 @@ object CustomCards {
         Entry(TrazynTheInfinite, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (ETB: mill three, then chooseAnyNumber artifact creature cards with TotalManaValueAtMost(6) -> battlefield).
         Entry(Technomancer, "40K", "Necron Dynasties"),
+        Entry(ShardOfTheVoidDragon, "40K", "Necron Dynasties"),
+        Entry(ConvergenceOfDominion, "40K", "Necron Dynasties"),
         // Necron Dynasties. No engine patch (Saga; III: up to three graveyard targets with TotalCap mana value 8, enter with a counter and as artifacts).
         Entry(TheWarInHeaven, "40K", "Necron Dynasties"),
     )
