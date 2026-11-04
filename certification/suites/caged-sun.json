@@ -1,0 +1,9 @@
+{
+  "key": "caged-sun",
+  "name": "Caged Sun",
+  "issue": 937,
+  "source": "certification/CagedSunIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CagedSunIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
