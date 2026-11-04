@@ -796,4 +796,5 @@ available. Never replace this with flashback's exile-on-leaving-stack behavior.
 
 Engine regression: `IntrinsicZoneCastXTest` (announced X, payment and ownership negatives).
 Unlocks: Their Number Is Legion; other intrinsic zone X-cost spells get the same picker metadata.
-Validation is pending; this recipe must not be treated as certification until the linked run passes.
+Validation: [B141 run 41869998750](https://github.com/AARMOU/arcana_table/actions/runs/41869998750),
+engine 9,301 / 0 failed, cards 1,088 / 0 failed, app 480 / 0 failed.
