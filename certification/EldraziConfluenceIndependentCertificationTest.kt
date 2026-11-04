@@ -56,6 +56,7 @@ class EldraziConfluenceIndependentCertificationTest {
         assertEquals(p, d.projected.getController(borrowed))
 
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = owner)
+        assertNull(d.passPriority(owner).error)
         val confluence = d.putCardInHand(p, name)
         d.giveColorlessMana(p, 4)
         assertNull(
