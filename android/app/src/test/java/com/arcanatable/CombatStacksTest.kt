@@ -11,6 +11,25 @@ import org.junit.Test
 
 /** Stacked combat screens: stacks, counts, last-turn replay, block hints, previews and suggestions. */
 class CombatStacksTest {
+    @Test fun singleAttackerTapsAssignRetargetAndClearWithoutChangingOtherAttacks() {
+        val options = attackPlan(listOf("a", "b"), listOf("left", "right")).options.associateBy { it.attackerId }
+        val other = mapOf("b" to "left")
+        val first = tapSingleAttacker(other, "a", options, "left")
+        assertEquals(other + ("a" to "left"), first)
+        val retargeted = tapSingleAttacker(first, "a", options, "right")
+        assertEquals(other + ("a" to "right"), retargeted)
+        assertEquals(other, tapSingleAttacker(retargeted, "a", options, "right"))
+    }
+
+    @Test fun mandatoryAttackerCannotBeClearedAndIllegalPreferredTargetIsNeverSent() {
+        val options = attackPlan(listOf("a"), listOf("legal"), mandatory = listOf("a")).options.associateBy { it.attackerId }
+        val selected = mapOf("a" to "legal")
+        assertEquals(selected, tapSingleAttacker(selected, "a", options, "illegal"))
+        assertEquals(selected, tapSingleAttacker(selected, "a", options, "legal"))
+        assertEquals(selected, tapSingleAttacker(emptyMap(), "a", options, "illegal"))
+        assertEquals(selected, tapSingleAttacker(selected, "missing", options, "legal"))
+    }
+
     private fun card(id: Int, name: String, p: String = "1", t: String = "1", keywords: List<String> = emptyList(),
                      counters: Map<String, Int> = emptyMap(), commander: Boolean = false, oracle: String? = null) =
         GameCard(id, name, "Creature — Test", Color.Red, power = p, toughness = t, keywords = keywords, counters = counters, isCommander = commander, oracleText = oracle)

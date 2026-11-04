@@ -2299,6 +2299,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // BEGIN changelog-since-build121 — generated next-APK release notes
+                Text("GAME UI PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Your hand header shows the turn, step, playable-card count and stack size.\n• Pick an attack target to see that defender's possible blockers. Tap a single creature to assign it to the selected target; tap again to clear an optional attack. Stacks keep their count picker.\n• Colored attack lines are still pending.", color = SoftWhite, fontSize = 12.sp)
                 Text("UPGRADES SINCE BUILD 121 · VERIFIED VS. PREPARED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("Newest first. Builds 122–141 (including Build 141 updates) are test previews and development milestones, not Play Store releases. Tests passing in development is not the same as full testing on a real phone.", color = SoftWhite, fontSize = 12.sp)
                 Text("BUILD 141 · UPDATE 4 · CURRENT TEST PREVIEW (13 NEW NECRON CARDS)", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

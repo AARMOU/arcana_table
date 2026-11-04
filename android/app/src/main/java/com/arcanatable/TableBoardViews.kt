@@ -786,13 +786,19 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
     canRespond: Boolean = false, commanderAffordable: Boolean = false,
-    autoPassing: Boolean = false, autoPassAvailable: Boolean = false, onAutoPass: () -> Unit = {}) {
+    autoPassing: Boolean = false, autoPassAvailable: Boolean = false, onAutoPass: () -> Unit = {},
+    turnContext: String? = null) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                turnContext?.let { Text(it, color = Muted, fontSize = 10.sp, maxLines = 2) }
+                if (argentumMode) Text("${cards.count { it.id in playableIds }} playable now · $stackCount on stack",
+                    color = Mint, fontSize = 10.sp, modifier = Modifier.testTag("hand-context"))
+            }
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {

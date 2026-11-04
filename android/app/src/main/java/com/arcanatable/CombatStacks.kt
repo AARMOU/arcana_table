@@ -78,6 +78,17 @@ internal fun stackTarget(selection: Map<String, String>, stack: CombatStack, opt
         ?: legal.firstOrNull()
 }
 
+/** Tap assigns a lone attacker to the chosen legal target; tapping it again clears optional attacks. */
+internal fun tapSingleAttacker(
+    selection: Map<String, String>, attacker: String,
+    optionFor: Map<String, ArgentumAttackOption>, preferred: String?,
+): Map<String, String> {
+    val option = optionFor[attacker] ?: return selection
+    val target = preferred?.takeIf { it in option.targets } ?: option.targets.firstOrNull() ?: return selection
+    return if (selection[attacker] == target && !option.mandatory) selection - attacker
+        else selection + (attacker to target)
+}
+
 /** One more (or one fewer, [delta] = -1) of this stack attacks; the count never passes the stack's size. */
 internal fun stepStack(
     selection: Map<String, String>, stack: CombatStack, delta: Int,

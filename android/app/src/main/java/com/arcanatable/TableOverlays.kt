@@ -1006,6 +1006,10 @@ internal fun TableController.TableOverlays() {
                     }
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
+                        turnContext = argentumSnapshot?.let { snap ->
+                            "Turn ${snap.turnNumber} · ${snap.stepName.lowercase().replaceFirstChar(Char::uppercase)} · " +
+                                (if (snap.activePlayer == localSeat) "your turn" else "${players.getOrNull(snap.activePlayer)?.name ?: "Opponent"}'s turn")
+                        },
                         cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,

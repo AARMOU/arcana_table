@@ -492,7 +492,7 @@ fun ArgentumAttackBoard(
 
     CombatScreen(
         title = "DECLARE ATTACKERS",
-        subtitle = if (targets.size > 1) "Tap a target, then pick how many of each stack attack it. Hold a card to read it; pinch to resize."
+        subtitle = if (targets.size > 1) "Tap a target, then tap a creature to attack it. Stacks open a count picker. Hold a card to read it; pinch to resize."
             else "Tap a creature to attack, or use − / + on a stack. Hold a card to read it; pinch to resize.",
         dismissable = true, onDismiss = onDismiss, step = 1, zoom = zoom,
         tray = {
@@ -561,7 +561,19 @@ fun ArgentumAttackBoard(
             TextButton(onClick = { showBlockers = !showBlockers }) {
                 Text(if (showBlockers) "HIDE WHO CAN BLOCK ▴" else "WHO CAN BLOCK ▾", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
-            if (showBlockers) OpponentBlockersStrip(opponentBlockers, cardWidth = (96f * zoom.floatValue).coerceIn(56f, 170f).dp)
+            if (showBlockers) {
+                val defender = preferred?.let(::defenderOf)
+                // Match card IDs, not display names (players may share a name). Unknown battle
+                // protectors retain the full view rather than hiding potentially relevant cards.
+                val ids = defender?.battlefield?.map { it.id }?.toSet()
+                val visible = if (ids == null) opponentBlockers else opponentBlockers.mapNotNull { (name, cards) ->
+                    cards.filter { it.id in ids }.takeIf { it.isNotEmpty() }?.let { name to it }
+                }
+                Text(defender?.let { "Showing ${it.name}'s possible blockers" } ?: "Showing all opponents' possible blockers",
+                    color = Muted, fontSize = 10.sp)
+                if (visible.isEmpty()) Text("No untapped creatures for this defender", color = Muted, fontSize = 11.sp)
+                else OpponentBlockersStrip(visible, cardWidth = (96f * zoom.floatValue).coerceIn(56f, 170f).dp)
+            }
         }
         },
     ) {
@@ -576,9 +588,8 @@ fun ArgentumAttackBoard(
                 val mandatoryCount = stack.ids.count { optionFor[it]?.mandatory == true }
                 val onTap: () -> Unit = {
                     when {
-                        stack.size > 1 || legal.size > 1 && targets.size > 1 -> picking = stack
-                        count > 0 && mandatoryCount == 0 -> selection = selection - stack.ids.toSet()
-                        else -> selection = stepStack(selection, stack, +1, optionFor, preferred)
+                        stack.size > 1 -> picking = stack
+                        else -> selection = tapSingleAttacker(selection, stack.rep, optionFor, preferred)
                     }
                 }
                 // Once it's attacking: what it risks against the defending player's untapped creatures.
