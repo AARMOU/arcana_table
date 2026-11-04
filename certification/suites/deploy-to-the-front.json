@@ -1,0 +1,9 @@
+{
+  "key": "deploy-to-the-front",
+  "name": "Deploy to the Front",
+  "issue": 926,
+  "source": "certification/DeployToTheFrontIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DeployToTheFrontIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
