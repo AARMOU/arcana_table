@@ -355,3 +355,15 @@ test('owner daily credit limit (paceLimit) blocks new paid assignment and repair
   assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: { ...ok, paceLimit: 'x' }, now: NOW }).allowed, false);
   assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [], ready: three, snapshot: base, now: NOW }).allowed, true);
 });
+\ntest('legacy card-work request without Cardkit packet is refused', () => {
+  const body = [
+    A.CARD_WORK_MARKER,
+    '<!-- source: trusted-main-queue-feeder; run:1; base-sha:' + 'a'.repeat(40) + '; precon-gap:six-precons; priority:0 -->',
+    '## Card', '- Celestine, the Living Saint', '',
+    '    {"oracle_text":"Flying"}',
+  ].join('\\n');
+  const r = A.reviewActionable(body);
+  assert.equal(r.ok, false);
+  assert.ok(r.missing.includes('cardkit-starting-packet'));
+});
+
