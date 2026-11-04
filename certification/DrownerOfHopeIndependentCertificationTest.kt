@@ -94,7 +94,9 @@ class DrownerOfHopeIndependentCertificationTest {
         val tokens = scions(d, p)
 
         for ((index, token) in tokens.withIndex()) {
-            assertNull(d.activate(p, token).error)
+            val manaAbilities = d.abilityActions(p, token).mapNotNull { it.action as? ActivateAbility }
+            assertEquals(1, manaAbilities.size)
+            assertNull(d.submit(manaAbilities.single()).error)
             d.resolveAll()
 
             assertEquals(index + 1, d.manaPool(p).colorless)
@@ -116,6 +118,11 @@ class DrownerOfHopeIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertNull(d.passPriority(opponent).error)
         assertNull(activateTapAbility(d, p, drowner, target).error)
+        assertTrue(
+            "Choosing the Scion is part of paying the activation cost",
+            d.state.pendingDecision is com.wingedsheep.engine.core.SelectCardsDecision,
+        )
+        assertNull(d.submitCardSelection(p, listOf(scion)).error)
 
         assertFalse(d.getPermanents(p).contains(scion))
         assertFalse(d.isTapped(target))
