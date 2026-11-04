@@ -265,10 +265,10 @@ function suiteActionable(body) {
 
 function hasCardkitStartingPacket(body) {
   const text = String(body || '');
-  const heading = /^## Cardkit starting packet\\s*$/im.exec(text);
-  if (!heading) return false;
-  const rest = text.slice(heading.index + heading[0].length).split(/^##\\s+/m)[0];
-  return rest.trim().length > 0;
+  const start = text.indexOf('## Cardkit starting packet');
+  if (start < 0) return false;
+  const next = text.indexOf('\\n## ', start);
+  return text.slice(start + '## Cardkit starting packet'.length, next < 0 ? undefined : next).trim().length > 0;
 }
 
 function queueUnitActionable(body, base) {
