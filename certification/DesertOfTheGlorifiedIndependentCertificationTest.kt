@@ -53,7 +53,7 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
 
         assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("Desert of the Glorified"))
         assertFalse(d.zoneNames(p, Zone.HAND).contains("Desert of the Glorified"))
-        assertEquals(handBefore - 1, d.getHandSize(p))
+        assertEquals(handBefore, d.getHandSize(p))
         assertEquals(libraryBefore - 1, d.zoneNames(p, Zone.LIBRARY).size)
         assertEquals(0, d.manaPool(p).black)
         assertEquals(0, d.manaPool(p).colorless)
