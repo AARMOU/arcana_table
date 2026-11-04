@@ -125,9 +125,9 @@ test('a card whose earlier trusted queue issue closed without landing is retried
 
 test('feeder labels a capped card and publishes it on the owner board in the same pass', async () => {
   const name = 'Celestine, the Living Saint';
-  const issue = { number: 360, state: 'closed', ...OWNER, title: '[Arcana Queue] Celestine',
-    body: A.AUTO_QUEUE_MARKER + '\\n' + unitBody(name), labels: [] };
-  let boardBody = '## Owner decisions\\n\\n## 2a. ⏰ Worker schedule\\n';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT, title: '[Arcana Queue] Celestine',
+    body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name), labels: [] };
+  let boardBody = '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n';
   const board = { number: 883, body: boardBody };
   const api = { issues: {
     get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
@@ -142,9 +142,9 @@ test('feeder labels a capped card and publishes it on the owner board in the sam
   assert.match(issue.body, /Copilot stopped after two failed attempts/);
   assert.equal(r.boardUpdated, true);
   assert.match(board.body, /## Hard cards waiting for a worker/);
-  assert.match(board.body, /https:\\/\\/github\\.com\\/AARMOU\\/arcana_table\\/issues\\/360/);
+  assert.ok(board.body.includes('https://github.com/AARMOU/arcana_table/issues/360'));
   assert.match(board.body, /An owner or PM can authorize one additional queue/);
-  assert.match(board.body, /## 2a\\. ⏰ Worker schedule/);
+  assert.ok(board.body.includes('## 2a. ⏰ Worker schedule'));
 });
 
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
