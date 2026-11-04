@@ -234,7 +234,7 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
   const suggestions = units.map(u => {
     const body = typeof u.body === 'string' ? u.body.trim() + '\n' : null;
     const act = !body ? { ok: false, missing: ['no-body'] } : body.length > MAX_REQUEST_CHARS
-      ? { ok: false, missing: ['request-too-large'] } : A.unitActionable(body, base);
+      ? { ok: false, missing: ['request-too-large'] } : A.queueUnitActionable(body, base);
     const title = `[Arcana Queue] ${u.name} — Cardkit SUPPORTED, unclaimed`;
     const request = (result?.requested || []).find(r => F.normName(r.name) === F.normName(u.name));
     return { name: u.name, ready: !!body && act.ok, requestedIssue: Number.isSafeInteger(request?.issue) ? request.issue : null,
@@ -298,7 +298,7 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   const notReady = new Set((payload.notReady || []).map(F.normName));
   // An outsider cannot park a fake "ready" issue and indefinitely block the feed.
   const waiting = safeIssues.filter(i => String(i.title || '').startsWith('[Arcana Queue]') && !isCopilotAssigned(i) &&
-    A.unitActionable(i.body || '', payload.base).ok);
+    A.queueUnitActionable(i.body || '', payload.base).ok);
   // A waiting issue whose card Cardkit says Copilot cannot take is skipped by the dispatcher forever;
   // it must not freeze the automatic queue. Reported, never closed or edited here.
   const stuck = waiting.map(i => ({ issue: i.number, cards: F.unitCards(i.body).filter(n => notReady.has(F.normName(n))) }))
@@ -315,7 +315,7 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   const held = [];
   let retryOf = null;
   const s = (payload.suggestions || []).find(x => {
-    if (!(x.ready && x.body && A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
+    if (!(x.ready && x.body && A.queueUnitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
       !safeIssues.some(i => String(i.title || '') === x.title))) return false;
     const prior = attempted.get(F.normName(x.name)) || [];
     if (prior.length >= MAX_AUTO_ATTEMPTS) { held.push({ name: x.name, issue: Math.max(...prior) }); return false; }
