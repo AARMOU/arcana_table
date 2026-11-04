@@ -1,0 +1,9 @@
+{
+  "key": "drowner-of-hope",
+  "name": "Drowner of Hope",
+  "issue": 942,
+  "source": "certification/DrownerOfHopeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DrownerOfHopeIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
