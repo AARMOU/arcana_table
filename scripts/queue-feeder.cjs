@@ -520,7 +520,7 @@ function needsSiteRefresh(previous, payload) {
 // Replace only our generated board section; every other owner decision and board line is preserved.
 function hardCardSection(body, cards = []) {
   const entries = cards.filter(x => Number.isSafeInteger(x.issue) && typeof x.name === 'string')
-    .map(x => '- #' + x.issue + ' — ' + x.name.replace(/[\r\n@]/g, ' ').slice(0, 140) +
+    .map(x => '- [#' + x.issue + '](https://github.com/AARMOU/arcana_table/issues/' + x.issue + ') — ' + x.name.replace(/[\r\n@]/g, ' ').slice(0, 140) +
       ': Copilot stopped after two failed attempts; waiting for a worker.');
   const section = [HARD_CARD_SECTION_START, '## Hard cards waiting for a worker',
     ...(entries.length ? entries : ['_None currently capped._']),
