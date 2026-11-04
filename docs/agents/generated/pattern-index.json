@@ -751,7 +751,7 @@
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Defile",
@@ -1224,7 +1224,7 @@
    ]
   },
   "DynamicAmounts.xValue": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -1237,6 +1237,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StonecoilSerpent.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StonecoilSerpentScenarioTest.kt"
+    },
+    {
+     "card": "Their Number Is Legion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheirNumberIsLegion.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheirNumberIsLegionScenarioTest.kt"
     },
     {
      "card": "Mage-Ring Network",
@@ -1936,7 +1942,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -2513,7 +2519,7 @@
    ]
   },
   "Effects.GainLife": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2540,16 +2546,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfLightAndShadowScenarioTest.kt"
     },
     {
+     "card": "Their Number Is Legion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheirNumberIsLegion.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheirNumberIsLegionScenarioTest.kt"
+    },
+    {
      "card": "Lavabelly Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LavabellySliver.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LavabellySliverScenarioTest.kt"
-    },
-    {
-     "card": "Suffer the Past",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
-     "lines": 38,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
     }
    ]
   },
@@ -5513,7 +5519,7 @@
    ]
   },
   "spell { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5595,7 +5601,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 70,
+   "count": 71,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -7092,6 +7098,17 @@
     }
    ]
   },
+  "MayCastSelfFromZones": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Their Number Is Legion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheirNumberIsLegion.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheirNumberIsLegionScenarioTest.kt"
+    }
+   ]
+  },
   "MayCastWithoutPayingManaCost": {
    "count": 1,
    "examples": [
@@ -7661,7 +7678,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -8420,7 +8437,7 @@
    ]
   },
   "Player.You": {
-   "count": 49,
+   "count": 50,
    "examples": [
     {
      "card": "Defile",

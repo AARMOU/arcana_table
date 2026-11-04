@@ -778,3 +778,22 @@ trigger; with Biotransference a creature card raised from your graveyard trigger
 engine: `GraveyardLookBackCardTypeTest` (granted card leaving fires; ungranted, battlefield-only grant and an
 opponent's grant don't; granted card put into your graveyard fires the arrival batch).
 Unlocks among missing six-deck cards: Imotekh the Stormlord with Biotransference (Necron Dynasties).
+
+### Intrinsic graveyard casting with X (patch 0040)
+
+`MayCastSelfFromZones(zones = listOf(Zone.GRAVEYARD))` permits the card's own normal-cost cast;
+this is not flashback and does not bypass timing or pay for X. `CastFromZoneEnumerator` now
+surfaces `hasXCost` and `maxAffordableX` on intrinsic zone offers, using the selected zone's
+cost calculation and eligible mana. The submitted `CastSpell.xValue` is still charged and
+validated by the ordinary casting handler. No new SDK type is introduced.
+
+Reference: `TheirNumberIsLegion.kt` / `TheirNumberIsLegionScenarioTest.kt`. Compose
+`Effects.CreateToken(count = DynamicAmounts.xValue(), ..., tapped = true, artifactToken = true)`
+then `Effects.GainLife(DynamicAmounts.battlefield(Player.You, GameObjectFilter.Artifact).count())`.
+Count at the second effect, so the new artifact tokens count. `spell { selfExile() }` exiles
+on resolution only: countering the spell sends it to the graveyard and leaves its permission
+available. Never replace this with flashback's exile-on-leaving-stack behavior.
+
+Engine regression: `IntrinsicZoneCastXTest` (announced X, payment and ownership negatives).
+Unlocks: Their Number Is Legion; other intrinsic zone X-cost spells get the same picker metadata.
+Validation is pending; this recipe must not be treated as certification until the linked run passes.
