@@ -118,7 +118,7 @@ test('legacy assignment without a session holds a slot as an unreviewed pickup t
   assert.deepEqual([u.state, u.reason, u.holdsSlot, u.assignments], ['halted', 'pickup-timeout', true, 1]);
 });
 
-test('per-unit ceilings: one assignment and two repair requests', () => {
+test('B15 two-attempt cap: one assignment then one repair; third paid attempt refused', () => {
   const ready = A.readiness(env());
   assert.match(A.admit({ op: 'assign', unit: review(63), ready, snapshot: snap(), now: NOW }).reason, /state review/);
   const repairs = n => A.parseLedger(Array.from({ length: n }, (_, i) =>
