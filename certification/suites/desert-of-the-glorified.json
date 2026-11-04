@@ -1,0 +1,9 @@
+{
+  "key": "desert-of-the-glorified",
+  "name": "Desert of the Glorified",
+  "issue": 941,
+  "source": "certification/DesertOfTheGlorifiedIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DesertOfTheGlorifiedIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
