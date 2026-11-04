@@ -113,10 +113,38 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   const held = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360 }]);
   assert.equal(held.suggestion, undefined);
   assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 360 }]);
+  const lifted = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360,
+    labels: [{ name: Q.RETRY_CAP_LIFT_LABEL }] }]);
+  assert.equal(lifted.suggestion.name, 'Celestine, the Living Saint');
+  assert.equal(lifted.capLiftIssue, 360);
   // An outsider's closed lookalike cannot block a card.
   const outsider = { ...closedBot, user: { login: 'x', type: 'User' }, body: unitBody('Celestine, the Living Saint') };
   const o = Q.chooseAutoQueue(p, [], [outsider, { ...outsider, number: 361 }]);
   assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
+});
+
+test('feeder labels a capped card and publishes it on the owner board in the same pass', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', ...OWNER, title: '[Arcana Queue] Celestine',
+    body: A.AUTO_QUEUE_MARKER + '\\n' + unitBody(name), labels: [] };
+  let boardBody = '## Owner decisions\\n\\n## 2a. ⏰ Worker schedule\\n';
+  const board = { number: 883, body: boardBody };
+  const api = { issues: {
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    getLabel: async () => ({ data: {} }),
+    createLabel: async () => ({ data: {} }),
+    addLabels: async ({ labels }) => { issue.labels.push(...labels.map(label => ({ name: label }))); },
+    update: async ({ issue_number, body }) => { if (issue_number === 883) board.body = body; else issue.body = body; },
+  } };
+  const r = await Q.syncHardCardHandoffs({ github: { rest: api }, owner: 'AARMOU', repo: 'arcana_table',
+    held: [{ name, issue: 360 }] });
+  assert.deepEqual(issue.labels.map(l => l.name), [Q.HARD_CARD_LABEL]);
+  assert.match(issue.body, /Copilot stopped after two failed attempts/);
+  assert.equal(r.boardUpdated, true);
+  assert.match(board.body, /## Hard cards waiting for a worker/);
+  assert.match(board.body, /https:\\/\\/github\\.com\\/AARMOU\\/arcana_table\\/issues\\/360/);
+  assert.match(board.body, /An owner or PM can authorize one additional queue/);
+  assert.match(board.body, /## 2a\\. ⏰ Worker schedule/);
 });
 
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
