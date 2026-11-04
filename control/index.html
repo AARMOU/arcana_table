@@ -260,6 +260,9 @@
         // A merged PR alone does not prove a forward-port to the Android destination.
         if(item.state==='integrated')return {step:0,label:'PR merged · Android integration receipt unavailable'};
         if(item.state==='changes-requested')return {step:0,label:'Changes requested · implementation needs repair'};
+        if(item.state==='held')return {step:0,label:'On hold · engineering dependency needs attention'};
+        if(item.state==='orphaned')return {step:0,label:'Queue closed · Android integration not verified'};
+        if(item.state==='repair-exhausted')return {step:0,label:'Repair limit reached · engineering handoff needed'};
         if(item.certification==='failed')return {step:2,label:'Independent certification failed · rules review needed'};
         if(item.state==='checks-failed')return {step:1,label:'Tests failed · repair needed'};
         if(item.certification==='certified'){
@@ -285,6 +288,12 @@
         if(status.step===5)return 'completed';
         // A merged PR without an exact Android receipt is not evidence of app readiness.
         if(item.state==='integrated')return 'older';
+        // An unresolved blocker or an approved card is still actionable after its PR
+        // stops receiving commits. The 72-hour filter previously hid these rows,
+        // leaving the default Active picker empty while work remained pending.
+        const needsAction=['approved','held','changes-requested','checks-failed','repair-exhausted','orphaned'].includes(item.state)||
+          (item.integration?.status==='blocked'&&item.integration?.sourceSha===item.headSha);
+        if(needsAction)return 'active';
         const updated=Date.parse(item.updatedAt||''),checked=Date.parse(checkedAt||'');
         if(!Number.isFinite(updated)||!Number.isFinite(checked)||updated>checked+60000||checked-updated>72*60*60*1000)return 'older';
         return 'active';
