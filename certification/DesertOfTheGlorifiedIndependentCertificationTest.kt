@@ -41,10 +41,10 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         val land = d.putCardInHand(p, "Desert of the Glorified")
         val handBefore = d.getHandSize(p)
         val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
-        d.giveMana(p, Color.BLACK)
-        d.giveColorlessMana(p, 1)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertNull(d.passPriority(opponent).error)
+        d.giveMana(p, Color.BLACK)
+        d.giveColorlessMana(p, 1)
 
         val cycleActions = d.legalActions(p).filter { (it.action as? CycleCard)?.cardId == land }
         assertEquals(1, cycleActions.size)
