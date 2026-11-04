@@ -11,7 +11,7 @@ const { calibrateReady } = require('./credit-calibration.cjs');
 const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
 const isReview = u => String(u?.raw?.title || '').startsWith(A.CARD_WORK_TITLE) && String(u?.raw?.body || '').startsWith(A.CARD_WORK_MARKER + '\n');
 const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body)
-  : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.unitActionable(body, base);
+  : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.queueUnitActionable(body, base);
 // A card-work item (review OR engine lane) is offered to engineers first: Copilot starts it after REVIEW_GRACE_MS
 // with no engineer CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
 // Owner 2026-10-31: cards must move without requiring a specific engineer; the old 2 h grace was dead time
