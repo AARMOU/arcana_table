@@ -39,10 +39,10 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         val p = d.player1
         val opponent = d.player2
         val land = d.putCardInHand(p, "Desert of the Glorified")
-        val handBefore = d.getHandSize(p)
-        val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertNull(d.passPriority(opponent).error)
+        val handBefore = d.getHandSize(p)
+        val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
         d.giveMana(p, Color.BLACK)
         d.giveColorlessMana(p, 1)
 
@@ -54,7 +54,7 @@ class DesertOfTheGlorifiedIndependentCertificationTest {
         assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("Desert of the Glorified"))
         assertFalse(d.zoneNames(p, Zone.HAND).contains("Desert of the Glorified"))
         assertEquals(handBefore - 1, d.getHandSize(p))
-        assertEquals(libraryBefore, d.zoneNames(p, Zone.LIBRARY).size)
+        assertEquals(libraryBefore - 1, d.zoneNames(p, Zone.LIBRARY).size)
         assertEquals(0, d.manaPool(p).black)
         assertEquals(0, d.manaPool(p).colorless)
         d.resolveAll()
