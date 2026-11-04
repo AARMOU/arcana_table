@@ -129,10 +129,10 @@ index 0000000000..d9d2b59cdf
 +    }
 +})
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 9ded13865e..a30b7e1268 100644
+index 6ca5a8af29..bb285b701c 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11775,6 +11775,14 @@ in the declare-blockers step, even before the turn-based block action has comple
+@@ -11801,6 +11801,14 @@ in the declare-blockers step, even before the turn-based block action has comple
    `mechanics/combat`) is the shared reader — `AttackPhaseManager` validates with it and the AI
    repairs its planned attack with it. Honors face-down, lost abilities, Room faces and
    `ConditionalStaticAbility` wrappers. `staticAbility { ability = OpponentsMustAttackYou }`.
@@ -148,10 +148,10 @@ index 9ded13865e..a30b7e1268 100644
    "change the target of target spell or ability with a single target" (Willbender). The two knobs
    are Reflecting Mirror's printed restrictions: fire only when the spell's single target is *you*,
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index cdf3b7f836..0735083eac 100644
+index a977f2bc6e..a663d4c90e 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1992,6 +1992,7 @@ Families:
+@@ -1993,6 +1993,7 @@ Families:
  - `NoMaximumHandSize(player: Player)` — Removes the maximum hand size limit for a scoped set of players, by default the controller.
  - `NoncombatDamageBonus(bonusAmount: Int)` — If a source you control would deal noncombat damage to an opponent or a permanent an opponent controls, it deals that much damage plus the bonus amount instead.
  - `OpponentsCantCauseYouTo(actions: Set<CompelledAction>)` — Spells and abilities your opponents control can't cause you to discard cards and/or sacrifice permanents, per actions — Sigarda, Host of Herons (sacrifice), Tamiyo, Collector of Tales (both).
@@ -187,7 +187,7 @@ index d4daf46776..8fde11961f 100644
   * Sentence-subject rendering of an attacker filter: "creature with flying" → "Creatures with
   * flying". This string is user-visible — it is the attack-rejection message and the label of a
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index e7e8eec8b2..7da662cafb 100644
+index 0d35dc6266..dcc8b847bc 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -1529,6 +1529,7 @@ MustBlock — StaticAbility
@@ -320,10 +320,10 @@ index c06d4d53fd..6013ff7c67 100644
      }
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
-index 96f7aaad5d..7c07ef5659 100644
+index acba4b101a..f1dd5a7cb8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
-@@ -1313,6 +1313,7 @@ class StaticAbilityHandler(
+@@ -1320,6 +1320,7 @@ class StaticAbilityHandler(
              is com.wingedsheep.sdk.scripting.Goaded,
              is CantBeAttackedWhileAttached,
              is com.wingedsheep.sdk.scripting.OpponentsMustAttackYou,

@@ -354,6 +354,9 @@
    "PAGE": [
     "PAGE: String"
    ],
+   "PEACE": [
+    "PEACE: String"
+   ],
    "PHYLACTERY": [
     "PHYLACTERY: String"
    ],
@@ -398,6 +401,9 @@
    ],
    "POSSESSION": [
     "POSSESSION: String"
+   ],
+   "PROMOTION": [
+    "PROMOTION: String"
    ],
    "PUPA": [
     "PUPA: String"
@@ -2015,6 +2021,9 @@
    ],
    "ExileFromGraveyardForTotal": [
     "ExileFromGraveyardForTotal(Int, CardMeasure, GameObjectFilter): AbilityCost"
+   ],
+   "ExileFromHand": [
+    "ExileFromHand(Int, GameObjectFilter): AbilityCost"
    ],
    "ExileFromSingleGraveyard": [
     "ExileFromSingleGraveyard(Int, GameObjectFilter): AbilityCost"
@@ -3698,6 +3707,9 @@
    ],
    "CreateMutavault": [
     "CreateMutavault(Int, Boolean, EffectTarget): Effect"
+   ],
+   "CreateNewPlanet": [
+    "CreateNewPlanet(Int, Boolean, EffectTarget): Effect"
    ],
    "CreatePermanentEmblem": [
     "CreatePermanentEmblem(GroupFilter, Int, Int, List<String>, List<ActivatedAbility>, List<? extends StaticAbility>, List<ActivatedAbility>, List<? extends ReplacementEffect>, String): Effect"
@@ -6224,6 +6236,9 @@
    "attacksAPlayer": [
     "attacksAPlayer(GameObjectFilter, Int, Player): TriggerSpec"
    ],
+   "becomesTarget": [
+    "becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean): TriggerSpec"
+   ],
    "becomesTheMonarch": [
     "becomesTheMonarch(): TriggerSpec"
    ],
@@ -6551,6 +6566,9 @@
    "kickerTargetRequirements$argentum_engine_mtg_sdk": [
     "kickerTargetRequirements$argentum_engine_mtg_sdk: List<TargetRequirement>"
    ],
+   "libraryPlacementOnResolve$argentum_engine_mtg_sdk": [
+    "libraryPlacementOnResolve$argentum_engine_mtg_sdk: ZonePlacement"
+   ],
    "modal": [
     "modal(Int, Int, Boolean, String, CostAtom, Boolean, DynamicAmount, DynamicAmount, Function1<? super ModalBuilder, Unit>): Unit"
    ],
@@ -6575,11 +6593,11 @@
    "selfExile": [
     "selfExile(Int): Unit"
    ],
+   "selfPutOnBottomOfLibrary": [
+    "selfPutOnBottomOfLibrary(): Unit"
+   ],
    "selfShuffleIntoLibrary": [
     "selfShuffleIntoLibrary(): Unit"
-   ],
-   "shufflesIntoLibraryOnResolve$argentum_engine_mtg_sdk": [
-    "shufflesIntoLibraryOnResolve$argentum_engine_mtg_sdk: Boolean"
    ],
    "target": [
     "target: TargetRequirement",
@@ -8747,6 +8765,7 @@
    "MODULAR",
    "FADING",
    "VANISHING",
+   "SUNBURST",
    "BLOODTHIRST",
    "CUMULATIVE_UPKEEP",
    "ECHO",
@@ -8961,6 +8980,7 @@
   "CreateMunitionsToken",
   "CreateMutagenToken",
   "CreateMutavault",
+  "CreateNewPlanet",
   "CreatePermanentEmblem",
   "CreatePest",
   "CreatePhyrexianMite",
@@ -9030,6 +9050,7 @@
   "ExileFromGraveyard",
   "ExileFromGraveyardForTotal",
   "ExileFromGraveyardOrPay",
+  "ExileFromHand",
   "ExileFromSingleGraveyard",
   "ExileFromStorage",
   "ExileFromTopRepeating",

@@ -15,10 +15,10 @@ Subject: [PATCH] arcana: 0039-graveyard-lookback-granted-types
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 81534cd79..7ec5a247c 100644
+index 9efd69021f..3e70c25202 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -9208,7 +9208,11 @@ in the repo today):
+@@ -9215,7 +9215,11 @@ in the repo today):
    etc.), regardless of how many or where they went. For the common "leave your graveyard
    **during your turn**" wording, add `triggerRestriction = Conditions.IsYourTurn`; for "this
    ability triggers only once each turn", add `oncePerTurn = true`. (Attuned Hunter, Kishla
@@ -31,7 +31,7 @@ index 81534cd79..7ec5a247c 100644
  - `Triggers.oneOrMore(filter).putIntoExile(from, includeTokens)` — batching trigger; fires once per event
    batch when one or more matching **cards** are put into exile from any of `fromZones` (default:
    graveyard and battlefield). Left unfiltered it is **not** scoped to one player's zones —
-@@ -11087,7 +11091,8 @@ staticAbility {
+@@ -11113,7 +11117,8 @@ staticAbility {
    battlefield only `filter`'s **card predicates** qualify an object (read against printed characteristics); its
    controller half is replaced by "spells the source's controller controls" / "cards that player owns". Honored by the
    `ProjectedState.crossZoneGrantedCardTypes` overlay, which `PredicateEvaluator`'s type predicates, cast triggers,
@@ -42,7 +42,7 @@ index 81534cd79..7ec5a247c 100644
  - `GrantSubtype(subtype, filter)` — Layer 4 type-changing static that adds a **fixed** creature subtype to the group,
    in addition to their other types ("is a Knight in addition to its other types"). (Dub, Angelic Destiny)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
-index 769ca4756..4e10a95ac 100644
+index 769ca47565..4e10a95acb 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 @@ -599,6 +599,7 @@ val engineSerializersModule = SerializersModule {
@@ -54,7 +54,7 @@ index 769ca4756..4e10a95ac 100644
          subclass(EmblemSourceComponent::class)
          subclass(EmblemActivatedAbilityComponent::class)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-index e3cdbc1e0..7a1450980 100644
+index e3cdbc1e08..7a14509803 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 @@ -3023,7 +3023,12 @@ class TriggerDetector(
@@ -150,7 +150,7 @@ index e3cdbc1e0..7a1450980 100644
              when (predicate) {
                  is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsCreature ->
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
-index efafde757..30a03f7d2 100644
+index efafde757b..30a03f7d23 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
 @@ -888,7 +888,28 @@ data class GameState(
@@ -184,7 +184,7 @@ index efafde757..30a03f7d2 100644
  
      /**
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
-index a4120e429..da1ffc40e 100644
+index a4120e4296..da1ffc40e2 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/identity/CardComponents.kt
 @@ -322,3 +322,13 @@ data class PutIntoGraveyardThisTurnComponent(
@@ -203,7 +203,7 @@ index a4120e429..da1ffc40e 100644
 +data class GraveyardLookBackTypesComponent(val cardTypes: Set<String>) : Component
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 new file mode 100644
-index 000000000..41e0f894d
+index 0000000000..41e0f894d6
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 @@ -0,0 +1,181 @@
