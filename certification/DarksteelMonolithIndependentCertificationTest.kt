@@ -91,7 +91,7 @@ class DarksteelMonolithIndependentCertificationTest {
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Sol Ring"))
         assertEquals(1, d.permanentsNamed(p, "Sol Ring").size)
 
-        d.passPriorityUntil(Step.END_STEP)
+        d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
 
         assertNull(d.castSpell(p, secondRing).error)
