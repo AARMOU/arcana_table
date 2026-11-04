@@ -20,7 +20,8 @@ const gaps = (cards, { verified = true, claimed = {} } = {}) => ({
   cards });
 const card = (name, readiness, route = null, extra = {}) => ({ name, readiness, route, reasons: ['reason for ' + name], ...extra });
 const PRECONS = gaps([card('Celestine, the Living Saint', 'SUPPORTED', 'copilot')]);
-const unitBody = name => ['## Cards', '- ' + name, '', '## Acceptance', '- ' + name + ': exact behavior',
+const unitBody = name => ['## Cards', '- ' + name, '', '## Cardkit starting packet', 'Cardkit classify: SUPPORTED',
+  'No close tested custom-card match.', '', '## Acceptance', '- ' + name + ': exact behavior',
   '- Exact current Oracle behavior (cost, types, every ability, targeting and timing), checked against authoritative card records',
   '- Executable regression scenarios for positive and negative behavior, registration and deterministic asset export',
   'Base: ' + BASE, ''].join('\n');
@@ -124,6 +125,16 @@ const oracleFor = name => JSON.stringify({ name, type_line: 'Creature', oracle_t
   scryfall_uri: 'https://scryfall.com/card/test/1/test' });
 const packetFor = name => PACKET.replace('NEEDS_REVIEW', 'NEEDS_REVIEW <!-- ' + name + ' -->');
 const enrichWork = r => ({ ...r, oracle: r.oracle || oracleFor(r.name), referencePacket: r.referencePacket || packetFor(r.name) });
+test('packet-less queue units fail closed before chooseAutoQueue', () => {
+  const name = 'Celestine, the Living Saint';
+  const r = Q.candidates({ gaps: PRECONS, openIssues: [] });
+  const body = unitBody(name).replace(/## Cardkit starting packet[\\s\\S]*?## Acceptance\\n/, '## Acceptance\\n');
+  const p = Q.queuePayload({ result: r, units: [{ name, body }], base: BASE, baseSha: SHA });
+  assert.equal(p.suggestions[0].ready, false);
+  assert.ok(p.suggestions[0].missing.includes('cardkit-starting-packet'));
+  assert.equal(Q.chooseAutoQueue(p, [], []).suggestion, undefined);
+});
+
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
   workRequests: requests.map(enrichWork), resolvedRequests: resolved });
 const ULALEK = enrichWork({ name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
