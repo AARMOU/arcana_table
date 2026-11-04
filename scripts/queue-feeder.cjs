@@ -288,6 +288,11 @@ const isCopilotAssigned = i => (i.assignees || []).some(a => ['copilot', 'copilo
 // destroy-outcome review); after two closed attempts the card is held for the owner instead of being paid
 // for again. Bounded: at most one extra session per card.
 const MAX_AUTO_ATTEMPTS = 2;
+const HARD_CARD_LABEL = 'needs-hard-card-worker';
+const RETRY_CAP_LIFT_LABEL = 'arcana:lift-copilot-attempt-cap';
+const HARD_CARD_NOTE_MARKER = '<!-- arcana-hard-card-handoff-v1 -->';
+const HARD_CARD_SECTION_START = '<!-- arcana-hard-card-handoff:start -->';
+const HARD_CARD_SECTION_END = '<!-- arcana-hard-card-handoff:end -->';
 function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
@@ -304,23 +309,34 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   const pending = waiting.find(i => !stuck.some(x => x.issue === i.number));
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting', stuck };
   const attempted = new Map();
+  const capLiftedBy = new Map();
   for (const i of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]')))
     for (const n of F.unitCards(i.body)) {
       const k = F.normName(n);
       if (!attempted.has(k)) attempted.set(k, []);
       if (!attempted.get(k).includes(i.number)) attempted.get(k).push(i.number);
+      const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+      if (labels.includes(RETRY_CAP_LIFT_LABEL) && (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
+        capLiftedBy.set(k, i.number);
     }
   const held = [];
   let retryOf = null;
+  let capLiftIssue = null;
   const s = (payload.suggestions || []).find(x => {
     if (!(x.ready && x.body && A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
       !safeIssues.some(i => String(i.title || '') === x.title))) return false;
     const prior = attempted.get(F.normName(x.name)) || [];
-    if (prior.length >= MAX_AUTO_ATTEMPTS) { held.push({ name: x.name, issue: Math.max(...prior) }); return false; }
+    const liftedBy = capLiftedBy.get(F.normName(x.name));
+    if (prior.length >= MAX_AUTO_ATTEMPTS && !liftedBy) {
+      held.push({ name: x.name, issue: Math.max(...prior) });
+      return false;
+    }
     retryOf = prior.length ? Math.max(...prior) : null;
+    capLiftIssue = liftedBy || null;
     return true;
   });
-  return s ? { suggestion: s, stuck, held, ...(retryOf ? { retryOf } : {}) } : { reason: 'no-unclaimed-ready-card', stuck, held };
+  return s ? { suggestion: s, stuck, held, ...(retryOf ? { retryOf } : {}), ...(capLiftIssue ? { capLiftIssue } : {}) }
+    : { reason: 'no-unclaimed-ready-card', stuck, held };
 }
 
 async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
@@ -354,6 +370,8 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   const notes = { stuck: pick.stuck || [], held: pick.held || [], ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
   if (!pick.suggestion) return { reason: pick.reason, ...notes, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
+  // A trusted owner/PM cap-lift label authorizes exactly one extra queue; consume it first.
+  if (pick.capLiftIssue) await github.rest.issues.removeLabel({ owner, repo, issue_number: pick.capLiftIssue, name: RETRY_CAP_LIFT_LABEL });
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
     ...(s.requestedIssue ? ['<!-- owner-selected-card-request: #' + s.requestedIssue + ' -->'] : []),
@@ -499,6 +517,65 @@ function needsSiteRefresh(previous, payload) {
     previous && /^[a-f0-9]{40}$/.test(String(previous.baseSha || '')) && previous.baseSha !== payload.baseSha);
 }
 
+// Replace only our generated board section; every other owner decision and board line is preserved.
+function hardCardSection(body, cards = []) {
+  const entries = cards.filter(x => Number.isSafeInteger(x.issue) && typeof x.name === 'string')
+    .map(x => '- #' + x.issue + ' — ' + x.name.replace(/[\r\n@]/g, ' ').slice(0, 140) +
+      ': Copilot stopped after two failed attempts; waiting for a worker.');
+  const section = [HARD_CARD_SECTION_START, '## Hard cards waiting for a worker',
+    ...(entries.length ? entries : ['_None currently capped._']),
+    'An owner or PM can authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + ' to the capped issue.',
+    HARD_CARD_SECTION_END].join('\n');
+  const text = String(body || '');
+  const start = text.indexOf(HARD_CARD_SECTION_START), end = text.indexOf(HARD_CARD_SECTION_END);
+  if (start >= 0 && end >= start) return text.slice(0, start) + section + text.slice(end + HARD_CARD_SECTION_END.length);
+  const marker = text.indexOf('## 2a. ⏰ Worker schedule');
+  return marker >= 0 ? text.slice(0, marker) + section + '\n\n' + text.slice(marker) : text.trimEnd() + '\n\n' + section + '\n';
+}
+
+async function ensureHardCardLabels(github, owner, repo) {
+  for (const [name, color, description] of [
+    [HARD_CARD_LABEL, '6f42c1', 'Copilot stopped after the approved two failed attempts; route to a human worker.'],
+    [RETRY_CAP_LIFT_LABEL, 'fbca04', 'Owner/PM authorization for exactly one additional Copilot queue attempt.'],
+  ]) {
+    try { await github.rest.issues.getLabel({ owner, repo, name }); }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      try { await github.rest.issues.createLabel({ owner, repo, name, color, description }); }
+      catch (createError) { if (createError.status !== 422) throw createError; }
+    }
+  }
+}
+
+async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
+  const cards = [];
+  for (const item of held) {
+    if (!Number.isSafeInteger(item.issue) || typeof item.name !== 'string') continue;
+    const issue = (await github.rest.issues.get({ owner, repo, issue_number: item.issue })).data;
+    if (issue.state !== 'closed' || !trustedIssue(issue) ||
+        !String(issue.title || '').startsWith('[Arcana Queue]') ||
+        !F.unitCards(issue.body).some(n => F.normName(n) === F.normName(item.name))) continue;
+    await ensureHardCardLabels(github, owner, repo);
+    const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+    if (!labels.includes(HARD_CARD_LABEL))
+      await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [HARD_CARD_LABEL] });
+    let body = String(issue.body || '');
+    if (!body.includes(HARD_CARD_NOTE_MARKER)) {
+      body = body.trimEnd() + '\n\n' + HARD_CARD_NOTE_MARKER +
+        '\nHard-card hand-off: Copilot stopped after two failed attempts. Waiting for a worker. ' +
+        'An owner or PM may authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + '.';
+      await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
+    }
+    cards.push({ name: item.name, issue: issue.number });
+  }
+  const board = (await github.rest.issues.get({ owner, repo, issue_number: 883 })).data;
+  const nextBody = hardCardSection(board.body, cards);
+  const boardUpdated = nextBody !== board.body;
+  if (boardUpdated) await github.rest.issues.update({ owner, repo, issue_number: 883, body: nextBody });
+  return { cards, boardUpdated };
+}
+
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
-  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK };
+  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK,
+  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, syncHardCardHandoffs };
