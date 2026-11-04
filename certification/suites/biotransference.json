@@ -1,0 +1,9 @@
+{
+  "key": "biotransference",
+  "name": "Biotransference",
+  "issue": 935,
+  "source": "certification/BiotransferenceIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BiotransferenceIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
