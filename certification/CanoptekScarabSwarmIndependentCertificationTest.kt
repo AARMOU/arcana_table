@@ -48,6 +48,9 @@ class CanoptekScarabSwarmIndependentCertificationTest {
 
         assertNull(d.castSpell(player, card).error)
         assertTrue(d.zoneNames(opponent, Zone.EXILE).isEmpty())
+        assertTrue(d.getPermanents(player).none {
+            d.state.getEntity(it)?.has<TokenComponent>() == true
+        })
         assertEquals(
             listOf("Grizzly Bears", "Plains", "Shock", "Sol Ring"),
             d.getGraveyardCardNames(opponent).sorted(),
