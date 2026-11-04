@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.Biotransference
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.identity.CardComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -96,8 +97,8 @@ class BiotransferenceIndependentCertificationTest {
         assertNull(d.castSpell(opponent, opposingSpell).error)
         val spellOnStack = d.state.stack.single { d.getCardName(it) == "Grizzly Bears" }
 
-        assertTrue(d.projected.hasType(spellOnStack, "CREATURE"))
-        assertFalse(d.projected.hasType(spellOnStack, "ARTIFACT"))
+        assertTrue(d.state.getEntity(spellOnStack)!!.get<CardComponent>()!!.typeLine.isCreature)
+        assertFalse(d.projected.crossZoneGrantedCardTypes(spellOnStack).contains("ARTIFACT"))
         d.resolveAll()
 
         val opposingCreatures = d.permanentsNamed(opponent, "Grizzly Bears")
@@ -124,12 +125,12 @@ class BiotransferenceIndependentCertificationTest {
         )
 
         ownCards.forEach { card ->
-            assertTrue(d.projected.hasType(card, "CREATURE"))
-            assertTrue(d.projected.hasType(card, "ARTIFACT"))
+            assertTrue(d.state.getEntity(card)!!.get<CardComponent>()!!.typeLine.isCreature)
+            assertTrue(d.projected.crossZoneGrantedCardTypes(card).contains("ARTIFACT"))
         }
         opponentsCards.forEach { card ->
-            assertTrue(d.projected.hasType(card, "CREATURE"))
-            assertFalse(d.projected.hasType(card, "ARTIFACT"))
+            assertTrue(d.state.getEntity(card)!!.get<CardComponent>()!!.typeLine.isCreature)
+            assertFalse(d.projected.crossZoneGrantedCardTypes(card).contains("ARTIFACT"))
         }
         assertTrue(d.zoneNames(d.player1, Zone.HAND).contains("Grizzly Bears"))
         assertTrue(d.zoneNames(d.player1, Zone.GRAVEYARD).contains("Grizzly Bears"))
@@ -147,8 +148,8 @@ class BiotransferenceIndependentCertificationTest {
 
         assertNull(d.castSpell(p, bear).error)
         val spellOnStack = d.state.stack.single { d.getCardName(it) == "Grizzly Bears" }
-        assertTrue(d.projected.hasType(spellOnStack, "CREATURE"))
-        assertTrue(d.projected.hasType(spellOnStack, "ARTIFACT"))
+        assertTrue(d.state.getEntity(spellOnStack)!!.get<CardComponent>()!!.typeLine.isCreature)
+        assertTrue(d.projected.crossZoneGrantedCardTypes(spellOnStack).contains("ARTIFACT"))
         assertEquals(20, d.getLifeTotal(p))
         d.resolveAll()
 
