@@ -18,13 +18,13 @@ Subject: [PATCH] arcana: 0030-bloodthirst-keyword
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index e028969d40..8162703bc6 100644
+index 74bc25a980..519558a91d 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -15026,6 +15026,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
-   abilities (as suspend's countdown and cast do): a vanishing permanent sits where instant-speed
-   counter removal can reach it, and it is sacrificed whenever the last counter leaves, not only on
-   an upkeep.
+@@ -15095,6 +15095,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+   permanent reanimated or blinked gets none; the counters go through `placeEntryCounters` (Hardened
+   Scales / Solemnity apply). Don't hand-write an `EntersWithDynamicCounters` for it — it would stack.
+   Converge (an ability word) is the hand-authored neighbour: `convergeEntersWithCounters()`.
 +- `Bloodthirst(n)` — **engine-live.** Declare it and nothing else:
 +  `keywordAbility(KeywordAbility.bloodthirst(2))`. The engine supplies the replacement effect
 +  from [`Bloodthirst`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Bloodthirst.kt):
@@ -46,12 +46,12 @@ index e028969d40..8162703bc6 100644
    `keywordAbility(KeywordAbility.renown(1))` (Topan Freeblade). The engine supplies the CR 702.112
    ability from [`Renown`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Renown.kt): a
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
-index 9196eed7d5..1f37b58810 100644
+index 24e839baec..71d9ca42cd 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
-@@ -839,6 +839,13 @@ enum class Keyword(val displayName: String) {
-     FADING("Fading"),
-     VANISHING("Vanishing"),
+@@ -852,6 +852,13 @@ enum class Keyword(val displayName: String) {
+      */
+     SUNBURST("Sunburst"),
  
 +    /**
 +     * Bloodthirst N: "If an opponent was dealt damage this turn, this permanent enters
@@ -461,21 +461,21 @@ index 0000000000..98083ec76b
 +    }
 +})
 diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
-index f9ac137d9c..99692da479 100644
+index 5013cb8422..40f9731dfb 100644
 --- a/web-client/src/types/enums.ts
 +++ b/web-client/src/types/enums.ts
-@@ -311,6 +311,7 @@ export enum Keyword {
-   SOULSHIFT = 'SOULSHIFT',
+@@ -312,6 +312,7 @@ export enum Keyword {
    FADING = 'FADING',
    VANISHING = 'VANISHING',
+   SUNBURST = 'SUNBURST',
 +  BLOODTHIRST = 'BLOODTHIRST',
    CUMULATIVE_UPKEEP = 'CUMULATIVE_UPKEEP',
    ECHO = 'ECHO',
    SUSPEND = 'SUSPEND',
-@@ -455,6 +456,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
-   [Keyword.MODULAR]: 'Modular',
+@@ -457,6 +458,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
    [Keyword.FADING]: 'Fading',
    [Keyword.VANISHING]: 'Vanishing',
+   [Keyword.SUNBURST]: 'Sunburst',
 +  [Keyword.BLOODTHIRST]: 'Bloodthirst',
    [Keyword.CUMULATIVE_UPKEEP]: 'Cumulative upkeep',
    [Keyword.ECHO]: 'Echo',

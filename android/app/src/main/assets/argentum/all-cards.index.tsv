@@ -11,6 +11,7 @@ Lander	token
 Just One Glass	token
 Map	token
 Sword	token
+Neuroflux Heirloom	token
 Cragflame	token
 Icingdeath, Frost Tongue	token
 Mutavault	token
@@ -24,6 +25,7 @@ Settlement	token
 Incubator	token
 Drone	token
 Everywhere	token
+New Planet	token
 Munitions	token
 Mutagen	token
 Frog	token
@@ -2268,6 +2270,7 @@ Kyren Negotiations	card
 Lightning Hounds	card
 Lumbering Satyr	card
 Maggot Therapy	card
+Magistrate's Scepter	card
 Misdirection	card
 Misshapen Fiend	card
 Molting Harpy	card
@@ -3974,6 +3977,7 @@ Desecration Elemental	card
 Dross Crocodile	card
 Early Frost	card
 Ebon Drake	card
+Engineered Explosives	card
 Eternal Witness	card
 Fangren Pathcutter	card
 Feedback Bolt	card
@@ -5744,6 +5748,7 @@ Dryad's Favor	card
 Earth Servant	card
 Ember Hauler	card
 Fauna Shaman	card
+Gargoyle Sentinel	card
 Garruk's Companion	card
 Garruk's Packleader	card
 Grave Titan	card
@@ -7880,22 +7885,28 @@ Ramos, Dragon Engine	card
 Teferi's Protection	card
 The Ur-Dragon	card
 Ancient Brontodon	card
+Anointed Deacon	card
+Belligerent Brontodon	card
 Bishop of Rebirth	card
 Bishop's Soldier	card
 Blight Keeper	card
 Blinding Fog	card
 Blossom Dryad	card
+Brazen Buccaneers	card
 Call to the Feast	card
 Captain Lannery Storm	card
 Carnage Tyrant	card
+Castaway's Despair	card
 Charging Monstrosaur	card
 Chart a Course	card
 Colossal Dreadmaw	card
 Contract Killing	card
+Costly Plunder	card
 Crash the Ramparts	card
 Crushing Canopy	card
 Dark Nourishment	card
 Deadeye Plunderers	card
+Deadeye Tormentor	card
 Deathless Ancient	card
 Deeproot Champion	card
 Deeproot Warrior	card
@@ -7903,12 +7914,17 @@ Deeproot Waters	card
 Depths of Desire	card
 Dinosaur Stampede	card
 Dire Fleet Hoarder	card
+Dire Fleet Interloper	card
 Dive Down	card
 Drover of the Mighty	card
 Dusk Legion Dreadnought	card
+Elaborate Firecannon	card
+Emissary of Sunrise	card
+Emperor's Vanguard	card
 Encampment Keeper	card
 Fathom Fleet Cutthroat	card
 Fathom Fleet Firebrand	card
+Fell Flagship	card
 Field of Ruin	card
 Fiery Cannonade	card
 Firecannon Blast	card
@@ -7916,13 +7932,17 @@ Frenzied Raptor	card
 Gilded Sentinel	card
 Gishath, Sun's Avatar	card
 Glorifier of Dusk	card
+Goring Ceratops	card
 Grazing Whiptail	card
 Growing Rites of Itlimoc	card
 Headwater Sentries	card
+Herald of Secret Streams	card
+Hierophant's Chalice	card
 Huatli's Snubhorn	card
 Imperial Aerosaur	card
 Imperial Lancer	card
 Inspiring Cleric	card
+Ixalli's Diviner	card
 Ixalli's Keeper	card
 Jade Guardian	card
 Jungle Delver	card
@@ -7934,6 +7954,7 @@ Lookout's Dispersal	card
 Looming Altisaur	card
 Makeshift Munitions	card
 Mavren Fein, Dusk Apostle	card
+Merfolk Branchwalker	card
 Nest Robber	card
 New Horizons	card
 One With the Wind	card
@@ -7941,30 +7962,39 @@ Otepec Huntmaster	card
 Overflowing Insight	card
 Paladin of the Bloodstained	card
 Perilous Voyage	card
+Pious Interdiction	card
 Pirate's Cutlass	card
 Pirate's Prize	card
 Pounce	card
 Prosperous Pirates	card
+Prying Blade	card
 Pterodon Knight	card
+Queen's Agent	card
 Queen's Bay Soldier	card
 Queen's Commission	card
 Rampaging Ferocidon	card
+Ranging Raptors	card
 Raptor Companion	card
 Raptor Hatchling	card
 Ravenous Daggertooth	card
 Regisaur Alpha	card
+Repeating Barrage	card
 Revel in Riches	card
 Rigging Runner	card
 Ripjaw Raptor	card
 River Sneak	card
 River's Rebuke	card
+Run Aground	card
 Sailor of Means	card
 Sanctum Seeker	card
+Sanguine Sacrament	card
+Seekers' Squire	card
 Settle the Wreckage	card
 Shaper Apprentice	card
 Sheltering Light	card
 Shining Aerosaur	card
 Shore Keeper	card
+Siren Lookout	card
 Siren Stormtamer	card
 Skittering Heartstopper	card
 Skulduggery	card
@@ -7975,15 +8005,20 @@ Slash of Talons	card
 Sleek Schooner	card
 Snapping Sailback	card
 Sorcerous Spyglass	card
+Spreading Rot	card
+Storm Fleet Aerialist	card
+Storm Fleet Arsonist	card
 Storm Fleet Pyromancer	card
 Storm Fleet Spy	card
 Storm Sculptor	card
 Sun-Crowned Hunters	card
 Sunbird's Invocation	card
+Sunrise Seeker	card
 Swashbuckling	card
 Territorial Hammerskull	card
 Thundering Spineback	card
 Tilonalli's Knight	card
+Tishana's Wayfinder	card
 Treasure Map	card
 Trove of Temptation	card
 Unclaimed Territory	card
@@ -7999,6 +8034,7 @@ Wily Goblin	card
 Wind Strider	card
 Angrath's Ambusher	card
 Aquatic Incursion	card
+Arterial Flow	card
 Atzocan Seer	card
 Bombard	card
 Brass's Bounty	card
@@ -8017,6 +8053,7 @@ Elenda, the Dusk Rose	card
 Exultant Skymarcher	card
 Famished Paladin	card
 Fanatical Firebrand	card
+Flood of Recollection	card
 Forerunner of the Coalition	card
 Forerunner of the Heralds	card
 Forerunner of the Legion	card
@@ -8028,14 +8065,17 @@ Goblin Trailblazer	card
 Grasping Scoundrel	card
 Impale	card
 Imperial Ceratops	card
+Jade Bearer	card
 Jadecraft Artisan	card
 Journey to Eternity	card
 Jungle Creeper	card
 Jungleborn Pioneer	card
 Kitesail Corsair	card
 Knight of the Stampede	card
+Kumena, Tyrant of Orazca	card
 Legion Lieutenant	card
 Luminous Bonds	card
+Majestic Heliopterus	card
 Martyr of Dusk	card
 Merfolk Mistbinder	card
 Mist-Cloaked Herald	card
@@ -8050,17 +8090,21 @@ Overgrown Armasaur	card
 Path of Discovery	card
 Pirate's Pillage	card
 Pitiless Plunderer	card
+Polyraptor	card
 Raging Regisaur	card
 Ravenous Chupacabra	card
 Reaver Ambush	card
 Reckless Rage	card
 River Darter	card
+Sanguine Glorifier	card
 Seafloor Oracle	card
 Siegehorn Ceratops	card
 Silverclad Ferocidons	card
+Siren Reaver	card
 Soul of the Rapids	card
 Squire's Devotion	card
 Storm Fleet Sprinter	card
+Strength of the Pack	card
 Sun Sentinel	card
 Sun-Collared Raptor	card
 Swab Goblin	card
@@ -8068,10 +8112,13 @@ Swaggering Corsair	card
 Swift Warden	card
 Sworn Guardian	card
 Thrashing Brontodon	card
+Tomb Robber	card
+Trapjaw Tyrant	card
 Twilight Prophet	card
 Vampire Champion	card
 Vampire Revenant	card
 Voracious Vampire	card
+Vraska's Conquistador	card
 Waterknot	card
 Wayward Swordtooth	card
 World Shaper	card
@@ -8339,8 +8386,10 @@ Ajani's Welcome	card
 Ajani, Adversary of Tyrants	card
 Ajani, Wise Counselor	card
 Alpine Moon	card
+Amulet of Safekeeping	card
 Angel of the Dawn	card
 Apex of Power	card
+Arcades, the Strategist	card
 Arcane Encyclopedia	card
 Arisen Gorgon	card
 Aven Wind Mage	card
@@ -8353,6 +8402,7 @@ Bristling Boar	card
 Catalyst Elemental	card
 Cavalry Drillmaster	card
 Chaos Wand	card
+Chromium, the Mutable	card
 Cleansing Nova	card
 Colossal Majesty	card
 Court Cleric	card
@@ -8369,8 +8419,11 @@ Dismissive Pyromancer	card
 Doublecast	card
 Draconic Disciple	card
 Dragon's Hoard	card
+Druid of Horns	card
+Dryad Greenseeker	card
 Dwarven Priest	card
 Dwindle	card
+Elvish Clancaller	card
 Elvish Rejuvenator	card
 Epicure of Blood	card
 Exclusion Mage	card
@@ -8382,6 +8435,7 @@ Frilled Sea Serpent	card
 Gallant Cavalry	card
 Gearsmith Guardian	card
 Gearsmith Prodigy	card
+Ghastbark Twins	card
 Gigantosaurus	card
 Goblin Instigator	card
 Goblin Motivator	card
@@ -8396,6 +8450,7 @@ Heroic Reinforcements	card
 Hieromancer's Cage	card
 Hired Blade	card
 Hostile Minotaur	card
+Hungering Hydra	card
 Infernal Reckoning	card
 Inferno Hellion	card
 Isareth the Awakener	card
@@ -8421,6 +8476,8 @@ Militia Bugler	card
 Mirror Image	card
 Mistcaller	card
 Mystic Archaeologist	card
+Nexus of Fate	card
+Nicol Bolas, the Ravager	card
 Nightmare's Thirst	card
 Novice Knight	card
 Onakke Ogre	card
@@ -8455,9 +8512,12 @@ Scholar of Stars	card
 Serra's Guardian	card
 Shield Mare	card
 Siegebreaker Giant	card
+Sigiled Sword of Valeron	card
 Silverbeak Griffin	card
+Skalla Wolf	card
 Skeleton Archer	card
 Skilled Animator	card
+Skyrider Patrol	card
 Skyscanner	card
 Sovereign's Bite	card
 Sparktongue Dragon	card
@@ -8467,17 +8527,21 @@ Stitcher's Supplier	card
 Strangling Spores	card
 Suncleanser	card
 Supreme Phantom	card
+Surge Mare	card
 Suspicious Bookcase	card
 Take Vengeance	card
 Talons of Wildwood	card
+Tezzeret's Gatebreaker	card
 Tezzeret's Strider	card
 Tezzeret, Artifice Master	card
 Tezzeret, Cruel Machinist	card
+Thorn Lieutenant	card
 Thud	card
 Transmogrifying Wand	card
 Trusty Packbeast	card
 Two-Headed Zombie	card
 Uncomfortable Chill	card
+Ursine Champion	card
 Vaevictis Asmadi, the Dire	card
 Valiant Knight	card
 Vampire Neonate	card
@@ -8486,6 +8550,8 @@ Viashino Pyromancer	card
 Vigilant Baloth	card
 Vine Mare	card
 Vivien Reid	card
+Vivien of the Arkbow	card
+Vivien's Invocation	card
 Vivien's Jaguar	card
 Volley Veteran	card
 Wall of Mist	card
@@ -19554,91 +19620,297 @@ Yuriko, Blade of the Mighty	card
 Yuriko, Hope from the Shadows	card
 Avacyn, Angel of Horror	card
 Niv-Mizzet, Ghost Counsel	card
+70,000 Light-Years from Home	card
+A Good Day to Die	card
+Academy Instructor	card
+Adversary by Algorithm	card
 All Good Things...	card
+Amok Time	card
 Andoria	card
+Andromedan Automatons	card
+Antagonist Incorporator	card
+Anthropological Mission	card
+Armus, Skin of Evil	card
+Artificial Anomaly	card
 Assault Drone	card
 Assembly Specialist	card
+Astute Terraformer	card
+Automated Warfare System	card
 Bajor	card
 Bat'leth	card
 Battle-Scarred Survivalist	card
+Beckett Mariner, Impetuous Ensign	card
+Blastoneuron	card
+Boarding Action	card
 Borg Cube	card
 Brad Boimler, Eager Ensign	card
+Branching Timeline	card
+Brazen Bluff	card
+Cantankerous Captain	card
 Captain Benjamin Sisko	card
+Captain James T. Kirk	card
+Captain Jean-Luc Picard	card
 Captain Jonathan Archer	card
+Captain Kathryn Janeway	card
+Captain Michael Burnham	card
+Captain Pike, Fullness of Time	card
 Captain's Tutelage	card
 Cardassia Prime	card
 Cetacean Ops	card
 Cha'DIch Investigator	card
+Class-F Shuttlecraft	card
+Cleveland Booker, Empath	card
+Cloak and Phaser	card
 Cloistered Telepath	card
 Cold-Blooded Crew	card
+Collation Trimatrix	card
 Collective Drone	card
+Combadge	card
 Command Decision	card
 Command Subadjunct	card
 Commander Raffi Musiker	card
 Common Goal	card
+Conquest Mission	card
+Consider the Prime Directive	card
 Constable Odo	card
+Crystalline Entity	card
+Culber and Stamets, Star-Crossed	card
 Cybernetic Specialist	card
+D'Ghor Bloodletter	card
 D'Vana Tendi, Optimistic Ensign	card
+D-7 Battle Cruiser	card
 DOT-7 Repair Squad	card
 Dahar Master	card
+Dal R'El, Augment Orphan	card
 Daniels, Temporal Agent	card
 Data, New Life	card
+Dathon and Picard at El-Adrel	card
+Dathon, His Heart Open	card
+David and Carol Marcus, Creators	card
+De-evolve	card
+Deanna Troi, Psychic Counsel	card
 Death Is Irrelevant	card
+Deep Space 9	card
 Deep Space Scan	card
+Dominion Assault Force	card
+Dominion Infiltration	card
 Dominion Saboteur	card
+Dominion Supervisor	card
 Dr. Beverly Crusher	card
+Dr. Joseph M'Benga	card
+Dr. Leonard "Bones" McCoy	card
 Dr. McCoy, Surly Surgeon	card
 Earth, Sector 001	card
+Eject the Warp Core	card
 Elim Garak, Simple Tailor	card
+Emergency Holographic Crew	card
 Emergency Medical Hologram	card
+Encounter the Unknown	card
+Energize	card
+Ensign Pavel Chekov	card
+Enterprise NX-01	card
+Erica Ortegas, Plucky Pilot	card
+Excalbian Gamemaster	card
+Exploratory Mission	card
+Federation Field Medic	card
+Federation Outpost	card
 Federation Probe	card
+Federation Resupply	card
 Ferenginar	card
+Final Frontier	card
 First Contact	card
 Free Borg Revolutionaries	card
+Fugitive Listener	card
+Gabriel Lorca, Mirror Menace	card
+Gaseous Anomaly	card
 General Chang, Cold Warrior	card
+Genesis Device	card
+Genesis Effect	card
+Georgiou, Terran Emperor	card
+Ghost of Illyria	card
+Gowron, Eager for Battle	card
+Grand Nagus Zek	card
+Gray and Adira, Forever Joined	card
+Guidance Failure	card
 Gul Dukat, Colonial Prefect	card
+Gwyndala, the Progeny	card
 H.M.S. Bounty, Unlikely Timeship	card
 He's Dead, Jim	card
+Hemmer, Fixing What Is Broken	card
+Highly Illogical	card
 Hit It!	card
+Hive Mind Coprocessor	card
+Holo-Engineer	card
+Hologram Janeway	card
+Hologram Stalker	card
 Horta	card
+Hoshi Sato, Exolinguist	card
 Humpback Whales	card
+I'm a Doctor, Not a . . .	card
+Impossible Choice	card
+In the Pale Moonlight	card
+Infinite Diversity	card
 Interstellar Effigy	card
+Isolinear Processor	card
+Jadzia Dax, Living Legacy	card
+Jake Sisko, War Correspondent	card
+Jett Reno, Problem Solver	card
+Kai Winn, Faithless Leader	card
 Khaaaaaaaaaaaannn!	card
+Khan, Despot by Design	card
+Khan, Vengeful Heart	card
 Kira Nerys, Firebrand	card
+Kirk, Commanding Officer	card
+Kobayashi Maru Scenario	card
 L'Rell, Fierce Visionary	card
+La'An Noonien-Singh, Security	card
+Lieutenant Commander Data	card
 Live Long and Prosper	card
+Locutus, the One Who Speaks	card
+Lore, Positronic Provocateur	card
+Lt. Cmdr. Geordi La Forge	card
 Lwaxana Troi, Charming Guest	card
+MACO Strike Team	card
 Make It So	card
 Malfunctioning Holodeck	card
 Marooned	card
+Melkotian Adjudicator	card
 Miles O'Brien, Transporter Ops	card
+Mirror Universe Intrusion	card
 Moopsy	card
+Mr. Spock, Science Officer	card
 Mugato	card
 Munitions Enthusiast	card
+Neelix, Moral Support	card
+Ni'Var Science Academy	card
+Nog, Ambitious Cadet	card
+Nyota Uhura, Communications	card
+Oberth-Class Starship	card
+Obsidian Order Operative	card
 Open Communications	card
 Organic Avulsion Unit	card
 Orion	card
+Overflow Submatrix	card
+Pah-Wraith	card
+Pattern Buffer Preservation	card
+Peace in Our Time	card
+Perils of the Past	card
+Pet Sehlat	card
+Phlox, Unorthodox Doctor	card
+Photosynthetic Physician	card
 Picard, Leading by Example	card
+Planetary Bombardment	card
 Planetary Patrol	card
 Plasma Cascade	card
 Primary Unimatrix Adjunct	card
+Pure Energy	card
+Q Continuum	card
+Q, Stacking the Deck	card
 Qo'noS	card
+Quark's Bar	card
+Quark, Humble Proprietor	card
+Ravenous Cosmozoan	card
+Red Alert!	card
 Relentless Drednok	card
+Replicator	card
+Resistance Is Futile	card
 Risa	card
 Rogue Artificial Intelligence	card
+Rok-Tahk, Budding Scientist	card
+Romulan Bird-of-Prey	card
 Romulus	card
+Rules of Acquisition	card
 Rutherford, Upgraded Ensign	card
 Saavik, Stoic Student	card
+Salt Vampire	card
+Sarcophagus, Ship of the Dead	card
+Sarek, Federation Ambassador	card
+Saru, Unthreatened	card
+Saurian Explorer	card
+Savvy Profiteer	card
 Scotty, Miracle Worker	card
+Sela, Tal Shiar Paradox	card
+Set Phasers to . . .	card
+Seven of Nine	card
+Seven of Nine, Unassimilated	card
+Shields Up!	card
+Shuttle Ace	card
+Sickbay	card
 Silicate Surveyor	card
+Spatial Anomaly	card
 Species 8472	card
+Spock, Always Your Friend	card
+Stable Wormhole	card
+Starfleet Academy	card
+Starfleet Security	card
+Starfleet Spanner Jockey	card
+Storied Veteran	card
+Stray from History	card
+Subcommander T'Pol	card
+Subspace Anomaly	card
+Sulu, Space Swashbuckler	card
+Support Mission	card
+Suurok-Class Science Vessel	card
+Suus Mahna Practitioner	card
+Sylvia Tilly, Joy of Discovery	card
 Syndicate Liquidators	card
+Tactical Officer	card
+Tal Shiar Analyst	card
+Tal Shiar Operative	card
+Targ Wrangler	card
+Tasha Yar, Out of Time	card
 Tea, Earl Grey, Hot	card
+Tell Me What You See	card
+Temporal Anomaly	card
+Temporal Conqueror	card
+Tenacious Drone	card
+Test of Conviction	card
+Test of Courage	card
+Test of Identity	card
+Test of Loyalty	card
+Test of Priorities	card
+The Caretaker	card
+The City on the Edge of Forever	card
+The Destruction of Praxis	card
+The Doctor, EMH	card
+The Duras Sisters	card
+The Holodeck	card
+The Inner Light	card
+The Measure of a Man	card
+The Naked Time	card
+The Needs of the Many	card
+The Traveler	card
+The Unicomplex	card
+The Wrath of Khan	card
+There's Coffee in that Nebula	card
+Those Old Scientists	card
+Transporter Malfunction	card
+Tricorder	card
 Troubling Tribbles	card
 Type-2 Phaser	card
+U.S.S. Cerritos, Following Up	card
+U.S.S. Discovery, at Black Alert	card
+U.S.S. Enterprise-A, Free Spirit	card
+U.S.S. Enterprise-D, Galaxy-Class	card
+U.S.S. Excelsior, Cutting Edge	card
+U.S.S. Reliant, From Hell's Heart	card
+U.S.S. Voyager, Lone Wanderer	card
+Una Chin-Riley, Number One	card
 Unexplored Territory	card
+V'Ger, the Intruder	card
+Vash, Freelance Archaeologist	card
+Vengeance Mission	card
 Vexing Drone	card
 Vulcan	card
+Vulcan Mind-Meld	card
 Warp Core	card
+Warp Speed	card
+Wesley Crusher, Starfleet Cadet	card
+Will Riker, First in the Field	card
+Worf, Honor-Bound Warrior	card
+Worf, Intelligence Contractor	card
 Xenobotanist	card
 Xindi Surveyors	card
+Year of Hell	card
+Zefram Cochrane, Warp Pioneer	card
+Zero, Incorporeal Sensate	card

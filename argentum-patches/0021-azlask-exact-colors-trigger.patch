@@ -9,7 +9,7 @@ Subject: [PATCH] arcana: 0021-azlask-exact-colors-trigger
  1 file changed, 14 insertions(+)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index ca82d06e8c..f64a2bf0e1 100644
+index 4391d7e59d..6dce92c25d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 @@ -1716,6 +1716,17 @@ class TriggerMatcher(

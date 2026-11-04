@@ -17,10 +17,10 @@ Subject: [PATCH] arcana: 0032-per-player-target-binding
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index fe4e9daa8c..e028969d40 100644
+index d2ed60f7f2..74bc25a980 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -6740,6 +6740,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
+@@ -6744,6 +6744,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
    "**For each other player, exile up to one target creature that player controls**" (Kaya, Spirits'
    Justice) is `TargetObject(filter = TargetFilter.CreatureOpponentControls, optional = true, dynamicMaxCount = DynamicAmount.PlayerCount(Player.EachOpponent), differentControllers = true, id = "one target creature each other player controls")`. Give it an `id` — the generated description
    reads "controlled by different players", which is the constraint, not the printed sentence.
@@ -134,7 +134,7 @@ index 84a0537cb3..5a908785f0 100644
      private fun anyTargetStillMatches(
          state: GameState,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
-index 4705612f39..bbb03bd95a 100644
+index 01471b0a13..6a429cba4c 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
 @@ -73,7 +73,8 @@ internal class SpellResolver(

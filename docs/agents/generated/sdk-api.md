@@ -13,7 +13,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 ## Enums
 
 - **Color**: `WHITE`, `BLUE`, `BLACK`, `RED`, `GREEN`
-- **Keyword**: `FLYING`, `MENACE`, `INTIMIDATE`, `FEAR`, `SHADOW`, `HORSEMANSHIP`, `SWAMPWALK`, `FORESTWALK`, `ISLANDWALK`, `MOUNTAINWALK`, `PLAINSWALK`, `DESERTWALK`, `NONBASIC_LANDWALK`, `LEGENDARY_LANDWALK`, `FIRST_STRIKE`, `DOUBLE_STRIKE`, `TRAMPLE`, `DEATHTOUCH`, `LIFELINK`, `VIGILANCE`, `REACH`, `PROVOKE`, `FLANKING`, `EXALTED`, `MYRIAD`, `BANDING`, `DEFENDER`, `INDESTRUCTIBLE`, `HEXPROOF`, `SHROUD`, `WARD`, `PROTECTION`, `PROTECTION_FROM_EACH_OPPONENT`, `UMBRA_ARMOR`, `HASTE`, `FLASH`, `PROWESS`, `FLURRY`, `CHANGELING`, `DEVOID`, `AMPLIFY`, `RIOT`, `READ_AHEAD`, `DEVOUR`, `CRAFT`, `CONVOKE`, `DELVE`, `AFFINITY`, `IMPROVISE`, `EMERGE`, `STORM`, `FLASHBACK`, `BEAM_ME_UP`, `SPLIT_SECOND`, `HARMONIZE`, `MAYHEM`, `ESCAPE`, `MADNESS`, `AFTERMATH`, `FUSE`, `DREDGE`, `DISTURB`, `EVOKE`, `BESTOW`, `BLITZ`, `MUTATE`, `PROTOTYPE`, `SNEAK`, `NINJUTSU`, `WEB_SLINGING`, `SPLICE`, `IMPENDING`, `CONSPIRE`, `CASUALTY`, `REPLICATE`, `SQUAD`, `BARGAIN`, `MIRACLE`, `SOULBOND`, `HIDEAWAY`, `CASCADE`, `PLOT`, `FORETELL`, `CLEAVE`, `OVERLOAD`, `DAYBOUND`, `NIGHTBOUND`, `OFFSPRING`, `PERSIST`, `UNDYING`, `ENDURING`, `RENEW`, `EMBALM`, `UNEARTH`, `ENCORE`, `ASCEND`, `STORIED`, `START_YOUR_ENGINES`, `MAX_SPEED`, `DECAYED`, `EXPLOIT`, `CHAMPION`, `TRAINING`, `MENTOR`, `EVOLVE`, `RAVENOUS`, `RECONFIGURE`, `WITHER`, `INFECT`, `TOXIC`, `ANNIHILATOR`, `BUSHIDO`, `RAMPAGE`, `ABSORB`, `AFFLICT`, `CREW`, `SADDLE`, `MODULAR`, `FADING`, `VANISHING`, `BLOODTHIRST`, `CUMULATIVE_UPKEEP`, `ECHO`, `SOULSHIFT`, `SUSPEND`, `RENOWN`, `FABRICATE`, `TRIBUTE`, `MOBILIZE`, `FIREBENDING`, `JOB_SELECT`, `FOR_MIRRODIN`, `COMPLEATED`, `EERIE`, `VIVID`, `FATEFUL_BITE`, `PREPARED`, `PARADIGM`, `INCREMENT`, `REBOUND`, `CIPHER`, `TEAMWORK`
+- **Keyword**: `FLYING`, `MENACE`, `INTIMIDATE`, `FEAR`, `SHADOW`, `HORSEMANSHIP`, `SWAMPWALK`, `FORESTWALK`, `ISLANDWALK`, `MOUNTAINWALK`, `PLAINSWALK`, `DESERTWALK`, `NONBASIC_LANDWALK`, `LEGENDARY_LANDWALK`, `FIRST_STRIKE`, `DOUBLE_STRIKE`, `TRAMPLE`, `DEATHTOUCH`, `LIFELINK`, `VIGILANCE`, `REACH`, `PROVOKE`, `FLANKING`, `EXALTED`, `MYRIAD`, `BANDING`, `DEFENDER`, `INDESTRUCTIBLE`, `HEXPROOF`, `SHROUD`, `WARD`, `PROTECTION`, `PROTECTION_FROM_EACH_OPPONENT`, `UMBRA_ARMOR`, `HASTE`, `FLASH`, `PROWESS`, `FLURRY`, `CHANGELING`, `DEVOID`, `AMPLIFY`, `RIOT`, `READ_AHEAD`, `DEVOUR`, `CRAFT`, `CONVOKE`, `DELVE`, `AFFINITY`, `IMPROVISE`, `EMERGE`, `STORM`, `FLASHBACK`, `BEAM_ME_UP`, `SPLIT_SECOND`, `HARMONIZE`, `MAYHEM`, `ESCAPE`, `MADNESS`, `AFTERMATH`, `FUSE`, `DREDGE`, `DISTURB`, `EVOKE`, `BESTOW`, `BLITZ`, `MUTATE`, `PROTOTYPE`, `SNEAK`, `NINJUTSU`, `WEB_SLINGING`, `SPLICE`, `IMPENDING`, `CONSPIRE`, `CASUALTY`, `REPLICATE`, `SQUAD`, `BARGAIN`, `MIRACLE`, `SOULBOND`, `HIDEAWAY`, `CASCADE`, `PLOT`, `FORETELL`, `CLEAVE`, `OVERLOAD`, `DAYBOUND`, `NIGHTBOUND`, `OFFSPRING`, `PERSIST`, `UNDYING`, `ENDURING`, `RENEW`, `EMBALM`, `UNEARTH`, `ENCORE`, `ASCEND`, `STORIED`, `START_YOUR_ENGINES`, `MAX_SPEED`, `DECAYED`, `EXPLOIT`, `CHAMPION`, `TRAINING`, `MENTOR`, `EVOLVE`, `RAVENOUS`, `RECONFIGURE`, `WITHER`, `INFECT`, `TOXIC`, `ANNIHILATOR`, `BUSHIDO`, `RAMPAGE`, `ABSORB`, `AFFLICT`, `CREW`, `SADDLE`, `MODULAR`, `FADING`, `VANISHING`, `SUNBURST`, `BLOODTHIRST`, `CUMULATIVE_UPKEEP`, `ECHO`, `SOULSHIFT`, `SUSPEND`, `RENOWN`, `FABRICATE`, `TRIBUTE`, `MOBILIZE`, `FIREBENDING`, `JOB_SELECT`, `FOR_MIRRODIN`, `COMPLEATED`, `EERIE`, `VIVID`, `FATEFUL_BITE`, `PREPARED`, `PARADIGM`, `INCREMENT`, `REBOUND`, `CIPHER`, `TEAMWORK`
 - **Rarity**: `COMMON`, `UNCOMMON`, `RARE`, `MYTHIC`, `SPECIAL`, `BONUS`
 - **Step**: `UNTAP`, `UPKEEP`, `DRAW`, `PRECOMBAT_MAIN`, `BEGIN_COMBAT`, `DECLARE_ATTACKERS`, `DECLARE_BLOCKERS`, `FIRST_STRIKE_COMBAT_DAMAGE`, `COMBAT_DAMAGE`, `END_COMBAT`, `POSTCOMBAT_MAIN`, `END`, `CLEANUP`
 - **Zone**: `LIBRARY`, `HAND`, `BATTLEFIELD`, `GRAVEYARD`, `STACK`, `EXILE`, `COMMAND`, `SIDEBOARD`, `ANTE`
@@ -141,6 +141,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `OIL: String`
 - `OMEN: String`
 - `PAGE: String`
+- `PEACE: String`
 - `PHYLACTERY: String`
 - `PHYRESIS: String`
 - `PIN: String`
@@ -156,6 +157,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `POINT: String`
 - `POISON: String`
 - `POSSESSION: String`
+- `PROMOTION: String`
 - `PUPA: String`
 - `QUEST: String`
 - `RAD: String`
@@ -747,6 +749,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `ExileFromGraveyard(Int, GameObjectFilter): AbilityCost`*
 - `ExileFromGraveyardForColoredSymbols(Int, Color...): AbilityCost`
 - `ExileFromGraveyardForTotal(Int, CardMeasure, GameObjectFilter): AbilityCost`*
+- `ExileFromHand(Int, GameObjectFilter): AbilityCost`*
 - `ExileFromSingleGraveyard(Int, GameObjectFilter): AbilityCost`*
 - `ExileGrantingPermanent: AbilityCost`
 - `ExilePermanents(GameObjectFilter, Int, Boolean, VariableCostMeasure, Int, Integer): AbilityCost`*
@@ -1384,6 +1387,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `CreateMutagenToken(Int): Effect`*
 - `CreateMutagenToken(DynamicAmount): Effect`*
 - `CreateMutavault(Int, Boolean, EffectTarget): Effect`*
+- `CreateNewPlanet(Int, Boolean, EffectTarget): Effect`*
 - `CreatePermanentEmblem(GroupFilter, Int, Int, List<String>, List<ActivatedAbility>, List<? extends StaticAbility>, List<ActivatedAbility>, List<? extends ReplacementEffect>, String): Effect`*
 - `CreatePest(Int, EffectTarget): Effect`*
 - `CreatePhyrexianMite(Int, EffectTarget): Effect`*
@@ -2396,6 +2400,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `attacks(GameObjectFilter, Int): TriggerSpec`*
 - `attacksAPlayer(GameObjectFilter, Int, Player): TriggerSpec`*
 - `attackTriggersAbility(): TriggerSpec`
+- `becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean): TriggerSpec`*
 - `becomesTheMonarch(): TriggerSpec`
 - `beginningOf(Step): TriggerSpec`
 - `bends(Set<? extends BendType>): TriggerSpec`*
@@ -2545,6 +2550,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `kickerTarget(TargetRequirement): EffectTarget.BoundVariable`*
 - `kickerTarget(TargetFilter, Boolean): EffectTarget.BoundVariable`*
 - `kickerTargetRequirements$argentum_engine_mtg_sdk: List<TargetRequirement>`
+- `libraryPlacementOnResolve$argentum_engine_mtg_sdk: ZonePlacement`
 - `modal(Int, Int, Boolean, String, CostAtom, Boolean, DynamicAmount, DynamicAmount, Function1<? super ModalBuilder, Unit>): Unit`*
 - `overloadEffect: Effect`
 - `paradigm(): Unit`
@@ -2553,8 +2559,8 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `returnTransformedFromGraveyard(List<CounterType>): Unit`
 - `returnTransformedFromGraveyardMarker$argentum_engine_mtg_sdk: ReturnTransformedFromGraveyard`
 - `selfExile(Int): Unit`*
+- `selfPutOnBottomOfLibrary(): Unit`
 - `selfShuffleIntoLibrary(): Unit`
-- `shufflesIntoLibraryOnResolve$argentum_engine_mtg_sdk: Boolean`
 - `target: TargetRequirement`*
 - `target(TargetRequirement): EffectTarget.BoundVariable`*
 - `target(TargetRequirement, Boolean): EffectTarget.BoundVariable`*

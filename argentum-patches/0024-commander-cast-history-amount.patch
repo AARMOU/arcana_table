@@ -16,7 +16,7 @@ Subject: [PATCH] arcana: 0024-commander-cast-history-amount
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 6d851f4aac..06a03d4dd6 100644
+index a65cdae707..60030f8cbb 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -645,6 +645,7 @@ Families:
@@ -67,10 +67,10 @@ index 9829dd3906..973428e4bf 100644
       * Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
       *
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 6c9515c668..e7e8eec8b2 100644
+index 8b0c7911bb..0d35dc6266 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1661,6 +1661,7 @@ Duration.WhileAffectedAttachedToSource — Duration — Lion Sash — Duration.W
+@@ -1662,6 +1662,7 @@ Duration.WhileAffectedAttachedToSource — Duration — Lion Sash — Duration.W
  Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duration.WhileSourceAttachedToAffected, Duration.WhileSourceOnBattlefield — an Aura's own 'enchanted creature is …' static follows the Aura to whatever it enchants (CR 611.3a); WhileSourceAttachedToAffected latches off per affected entity and never moves to a new host, and WhileSourceOnBattlefield doesn't end when the source becomes unattached
  Duration.WhileSourceEncodedOnAffected — Duration — Whispering Madness — Duration.WhileSourceOnBattlefield, Duration.WhileSourceAttachedToAffected — cipher's source is a card in exile, not a permanent, so the battlefield gate is always closed for it; the attachment gate reads AttachedToComponent between two permanents, while 'encoded' (CR 702.99b) is a link from an exiled card to a creature that must also be the same exiled object (CR 702.99c)
  DynamicAmount.CapturedAtCast — DynamicAmount — Lethal Exploit — DynamicAmount.CastChoice, DynamicAmount.VariableReference — CastChoice reads a number the player chose into a fixed ChoiceSlot enum (a closed set of player decisions), not a card-named game-state snapshot; VariableReference reads a pipeline variable that dies with the resolving effect, while a capture is frozen at cast and outlives the cast. Subsumes and deletes the CastTimeFlagSet condition (now Compare(CapturedAtCast, GT, 0))
@@ -112,10 +112,10 @@ index 536221e27b..2b07e3e37d 100644
              // state off each Room's RoomComponent — a single Room entity can contribute two
              // doors, so this can't go through the entity-level AggregateBattlefield. Controller
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-index 54b7f2f18f..e66cdea39b 100644
+index 0d683ce244..37bff64a87 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-@@ -445,6 +445,7 @@ class CreateDelayedTriggerExecutor(
+@@ -449,6 +449,7 @@ class CreateDelayedTriggerExecutor(
          is DynamicAmount.CardsCycledThisGame,
          is DynamicAmount.SpellsCastThisGame,
          is DynamicAmount.ExtraTurnsBegunThisGame,
