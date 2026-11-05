@@ -1,0 +1,9 @@
+{
+  "key": "flayed-one",
+  "name": "Flayed One",
+  "issue": 968,
+  "source": "certification/FlayedOneIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.FlayedOneIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
