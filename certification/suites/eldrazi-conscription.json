@@ -1,0 +1,9 @@
+{
+  "key": "eldrazi-conscription",
+  "name": "Eldrazi Conscription",
+  "issue": 957,
+  "source": "certification/EldraziConscriptionIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldraziConscriptionIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
