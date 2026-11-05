@@ -56,11 +56,11 @@ class EldraziDisplacerIndependentCertificationTest {
         val owner = d.player2
         val displacer = d.putPermanentOnBattlefield(p, name)
         val target = d.putCreatureOnBattlefield(owner, "Grizzly Bears")
-        d.giveMana(p, Color.WHITE, 2)
-        d.giveColorlessMana(p, 1)
 
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = owner)
         assertNull(d.passPriority(owner).error)
+        d.giveMana(p, Color.WHITE, 2)
+        d.giveColorlessMana(p, 1)
         assertNull(activateBlink(d, p, displacer, target).error)
         d.resolveAll()
 
