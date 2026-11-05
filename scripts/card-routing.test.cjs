@@ -165,8 +165,8 @@ test('feeder preserves a still-capped prior card in its bot-maintained board com
     title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
     labels: [{ name: Q.HARD_CARD_LABEL }] };
   const board = { number: 883, body: 'Owner decisions stay here.' };
-  const comments = { 360: [{ id: 1, user: BOT, body: Q.HARD_CARD_NOTE_MARKER + '\nWaiting for a worker.' }],
-    883: [{ id: 2, user: BOT, body: Q.HARD_CARD_COMMENT_MARKER + '\n## Hard cards waiting for a worker\n- Old card' }] };
+  const comments = { 360: [{ id: 1, user: BOT, body: '<!-- arcana-hard-card-handoff-v1 -->' + '\nWaiting for a worker.' }],
+    883: [{ id: 2, user: BOT, body: '<!-- arcana-hard-card-handoff-comment-v1 -->' + '\n## Hard cards waiting for a worker\n- Old card' }] };
   const api = { issues: {
     get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
     listForRepo: () => {},
@@ -191,8 +191,8 @@ test('feeder updates only its bot comment and preserves concurrent owner board e
     title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
     labels: [{ name: Q.HARD_CARD_LABEL }] };
   const board = { number: 883, body: 'Owner edit added during hand-off sync.' };
-  const comments = { 360: [{ id: 1, user: BOT, body: Q.HARD_CARD_NOTE_MARKER + '\nWaiting.' }],
-    883: [{ id: 2, user: BOT, body: Q.HARD_CARD_COMMENT_MARKER + '\nOld handoff.' }] };
+  const comments = { 360: [{ id: 1, user: BOT, body: '<!-- arcana-hard-card-handoff-v1 -->' + '\nWaiting.' }],
+    883: [{ id: 2, user: BOT, body: '<!-- arcana-hard-card-handoff-comment-v1 -->' + '\nOld handoff.' }] };
   let boardWrites = 0;
   const api = { issues: {
     get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
