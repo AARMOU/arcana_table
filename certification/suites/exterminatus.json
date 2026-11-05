@@ -4,6 +4,6 @@
   "issue": 966,
   "source": "certification/ExterminatusIndependentCertificationTest.kt",
   "testClass": "com.arcanatable.customcards.ExterminatusIndependentCertificationTest",
-  "tests": 5,
+  "tests": 6,
   "target": "build"
 }
