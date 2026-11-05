@@ -18,7 +18,7 @@ const CLASSIFIED = [
   { name: 'Eldrazi Temple', readiness: 'ENGINE_BLOCKED', route: 'gpt', reasons: ['recorded gap'] },
 ];
 const verdicts = F.buildVerdicts({ baseSha: SHA, classified: CLASSIFIED });
-const body = (cards, extra = '') => ['## Cards', ...cards.map(c => '- ' + c), '', '## Acceptance', '- Exact Oracle behavior with executable regression tests', extra, '', 'Base: ' + BASE].join('\n');
+const body = (cards, extra = '') => ['## Cards', ...cards.map(c => '- ' + c), '', '## Cardkit starting packet', 'Cardkit classify: SUPPORTED', 'No close tested custom-card match.', '', '## Acceptance', '- Exact Oracle behavior with executable regression tests', extra, '', 'Base: ' + BASE].join('\n');
 
 test('card names are read from the Cards bullets in every format the queue uses', () => {
   assert.deepEqual(F.unitCards(['## Cards', "- Ulamog's Nullifier — original Eldrazi Incursion, one slot", '- **The Swarmlord** — the commander',
