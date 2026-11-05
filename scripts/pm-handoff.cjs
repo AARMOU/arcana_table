@@ -40,6 +40,9 @@ async function relayReviewHandoffs({ github, owner, repo, core, now = () => Date
   const target = await allComments(github, owner, repo, GOOSE_INBOX);
   const existing = new Set();
   for (const c of target) {
+    // Ignore forged receipts from unrelated accounts in this public inbox.
+    if (String(c?.user?.login || '').toLowerCase() !== owner.toLowerCase() ||
+        c?.author_association !== 'OWNER') continue;
     const match = /^<!-- arcana-handoff-relay-v1 pr=([1-9]\d{0,7}) sha=([a-f0-9]{40}) -->/.exec(String(c.body || ''));
     if (match) existing.add(marker(Number(match[1]), match[2]));
   }
