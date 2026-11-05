@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.Exterminatus
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -63,18 +64,31 @@ class ExterminatusIndependentCertificationTest {
 
     @Test
     fun lossOfIndestructibleEndsAtTheEndOfTurn() {
-        val d = customScenario(Exterminatus, "Darksteel Myr")
+        val d = customScenario(Exterminatus, "Darksteel Myr", "Shield Broker")
         val p = d.player1
         val opponent = d.player2
+        val myr = d.putCreatureOnBattlefield(p, "Darksteel Myr")
         val spell = d.putCardInHand(p, "Exterminatus")
+        val broker = d.putCardInHand(opponent, "Shield Broker")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        d.giveColorlessMana(opponent, 3)
+        d.giveMana(opponent, Color.BLUE, 2)
+        assertNull(d.castSpell(opponent, broker).error)
+        d.resolveAll(Choices(targets = listOf(myr)))
+        assertEquals(opponent, d.projected.getController(myr))
+        assertTrue(d.projected.hasKeyword(myr, Keyword.INDESTRUCTIBLE))
+
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
         d.giveColorlessMana(p, 5)
         d.giveMana(p, Color.WHITE)
         d.giveMana(p, Color.BLACK)
 
         assertNull(d.castSpell(p, spell).error)
+        assertNull(d.passPriority(p).error)
         d.resolveAll()
 
-        val myr = d.putCreatureOnBattlefield(opponent, "Darksteel Myr")
+        assertTrue(d.getPermanents(p).contains(myr))
+        assertEquals(p, d.projected.getController(myr))
         assertFalse(d.projected.hasKeyword(myr, Keyword.INDESTRUCTIBLE))
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertTrue(d.projected.hasKeyword(myr, Keyword.INDESTRUCTIBLE))
