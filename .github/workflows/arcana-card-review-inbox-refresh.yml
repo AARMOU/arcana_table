@@ -74,6 +74,10 @@ jobs:
         with:
           script: |
             try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            // Always publish the protected-board status before the expensive full inbox rebuild.
+            // A failed status refresh is visible in Actions warnings and by an aging timestamp in Control.
+            try { core.info('Board status: ' + await require('./scripts/board-facts.cjs').reportBoard({github, ...context.repo})); }
+            catch (error) { core.warning('Board status refresh failed: ' + String(error?.message || error).slice(0, 240)); }
             const R = require('./scripts/review-inbox.cjs');
             const S = require('./scripts/control-status.cjs');
             const payload = await R.buildReviewInbox({github, ...context.repo});
@@ -87,9 +91,6 @@ jobs:
             catch (error) { core.warning('Stall report unavailable: ' + String(error?.message || error).slice(0, 200)); }
             try { core.info('Engine versions: ' + await require('./scripts/engine-watch.cjs').reportUpstream({github, ...context.repo})); }
             catch (error) { core.warning('Engine version note unavailable: ' + String(error?.message || error).slice(0, 200)); }
-            // Live facts on the orders board (#883), so it never lags behind what GitHub shows (owner, 2026-11-03).
-            try { core.info('Board facts: ' + await require('./scripts/board-facts.cjs').reportBoard({github, ...context.repo})); }
-            catch (error) { core.warning('Board facts unavailable: ' + String(error?.message || error).slice(0, 200)); }
             // Explain owner-approved cards that integration skips (e.g. a non-card file in the PR).
             try { core.info('Integration skips: ' + await require('./scripts/card-integration.cjs').reportIntegrationSkips({github, ...context.repo})); }
             catch (error) { core.warning('Integration skip report unavailable: ' + String(error?.message || error).slice(0, 200)); }
