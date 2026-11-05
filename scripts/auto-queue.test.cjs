@@ -8,6 +8,7 @@ const SHA = '9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f';
 const CARD = 'Blood for the Blood God!';
 const BODY = [
   '## Cards', '- ' + CARD, '',
+  '## Cardkit starting packet', 'Cardkit classify: SUPPORTED', 'No close tested custom-card match.', '',
   '## Acceptance',
   '- Blood for the Blood God!: reduce generic cost for each creature that died this turn; discard your hand, draw eight and deal eight to each opponent; exile the spell',
   '- Exact current Oracle behavior (cost, types, every ability, targeting and timing), checked against authoritative card records',
