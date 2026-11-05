@@ -51,7 +51,7 @@ tools/cardkit/cardkit similar --text "Whenever this creature attacks, draw a car
 ```
 
 Matches marked `[custom]` link a Kotlin file **and its test** in this repo. Matches marked `[library]` link
-the card's source in upstream Argentum at the pinned commit (`c1c04ca…`), which is the same DSL the app
+the card's source in upstream Argentum at the pinned commit (`173a09a…`), which is the same DSL the app
 compiles against.
 
 No Oracle text cached? `tools/cardkit/cardkit oracle fetch "Card Name"` (needs api.scryfall.com). If your
@@ -86,7 +86,7 @@ tools/cardkit/cardkit newcard "Card Name"            # or --offline to use only 
 Creates `cards/<Val>.kt` (name, cost, identity, type line, stats, verbatim Oracle text, metadata, plain
 keywords already proven by tested cards) and `<Val>ScenarioTest.kt` that **fails on purpose**. Each rules
 line becomes a `CARDKIT-TODO` with its closest references. A scaffold is not an implementation:
-`cardkit check` errors if a scaffold is registered or its failing test is left in place.
+`cardkit check` errors if a scaffold is registered or its failing test is left in place. On a pull request, CI also runs `cardkit check --finished <the PR's card files>`: a card the PR adds or changes must be finished and registered, so an unfinished card fails CI and goes back to its agent instead of reaching review.
 
 ## 4. Implement
 

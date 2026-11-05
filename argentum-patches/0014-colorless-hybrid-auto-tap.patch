@@ -1,8 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0014-colorless-hybrid-auto-tap
+
+---
+ .../engine/mechanics/mana/ManaSolver.kt       | 47 +++++++--
+ .../ColorlessHybridManaSolverTest.kt          | 97 +++++++++++++++++++
+ 2 files changed, 138 insertions(+), 6 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 6e41eb9f1..0acc0e501 100644
+index 4dd83dd3d5..9ab971c641 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-@@ -810,10 +810,13 @@ class ManaSolver private constructor(
+@@ -868,10 +868,13 @@ class ManaSolver private constructor(
              }.forEach(::tapIntoBonusPool)
          }
  
@@ -17,7 +29,7 @@ index 6e41eb9f1..0acc0e501 100644
                  is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2)).size
                  else -> 6
              }
-@@ -829,12 +832,14 @@ class ManaSolver private constructor(
+@@ -887,12 +890,14 @@ class ManaSolver private constructor(
                  is ManaSymbol.Colored -> payableColors(listOf(symbol.color))
                  is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color))
                  is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2))
@@ -34,7 +46,7 @@ index 6e41eb9f1..0acc0e501 100644
              val relevant = source.availableColorsFor(spellContext).any { it in strictColors } ||
                  (needsColorless && source.producesColorless)
              (relevant || (strictColors.isNotEmpty() && snowStandIn(source) != null)) && source.bonusManaPerTap == 0 && source.bonusManaColorlessPerTap == 0 &&
-@@ -843,13 +848,13 @@ class ManaSolver private constructor(
+@@ -901,13 +906,13 @@ class ManaSolver private constructor(
                  source.producesColors.all { source.amountFor(it) == 1 } &&
                  (!source.producesColorless || source.amountFor(null) == 1)
          }
@@ -49,7 +61,7 @@ index 6e41eb9f1..0acc0e501 100644
                      else -> emptyList()
                  }
                  val allowed = payableColors(required)
-@@ -858,7 +863,7 @@ class ManaSolver private constructor(
+@@ -916,7 +921,7 @@ class ManaSolver private constructor(
                          if (source.producesColorless) listOf(PlannedPip(source, null)) else emptyList()
                      } else source.availableColorsFor(spellContext).filter { it in allowed }
                          .map { PlannedPip(source, it) } +
@@ -58,7 +70,7 @@ index 6e41eb9f1..0acc0e501 100644
                              listOf(PlannedPip(source, null)) else emptyList()) +
                          (snowStandIn(source)?.takeIf { required.isNotEmpty() && it.color !in allowed }
                              ?.let { listOf(PlannedPip(source, it.color)) } ?: emptyList())
-@@ -885,7 +890,8 @@ class ManaSolver private constructor(
+@@ -943,7 +948,8 @@ class ManaSolver private constructor(
              val strict = paymentSymbols.indices.filter { index ->
                  when (paymentSymbols[index]) {
                      is ManaSymbol.Colored, is ManaSymbol.Phyrexian,
@@ -68,7 +80,7 @@ index 6e41eb9f1..0acc0e501 100644
                      else -> false
                  }
              }
-@@ -1007,6 +1013,33 @@ class ManaSolver private constructor(
+@@ -1065,6 +1071,33 @@ class ManaSolver private constructor(
                      manaProduced[source.entityId] = ManaProduction(colorless = source.amountFor(null))
                      useSource(source, null)
                  }
@@ -102,7 +114,7 @@ index 6e41eb9f1..0acc0e501 100644
                  is ManaSymbol.MonocolorHybrid -> {
                      // Handle in pass 1a below, after all strict colored pips have claimed sources.
                  }
-@@ -3771,6 +3804,8 @@ class ManaSolver private constructor(
+@@ -3872,6 +3905,8 @@ class ManaSolver private constructor(
                  }
                  is ManaSymbol.MonocolorHybrid ->
                      colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
@@ -113,7 +125,7 @@ index 6e41eb9f1..0acc0e501 100644
          }
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 new file mode 100644
-index 000000000..90f3c36ce
+index 0000000000..90f3c36ce2
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 @@ -0,0 +1,97 @@

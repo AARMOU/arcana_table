@@ -1,0 +1,199 @@
+package com.wingedsheep.engine.handlers.effects.zones
+
+import com.wingedsheep.engine.core.*
+import com.wingedsheep.engine.handlers.DecisionHandler
+import com.wingedsheep.engine.handlers.EffectContext
+import com.wingedsheep.engine.handlers.effects.EffectExecutor
+import com.wingedsheep.engine.handlers.effects.BattlefieldFilterUtils
+import com.wingedsheep.engine.handlers.effects.ZoneTransitionService
+import com.wingedsheep.engine.mechanics.CompelledActionImmunity
+import com.wingedsheep.engine.mechanics.cost.SacrificeCostLegality
+import com.wingedsheep.sdk.scripting.CompelledAction
+import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.stack.captureEntitySnapshots
+import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.scripting.effects.SacrificeEffect
+import kotlin.reflect.KClass
+
+/**
+ * Executor for SacrificeEffect.
+ *
+ * Handles "sacrifice a creature" / "sacrifice N permanents" effects where the
+ * controller must choose which permanents to sacrifice.
+ *
+ * Examples:
+ * - Accursed Centaur: "When ~ enters the battlefield, sacrifice a creature."
+ * - Scapeshift: "Sacrifice any number of lands..."
+ *
+ * The sacrifice is mandatory (not optional) - the player must sacrifice if they
+ * have valid permanents. If they don't have enough, they sacrifice all they have (CR 609.3).
+ */
+class SacrificeExecutor(
+    private val zones: ZoneTransitionService,
+    private val decisionHandler: DecisionHandler = DecisionHandler()
+) : EffectExecutor<SacrificeEffect> {
+
+    override val effectType: KClass<SacrificeEffect> = SacrificeEffect::class
+
+    override fun execute(
+        state: GameState,
+        effect: SacrificeEffect,
+        context: EffectContext
+    ): EffectResult {
+        val controllerId = context.controllerId
+        val sourceId = context.sourceId
+
+        // Sigarda, Host of Herons. Normally the sacrificing player *is* the spell's controller, so
+        // this never fires — but a per-player iteration ("each player sacrifices a permanent")
+        // rebinds controllerId to each iterated player while effectControllerId stays the caster,
+        // and that is exactly the case Sigarda stops.
+        if (CompelledActionImmunity.appliesTo(state, controllerId, context.effectControllerId ?: controllerId, CompelledAction.SACRIFICE, predicateEvaluator = zones.predicateEvaluator)) {
+            return EffectResult.success(state)
+        }
+
+        val sourceName = if (sourceId != null) {
+            state.getEntity(sourceId)?.get<CardComponent>()?.name ?: "Unknown"
+        } else {
+            "Unknown"
+        }
+
+        // Find all valid permanents on the battlefield that the player controls
+        val validPermanents = findValidPermanents(state, context, effect, sourceId)
+
+        if (effect.any) {
+            // "Sacrifice any number of..." - player chooses 0 to all
+            return presentSacrificeDecision(
+                state, controllerId, sourceId, sourceName,
+                validPermanents, minSelections = 0, maxSelections = validPermanents.size
+            )
+        }
+
+        // Standard sacrifice: must sacrifice exactly `count` permanents. With `count` or fewer
+        // candidates there is nothing to choose — sacrifice them all. Too few is not a reason to
+        // sacrifice none: an effect that attempts the impossible does as much as possible
+        // (CR 609.3; Barter in Blood: "If a player controls only one creature, that creature is
+        // sacrificed"). Mirrors ForceSacrificeExecutor. Cost-shaped uses ("you may sacrifice
+        // two …. If you do") never reach here short: GatedEffectExecutor.canAfford and the
+        // trigger/reflexive feasibility checks reject them while fewer than `count` exist.
+        if (validPermanents.size <= effect.count) {
+            return sacrificePermanents(state, controllerId, validPermanents)
+        }
+
+        // More than enough - player must choose which to sacrifice
+        return presentSacrificeDecision(
+            state, controllerId, sourceId, sourceName,
+            validPermanents, minSelections = effect.count, maxSelections = effect.count
+        )
+    }
+
+    private fun findValidPermanents(
+        state: GameState,
+        context: EffectContext,
+        effect: SacrificeEffect,
+        sourceId: EntityId? = null
+    ): List<EntityId> {
+        // The resolving ability's whole context, as ReflexiveTriggerEffectExecutor's feasibility
+        // check reads it — so a source-relative filter ("an Aura attached to Three Dog",
+        // `attachedToSource()`) sees its source and the two agree on what can be sacrificed.
+        // A permanent that can't be sacrificed is never a legal choice (CR 701.21a), as in ForceSacrificeExecutor.
+        val matches = BattlefieldFilterUtils.findMatchingOnBattlefield(
+            state, effect.filter.youControl(), context,
+            predicateEvaluator = zones.predicateEvaluator
+<<<<<<<
+        ).filter { SacrificeCostLegality.canBeSacrificed(state, it) }
+=======
+        ).filterNot { state.projectedState.hasKeyword(it, com.wingedsheep.sdk.core.AbilityFlag.CANT_BE_SACRIFICED) }
+>>>>>>>
+        return if (effect.excludeSource && sourceId != null) {
+            matches.filter { it != sourceId }
+        } else {
+            matches
+        }
+    }
+
+    private fun presentSacrificeDecision(
+        state: GameState,
+        controllerId: EntityId,
+        sourceId: EntityId?,
+        sourceName: String,
+        validPermanents: List<EntityId>,
+        minSelections: Int,
+        maxSelections: Int
+    ): EffectResult {
+        val prompt = buildString {
+            append("Choose ")
+            when {
+                minSelections == 0 && maxSelections > 0 -> append("any number of permanents")
+                minSelections == 1 -> append("a permanent")
+                else -> append("$minSelections permanents")
+            }
+            append(" to sacrifice")
+        }
+
+        val continuation = SacrificeContinuation(
+            playerId = controllerId,
+            sourceId = sourceId,
+            sourceName = sourceName
+        )
+
+        val decisionResult = decisionHandler.createCardSelectionDecision(
+            state = state,
+            playerId = controllerId,
+            sourceId = sourceId,
+            sourceName = sourceName,
+            prompt = prompt,
+            options = validPermanents,
+            minSelections = minSelections,
+            maxSelections = maxSelections,
+            ordered = false,
+            phase = DecisionPhase.RESOLUTION,
+            useTargetingUI = true,
+            answer = continuation
+        )
+
+        return EffectResult.propagatePause(
+            decisionResult.state,
+            decisionResult.events
+        )
+    }
+
+    private fun sacrificePermanents(
+        state: GameState,
+        controllerId: EntityId,
+        permanentIds: List<EntityId>
+    ): EffectResult {
+        var newState = state
+        val events = mutableListOf<GameEvent>()
+
+        // Capture P/T/subtype/token-ness snapshots BEFORE the zone change (CR 608.2h / 113.7a —
+        // last known information) so a follow-up sibling effect can read the sacrificed
+        // permanent's characteristics: e.g. Serendib Djinn's "if you sacrifice an Island this way,
+        // ~ deals 3 damage to you" (subtypes via [Conditions.SacrificedHadSubtype] /
+        // [DynamicAmount.EntityProperty(SacrificedAsCost, ...)]), or Exploit's `EmitExploitedEventEffect`
+        // reading `wasToken` for Skull Skaab's "exploits a nontoken creature". The GameState overload
+        // is used so token-ness (a [TokenComponent] fact, not a projected value) is recorded too.
+        val snapshots = if (permanentIds.isNotEmpty()) {
+            captureEntitySnapshots(permanentIds, newState)
+        } else {
+            emptyList()
+        }
+
+        if (permanentIds.isNotEmpty()) {
+            val permanentNames = permanentIds.map { id ->
+                newState.getEntity(id)?.get<CardComponent>()?.name ?: "Unknown"
+            }
+            events.add(PermanentsSacrificedEvent(controllerId, permanentIds, permanentNames))
+            newState = ZoneTransitionService.trackPermanentSacrifice(newState, permanentIds, controllerId)
+        }
+
+        // One simultaneous event: a batch move freezes every look-back grant before the first goes.
+        val transitionResult = zones.moveToZoneBatch(newState, permanentIds, Zone.GRAVEYARD)
+        newState = transitionResult.state
+        events.addAll(transitionResult.events)
+
+        return EffectResult.success(newState, events)
+            .copy(updatedSacrificedPermanents = snapshots)
+    }
+}

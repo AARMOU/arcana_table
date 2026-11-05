@@ -25,7 +25,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/argentum-weekly-upgrade.yml"
 WRITE_COMMANDS = re.compile(r"\bgit\s+push\b|\bgh\s+(pr|issue|api|release|workflow)\b|\bcurl\b.*-X\s*(POST|PUT|PATCH|DELETE)")
-UPSTREAM_CODE = re.compile(r"gradle|wingedsheep|argentum-engine|weekly\.py\s+(rebase|install)|python3?\s+(-\S+\s+)*\S*audit_patches|setup-java|setup-android")
+# `gradle` as a command (gradle, ./gradlew, gradle-locked), not a `*.gradle.kts` path on the scope allowlist.
+UPSTREAM_CODE = re.compile(r"gradle(?!\.kts)|wingedsheep|argentum-engine|weekly\.py\s+(rebase|install)|python3?\s+(-\S+\s+)*\S*audit_patches|setup-java|setup-android")
 
 
 def load():
@@ -133,7 +134,8 @@ class WeeklyWorkflowSafety(unittest.TestCase):
     def test_safety_checks_include_the_scope_tests(self):
         run = self.step("validate", "Workflow safety checks")["run"]
         for name in ("test_weekly_workflow.py", "test_candidate_scope.py", "test_weekly_docs.py",
-                     "test_weekly_handoff.py"):
+                     "test_weekly_handoff.py", "test_weekly_retired.py", "test_weekly_imports.py",
+                     "test_check_android_engine.py"):
             self.assertIn(name, run)
 
     def test_failed_engine_build_gives_a_starting_branch_but_no_pr(self):
@@ -211,7 +213,7 @@ class WeeklyWorkflowSafety(unittest.TestCase):
 
     def test_live_failures_that_published_nothing_reach_81(self):
         notice = self.step("verdict", "Tell issue 81 when a live run failed without publishing anything")
-        self.assertIn("github.event_name != 'push'", notice["if"])
+        self.assertIn("github.event_name == 'workflow_dispatch'", notice["if"])  # scheduled: the status alert
         self.assertIn("needs.validate.result != 'success'", notice["if"])
         self.assertIn("gh issue comment 81", notice["run"])
         self.assertNotIn("@", notice["run"].replace("$GITHUB", ""))
@@ -233,6 +235,131 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         for path in ("docs/agents/generated/sdk-api.md", "docs/agents/argentum-upstream", "AGENTS.md",
                      "tools/cardkit/cardkit_lib/repo.py"):
             self.assertIn(path, add)
+
+    # --- added 2026-11-02 after upstream's JDK 25 bump blocked every run -----------------------------
+    EARLY = "'23 11 * * *'"
+
+    def test_daily_upgrade_is_live_and_one_day_behind(self):
+        crons = [c["cron"] for c in self.wf["on"]["schedule"]]
+        self.assertIn("23 11 * * *", crons)
+        self.assertEqual(self.wf["env"]["LAG_HOURS"],
+                         "${{ (github.event_name == 'schedule' || inputs.daily == 'true') && '24' || inputs.lag_hours || '0' }}")
+        self.assertEqual(self.wf["env"]["DAILY"], "${{ github.event_name == 'schedule' || inputs.daily == 'true' }}")
+        self.assertNotIn("schedule", self.publish["if"])  # scheduled runs publish (and merge when green)
+        self.assertNotIn("EARLY_WARNING", text(self.wf))
+        target = next(s for s in self.validate["steps"] if s.get("id") == "target")["run"]
+        self.assertIn('--before="$LAG_HOURS hours ago"', target)
+        self.assertIn("--filter=tree:0", target)  # commit history only: nothing of upstream is run or checked out
+        self.assertIn("^[0-9]{1,3}$", target)
+
+    def test_scheduled_runs_post_to_81_only_on_a_new_problem(self):
+        for name in ("Open or refresh the draft PR", "Merge a green upgrade into the integration branch", "Report a blocked upgrade"):
+            run = self.step("publish", name)["run"]
+            for line in run.splitlines():
+                # A green run that could not be merged is a problem someone must act on: it always posts.
+                if "gh issue comment 81" in line and "could not be merged" not in line:
+                    self.assertIn('[ "$DAILY" = true ] ||', line, name)
+        status = self.step("verdict", "Publish the engine status for Arcana Control")["run"]
+        self.assertIn("if scheduled and problem and not same:", status)
+        self.assertIn("Goose", status)
+        self.assertIn("held >= 20", status)  # Claude only when the same problem outlives a day
+        self.assertIn("scheduled = e.get('DAILY') == 'true'", status)  # a watchdog restart alerts like a scheduled run
+        self.assertIn("Safe to touch:", status)  # the alert says what a fix branch can and cannot affect (drill, 2026-11-03)
+
+    # --- added 2026-11-03: the 11:23 UTC daily run never started; 0036 found missing only by hand ------
+    def test_daily_watchdog_restart_counts_as_the_daily_run(self):
+        inputs = self.wf["on"]["workflow_dispatch"]["inputs"]
+        self.assertEqual("false", inputs["daily"]["default"])
+        infra = self.step("verdict", "Tell issue 81 when a live run failed without publishing anything")["if"]
+        self.assertIn("env.DAILY != 'true'", infra)  # the daily run reports through the engine status instead
+
+    def test_up_to_date_days_still_check_the_current_builds_patches(self):
+        for key in ("synced", "unsynced"):
+            self.assertIn(key, self.validate["outputs"])
+        status = self.step("verdict", "Publish the engine status for Arcana Control")["run"]
+        self.assertIn("status == 'up_to_date' and e.get('SYNCED') == 'false'", status)
+        overall = self.step("verdict", "Overall result")["run"]
+        self.assertLess(overall.index('[ "$SYNCED" = false ]'), overall.index("Already on the latest upstream"))
+
+    def test_build_error_annotations_lead_with_the_compiler_error(self):
+        collect = self.step("validate", "Collect engine build errors")["run"]
+        self.assertIn("grep -E '^e: '", collect)
+        self.assertIn("^> Task ", collect)  # Gradle progress lines are filtered out
+
+    def test_engine_jdk_follows_upstream(self):
+        jdk = next(s for s in self.validate["steps"] if s.get("id") == "jdk")
+        self.assertIn("gradle-daemon-jvm.properties", jdk["run"])
+        self.assertIn("jvmToolchain", jdk["run"])
+        names = [s.get("name", s.get("uses", "")) for s in self.validate["steps"]]
+        setups = [s for s in self.validate["steps"] if str(s.get("uses", "")).startswith("actions/setup-java")]
+        self.assertEqual(setups[0]["with"]["java-version"], "${{ steps.jdk.outputs.version }}")
+        self.assertLess(names.index(jdk["name"]), self.validate["steps"].index(setups[0]))
+
+    def report_env(self):
+        return self.step("validate", "Write the report")["env"]
+
+    def test_android_safety_gates_green(self):
+        android = next(s for s in self.validate["steps"] if s.get("id") == "android")
+        self.assertIn("tools/check_android_engine.py check", android["run"])
+        self.assertIn('--baseline-jars "$RUNNER_TEMP/old-libs"', android["run"])
+        self.assertTrue(android.get("continue-on-error"))
+        self.assertEqual(self.report_env()["ANDROID"], "${{ steps.android.outcome }}")
+        self.assertIn("env['ANDROID'] == 'success'", self.step("validate", "Write the report")["run"])
+        keep = self.step("validate", "Keep the shipped card data and engine jars for comparison")["run"]
+        self.assertIn('android/app/libs "$RUNNER_TEMP/old-libs"', keep)
+        names = [s.get("name") for s in self.validate["steps"]]
+        self.assertLess(names.index("Keep the shipped card data and engine jars for comparison"),
+                        names.index("Install the new engine into the app"))
+
+    def test_app_library_versions_follow_the_engine(self):
+        align = self.step("validate", "Raise the app's library versions to the engine's")
+        self.assertIn("check_android_engine.py align", align["run"])
+        names = [s.get("name") for s in self.validate["steps"]]
+        self.assertLess(names.index("Install the new engine into the app"), names.index(align["name"]))
+        self.assertLess(names.index(align["name"]), names.index("App test suite on the new engine"))
+        add = next(s for s in self.validate["steps"] if s.get("id") == "candidate")["run"]
+        allowed = self.step("publish", "Verify the candidate before using it")["run"].split("allowed =")[1].split(")")[0]
+        for path in ("android/build.gradle.kts", "android/app/build.gradle.kts", "android/custom-cards/build.gradle.kts"):
+            self.assertIn(path, add)
+            self.assertIn(f"'{path}'", allowed)
+        self.assertNotIn("'android/'", allowed)
+
+    def test_current_build_is_read_from_main_and_gates_green(self):
+        current = next(s for s in self.validate["steps"] if s.get("id") == "current")
+        self.assertIn("integration/policy.json", current["run"])
+        self.assertIn("MANDATORY", current["run"])
+        cards = next(s for s in self.validate["steps"] if s.get("id") == "currentcards")
+        self.assertEqual(cards["env"]["CURRENT_BRANCH"], "${{ steps.current.outputs.branch }}")
+        self.assertNotIn("b140", text(self.wf).lower())  # no hard-coded numbered build left
+        self.assertTrue(cards["run"].lstrip().startswith("set +e"), "a failing card must still be reported")
+        self.assertIn("git archive FETCH_HEAD android |", cards["run"])  # the build's own tree, not ours
+        self.assertIn('cp android/app/libs/argentum-*.jar "$d/android/app/libs/"', cards["run"])
+        self.assertIn('align --engine-versions argentum-engine/gradle/libs.versions.toml --android "$d/android"', cards["run"])
+        self.assertIn('weekly.py reconcile 4 --android "$d/android" --name currentreconcile', cards["run"])
+        report = self.step("validate", "Write the report")["run"]
+        self.assertIn("env['CURRENTCARDS'] == 'success'", report)
+        self.assertIn("synced,", report)
+        self.assertEqual(self.report_env()["SYNCED"], "${{ steps.current.outputs.synced }}")
+
+    def test_patches_retired_on_purpose_do_not_count_as_missing(self):
+        run = next(s for s in self.validate["steps"] if s.get("id") == "current")["run"]
+        self.assertIn("RETIRED = ", run)
+        self.assertIn("p not in base and p not in retired", run)
+
+    def test_engine_status_takes_only_fixed_keys_from_validate(self):
+        status = self.step("verdict", "Publish the engine status for Arcana Control")
+        self.assertIn("github.event_name != 'push'", status["if"])
+        self.assertIn("arcana-control-status-v1:engine", status["run"])
+        for key in ("FAILED", "BLOCKER", "UPSTREAM", "CURRENT_BRANCH"):
+            self.assertTrue(status["env"][key].startswith("${{ needs.validate.outputs."), key)
+            self.assertNotIn("${{", status["run"])  # validate's outputs reach the script only through env
+        self.assertTrue(status["run"].lstrip().startswith("set +e"), "status publishing must not turn a run red")
+        self.assertTrue(status["run"].rstrip().endswith("exit 0"))
+        self.assertIn("if k in plain", status["run"])  # unknown keys are dropped, never echoed
+        self.assertIn(r"[0-9]{4}-[a-z0-9-]+\.patch", status["run"])
+        self.assertIn("issues/78/comments", status["run"])
+        self.assertIn("gh issue comment 81", status["run"])
+        self.assertNotIn("@", status["run"].replace("=@$RUNNER_TEMP", "").replace("'@', '＠'", ""))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@
     weekly.py reconcile [ROUNDS]      custom cards Argentum now also has: keep every one, and choose per
                                       card which version is played (Argentum's if it passes Arcana's
                                       scenario tests for that card, else Arcana's, via custom-overrides.txt)
+              [--android DIR --name NAME --tests PATTERN]   the same in another Android tree (the current
+                                      build's, with the candidate engine swapped in); reports as NAME.*
     weekly.py summary  RESULTS_DIR    test totals from JUnit XML
 
 Conflicts are auto-resolved only where that is safe: CHANGELOG files (upstream wins) and resolutions
@@ -100,8 +102,18 @@ def engine_git(engine):
     return lambda *a, check=True: run("git", *a, cwd=engine, check=check)
 
 
+class PatchDoesNotApply(Exception):
+    """A patch in the series does not apply on the pinned upstream commit (it was made on another engine)."""
+
+    def __init__(self, name, output):
+        super().__init__(f"{name} does not apply on the pinned engine:\n{output}")
+        self.name, self.output = name, output
+        self.files = list(dict.fromkeys(re.findall(r"^error: (?:patch failed: )?([^:\s]+)(?::\d+)?(?:: patch does not apply)?$", output, re.M)))
+
+
 def prepare(engine, pin, mandatory):
-    """The series as commits on the pin (the strict audit proves it applies there), with rerere primed."""
+    """The series as commits on the pin (the strict audit proves it applies there), with rerere primed.
+    Raises PatchDoesNotApply naming the first patch that does not apply."""
     git = engine_git(engine)
     git("config", "user.name", "arcana-weekly-bot")
     git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
@@ -113,7 +125,9 @@ def prepare(engine, pin, mandatory):
         shutil.copytree(RERERE, cache, dirs_exist_ok=True)
     git("checkout", "-q", "-f", "-B", "arcana", pin)
     for name in mandatory:
-        git("apply", "--index", str(patch_file(name)))
+        applied = git("apply", "--index", str(patch_file(name)), check=False)
+        if applied.returncode:
+            raise PatchDoesNotApply(name, (applied.stdout + applied.stderr).strip())
         # Fixed dates: the date goes into each patch file's header, so a patch whose content did not
         # change comes out byte-identical instead of showing up as changed every week.
         run("git", "commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")], cwd=engine,
@@ -139,7 +153,10 @@ def rebase(engine_dir, target, *flags):
             write("rebase.json", report)
             print("Already on upstream", target)
             return 0
-        prepare(engine, pin, mandatory)  # proves the series applies; nothing to rewrite
+        try:
+            prepare(engine, pin, mandatory)  # proves the series applies; nothing to rewrite
+        except PatchDoesNotApply as e:
+            return report_unapplied(report, e)
         report.update(status="rebased", upstream_commits=0, auto_resolved=[],
                       patches=[{"patch": n, "status": "unchanged"} for n in mandatory],
                       engine_head=git("rev-parse", "HEAD").stdout.strip())
@@ -147,8 +164,17 @@ def rebase(engine_dir, target, *flags):
         write("auto-resolved.md", "")
         print(f"Validating this branch's {len(mandatory)} patches as-is on {target}")
         return 0
+    if pin_is_newer(git, target, pin):
+        # A one-day-behind target can be older than a pin a manual run moved forward: never step back.
+        report.update(status="up_to_date", note="the pinned upstream commit is already newer than the target")
+        write("rebase.json", report)
+        print(f"Pin {pin[:10]} is already newer than the target {target[:10]}; nothing to do")
+        return 0
     report["upstream_commits"] = int(git("rev-list", "--count", f"{pin}..{target}").stdout)
-    prepare(engine, pin, mandatory)
+    try:
+        prepare(engine, pin, mandatory)
+    except PatchDoesNotApply as e:
+        return report_unapplied(report, e)
     save_state(engine, pin=pin, target=target, mode="rebase")
 
     # Three-way rebase onto the new upstream, auto-resolving only the safe cases.
@@ -157,7 +183,10 @@ def rebase(engine_dir, target, *flags):
     rules = json.loads(RULES.read_text()) if RULES.is_file() else {}
     keep_deleted = {entry["path"]: entry for entry in rules.get("keep_deleted", [])}
     report["auto_resolved"] = []
-    step = git("rebase", target, check=False)
+    # After each replayed patch, drop imports the patch adds that upstream now has too (Kotlin rejects a
+    # duplicate import as ambiguous; 0035's TappedComponent/Keyword after upstream added them, 2026-11-02).
+    dedupe = f"{sys.executable} {Path(__file__).resolve()} dedupe-imports"
+    step = git("rebase", "--exec", dedupe, target, check=False)
     while step.returncode:
         unresolved = git("diff", "--name-only", "--diff-filter=U").stdout.split()
         for path in [p for p in unresolved if p.endswith("CHANGELOG.md")]:
@@ -197,6 +226,11 @@ def rebase(engine_dir, target, *flags):
     print(f"Rebased {len([p for p in report['patches'] if p['status'] == 'refreshed'])} patches onto {target} "
           f"({report['upstream_commits']} upstream commits)")
     return 0
+
+
+def pin_is_newer(git, target, pin):
+    """True when TARGET is an ancestor of the pin (an upgrade there would be a downgrade)."""
+    return target != pin and git("merge-base", "--is-ancestor", target, pin, check=False).returncode == 0
 
 
 def checkout(engine_dir):
@@ -283,6 +317,9 @@ def export_series(engine, target, mandatory, text, report):
     listing = "".join(f'    "{n}",\n' for n in kept)
     text = re.sub(r'^TARGET = "[0-9a-f]{40}"', f'TARGET = "{target}"', text, flags=re.M)
     text = re.sub(r"^MANDATORY = \[\n.*?^\]", "MANDATORY = [\n" + listing + "]", text, flags=re.M | re.S)
+    for name in mandatory:
+        if name not in kept:
+            text = add_retired(text, name, f"upstream has it as of {target[:10]}")
     AUDIT.write_text(text)
     config = json.loads(CONFIG.read_text())
     config["upstream"] = target
@@ -292,6 +329,54 @@ def export_series(engine, target, mandatory, text, report):
     write("rebase.json", report)
     write("auto-resolved.md", auto_resolved_markdown(report))
     return kept
+
+
+def add_retired(text, name, why):
+    """Record a patch that left the series in audit_patches.py's RETIRED (created if absent)."""
+    entry = f'    "{name}": "{why}",\n'
+    block = re.search(r"^RETIRED = \{\n(.*?)^\}\n", text, re.M | re.S)
+    if block is None:
+        mandatory = re.search(r"^MANDATORY = \[\n.*?^\]\n", text, re.M | re.S)
+        return text[:mandatory.end()] + "RETIRED = {\n" + entry + "}\n" + text[mandatory.end():]
+    if f'    "{name}":' in block[1]:
+        return text
+    return text[:block.end(1)] + entry + text[block.end(1):]
+
+
+DUPLICABLE = (".kt", ".kts", ".java")
+
+
+def dedupe_import_lines(text):
+    """Remove exact repeats of an `import …` line, keeping the first. Nothing else changes."""
+    seen, out, changed = set(), [], False
+    for line in text.splitlines(keepends=True):
+        key = line.strip()
+        if key.startswith("import ") and key in seen:
+            changed = True
+            continue
+        if key.startswith("import "):
+            seen.add(key)
+        out.append(line)
+    return "".join(out), changed
+
+
+def dedupe_imports():
+    """`git rebase --exec` hook, run in the engine checkout after each replayed patch commit: amend it
+    so the files it touched carry each import once."""
+    files = run("git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.split()
+    fixed = []
+    for name in files:
+        path = Path(name)
+        if path.suffix in DUPLICABLE and path.is_file():
+            text, changed = dedupe_import_lines(path.read_text())
+            if changed:
+                path.write_text(text)
+                fixed.append(name)
+    if fixed:
+        run("git", "add", "--", *fixed)
+        run("git", "commit", "-q", "--amend", "--no-edit", "--allow-empty")
+        print("Removed imports upstream already has from:", ", ".join(fixed))
+    return 0
 
 
 def auto_resolved_markdown(report):
@@ -306,9 +391,26 @@ def auto_resolved_markdown(report):
     return "\n".join(lines) + "\n"
 
 
+def report_unapplied(report, error):
+    """A patch that does not apply even on the pin is reported as a conflict naming it (exit 2), not a crash:
+    it was usually made on another engine (a numbered build's) and has to be re-fitted to this pin."""
+    report["status"] = "conflict"
+    report["conflicts"] = [{"patch": error.name, "file": f, "kind": "does_not_apply_on_pin", "diff": error.output[-5000:]}
+                           for f in (error.files or [""])]
+    write("rebase.json", report)
+    write("rebase.md", conflict_markdown(report))
+    print(f"{error.name} does not apply on the pinned engine {report['old_pin'][:10]}:\n{error.output}")
+    return 2
+
+
 def conflict_markdown(report):
-    lines = [f"Upstream `{report['target'][:10]}` is {report.get('upstream_commits', '?')} commits ahead of the pin "
-             f"`{report['old_pin'][:10]}`. A patch no longer merges on its own; see **Handoff** below.", ""]
+    if any(c.get("kind") == "does_not_apply_on_pin" for c in report["conflicts"]):
+        lines = [f"A patch does not apply even on the pinned engine `{report['old_pin'][:10]}`: it was made on a "
+                 "different engine (often a numbered build's). Re-fit it to the pin first, then the upgrade can run; "
+                 "see **Handoff** below.", ""]
+    else:
+        lines = [f"Upstream `{report['target'][:10]}` is {report.get('upstream_commits', '?')} commits ahead of the pin "
+                 f"`{report['old_pin'][:10]}`. A patch no longer merges on its own; see **Handoff** below.", ""]
     for conflict in report["conflicts"]:
         kind = conflict.get("kind", "content")
         lines += [f"### `{conflict['patch']}` → `{conflict['file']}` ({kind})", "", "```diff",
@@ -347,7 +449,9 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "the patched engine compiles and the strict audit passes"
     else:
-        start = "origin/bot/argentum-weekly"
+        # the base, not the bot branch: the bot commits its reconciled override file, which the
+        # clean-header test rejects on a fix branch; the dry run re-reconciles against the target
+        start = "origin/gpt/arcana-integration-next"
         steps = [f"git fetch origin && git checkout -b {fix} {start}",
                  "# custom-card collisions are reconciled automatically (weekly.py reconcile keeps every Arcana card",
                  "#   and picks the version in play from its scenario tests); never delete a custom card to fix a run.",
@@ -357,7 +461,7 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "every check in the table above is green"
     lines = ["### Handoff", "",
-             f"**Who:** engine fixes are Claude's lane; GPT finishes when Claude is unavailable (issue #81). Card "
+             f"**Who:** Goose (GPT) first, Claude if it is still blocked a day later (issue #81). Card "
              f"decisions are GPT's lane. Full runbook: `engine-upgrade/HANDOFF.md`.", "",
              f"**Done when:** {goal}, and the dry run on `{fix}` is green except for anything listed as a card "
              f"decision. Then open a draft PR from `{fix}` into `gpt/arcana-integration-next`, link this run, post on #81. "
@@ -636,11 +740,29 @@ def implicated(failing, candidates, identifiers):
     return hit
 
 
-def reconcile(rounds="4"):
+def use_android(root):
+    """Point the reconcile paths at another Android tree (a scratch copy of the current build)."""
+    global ANDROID, ASSETS, CARD_SOURCES, CUSTOM_TESTS, CUSTOM_RESULTS, OVERRIDES
+    ANDROID = Path(root).resolve()
+    ASSETS = ANDROID / "app/src/main/assets/argentum"
+    CARD_SOURCES = ANDROID / "custom-cards/src/main/kotlin/com/arcanatable/customcards/cards"
+    CUSTOM_TESTS = ANDROID / "custom-cards/src/test/kotlin"
+    CUSTOM_RESULTS = ANDROID / "custom-cards/build/test-results/test"
+    OVERRIDES = ASSETS / "custom-overrides.txt"
+
+
+def reconcile(rounds="4", *options):
     """Every Arcana custom card is kept. For each one Argentum now also has, Argentum's version is tried
     first: the card's scenario tests run against it (CardPool.inPlay). A card whose tests then fail
     keeps Arcana's version in play (custom-overrides.txt), and the suite is re-run to confirm. Each run
     starts from a clean list, so a card goes back to Argentum's version once that version passes."""
+    opts = dict(zip(options[::2], options[1::2]))
+    if set(opts) - {"--android", "--name", "--tests"} or len(options) % 2:
+        raise SystemExit(f"reconcile: unknown options {options}")
+    if "--android" in opts:
+        use_android(opts["--android"])
+    name = opts.get("--name", "reconcile")
+    tests = ["--tests", opts["--tests"]] if "--tests" in opts else []
     library = {n.lower() for n in names(ASSETS / "all-cards.index.tsv")}
     custom = names(ASSETS / "custom-cards.index.tsv")
     collisions = sorted(n for n in custom if n.lower() in library)
@@ -652,7 +774,7 @@ def reconcile(rounds="4"):
     for _ in range(int(rounds)):
         shutil.rmtree(CUSTOM_RESULTS, ignore_errors=True)
         result = run("./gradlew", "--no-daemon", "--max-workers=2", ":custom-cards:exportCards",
-                     ":custom-cards:test", "--rerun", cwd=ANDROID, check=False)
+                     ":custom-cards:test", *tests, "--rerun", cwd=ANDROID, check=False)
         log = (result.stdout + result.stderr)[-6000:]
         failing = failing_test_classes()
         if result.returncode == 0:
@@ -671,8 +793,8 @@ def reconcile(rounds="4"):
         "passed": passed,
         "failing_classes": sorted(c.split(".")[-1] for c in failing),
     }
-    write("reconcile.json", report)
-    write("reconcile.md", reconcile_markdown(report))
+    write(f"{name}.json", report)
+    write(f"{name}.md", reconcile_markdown(report))
     print(reconcile_markdown(report))
     if not passed:
         print(log)
@@ -726,5 +848,5 @@ def summary(results_dir):
 
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
-    sys.exit({"rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
+    sys.exit({"dedupe-imports": dedupe_imports, "rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
               "docs": docs, "cards": cards, "reconcile": reconcile, "summary": summary}[command](*args) or 0)

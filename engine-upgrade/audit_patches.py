@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "argentum-engine"
 PATCHES = ROOT / "argentum-patches"
 REPORT = ROOT / "engine-upgrade" / "patch-report.json"
-TARGET = "c1c04ca3265c61df913af6db65460ad4ce409614"
+TARGET = "173a09a2ed15763dce854e385b2df0d085e03975"
 MANDATORY = [
     "0001-android-regex.patch",
     "0002-engine-trial-build.patch",
@@ -26,7 +26,6 @@ MANDATORY = [
     "0005-last-known-negative-subtype.patch",
     "0006-ai-decision-deadline.patch",
     "0007-ai-bounded-stack-search.patch",
-    "0008-jvm-test-toolchain.patch",
     "0011-stack-object-copying.patch",
     "0012-colorless-hybrid-sdk.patch",
     "0013-colorless-hybrid-floating-payment.patch",
@@ -55,6 +54,11 @@ MANDATORY = [
     "0038-chosen-color-land-mana-bonus.patch",
     "0039-graveyard-lookback-granted-types.patch",
 ]
+# Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
+# numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.
+RETIRED = {
+    "0008-jvm-test-toolchain.patch": "folded into 0002-engine-trial-build.patch (2026-11-02)",
+}
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
 

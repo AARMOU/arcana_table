@@ -1,8 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0038-chosen-color-land-mana-bonus
+
+---
+ docs/card-sdk-language-reference.md           |  14 +-
+ docs/sdk-index.md                             |   2 +-
+ .../sdk/scripting/MiscStaticAbilities.kt      |  23 +-
+ .../ability/ActivatedManaAbilityResolver.kt   |   6 +-
+ .../ColorChoiceContinuationResumer.kt         |   6 +-
+ .../mana/ManaAbilityResolutionPipeline.kt     |  34 ++-
+ .../effects/mana/ScopedManaProduction.kt      |   1 +
+ .../engine/mechanics/mana/ManaSolver.kt       |  36 ++-
+ .../mana/ChosenColorLandManaBonusTest.kt      | 242 ++++++++++++++++++
+ 9 files changed, 354 insertions(+), 10 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 7099656bd0..291ec71896 100644
+index 70c2a753c5..5aadedab0c 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -12601,7 +12601,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -12977,7 +12977,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `{S}` spent. When auto-pay taps a snow land for a `{S}` pip, it also spends that land's any-color
    snow-aura bonus on a further `{S}` pip (a fixed-color bonus floats instead). (Elvish Guidance = fixed `{G}`; **Fertile
    Ground** = `anyColor`; **Glittering Frost** = `anyColor` + `GrantSupertype("SNOW")` on a snow Aura)
@@ -11,7 +30,7 @@ index 7099656bd0..291ec71896 100644
    a `<sourceFilter>` is tapped for mana, that player adds …". `color = null` mirrors the produced color.
    `rider` is an optional non-mana `Effect` resolved inline, controlled by the tapping player
    (`EffectTarget.Controller` = tapper, `EffectTarget.Self` = the static's source). (Lavaleaper = basic-land
-@@ -12616,6 +12616,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -12992,6 +12992,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    Oblivion** = `GameObjectFilter.Land.youControl()`, `color = null`, `whenProducing = COLORLESS`. Gated
    on all three mana paths (manual tap, color-choice-resume mirror, and the auto-pay `ManaSolver`, whose
    colorless bonus floats as a colorless `BonusManaEntry`).
@@ -31,12 +50,12 @@ index 7099656bd0..291ec71896 100644
    produces `<multiplier>` times as much of that mana instead." The **multiplicative** sibling of
    `AdditionalManaOnSourceTap`, sharing its filter convention (the filter is evaluated from the static's own
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index c052a1e9d6..7774adaeb9 100644
+index de3af7ceb6..297dabfb29 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1831,7 +1831,7 @@ Families:
- - `AdditionalDungeonRoomTriggers` — Room abilities of dungeons you own trigger an additional time (CR 603.2d, 309.4c) — Hama Pashar, Ruin Seeker.
+@@ -1847,7 +1847,7 @@ Families:
  - `AdditionalETBOrLTBTriggers(filter: GameObjectFilter, mustBeYouControl: Boolean, directions: Set<BattlefieldDirection>, description: String)` — When a permanent matching filter crosses the battlefield boundary in one of directions, triggered abilities of permanents controlled by this ability's controller that fired from that event trigger…
+ - `AdditionalLifeGainTriggers` — If you gaining life causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time (CR 603.2d) — Dr.
  - `AdditionalManaForEntryCounters(spellFilter: GameObjectFilter, counterType: CounterType)` — "As an additional cost to cast spellFilter spells, you may pay any amount of mana.
 -- `AdditionalManaOnSourceTap(sourceFilter: GameObjectFilter, color: Color?, amount: DynamicAmount, rider: Effect?, whenProducing: TappedForManaType)` — Whenever a permanent matching sourceFilter is tapped for mana, the tapping player adds amount additional mana to their pool.
 +- `AdditionalManaOnSourceTap(sourceFilter: GameObjectFilter, color: Color?, amount: DynamicAmount, rider: Effect?, whenProducing: TappedForManaType, anyManaAbility: Boolean, onlyWhenYouAdd: Boolean)` — Whenever a permanent matching sourceFilter is tapped for mana, the tapping player adds amount additional mana to their pool.
@@ -44,7 +63,7 @@ index c052a1e9d6..7774adaeb9 100644
  - `AdditionalSourceTriggers(sourceFilter: GameObjectFilter, excludeSelf: Boolean, alsoSource: Boolean, condition: Condition?, description: String)` — If a triggered ability of a permanent matching sourceFilter you control triggers, it triggers an additional time.
  - `AnimateLandGroup(filter: GroupFilter, power: Int, toughness: Int, creatureSubtypes: List<String>, colors: Set<Color>)` — Animates a group of lands into creatures while keeping them as lands.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
-index e4b037bae7..bc405d9e77 100644
+index be46a651f7..57d5d2d191 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
 @@ -325,7 +325,14 @@ data class OverrideEnchantedLandManaColor(
@@ -139,7 +158,7 @@ index 034dc01faa..bed42ef33c 100644
              tracked,
              sourceId, sourceCard, tapperId, producedMana, events,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
-index c90a4d6afa..a8604ea896 100644
+index 412ca98c84..4b22a290a1 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
 @@ -127,7 +127,7 @@ class ManaAbilityResolutionPipeline(
@@ -239,10 +258,10 @@ index 0091bd548c..2846587f3f 100644
      else ExecutionResult.success(tracked, visible)
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 0acc0e501e..0992cd8ff8 100644
+index 9ab971c641..7500207deb 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-@@ -2576,9 +2576,11 @@ class ManaSolver private constructor(
+@@ -2663,9 +2663,11 @@ class ManaSolver private constructor(
          var totalBonus = 0
          var bonusColor: Color? = null
          var totalColorlessBonus = 0
@@ -254,7 +273,7 @@ index 0acc0e501e..0992cd8ff8 100644
  
              // Gate on the produced-mana type. At solve time the produced type is inferred from
              // what the source can supply: COLORLESS applies only to a source that produces {C},
-@@ -2587,6 +2589,7 @@ class ManaSolver private constructor(
+@@ -2674,6 +2676,7 @@ class ManaSolver private constructor(
                  TappedForManaType.ANY -> {}
                  TappedForManaType.COLORLESS -> if (!source.producesColorless) continue
                  TappedForManaType.COLORED -> if (source.producesColors.isEmpty()) continue
@@ -262,7 +281,7 @@ index 0acc0e501e..0992cd8ff8 100644
              }
  
              // Filter from the static-ability controller's perspective — see
-@@ -2608,6 +2611,29 @@ class ManaSolver private constructor(
+@@ -2695,6 +2698,29 @@ class ManaSolver private constructor(
              val amount = dynamicAmountEvaluator.evaluate(state, onSourceTap.amount, effectContext)
              if (amount <= 0) continue
  
@@ -292,7 +311,7 @@ index 0acc0e501e..0992cd8ff8 100644
              // A colorless bonus arises when the ability adds {C}: either it's explicitly gated to
              // colorless taps, or it's a mirror (color = null) over a colorless-only source.
              val isColorlessBonus = onSourceTap.color == null &&
-@@ -2623,7 +2649,7 @@ class ManaSolver private constructor(
+@@ -2710,7 +2736,7 @@ class ManaSolver private constructor(
              bonusColor = bonusColor ?: resolvedColor
          }
  
@@ -301,7 +320,7 @@ index 0acc0e501e..0992cd8ff8 100644
              source.copy(
                  bonusManaPerTap = source.bonusManaPerTap + totalBonus,
                  bonusManaColor = source.bonusManaColor ?: bonusColor,
-@@ -2632,6 +2658,14 @@ class ManaSolver private constructor(
+@@ -2719,6 +2745,14 @@ class ManaSolver private constructor(
          } else {
              source
          }

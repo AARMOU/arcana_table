@@ -1,8 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0028-base-power-toughness-at-most
+
+---
+ docs/card-sdk-language-reference.md           |   6 +
+ docs/sdk-index.md                             |   2 +
+ .../filters/unified/ObjectFilterBuilder.kt    |  14 ++
+ .../sdk/scripting/predicates/CardPredicate.kt |  19 +++
+ .../test/resources/sdk-surface-baseline.txt   |   2 +
+ .../engine/event/TriggerMatcher.kt            |  10 ++
+ .../engine/handlers/PredicateEvaluator.kt     |  12 ++
+ .../actions/spell/CastZoneResolver.kt         |   2 +
+ .../mechanics/layers/AffectsFilterResolver.kt |   2 +
+ .../engine/mechanics/mana/CostCalculator.kt   |   2 +
+ .../BasePowerOrToughnessAtMostTest.kt         | 141 ++++++++++++++++++
+ 11 files changed, 212 insertions(+)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 34f1a058..276ffc5f 100644
+index 7f6e6cb2e4..75c683f9a6 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -7243,6 +7243,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
+@@ -7401,6 +7401,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
    P/T (as `.powerGreaterThanBase()` does); elsewhere it reads the printed value. Rapid Augmenter ("another creature you
    control with base power 1 enters"), Sword of the Squeak ("for each creature you control with base power or
    toughness 1"). `.powerGreaterThanBase()` above compares current power against this same base.
@@ -16,10 +37,10 @@ index 34f1a058..276ffc5f 100644
    entity. Reads the live `SpellOnStackComponent` buckets while the entity is still a spell, or the
    `CastRecordComponent` snapshot once it has resolved onto the battlefield (0 if it was never cast).
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index f1ccac8a..ce6415ff 100644
+index abf4eee468..d779ed6e6c 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -175,7 +175,9 @@ Families:
+@@ -178,7 +178,9 @@ Families:
  
  - `CardPredicate.AbilitySourceMatches(subfilter: GameObjectFilter)` — Matches an **activated or triggered ability on the stack** whose *source* (CR 113.7 — the object that generated it) matches subfilter.
  - `CardPredicate.And(predicates: List<CardPredicate>)`
@@ -30,7 +51,7 @@ index f1ccac8a..ce6415ff 100644
  - `CardPredicate.CardTypeEqualsChosen(variableName: String)` — Matches cards with a **card type** equal to a card type chosen earlier in the pipeline and stored in `chosenValuesvariableName` (via com.wingedsheep.sdk.scripting.effects.OptionType.CARD_TYPE).
  - `CardPredicate.CardTypeEqualsChosenComponent(slot: ChoiceSlot)` — Matches cards whose **card type** equals a card type **durably chosen by the source permanent** as it entered — read from that permanent's com.wingedsheep.engine.state.components.battlefield.CastCh…
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
-index 88de4209..16919b60 100644
+index 0d49895f63..c0a4826c5a 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
 @@ -332,6 +332,20 @@ interface ObjectFilterBuilder<out Self> {
@@ -55,7 +76,7 @@ index 88de4209..16919b60 100644
      fun compareNumericProperty(
          property: CardNumericProperty,
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
-index 6518c850..1703ed5a 100644
+index 6518c8509e..1703ed5ab1 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
 @@ -783,6 +783,25 @@ sealed interface CardPredicate : TextReplaceable<CardPredicate> {
@@ -85,7 +106,7 @@ index 6518c850..1703ed5a 100644
      @Serializable
      data class PowerAtMost(val max: Int) : CardPredicate {
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index d05f5d2e..425b22e2 100644
+index 45afd44bb6..4bba517601 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -81,7 +81,9 @@ CardMeasure.DistinctCardTypes — CardMeasure
@@ -99,10 +120,10 @@ index d05f5d2e..425b22e2 100644
  CardPredicate.CardTypeEqualsChosen — CardPredicate
  CardPredicate.CardTypeEqualsChosenComponent — CardPredicate
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index dd68d1a1..53c588f3 100644
+index 7546c84ed7..1ecf9332d7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-@@ -1923,6 +1923,16 @@ class TriggerMatcher(
+@@ -1996,6 +1996,16 @@ class TriggerMatcher(
                      else lastKnownBaseToughness ?: projected.getBaseToughness(entityId) ?: unprojectedStat(isPower = false)
                  baseToughness == predicate.value
              }
@@ -120,10 +141,10 @@ index dd68d1a1..53c588f3 100644
                  // Self-relative: last-known/projected power at event time vs the object's own
                  // effective (layer-7b) base power, printed base once it has no projection entry.
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
-index 0fac8b9a..6f384fb3 100644
+index 816e869f4e..e7751203df 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
-@@ -565,6 +565,8 @@ class PredicateEvaluator(
+@@ -604,6 +604,8 @@ class PredicateEvaluator(
              is CardPredicate.PowerAtMostDynamic,
              is CardPredicate.BasePowerEquals,
              is CardPredicate.BaseToughnessEquals,
@@ -132,7 +153,7 @@ index 0fac8b9a..6f384fb3 100644
              is CardPredicate.PowerGreaterThanEntity,
              is CardPredicate.PowerLessThanEntity,
              is CardPredicate.CompareNumericProperty,
-@@ -1150,6 +1152,14 @@ class PredicateEvaluator(
+@@ -1198,6 +1200,14 @@ class PredicateEvaluator(
                  val baseToughness = projectedValues?.baseToughness ?: amounts.offBattlefieldStat(state, entityId, isPower = false, projected)
                  baseToughness == predicate.value
              }
@@ -147,7 +168,7 @@ index 0fac8b9a..6f384fb3 100644
  
              // Power/toughness predicates - use projected P/T
              is CardPredicate.PowerEquals -> {
-@@ -2918,6 +2928,8 @@ class PredicateEvaluator(
+@@ -2974,6 +2984,8 @@ class PredicateEvaluator(
              CardPredicate.PowerGreaterThanBase,
              is CardPredicate.BasePowerEquals,
              is CardPredicate.BaseToughnessEquals,
@@ -157,10 +178,10 @@ index 0fac8b9a..6f384fb3 100644
  
              // Name predicates — matched against the record's card name; a record without a
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
-index 11331b8b..5a01a580 100644
+index 1f902beb72..c75c730226 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
-@@ -1270,6 +1270,8 @@ class CastZoneResolver(
+@@ -1330,6 +1330,8 @@ class CastZoneResolver(
                  // A card in a zone has no projection, so its base P/T is its printed P/T.
                  is CardPredicate.BasePowerEquals -> power == predicate.value
                  is CardPredicate.BaseToughnessEquals -> toughness == predicate.value
@@ -170,10 +191,10 @@ index 11331b8b..5a01a580 100644
                  is CardPredicate.PowerAtLeast -> power != null && power >= predicate.min
                  is CardPredicate.ToughnessEquals -> toughness == predicate.value
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
-index 53904283..e5cd6b4d 100644
+index 32d84b7750..d5c5796062 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
-@@ -1071,6 +1071,8 @@ internal class AffectsFilterResolver(
+@@ -1098,6 +1098,8 @@ internal class AffectsFilterResolver(
          // falls back to the printed value, which is what a base P/T is before 7a/7b apply.
          is CardPredicate.BasePowerEquals -> (projected?.basePower ?: card.baseStats?.basePower) == predicate.value
          is CardPredicate.BaseToughnessEquals -> (projected?.baseToughness ?: card.baseStats?.baseToughness) == predicate.value
@@ -183,10 +204,10 @@ index 53904283..e5cd6b4d 100644
          is CardPredicate.ToughnessAtLeast -> (projected?.toughness ?: card.baseStats?.baseToughness ?: 0) >= predicate.min
          is CardPredicate.ToughnessEquals -> (projected?.toughness ?: card.baseStats?.baseToughness) == predicate.value
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-index ff4e518e..825c5ca0 100644
+index a7880bfb8a..0bf4a05cc0 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-@@ -1976,6 +1976,8 @@ class CostCalculator(
+@@ -1958,6 +1958,8 @@ class CostCalculator(
              is CardPredicate.PowerEquals -> cardDef.creatureStats?.basePower == predicate.value
              is CardPredicate.BasePowerEquals -> cardDef.creatureStats?.basePower == predicate.value
              is CardPredicate.BaseToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
@@ -197,7 +218,7 @@ index ff4e518e..825c5ca0 100644
              is CardPredicate.ToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
 new file mode 100644
-index 00000000..10283a36
+index 0000000000..10283a3695
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
 @@ -0,0 +1,141 @@

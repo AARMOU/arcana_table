@@ -12,15 +12,17 @@ Subject: [PATCH] arcana: 0006-ai-decision-deadline
  4 files changed, 46 insertions(+), 15 deletions(-)
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index 1c45f9f1f5..1364f49de4 100644
+index bad56b5518..66d6743d11 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-@@ -70,11 +70,12 @@ class AIPlayer(
+@@ -84,13 +84,14 @@ class AIPlayer(
       * ~20-30 windows it crosses.
       */
      fun chooseAction(state: GameState): GameAction {
 +        val decisionStartedNanos = System.nanoTime()
-         if (useMeaningfulFilter && MeaningfulActionFilter.canAutoPassWithoutEnumerating(state, playerId)) {
+         if (useMeaningfulFilter && MeaningfulActionFilter.canAutoPassWithoutEnumerating(state, playerId) &&
+             !wantsWindowItWouldAutoPass(state)
+         ) {
              return PassPriority(playerId)
          }
          val legalActions = simulator.getLegalActions(state, playerId)
@@ -30,10 +32,10 @@ index 1c45f9f1f5..1364f49de4 100644
  
      /**
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index 58855ab078..c58920f169 100644
+index 6445a30a46..5d2caa89b6 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-@@ -302,7 +302,8 @@ class Strategist(
+@@ -351,7 +351,8 @@ class Strategist(
      fun chooseAction(
          state: GameState,
          legalActions: List<LegalAction>,
@@ -43,7 +45,7 @@ index 58855ab078..c58920f169 100644
      ): LegalAction {
          val startNanos = if (insightSink != null) System.nanoTime() else 0L
          val forcedPlay = state.pendingDecision is com.wingedsheep.engine.core.PlayCardDecision
-@@ -312,7 +313,9 @@ class Strategist(
+@@ -361,7 +362,9 @@ class Strategist(
          // returns a single DeclareAttackers/DeclareBlockers with an empty default map).
          val combatAction = legalActions.find { it.actionType == "DeclareAttackers" || it.actionType == "DeclareBlockers" }
          if (combatAction != null) {
@@ -54,7 +56,7 @@ index 58855ab078..c58920f169 100644
              return handleCombatDeclaration(evaluationState, combatAction, playerId, budget, startNanos)
          }
  
-@@ -329,7 +332,10 @@ class Strategist(
+@@ -378,7 +381,10 @@ class Strategist(
              } else {
                  single
              }
@@ -66,7 +68,7 @@ index 58855ab078..c58920f169 100644
          }
  
          val pass = legalActions.find { it.actionType == "PassPriority" }
-@@ -346,7 +352,10 @@ class Strategist(
+@@ -395,7 +401,10 @@ class Strategist(
  
          if (affordable.isEmpty()) return pass ?: legalActions.first()
  
@@ -78,7 +80,7 @@ index 58855ab078..c58920f169 100644
          val here = StateProgress.digest(evaluationState)
  
          // ── Pass 1: one simulation per candidate, to the quiet state it leads to ──
-@@ -378,6 +387,7 @@ class Strategist(
+@@ -427,6 +436,7 @@ class Strategist(
              }
          }
          for (action in affordable) {
@@ -86,7 +88,7 @@ index 58855ab078..c58920f169 100644
              searched++
              val (materialized, materializedSimulation) = materialize(evaluationState, action, playerId, budget, here)
              // Only on failure, so a cast auto-pay can cover costs nothing extra.
-@@ -1704,7 +1714,7 @@ class Strategist(
+@@ -1923,7 +1933,7 @@ class Strategist(
          if (TargetSelection.targetsAlreadyFilled(baseAction) != false) {
              return withSumGatedExilePayment(state, action, baseAction)
          }
@@ -94,8 +96,8 @@ index 58855ab078..c58920f169 100644
 +        if (budget.expired() || (!budget.allowances.refineTargetsBySimulation && !forceTargetRefinement)) {
              return heuristicTargets(state, action, playerId)
          }
-         val targetInfos = TargetSelection.fillableRequirements(action, useMeaningfulFilter)
-@@ -1752,16 +1762,18 @@ class Strategist(
+         if (action.modalEnumeration != null) {
+@@ -1978,9 +1988,8 @@ class Strategist(
              if (forceTargetRefinement) maxOf(budget.allowances.targetCandidates, RESCUE_TARGET_CANDIDATES)
              else budget.allowances.targetCandidates
          for (i in targetInfos.indices) {
@@ -106,9 +108,10 @@ index 58855ab078..c58920f169 100644
 +            if (budget.expired()) break
              val info = targetInfos[i]
              val priorIds = chosenTargetIds.take(i).toSet()
-             val candidates = worth(i, info.validTargets.filterNot { info.mustDifferFromEarlier && it in priorIds })
-                 .sortedByDescending(rankTarget)
-                 .take(targetCandidates)
+             val ranked = worth(i, info.validTargets.filterNot { info.mustDifferFromEarlier && it in priorIds })
+@@ -1991,7 +2000,10 @@ class Strategist(
+                 ranked.take(targetCandidates)
+             }
              if (candidates.size <= 1) continue
 -            val best = candidates.maxByOrNull { candidate ->
 +            var best: EntityId? = null
@@ -117,8 +120,8 @@ index 58855ab078..c58920f169 100644
 +                if (budget.expired()) break
                  val trial = chosenTargets.toMutableList()
                  trial[i] = TargetSelection.toChosenTarget(state, info, candidate, playerId)
-                 val result = simulator.simulate(state, TargetSelection.applyTargets(baseAction, trial))
-@@ -1770,7 +1782,7 @@ class Strategist(
+                 val trialAction = TargetSelection.applyTargets(baseAction, trial)
+@@ -2001,7 +2013,7 @@ class Strategist(
                  // below every real option, so `chooseAction` only ever drops the whole ability as
                  // inert when *no* target does anything. A target whose simulation never finished
                  // ranks there too, for the same reason: we cannot say what it does.
@@ -127,8 +130,8 @@ index 58855ab078..c58920f169 100644
                      if (StateProgress.digest(leaf) == here) {
                          Double.NEGATIVE_INFINITY
                      } else {
-@@ -1778,9 +1790,14 @@ class Strategist(
-                         if (recastBouncedPermanents) maxOf(direct, bestReplayOfBounced(state, leaf, playerId)) else direct
+@@ -2018,9 +2030,14 @@ class Strategist(
+                         else if (recastBouncedPermanents) maxOf(direct, bestReplayOfBounced(state, leaf, playerId)) else direct
                      }
                  }
 -            } ?: continue
@@ -144,8 +147,8 @@ index 58855ab078..c58920f169 100644
 +            chosenTargetIds[i] = selected
          }
          // A lone optional slot ("up to one target creature") is a choice that includes *none*. When
-         // the effect's side of the table can't be read, ask the simulation whether the best target
-@@ -1795,7 +1812,7 @@ class Strategist(
+         // the effect is flexible or unread, ask the simulation whether the best target
+@@ -2035,7 +2052,7 @@ class Strategist(
                      .scoreOrRankLast { leaf -> evaluator.evaluate(leaf, leaf.projectedState, playerId) }
              }
              val skip = score(emptyList())

@@ -1,8 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0037-static-attacking-chosen-player
+
+---
+ docs/card-sdk-language-reference.md           |  12 +-
+ .../scripting/predicates/StatePredicate.kt    |   5 +
+ .../mechanics/layers/AffectsFilterResolver.kt |  28 +++-
+ .../layers/AttackingChosenPlayerStaticTest.kt | 137 ++++++++++++++++++
+ 4 files changed, 177 insertions(+), 5 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/AttackingChosenPlayerStaticTest.kt
+
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 7099656bd0..6807dead3c 100644
+index d878322fff..70c2a753c5 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -7828,8 +7828,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
+@@ -7987,8 +7987,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
    `attackingDefenderOf(reference)`, which takes the whole defending side. Pairs with
    `Triggers.you.attacksAPlayer()`: Echoing Assault's "target nontoken creature that's attacking that
    player" is `TargetFilter(GameObjectFilter.Creature.nontoken().attackingPlayer(EffectTarget.PlayerRef(Player.TriggeringPlayer)))`.
@@ -22,7 +36,7 @@ index 7099656bd0..6807dead3c 100644
    filtering ability's **source Aura is attached to** (CR 303 enchant player). The attachment-scoped third
    of the trio above: `IsAttackingAnOpponent` and `IsAttackingYouOrYourPlaneswalkers` both scope the
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
-index 9386e4f422..c3913e897f 100644
+index 37b2d8fd15..204d8a3cfc 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/StatePredicate.kt
 @@ -246,6 +246,11 @@ sealed interface StatePredicate {
@@ -38,7 +52,7 @@ index 9386e4f422..c3913e897f 100644
       * resolves to nothing.
       */
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
-index e5cd6b4d5f..f776474aa1 100644
+index d5c5796062..98581c5f0b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
 @@ -1,6 +1,8 @@
@@ -50,7 +64,7 @@ index e5cd6b4d5f..f776474aa1 100644
  import com.wingedsheep.engine.state.components.battlefield.chosenSubtype
  import com.wingedsheep.engine.state.components.battlefield.CastChoicesComponent
  import com.wingedsheep.engine.state.components.battlefield.chosenCreatureOf
-@@ -532,9 +534,29 @@ internal class AffectsFilterResolver(
+@@ -556,9 +558,29 @@ internal class AffectsFilterResolver(
              }
              player != null && defendingPlayer != null && player in state.sharedTurnTeam(defendingPlayer)
          }

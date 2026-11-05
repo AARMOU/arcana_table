@@ -1,8 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0017-colorless-eldrazi-source-mana
+
+---
+ docs/sdk-index.md                                |  1 +
+ .../sdk/scripting/effects/ManaRestriction.kt     | 16 ++++++++++++++++
+ .../src/test/resources/sdk-surface-baseline.txt  |  1 +
+ .../mana/AbilityPaymentContextBuilder.kt         |  7 +++++++
+ .../engine/mechanics/mana/ManaPool.kt            | 10 ++++++++++
+ 5 files changed, 35 insertions(+)
+
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 0d3fbf694..02cde100d 100644
+index b87eb70e14..b632bbb425 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1413,6 +1413,7 @@ Families:
+@@ -1423,6 +1423,7 @@ Families:
  - `ManaRestriction.ClassLevelUpOnly` — "Spend this mana only to … gain a Class level." Satisfied only by paying the cost of a Class's level-up ability (CR 716.2c: "to gain a Class level" means to activate an ability indicated by a class…
  - `ManaRestriction.ColoredSpellsOnly(withoutXInCost: Boolean)` — "Spend this mana only to cast a spell that's one or more colors" — the complement of ColorlessSpellsOnly: a spell with at least one color (CR 105.2), read off the spell being cast, so a hybrid or d…
  - `ManaRestriction.ColorlessSpellsOnly` — "Spend this mana only to cast colorless spells." A spell is colorless when its colors are empty (CR 105.2c) — a devoid spell, an artifact with no colored symbols, and a face-down spell (CR 708.2) a…
@@ -11,7 +25,7 @@ index 0d3fbf694..02cde100d 100644
  - `ManaRestriction.CreatureSpellsOnly` — "Spend this mana only to cast creature spells."
  - `ManaRestriction.DisturbCostOnly` — "Spend this mana only to pay a disturb cost." Satisfied only by casting a spell for its disturb alternative cost (CR 702.146a — cast transformed from the graveyard).
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
-index bff352a19..06055b8c3 100644
+index bff352a196..06055b8c38 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
 @@ -111,6 +111,22 @@ sealed interface ManaRestriction {
@@ -38,10 +52,10 @@ index bff352a19..06055b8c3 100644
       * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
       * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index d535ae55e..bf0eb74bc 100644
+index 40e85b0f32..e4c2a56c51 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1728,6 +1728,7 @@ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, Prev
+@@ -1737,6 +1737,7 @@ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, Prev
  ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaColorSet.Union, ManaColorSet.SourceChosenColor — Union only adds pools and has no subtraction; SourceChosenColor reads a color stored on the source permanent, while "any other color" reads the choice made earlier in the same resolution and removes it from a base pool
  ManaRestriction.CannotPayGenericCosts — ManaRestriction — Jegantha, the Wellspring — ManaRestriction.CannotCastSpellsFromHand, ManaRestriction.CannotCastSpellsOtherThan — every other restriction answers "may this payment spend the mana" through isSatisfiedBy; this one admits every payment and refuses a symbol (generic {N}/{X}, CR 107.4b), which no payment-context axis can express, and the negative pair are shipped data shapes about the spell being cast
  ManaRestriction.ClassLevelUpOnly — ManaRestriction — Sorcerer Class — ManaRestriction.EquipAbilityActivationOnly, ManaRestriction.AbilityActivationOnly — a Class level-up is one activated ability among the others its source's levels grant, so neither the any-ability atom nor a source type/subtype test can separate it; EquipAbilityActivationOnly is the same narrowing for a different spend context, and both are shipped data objects on the wire
@@ -50,7 +64,7 @@ index d535ae55e..bf0eb74bc 100644
  ManaRestriction.OfChosenType — ManaRestriction — The Ringhart Crest (Kolvori, God of Kinship) — ManaRestriction.SubtypeSpellsOrAbilitiesOnly, ManaRestriction.SubtypeSpellsOnly — both carry a fixed subtype baked into the pool entry; "the chosen type" is unknown until the producing source is known, and a sentinel subtype string would collide with a printed one, so this is the unbound template the engine binds to SubtypeSpellsOrAbilitiesOnly as the mana is made (it subsumes the deleted AddAnyColorManaSpendOnChosenTypeEffect)
  ManaRestriction.SpellsWithKeywordOnly — ManaRestriction — Niko Defies Destiny — ManaRestriction.KickedSpellsOnly, ManaRestriction.SubtypeSpellsOnly — KickedSpellsOnly asks whether the kicker cost was paid, not whether the card has a keyword; SubtypeSpellsOnly reads type-line subtypes, and a keyword is not a subtype
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
-index fe94c1faa..befb346ca 100644
+index fe94c1faa3..befb346ca1 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 @@ -42,6 +42,13 @@ internal fun buildAbilityPaymentContext(
@@ -68,7 +82,7 @@ index fe94c1faa..befb346ca 100644
          subtypes = subtypes,
          isEquipAbilityActivation = ability?.isEquipAbility == true,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index efdc2b31e..49fbcf4c4 100644
+index 19937b09ac..c931b0aa39 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -59,6 +59,12 @@ data class SpellPaymentContext(

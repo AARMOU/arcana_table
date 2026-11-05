@@ -1,5 +1,17 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0018-devoid-after-temple
+
+---
+ .../wingedsheep/sdk/scripting/effects/ManaRestriction.kt   | 7 +++++++
+ .../com/wingedsheep/engine/mechanics/mana/ManaPool.kt      | 3 +++
+ .../wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt   | 1 +
+ 3 files changed, 11 insertions(+)
+
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
-index 06055b8c3..5a09d2570 100644
+index 06055b8c38..5a09d2570f 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
 @@ -127,6 +127,13 @@ sealed interface ManaRestriction {
@@ -17,7 +29,7 @@ index 06055b8c3..5a09d2570 100644
       * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
       * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index 49fbcf4c4..155a9aa78 100644
+index c931b0aa39..a672dd909d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -43,6 +43,8 @@ data class SpellPaymentContext(
@@ -38,7 +50,7 @@ index 49fbcf4c4..155a9aa78 100644
      is ManaRestriction.CostsContainingXOnly -> (context.isSpellCast || context.isAbilityActivation) && context.hasXInCost
      is ManaRestriction.SubtypeSpellsOrAbilitiesOnly ->
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
-index a0dad3f94..cdb786a21 100644
+index a0dad3f949..cdb786a212 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/PaymentSubtypes.kt
 @@ -50,6 +50,7 @@ internal fun spellPaymentContextFor(
