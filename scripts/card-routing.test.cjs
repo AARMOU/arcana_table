@@ -113,8 +113,11 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   const held = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360 }]);
   assert.equal(held.suggestion, undefined);
   assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 360 }]);
-  const lifted = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360,
+  const labeledOnly = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360,
     labels: [{ name: Q.RETRY_CAP_LIFT_LABEL }] }]);
+  assert.equal(labeledOnly.suggestion, undefined, 'label alone is not owner approval');
+  const lifted = Q.chooseAutoQueue({ ...p, authorizedCapLiftIssues: new Set([360]) }, [],
+    [closedBot, { ...closedBot, number: 360, labels: [{ name: Q.RETRY_CAP_LIFT_LABEL }] }]);
   assert.equal(lifted.suggestion.name, 'Celestine, the Living Saint');
   assert.equal(lifted.capLiftIssue, 360);
   // An outsider's closed lookalike cannot block a card.
