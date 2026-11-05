@@ -38,10 +38,15 @@ test('valid owner marker produces an exact-head review request, not a paid actio
   assert.doesNotMatch(h.made[0].body, /@copilot|approved to merge/);
 });
 test('existing matching receipt causes no duplicate write or extra PR query', async () => {
-  const h = mock([valid(), valid(933, HEAD, 7)], [{ body: marker(933, HEAD) + '\nDelivered' }]);
+  const h = mock([valid(), valid(933, HEAD, 7)], [{ body: marker(933, HEAD) + '\nDelivered', user: { login: owner }, author_association: 'OWNER' }]);
   assert.equal((await run(h)).sent, 0);
   assert.equal(h.made.length, 0);
   assert.equal(h.gets.length, 0);
+});
+test('forged receipt from unrelated account cannot suppress legitimate request', async () => {
+  const h = mock([valid()], [{ body: marker(933, HEAD) + '\\nForged', user: { login: 'outsider' }, author_association: 'CONTRIBUTOR' }]);
+  assert.equal((await run(h)).sent, 1);
+  assert.equal(h.made.length, 1);
 });
 test('stale head, closed PR, or wrong repository is never relayed', async () => {
   for (const opts of [{ sha: 'b'.repeat(40) }, { state: 'closed' }, { fullName: 'other/repo' }]) {
