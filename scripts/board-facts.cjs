@@ -1,8 +1,8 @@
 'use strict';
-// Live facts block on the orders board (#883), refreshed by the review-inbox refresh (every ~15-30 min), so
-// the board no longer depends on someone remembering to edit it (owner, 2026-11-03: "the board has been
-// lagging behind"). Only the text between the two markers is ever touched; agents keep editing the rest.
-// Facts only, read from GitHub itself: nothing here is anyone's claim. Edits notify nobody.
+// Live GitHub status is published to one bot-owned comment on the protected orders board (#883).
+// Keep the owner's issue body/decisions untouched: GitHub issue-body updates are not atomic.
+// The comment carries an independent checkedAt heartbeat plus links to worker inbox evidence.
+// Inbox snippets are reports, not proof that a worker is currently executing.
 const START = '<!-- board-facts:start -->';
 const END = '<!-- board-facts:end -->';
 const ENGINE_MARKER = '<!-- arcana-control-status-v1:engine -->';
