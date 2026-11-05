@@ -126,71 +126,91 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
 });
 
-test('feeder labels a capped card and publishes it on the owner board in the same pass', async () => {
+test('feeder posts a hard-card handoff comment without editing the owner board body', async () => {
   const name = 'Celestine, the Living Saint';
   const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT, title: '[Arcana Queue] Celestine',
     body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name), labels: [] };
-  let boardBody = '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n';
-  const board = { number: 883, body: boardBody };
+  const board = { number: 883, body: '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n' };
+  const comments = { 883: [] };
+  let nextId = 1;
   const api = { issues: {
     get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
     getLabel: async () => ({ data: {} }),
     createLabel: async () => ({ data: {} }),
     addLabels: async ({ labels }) => { issue.labels.push(...labels.map(label => ({ name: label }))); },
-    update: async ({ issue_number, body }) => { if (issue_number === 883) board.body = body; else issue.body = body; },
+    listComments: () => {},
+    createComment: async ({ issue_number, body }) => {
+      (comments[issue_number] ||= []).push({ id: nextId++, user: BOT, body });
+    },
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      const found = comments[issue_number].find(x => x.id === comment_id);
+      found.body = body;
+    },
   } };
-  const r = await Q.syncHardCardHandoffs({ github: { rest: api }, owner: 'AARMOU', repo: 'arcana_table',
+  const github = { rest: api, paginate: async (fn, args) => comments[args.issue_number] || [] };
+  const originalBoard = board.body;
+  const r = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table',
     held: [{ name, issue: 360 }] });
   assert.deepEqual(issue.labels.map(l => l.name), [Q.HARD_CARD_LABEL]);
-  assert.match(issue.body, /Copilot stopped after two failed attempts/);
+  assert.match(comments[360][0].body, /Copilot stopped after two failed attempts/);
   assert.equal(r.boardUpdated, true);
-  assert.match(board.body, /## Hard cards waiting for a worker/);
-  assert.ok(board.body.includes('https://github.com/AARMOU/arcana_table/issues/360'));
-  assert.match(board.body, /An owner or PM can authorize one additional queue/);
-  assert.ok(board.body.includes('## 2a. ⏰ Worker schedule'));
+  assert.equal(board.body, originalBoard, 'the owner-maintained issue body is untouched');
+  assert.match(comments[883][0].body, /## Hard cards waiting for a worker/);
+  assert.ok(comments[883][0].body.includes('#360'));
 });
 
-test('feeder preserves a still-capped prior card when the current pass has no new held cards', async () => {
+test('feeder preserves a still-capped prior card in its bot-maintained board comment', async () => {
   const name = 'Celestine, the Living Saint';
   const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
     title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
     labels: [{ name: Q.HARD_CARD_LABEL }] };
-  const board = { number: 883, body: Q.hardCardSection('## Owner decisions\n', [{ name, issue: 360 }]) };
+  const board = { number: 883, body: 'Owner decisions stay here.' };
+  const comments = { 360: [{ id: 1, user: BOT, body: Q.HARD_CARD_NOTE_MARKER + '\nWaiting for a worker.' }],
+    883: [{ id: 2, user: BOT, body: Q.HARD_CARD_COMMENT_MARKER + '\n## Hard cards waiting for a worker\n- Old card' }] };
   const api = { issues: {
     get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
     listForRepo: () => {},
-    update: async ({ issue_number, body }) => { if (issue_number === 883) board.body = body; },
+    listComments: () => {},
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      comments[issue_number].find(x => x.id === comment_id).body = body;
+    },
   } };
-  const github = { rest: api, paginate: async () => [] };
+  const github = { rest: api, paginate: async (fn, args) => {
+    if (fn === api.issues.listComments) return comments[args.issue_number] || [];
+    return args.state === 'closed' ? [issue] : [];
+  } };
   const result = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
   assert.deepEqual(result.cards, [{ name, issue: 360 }]);
-  assert.match(board.body, /#360.*Celestine, the Living Saint/);
+  assert.match(comments[883][0].body, /#360.*Celestine, the Living Saint/);
+  assert.equal(board.body, 'Owner decisions stay here.');
 });
 
-test('feeder leaves a concurrent owner board edit intact and retries on a later pass', async () => {
+test('feeder updates only its bot comment and preserves concurrent owner board edits', async () => {
   const name = 'Celestine, the Living Saint';
   const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
-    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name), labels: [] };
-  const board = { number: 883, body: '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n' };
-  let boardReads = 0, boardWrites = 0;
+    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
+    labels: [{ name: Q.HARD_CARD_LABEL }] };
+  const board = { number: 883, body: 'Owner edit added during hand-off sync.' };
+  const comments = { 360: [{ id: 1, user: BOT, body: Q.HARD_CARD_NOTE_MARKER + '\nWaiting.' }],
+    883: [{ id: 2, user: BOT, body: Q.HARD_CARD_COMMENT_MARKER + '\nOld handoff.' }] };
+  let boardWrites = 0;
   const api = { issues: {
-    get: async ({ issue_number }) => {
-      if (issue_number !== 883) return { data: issue };
-      boardReads++;
-      if (boardReads === 2) board.body += '\nOwner edit added during hand-off sync.\n';
-      return { data: { ...board } };
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    listForRepo: () => {},
+    listComments: () => {},
+    update: async () => { boardWrites++; },
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      comments[issue_number].find(x => x.id === comment_id).body = body;
     },
-    getLabel: async () => ({ data: {} }),
-    createLabel: async () => ({ data: {} }),
-    addLabels: async ({ labels }) => { issue.labels.push(...labels.map(label => ({ name: label }))); },
-    update: async ({ issue_number, body }) => { if (issue_number === 883) { boardWrites++; board.body = body; } },
   } };
-  const result = await Q.syncHardCardHandoffs({ github: { rest: api }, owner: 'AARMOU', repo: 'arcana_table',
-    held: [{ name, issue: 360 }] });
-  assert.equal(result.boardConflict, true);
+  const github = { rest: api, paginate: async (fn, args) => {
+    if (fn === api.issues.listComments) return comments[args.issue_number] || [];
+    return args.state === 'closed' ? [issue] : [];
+  } };
+  await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
   assert.equal(boardWrites, 0);
-  assert.match(board.body, /Owner edit added during hand-off sync/);
-  assert.doesNotMatch(board.body, /## Hard cards waiting for a worker/);
+  assert.equal(board.body, 'Owner edit added during hand-off sync.');
+  assert.match(comments[883][0].body, /#360/);
 });
 
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
