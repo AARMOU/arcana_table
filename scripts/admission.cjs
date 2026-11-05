@@ -267,7 +267,7 @@ function hasCardkitStartingPacket(body) {
   const text = String(body || '');
   const start = text.indexOf('## Cardkit starting packet');
   if (start < 0) return false;
-  const next = text.indexOf('\\n## ', start);
+  const next = text.indexOf('\n## ', start);
   return text.slice(start + '## Cardkit starting packet'.length, next < 0 ? undefined : next).trim().length > 0;
 }
 
