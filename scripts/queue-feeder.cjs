@@ -644,8 +644,11 @@ async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
     const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
     if (!labels.includes(HARD_CARD_LABEL))
       await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [HARD_CARD_LABEL] });
-    const body = String(issue.body || '');
-    if (!body.includes(HARD_CARD_NOTE_MARKER)) {
+    const handoffComments = await github.paginate(github.rest.issues.listComments,
+      { owner, repo, issue_number: issue.number, per_page: 100 });
+    const hasHandoff = handoffComments.some(c => c.user?.login === 'github-actions[bot]' &&
+      String(c.body || '').startsWith(HARD_CARD_NOTE_MARKER));
+    if (!hasHandoff) {
       await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
         body: HARD_CARD_NOTE_MARKER +
           '\nHard-card hand-off: Copilot stopped after two failed attempts. Waiting for a worker. ' +
