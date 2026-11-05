@@ -273,6 +273,8 @@ function queueSummary(p) {
     p.autoQueue.stuck.map(x => '#' + x.issue + ' (' + x.cards.join(', ') + ')').join(', ').slice(0, 600)] : []),
   ...((p.autoQueue?.held || []).length ? ['Held for the owner after two closed queue attempts that did not land (one automatic retry already used): ' +
     p.autoQueue.held.map(x => x.name + ' (#' + x.issue + ')').join(', ').slice(0, 600)] : []),
+  ...((p.autoQueue?.attemptHistoryUnknown || []).length ? ['Not queued because paid-attempt history could not be verified: ' +
+    p.autoQueue.attemptHistoryUnknown.map(x => x.name).join(', ').slice(0, 600)] : []),
   ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
     ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') +
       (p.autoQueue?.pending ? ' (#' + p.autoQueue.issue + ' queued; guarded dispatcher requested)' : '') + '.'])];
@@ -319,24 +321,67 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
       if (labels.includes(RETRY_CAP_LIFT_LABEL) && (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
         capLiftedBy.set(k, i.number);
     }
-  const held = [];
+  const held = [], attemptHistoryUnknown = [];
   let retryOf = null;
   let capLiftIssue = null;
-  const s = (payload.suggestions || []).find(x => {
+  let s = null;
+  for (const x of payload.suggestions || []) {
     if (!(x.ready && x.body && A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
-      !safeIssues.some(i => String(i.title || '') === x.title))) return false;
-    const prior = attempted.get(F.normName(x.name)) || [];
-    const liftedBy = capLiftedBy.get(F.normName(x.name));
-    if (prior.length >= MAX_AUTO_ATTEMPTS && !liftedBy) {
-      held.push({ name: x.name, issue: Math.max(...prior) });
-      return false;
+      !safeIssues.some(i => String(i.title || '') === x.title))) continue;
+    const key = F.normName(x.name), prior = attempted.get(key) || [];
+    const paidCount = payload.attemptCounts instanceof Map ? payload.attemptCounts.get(key) : undefined;
+    const unknown = payload.attemptHistoryUnknown instanceof Set && payload.attemptHistoryUnknown.has(key);
+    const liftedBy = capLiftedBy.get(key);
+    if (unknown) { attemptHistoryUnknown.push({ name: x.name, issue: Math.max(0, ...prior) }); continue; }
+    if ((paidCount ?? prior.length) >= MAX_AUTO_ATTEMPTS && !liftedBy) {
+      held.push({ name: x.name, issue: Math.max(0, ...prior) });
+      continue;
     }
-    retryOf = prior.length ? Math.max(...prior) : null;
-    capLiftIssue = liftedBy || null;
-    return true;
-  });
-  return s ? { suggestion: s, stuck, held, ...(retryOf ? { retryOf } : {}), ...(capLiftIssue ? { capLiftIssue } : {}) }
-    : { reason: 'no-unclaimed-ready-card', stuck, held };
+    if (!s) { s = x; retryOf = prior.length ? Math.max(...prior) : null; capLiftIssue = liftedBy || null; }
+  }
+  return s ? { suggestion: s, stuck, held, attemptHistoryUnknown, ...(retryOf ? { retryOf } : {}), ...(capLiftIssue ? { capLiftIssue } : {}) }
+    : { reason: 'no-unclaimed-ready-card', stuck, held, attemptHistoryUnknown };
+}
+
+function paidAttemptHistory(comments = [], expectedIssue = null) {
+  if (!Array.isArray(comments)) return { complete: false, count: 0 };
+  const marked = comments.filter(c => c?.user?.type === 'Bot' && c?.user?.login === 'github-actions[bot]' &&
+    String(c.body || '').startsWith(A.LEDGER));
+  const ledger = A.parseLedger(comments);
+  if (ledger.length !== marked.length || (expectedIssue !== null && ledger.some(r => String(r.issue) !== String(expectedIssue))))
+    return { complete: false, count: 0 };
+  const results = new Map(ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => [r.run, r]));
+  const attempts = new Set(), pending = new Set();
+  for (const r of ledger) {
+    if (r.op === 'authorizing') {
+      const result = results.get(r.run);
+      if (!result) { attempts.add('assign:' + r.run); pending.add(r.run); }
+      else if (result.op === 'resolution' ? result.result === 'assigned' : ['confirmed', 'error', 'not-confirmed'].includes(result.result))
+        attempts.add('assign:' + r.run);
+    } else if (r.op === 'repair-request') attempts.add('repair:' + r.run);
+  }
+  return { complete: pending.size === 0, count: attempts.size };
+}
+
+async function attemptHistoryForCards({ github, owner, repo, closedIssues, names }) {
+  const wanted = new Set(names.map(F.normName)), counts = new Map(), unknown = new Set();
+  for (const issue of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]'))) {
+    const cards = F.unitCards(issue.body).filter(name => wanted.has(F.normName(name)));
+    if (!cards.length) continue;
+    let history;
+    try {
+      if (!github.rest.issues.listComments) throw Error('ledger comments endpoint unavailable');
+      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue.number, per_page: 100 });
+      history = paidAttemptHistory(comments, issue.number);
+    } catch { history = { complete: false, count: 0 }; }
+    for (const name of cards) {
+      const key = F.normName(name);
+      const legacyAssigned = history.complete && history.count === 0 && isCopilotAssigned(issue);
+      if (!history.complete || legacyAssigned) unknown.add(key);
+      counts.set(key, (counts.get(key) || 0) + history.count + (legacyAssigned ? 1 : 0));
+    }
+  }
+  return { counts, unknown };
 }
 
 async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
@@ -365,9 +410,13 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   payload = { ...payload, suggestions: (payload.suggestions || []).filter(x => !onDestination.has(F.normName(x.name))) };
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const closed = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'closed', per_page: 100 });
+  const history = await attemptHistoryForCards({ github, owner, repo, closedIssues: closed,
+    names: (payload.suggestions || []).map(s => s.name) });
+  payload = { ...payload, attemptCounts: history.counts, attemptHistoryUnknown: history.unknown };
   const pick = chooseAutoQueue(payload, open, closed);
   if (skippedOnDestination.length) pick.skippedOnDestination = skippedOnDestination;
-  const notes = { stuck: pick.stuck || [], held: pick.held || [], ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
+  const notes = { stuck: pick.stuck || [], held: pick.held || [], attemptHistoryUnknown: pick.attemptHistoryUnknown || [],
+    ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
   if (!pick.suggestion) return { reason: pick.reason, ...notes, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
   // A trusted owner/PM cap-lift label authorizes exactly one extra queue; consume it first.
@@ -614,4 +663,5 @@ async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK,
-  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, existingHardCardEntries, syncHardCardHandoffs };
+  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, existingHardCardEntries,
+  paidAttemptHistory, attemptHistoryForCards, syncHardCardHandoffs };
