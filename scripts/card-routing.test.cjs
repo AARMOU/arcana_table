@@ -172,7 +172,7 @@ test('feeder preserves a still-capped prior card in its bot-maintained board com
     listForRepo: () => {},
     listComments: () => {},
     updateComment: async ({ issue_number, comment_id, body }) => {
-      comments[issue_number].find(x => x.id === comment_id).body = body;
+      Object.values(comments).flat().find(x => x.id === comment_id).body = body;
     },
   } };
   const github = { rest: api, paginate: async (fn, args) => {
@@ -200,7 +200,7 @@ test('feeder updates only its bot comment and preserves concurrent owner board e
     listComments: () => {},
     update: async () => { boardWrites++; },
     updateComment: async ({ issue_number, comment_id, body }) => {
-      comments[issue_number].find(x => x.id === comment_id).body = body;
+      Object.values(comments).flat().find(x => x.id === comment_id).body = body;
     },
   } };
   const github = { rest: api, paginate: async (fn, args) => {
