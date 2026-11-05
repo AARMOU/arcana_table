@@ -21,7 +21,7 @@ const payload = () => Q.queuePayload({
   units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA, runId: 555,
 });
 
-function fakeGitHub({ open = [], closed = [], comments = {}, head = SHA, issuer = BOT } = {}) {
+function fakeGitHub({ open = [], closed = [], comments = {}, events = {}, head = SHA, issuer = BOT } = {}) {
   const calls = [];
   const github = {
     rest: {
@@ -29,6 +29,7 @@ function fakeGitHub({ open = [], closed = [], comments = {}, head = SHA, issuer 
       issues: {
         listForRepo: () => {},
         listComments: () => {},
+        listEventsForTimeline: () => {},
         removeLabel: async ({ issue_number, name }) => {
           const issue = closed.find(i => i.number === issue_number);
           if (issue) issue.labels = (issue.labels || []).filter(l => (typeof l === 'string' ? l : l.name) !== name);
@@ -39,6 +40,7 @@ function fakeGitHub({ open = [], closed = [], comments = {}, head = SHA, issuer 
     paginate: async (fn, args) => {
       calls.push([fn === github.rest.issues.listComments ? 'comments' : 'list', args]);
       if (fn === github.rest.issues.listComments) return comments[args.issue_number] || [];
+      if (fn === github.rest.issues.listEventsForTimeline) return events[args.issue_number] || [];
       return args.state === 'closed' ? closed : open;
     },
   };
@@ -160,7 +162,9 @@ test('B15 holds exhausted card but keeps an unrelated eligible card moving', asy
 
 test('B15 consumes one explicit cap-lift and does not authorize another queue next pass', async () => {
   const prior = queueIssue(901, CARD, [{ name: Q.RETRY_CAP_LIFT_LABEL }]);
-  const options = { closed: [prior], comments: { 901: paidPair(901, 1) } };
+  const options = { closed: [prior], comments: { 901: paidPair(901, 1) }, events: { 901: [
+    { event: 'labeled', actor: { login: 'AARMOU' }, label: { name: Q.RETRY_CAP_LIFT_LABEL } },
+  ] } };
   const first = await run(options);
   assert.equal(first.result.created, true);
   assert.ok(!prior.labels.some(l => l.name === Q.RETRY_CAP_LIFT_LABEL));
