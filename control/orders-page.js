@@ -6,6 +6,26 @@
   const ORDERS_ISSUE = 883;
   const STALE_MS = 36 * 3600 * 1000;
 
+  const LIVE_MARKER = '<!-- arcana-owner-status-v1 -->';
+  const LIVE_STALE_MS = 90 * 60 * 1000;
+
+  // A bot-owned comment is the heartbeat, not the owner's protected issue body.
+  function parseLive(comments) {
+    if (!Array.isArray(comments)) return null;
+    const item = [...comments].reverse().find(c =>
+      c && c.user?.type === 'Bot' && String(c.body || '').startsWith(LIVE_MARKER));
+    if (!item) return null;
+    const match = /```json\n([\s\S]*?)\n```/.exec(item.body);
+    if (!match) return null;
+    try {
+      const payload = JSON.parse(match[1]);
+      if (!Number.isFinite(Date.parse(payload.checkedAt)) ||
+          !Array.isArray(payload.facts) || !Array.isArray(payload.inbox)) return null;
+      return payload;
+    } catch (_) { return null; }
+  }
+
+
   // ---- pure parsing (tested in orders-page.test.cjs) ----
   function inline(md) {
     const out = [];
@@ -83,7 +103,7 @@
   }
 
   // ---- rendering ----
-  function render(doc, container, issue, openIssues, now) {
+  function render(doc, container, issue, openIssues, now, live) {
     now = now || Date.now();
     const el = (tag, cls, value) => { const n = doc.createElement(tag); if (cls) n.className = cls; if (value !== undefined) n.textContent = value; return n; };
     const rich = (md, tag, cls) => {
@@ -116,6 +136,36 @@
     wbox.append(el('p', 'fine', 'Answer in Claude or GPT, whichever you have open. Either one will act on it.'));
     container.append(wbox);
 
+    // Verified live facts and inbox reports precede hand-maintained order statuses.
+    // A report is not proof that an agent is executing right now.
+    const liveTime = live && Date.parse(live.checkedAt);
+    const liveStale = !Number.isFinite(liveTime) || now - liveTime > LIVE_STALE_MS;
+    container.append(label('Live activity', live
+      ? (liveStale ? 'Refresh delayed' : 'Checked ' + ago(live.checkedAt, now))
+      : 'No automated report yet'));
+    const livePanel = el('section', 'panel ob-generic');
+    if (live) {
+      const facts = el('ul', 'ob-list');
+      live.facts.slice(0, 10).forEach(x => facts.append(rich(String(x), 'li')));
+      livePanel.append(facts);
+      for (const source of live.inbox.slice(0, 2)) {
+        const name = source.issue === 949 ? 'Boneknuckles' :
+          source.issue === 950 ? 'Goose / Elmer coordination' : 'Worker inbox';
+        const latest = Array.isArray(source.entries) ? source.entries[0] : null;
+        if (!latest) continue;
+        livePanel.append(el('p', '', name + ' · ' + ago(latest.at, now) + ': ' +
+          String(latest.summary || '').slice(0, 180) + ' (reported, not live telemetry)'));
+        if (/^https:\/\/github\.com\//.test(String(latest.url || ''))) {
+          const a = el('a', 'ob-link', 'View source');
+          a.href = latest.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          livePanel.append(a);
+        }
+      }
+    } else {
+      livePanel.append(el('p', '', 'Automatic status is not yet available. The order list below may be behind worker reports.'));
+    }
+    container.append(livePanel);
+
     // 2. Rules questions
     const rq = (Array.isArray(openIssues) ? openIssues : []).filter(isRulesQuestion);
     container.append(label('Card rules questions', rq.length ? rq.length + ' open' : 'None open'));
@@ -134,7 +184,7 @@
       const t = s.table; if (!t) continue;
       const col = name => t.head.findIndex(h => h.toLowerCase() === name);
       const ia = col('agent'), io = col('order'), is = col('status'), id = col('id');
-      container.append(label('Who is doing what', t.rows.length + ' orders'));
+      container.append(label('Assigned work (owner board snapshot)', t.rows.length + ' orders'));
       const grid = el('div', 'ob-orders');
       t.rows.forEach(r => {
         const badge = agentBadge(r[ia]); const st = statusTag(r[is] || '');
@@ -181,7 +231,7 @@
       const ul = el('ul', 'ob-list'); dec.forEach(x => ul.append(rich(x, 'li'))); det.append(ul);
       container.append(det);
     }
-    return { ok: true, stale, revision: meta.revision, updated: issue.updated_at, waiting: waiting.length, rules: rq.length };
+    return { ok: true, stale, liveStale, liveCheckedAt: live?.checkedAt || null, revision: meta.revision, updated: issue.updated_at, waiting: waiting.length, rules: rq.length };
   }
   function ago(input, now) {
     const t = Date.parse(input); if (!Number.isFinite(t)) return 'at an unknown time';
@@ -189,7 +239,7 @@
     if (n < 1) return 'just now'; if (n < 60) return n + 'm ago'; if (n < 1440) return Math.floor(n / 60) + 'h ago'; return Math.floor(n / 1440) + 'd ago';
   }
 
-  const api = { ORDERS_ISSUE, STALE_MS, inline, plain, parse, kind, statusTag, agentBadge, isRulesQuestion, rulesCard, render, ago };
+  const api = { ORDERS_ISSUE, STALE_MS, LIVE_STALE_MS, parseLive, inline, plain, parse, kind, statusTag, agentBadge, isRulesQuestion, rulesCard, render, ago };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ArcanaOrders = api;
 })(typeof window !== 'undefined' ? window : globalThis);

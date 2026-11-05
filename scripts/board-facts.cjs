@@ -1,13 +1,14 @@
 'use strict';
-// Live facts block on the orders board (#883), refreshed by the review-inbox refresh (every ~15-30 min), so
-// the board no longer depends on someone remembering to edit it (owner, 2026-11-03: "the board has been
-// lagging behind"). Only the text between the two markers is ever touched; agents keep editing the rest.
-// Facts only, read from GitHub itself: nothing here is anyone's claim. Edits notify nobody.
+// Live GitHub status is published to one bot-owned comment on the protected orders board (#883).
+// Keep the owner's issue body/decisions untouched: GitHub issue-body updates are not atomic.
+// The comment carries an independent checkedAt heartbeat plus links to worker inbox evidence.
+// Inbox snippets are reports, not proof that a worker is currently executing.
 const START = '<!-- board-facts:start -->';
 const END = '<!-- board-facts:end -->';
 const ENGINE_MARKER = '<!-- arcana-control-status-v1:engine -->';
 const UPGRADE = 'argentum-weekly-upgrade.yml';
 const TEST_APK = /^b\d+-test-apk\.yml$/;
+const LIVE_MARKER = '<!-- arcana-owner-status-v1 -->';
 
 const mt = iso => {
   const d = new Date(iso);
@@ -76,14 +77,47 @@ async function reportBoard({ github, owner, repo, issue = 883, now = new Date() 
   const build = await currentBuild(github, owner, repo);
   const facts = [await engineLine(github, owner, repo), ...await upgradeRuns(github, owner, repo),
     ...await waitingPrs(github, owner, repo, build), ...await latestApks(github, owner, repo)];
-  const core = facts.map(f => '- ' + f).join('\n');
-  const block = [START, '## 0. Live facts (refreshed automatically from GitHub every ~30 min; do not edit by hand)',
-    `_Checked ${mt(now.toISOString())}._`, core, END].join('\n');
-  const current = (await github.rest.issues.get({ owner, repo, issue_number: issue })).data.body || '';
-  const a = current.indexOf(START), b = current.indexOf(END);
-  if (a >= 0 && b > a && current.slice(a, b).includes(core)) return 'unchanged';
-  await github.rest.issues.update({ owner, repo, issue_number: issue, body: place(current, block) });
-  return `updated (${facts.length} facts)`;
+  // This status snapshot is owned by the automation, not by the protected owner orders.
+  // GitHub's issue-body update has no compare-and-swap guard: do not rewrite #883.
+  const inbox = await Promise.all([949, 950].map(async issueNumber => {
+    const meta = (await github.rest.issues.get({ owner, repo, issue_number: issueNumber })).data;
+    const count = Math.max(0, Number(meta.comments) || 0);
+    const page = Math.max(1, Math.ceil(count / 100));
+    const comments = (await github.rest.issues.listComments({
+      owner, repo, issue_number: issueNumber, per_page: 100, page,
+    })).data || [];
+    return {
+      issue: issueNumber,
+      entries: comments.slice(-3).reverse().map(c => ({
+        at: c.created_at,
+        url: c.html_url,
+        summary: clean(String(c.body || '').split('\n').find(l => l.trim()) || '').slice(0, 180),
+      })),
+    };
+  }));
+  const payload = {
+    checkedAt: now.toISOString(),
+    facts,
+    inbox,
+    // Neither an inbox comment nor a green PR proves an agent is actively running.
+    note: 'Latest reported activity, not worker liveness. Owner decisions remain on #883.',
+  };
+  const body = LIVE_MARKER + '\n' + '## Automated Arcana status\n' +
+    '_Checked ' + mt(now.toISOString()) + '._\n\n' +
+    facts.map(f => '- ' + f).join('\n') + '\n\n' +
+    'Latest inbox reports: [Boneknuckles #949](https://github.com/' + owner + '/' + repo + '/issues/949) · ' +
+    '[Goose / Elmer #950](https://github.com/' + owner + '/' + repo + '/issues/950)\n\n' +
+    '```json\n' + JSON.stringify(payload) + '\n```';
+  const existing = await github.paginate(github.rest.issues.listComments, {
+    owner, repo, issue_number: issue, per_page: 100,
+  });
+  const mine = existing.find(c => c.user?.type === 'Bot' && String(c.body || '').startsWith(LIVE_MARKER));
+  if (mine) {
+    await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+    return 'updated existing live-status comment';
+  }
+  await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
+  return 'created live-status comment';
 }
 
-module.exports = { reportBoard, place, START, END };
+module.exports = { reportBoard, place, START, END, LIVE_MARKER };
