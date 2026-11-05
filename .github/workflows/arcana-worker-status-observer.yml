@@ -45,6 +45,17 @@ jobs:
             try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const { refreshWorkerStatus } = require('./scripts/worker-status.cjs');
             await refreshWorkerStatus({ github, context, core });
+      - name: Relay verified Goose review handoffs from Boneknuckles inbox (no dispatch)
+        # Reuse an existing scheduled run; failures MUST be visible as failed Actions.
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const relay = require('./scripts/pm-handoff.cjs');
+            const outcome = await relay.relayReviewHandoffs({
+              github, owner: context.repo.owner, repo: context.repo.repo, core
+            });
+            core.info('PM handoff relay: ' + JSON.stringify(outcome));
       - name: Save GitHub API ETag cache
         if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
         uses: actions/cache/save@v4
