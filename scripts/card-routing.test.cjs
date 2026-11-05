@@ -147,6 +147,49 @@ test('feeder labels a capped card and publishes it on the owner board in the sam
   assert.ok(board.body.includes('## 2a. ⏰ Worker schedule'));
 });
 
+test('feeder preserves a still-capped prior card when the current pass has no new held cards', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
+    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
+    labels: [{ name: Q.HARD_CARD_LABEL }] };
+  const board = { number: 883, body: Q.hardCardSection('## Owner decisions\n', [{ name, issue: 360 }]) };
+  const api = { issues: {
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    listForRepo: () => {},
+    update: async ({ issue_number, body }) => { if (issue_number === 883) board.body = body; },
+  } };
+  const github = { rest: api, paginate: async () => [] };
+  const result = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
+  assert.deepEqual(result.cards, [{ name, issue: 360 }]);
+  assert.match(board.body, /#360.*Celestine, the Living Saint/);
+});
+
+test('feeder leaves a concurrent owner board edit intact and retries on a later pass', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
+    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name), labels: [] };
+  const board = { number: 883, body: '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n' };
+  let boardReads = 0, boardWrites = 0;
+  const api = { issues: {
+    get: async ({ issue_number }) => {
+      if (issue_number !== 883) return { data: issue };
+      boardReads++;
+      if (boardReads === 2) board.body += '\nOwner edit added during hand-off sync.\n';
+      return { data: { ...board } };
+    },
+    getLabel: async () => ({ data: {} }),
+    createLabel: async () => ({ data: {} }),
+    addLabels: async ({ labels }) => { issue.labels.push(...labels.map(label => ({ name: label }))); },
+    update: async ({ issue_number, body }) => { if (issue_number === 883) { boardWrites++; board.body = body; } },
+  } };
+  const result = await Q.syncHardCardHandoffs({ github: { rest: api }, owner: 'AARMOU', repo: 'arcana_table',
+    held: [{ name, issue: 360 }] });
+  assert.equal(result.boardConflict, true);
+  assert.equal(boardWrites, 0);
+  assert.match(board.body, /Owner edit added during hand-off sync/);
+  assert.doesNotMatch(board.body, /## Hard cards waiting for a worker/);
+});
+
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
   workRequests: requests, resolvedRequests: resolved });
 const ULALEK = { name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
