@@ -367,3 +367,26 @@ test('legacy card-work request without Cardkit packet is refused', () => {
   assert.ok(r.missing.includes('cardkit-starting-packet'));
 });
 
+test('empty Cardkit section with later nonempty heading fails closed for both admission paths', () => {
+  const body = [
+    A.CARD_WORK_MARKER,
+    '<!-- source: trusted-main-queue-feeder; run:1; base-sha:' + 'a'.repeat(40) + '; precon-gap:six-precons; priority:0 -->',
+    '## Card', '- Celestine, the Living Saint', '',
+    '    {"oracle_text":"Flying"}',
+    '## Cardkit starting packet',
+    '## Priority',
+    'Other nonempty content must not stand in for Cardkit evidence.',
+  ].join('\n');
+  assert.equal(A.hasCardkitStartingPacket(body), false);
+  const review = A.reviewActionable(body);
+  assert.equal(review.ok, false);
+  assert.ok(review.missing.includes('cardkit-starting-packet'));
+  const queued = A.queueUnitActionable(body, 'gpt/arcana-integration-next');
+  assert.equal(queued.ok, false);
+  assert.ok(queued.missing.includes('cardkit-starting-packet'));
+
+  const withPacket = body.replace('## Cardkit starting packet\n## Priority',
+    '## Cardkit starting packet\nCardkit classify: NEEDS_REVIEW\n## Priority');
+  assert.equal(A.hasCardkitStartingPacket(withPacket), true);
+  assert.equal(A.reviewActionable(withPacket).ok, true);
+});
