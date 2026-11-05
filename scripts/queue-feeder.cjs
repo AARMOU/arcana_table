@@ -295,6 +295,8 @@ const RETRY_CAP_LIFT_LABEL = 'arcana:lift-copilot-attempt-cap';
 const HARD_CARD_NOTE_MARKER = '<!-- arcana-hard-card-handoff-v1 -->';
 const HARD_CARD_SECTION_START = '<!-- arcana-hard-card-handoff:start -->';
 const HARD_CARD_SECTION_END = '<!-- arcana-hard-card-handoff:end -->';
+const HARD_CARD_COMMENT_MARKER = '<!-- arcana-hard-card-handoff-comment-v1 -->';
+const CAP_LIFT_APPROVAL_EVENT = 'labeled';
 function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
@@ -318,7 +320,9 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
       if (!attempted.has(k)) attempted.set(k, []);
       if (!attempted.get(k).includes(i.number)) attempted.get(k).push(i.number);
       const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
-      if (labels.includes(RETRY_CAP_LIFT_LABEL) && (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
+      const authorizedLiftIssues = payload.authorizedCapLiftIssues instanceof Set ? payload.authorizedCapLiftIssues : new Set();
+      if (labels.includes(RETRY_CAP_LIFT_LABEL) && authorizedLiftIssues.has(i.number) &&
+          (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
         capLiftedBy.set(k, i.number);
     }
   const held = [], attemptHistoryUnknown = [];
@@ -384,6 +388,25 @@ async function attemptHistoryForCards({ github, owner, repo, closedIssues, names
   return { counts, unknown };
 }
 
+async function authorizedCapLiftIssues({ github, owner, repo, closedIssues }) {
+  const authorized = new Set();
+  if (!github.rest.issues.listEventsForTimeline) return authorized;
+  for (const issue of closedIssues.filter(i => {
+    const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+    return labels.includes(RETRY_CAP_LIFT_LABEL);
+  })) {
+    try {
+      const events = await github.paginate(github.rest.issues.listEventsForTimeline,
+        { owner, repo, issue_number: issue.number, per_page: 100 });
+      if (events.some(e => e.event === CAP_LIFT_APPROVAL_EVENT &&
+          e.actor?.login?.toLowerCase() === OWNER &&
+          (typeof e.label === 'string' ? e.label : e.label?.name) === RETRY_CAP_LIFT_LABEL))
+        authorized.add(issue.number);
+    } catch { /* missing timeline evidence fails closed */ }
+  }
+  return authorized;
+}
+
 async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
   if (!enabled) return { reason: 'normal-auto-dispatch-not-enabled' };
   if (!payload?.ok) return { reason: 'cardkit-suggestions-unavailable' };
@@ -412,7 +435,9 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   const closed = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'closed', per_page: 100 });
   const history = await attemptHistoryForCards({ github, owner, repo, closedIssues: closed,
     names: (payload.suggestions || []).map(s => s.name) });
-  payload = { ...payload, attemptCounts: history.counts, attemptHistoryUnknown: history.unknown };
+  const authorizedLifts = await authorizedCapLiftIssues({ github, owner, repo, closedIssues: closed });
+  payload = { ...payload, attemptCounts: history.counts, attemptHistoryUnknown: history.unknown,
+    authorizedCapLiftIssues: authorizedLifts };
   const pick = chooseAutoQueue(payload, open, closed);
   if (skippedOnDestination.length) pick.skippedOnDestination = skippedOnDestination;
   const notes = { stuck: pick.stuck || [], held: pick.held || [], attemptHistoryUnknown: pick.attemptHistoryUnknown || [],
@@ -619,47 +644,46 @@ async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
     const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
     if (!labels.includes(HARD_CARD_LABEL))
       await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [HARD_CARD_LABEL] });
-    let body = String(issue.body || '');
+    const body = String(issue.body || '');
     if (!body.includes(HARD_CARD_NOTE_MARKER)) {
-      body = body.trimEnd() + '\n\n' + HARD_CARD_NOTE_MARKER +
-        '\nHard-card hand-off: Copilot stopped after two failed attempts. Waiting for a worker. ' +
-        'An owner or PM may authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + '.';
-      await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
+      await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+        body: HARD_CARD_NOTE_MARKER +
+          '\nHard-card hand-off: Copilot stopped after two failed attempts. Waiting for a worker. ' +
+          'An owner may authorize one additional queue only by applying ' + RETRY_CAP_LIFT_LABEL + '.' });
     }
     cards.set(issue.number, { name: item.name, issue: issue.number });
   }
-  const board = (await github.rest.issues.get({ owner, repo, issue_number: 883 })).data;
-  const previousEntries = existingHardCardEntries(board.body);
-  if (previousEntries.length) {
-    const openIssues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
-    for (const item of previousEntries) {
-      if (cards.has(item.issue)) continue;
-      let issue;
-      try { issue = (await github.rest.issues.get({ owner, repo, issue_number: item.issue })).data; }
-      catch (error) { throw Error('cannot-verify-existing-hard-card-' + item.issue + ': ' + error.message); }
-      const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
-      const remainsCapped = issue.state === 'closed' && trustedIssue(issue) &&
-        String(issue.title || '').startsWith('[Arcana Queue]') &&
-        F.unitCards(issue.body).some(n => F.normName(n) === F.normName(item.name)) &&
-        labels.includes(HARD_CARD_LABEL) && !labels.includes(RETRY_CAP_LIFT_LABEL);
+  const previousEntries = [];
+  const openIssues = await github.paginate(github.rest.issues.listForRepo,
+    { owner, repo, state: 'open', per_page: 100 });
+  const history = await github.paginate(github.rest.issues.listForRepo,
+    { owner, repo, state: 'closed', per_page: 100 });
+  for (const issue of history.filter(i => trustedIssue(i) &&
+      String(i.title || '').startsWith('[Arcana Queue]') &&
+      (i.labels || []).some(l => (typeof l === 'string' ? l : l?.name) === HARD_CARD_LABEL))) {
+    for (const name of F.unitCards(issue.body)) {
       const isRequeued = openIssues.some(openIssue => trustedIssue(openIssue) &&
         String(openIssue.title || '').startsWith('[Arcana Queue]') &&
-        F.unitCards(openIssue.body).some(n => F.normName(n) === F.normName(item.name)));
-      if (remainsCapped && !isRequeued) cards.set(item.issue, { name: item.name, issue: item.issue });
+        F.unitCards(openIssue.body).some(n => F.normName(n) === F.normName(name)));
+      const hasLift = (issue.labels || []).some(l => (typeof l === 'string' ? l : l?.name) === RETRY_CAP_LIFT_LABEL);
+      if (!isRequeued && !hasLift) cards.set(issue.number, { name, issue: issue.number });
     }
   }
-  const nextBody = hardCardSection(board.body, [...cards.values()]);
-  const boardUpdated = nextBody !== board.body;
-  if (boardUpdated) {
-    // Issue bodies have no conditional-write API. Re-read before replacement so an edit that
-    // lands while we validate the capped cards is preserved for the next feeder pass.
-    const latestBoard = (await github.rest.issues.get({ owner, repo, issue_number: 883 })).data;
-    if (latestBoard.body !== board.body) return { cards: [...cards.values()], boardUpdated: false, boardConflict: true };
-    await github.rest.issues.update({ owner, repo, issue_number: 883, body: nextBody });
-  }
-  return { cards: [...cards.values()], boardUpdated, boardConflict: false };
+  const lines = [...cards.values()].sort((a,b)=>a.name.localeCompare(b.name))
+    .map(x => '- ' + x.name + ' (queue #' + x.issue + ')');
+  const commentBody = [HARD_CARD_COMMENT_MARKER, '## Hard cards waiting for a worker',
+    ...(lines.length ? lines : ['No cards are currently waiting.'])].join('\n');
+  const comments = await github.paginate(github.rest.issues.listComments,
+    { owner, repo, issue_number: 883, per_page: 100 });
+  const existing = comments.find(c => c.user?.login === 'github-actions[bot]' &&
+    String(c.body || '').startsWith(HARD_CARD_COMMENT_MARKER));
+  const changed = existing?.body !== commentBody;
+  if (changed && existing)
+    await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: commentBody });
+  else if (changed)
+    await github.rest.issues.createComment({ owner, repo, issue_number: 883, body: commentBody });
+  return { cards: [...cards.values()], boardUpdated: changed, boardConflict: false };
 }
-
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK,
