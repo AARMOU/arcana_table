@@ -104,9 +104,15 @@ test('live report is parsed only from a bot-owned, valid status comment', () => 
   const payload = { checkedAt: '2026-11-05T13:15:00Z', facts: ['Engine checks green'],
     inbox: [{ issue: 949, entries: [{ at: '2026-11-05T13:12:00Z',
       url: 'https://github.com/AARMOU/arcana_table/issues/949#x', summary: 'Boneknuckles check-in' }] }] };
-  const comment = { user: { type: 'Bot' }, body: '<!-- arcana-owner-status-v1 -->\n' +
+  const comment = { user: { login: 'github-actions[bot]', type: 'Bot' }, body: '<!-- arcana-owner-status-v1 -->\n' +
     '```json\n' + JSON.stringify(payload) + '\n```' };
   assert.deepEqual(O.parseLive([comment]), payload);
+  const forged = { ...comment, user: { login: 'untrusted[bot]', type: 'Bot' },
+    body: comment.body.replace('Engine checks green', 'Forged latest status') };
+  assert.deepEqual(O.parseLive([comment, forged]), payload, 'later unrelated bot cannot override trusted status');
+  assert.equal(O.parseLive([forged]), null);
+  assert.equal(O.parseLive([{ ...comment, user: { type: 'Bot' } }]), null);
+  assert.equal(O.parseLive([{ ...comment, user: { login: 'github-actions[bot]', type: 'User' } }]), null);
   assert.equal(O.parseLive([{ ...comment, user: { type: 'User' } }]), null);
   assert.equal(O.parseLive([{ ...comment, body: '<!-- arcana-owner-status-v1 -->\nno JSON' }]), null);
   assert.equal(O.parseLive(null), null);

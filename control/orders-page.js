@@ -13,7 +13,7 @@
   function parseLive(comments) {
     if (!Array.isArray(comments)) return null;
     const item = [...comments].reverse().find(c =>
-      c && c.user?.type === 'Bot' && String(c.body || '').startsWith(LIVE_MARKER));
+      c && c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(LIVE_MARKER));
     if (!item) return null;
     const match = /```json\n([\s\S]*?)\n```/.exec(item.body);
     if (!match) return null;
