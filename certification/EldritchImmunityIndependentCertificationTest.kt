@@ -112,6 +112,7 @@ class EldritchImmunityIndependentCertificationTest {
         val player = d.player1
         val opponent = d.player2
         val playerBear = d.putCreatureOnBattlefield(player, "Grizzly Bears")
+        val anotherPlayerBear = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val opponentBear = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
         val spell = d.putCardInHand(player, "Eldritch Immunity")
         d.giveColorlessMana(player, 5)
@@ -131,7 +132,13 @@ class EldritchImmunityIndependentCertificationTest {
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Eldritch Immunity"))
 
         assertNull(d.passPriority(player).error)
-        assertColoredSpellsCannotTarget(d, opponent, listOf(playerBear, opponentBear))
+        assertColoredSpellsCannotTarget(d, opponent, listOf(playerBear, anotherPlayerBear))
+
+        val ownTargetSpell = d.putCardInHand(opponent, "Swords to Plowshares")
+        d.giveMana(opponent, Color.WHITE)
+        assertNull(d.castSpell(opponent, ownTargetSpell, listOf(opponentBear)).error)
+        d.resolveAll()
+        assertTrue(d.zoneNames(opponent, Zone.EXILE).contains("Grizzly Bears"))
     }
 
     @Test
