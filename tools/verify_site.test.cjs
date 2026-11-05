@@ -8,29 +8,30 @@ const root = path.resolve(__dirname, '..');
 const landing = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const closed = fs.readFileSync(path.join(root, 'closed-testing.html'), 'utf8');
 
-test('Build 138 copy shows the actual release state without claiming Play approval', () => {
-  assert.match(landing, /Build 138 · Closed-test release candidate/);
-  assert.match(landing, /Google Play acceptance or closed-testing rollout has not been confirmed/);
-  assert.match(landing, /427 Android tests, zero failures and five skips/);
-  assert.doesNotMatch(landing, /Coming soon:<\/strong> Deck importing/);
+test('Build 141 copy states the actual debug-test release status', () => {
+  assert.match(landing, /Build 141 · Android test build/);
+  assert.match(landing, /Debug APK not uploaded to Google Play or released publicly/);
+  assert.match(landing, /Build 141 is a debug test APK, not a public release/);
   assert.doesNotMatch(landing, /Build 112 is still under development/);
+  assert.doesNotMatch(landing, /Coming soon:<\/strong> Deck importing/);
 });
-test('Main feature copy distinguishes implementation from on-device acceptance', () => {
+test('Current feature copy distinguishes supported testing from public deck import', () => {
   for (const phrase of [
-    'four-seat friends lobby', 're-enabled deck importer and editor',
-    'Room chat and private hands', '20 chapters of guided play',
-    'original Arcana launcher logo', '94 of 100 card-name slots',
-    'physical multiplayer acceptance is ongoing',
-  ]) assert.ok(landing.includes(phrase), 'Missing feature/status: ' + phrase);
+    'four players', 'offline AI', 'premade Commander decks',
+    'local Wi-Fi', 'across networks online',
+    'Public deck import is turned off',
+  ]) assert.ok(landing.includes(phrase), 'Missing current feature/status: ' + phrase);
+  assert.match(landing, /Additional card interactions are still in development/);
 });
-test('Play release excludes standalone debug scenarios but includes tutorial practice', () => {
-  assert.match(landing, /debug builds only/);
-  assert.match(landing, /not included in the Play release/);
-  assert.match(landing, /Guided tutorial practice is included/);
+test('Test invitation never claims to distribute the debug APK', () => {
+  assert.match(landing, /The closed-test form requests a Google Play invitation; it does not distribute this APK/);
+  assert.match(landing, /form does not guarantee admission or distribute the Build 141 debug APK/);
+  assert.match(landing, /not been uploaded to Google Play or released publicly/);
 });
-test('Historical marketing screenshots are not mislabeled Build 138 captures', () => {
-  assert.match(landing, /Earlier-build screenshot/);
-  assert.match(landing, /not newly captured Build 138 images/);
+test('Historical marketing screenshots are explicitly identified as earlier captures', () => {
+  assert.match(landing, /Genuine app captures · Earlier builds/);
+  assert.match(landing, /These screenshots show earlier Android builds and may not match the Build 141 interface exactly/);
+  assert.match(landing, /These genuine app captures are from earlier builds and may not match Build 141 exactly/);
 });
 test('All same-page anchor links point to unique IDs', () => {
   const ids = [...landing.matchAll(/\bid="([^"]+)"/g)].map(x => x[1]);
