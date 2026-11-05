@@ -13,7 +13,15 @@ function mock(source = [valid()], target = [], options = {}) {
   const made = [], gets = [];
   const github = {
     rest: {
-      issues: { listComments: () => {}, async createComment(args) { made.push(args); return { data: { id: 123 } }; } },
+      issues: { listComments: () => {}, async createComment(args) {
+        made.push(args);
+        // Model real GITHUB_TOKEN behavior: the persisted comment is authored
+        // by github-actions[bot], NOT by the repository owner.
+        target.push({ id: 1000 + made.length, body: args.body,
+          user: { login: 'github-actions[bot]', type: 'Bot' },
+          author_association: 'NONE' });
+        return { data: { id: 1000 + made.length } };
+      } },
       pulls: { async get(args) {
         gets.push(args);
         return { data: { state: options.state || 'open', head: { sha: options.sha || HEAD },
@@ -38,10 +46,36 @@ test('valid owner marker produces an exact-head review request, not a paid actio
   assert.doesNotMatch(h.made[0].body, /@copilot|approved to merge/);
 });
 test('existing matching receipt causes no duplicate write or extra PR query', async () => {
-  const h = mock([valid(), valid(933, HEAD, 7)], [{ body: marker(933, HEAD) + '\nDelivered', user: { login: owner }, author_association: 'OWNER' }]);
+  const h = mock([valid(), valid(933, HEAD, 7)], [{ body: marker(933, HEAD) + '\nDelivered',
+    user: { login: 'github-actions[bot]', type: 'Bot' }, author_association: 'NONE' }]);
   assert.equal((await run(h)).sent, 0);
   assert.equal(h.made.length, 0);
   assert.equal(h.gets.length, 0);
+});
+test('two actual scheduled runs post only one bot-authored receipt', async () => {
+  const h = mock();
+  const first = await run(h);
+  assert.equal(first.sent, 1);
+  assert.equal(h.made.length, 1);
+  assert.equal(h.gets.length, 1);
+  const second = await run(h);
+  assert.equal(second.sent, 0, 'same PR and SHA must not be posted twice');
+  assert.equal(h.made.length, 1, 'no second bot comment');
+  assert.equal(h.gets.length, 1, 'no second PR query');
+});
+test('forged Actions-login without Bot type cannot suppress a real handoff', async () => {
+  const h = mock([valid()], [{
+    body: marker(933, HEAD), user: { login: 'github-actions[bot]', type: 'User' },
+    author_association: 'OWNER',
+  }]);
+  assert.equal((await run(h)).sent, 1);
+});
+test('owner-authored receipt cannot impersonate GitHub Actions relay', async () => {
+  const h = mock([valid()], [{
+    body: marker(933, HEAD), user: { login: owner, type: 'User' },
+    author_association: 'OWNER',
+  }]);
+  assert.equal((await run(h)).sent, 1);
 });
 test('forged receipt from unrelated account cannot suppress legitimate request', async () => {
   const h = mock([valid()], [{ body: marker(933, HEAD) + '\\nForged', user: { login: 'outsider' }, author_association: 'CONTRIBUTOR' }]);
