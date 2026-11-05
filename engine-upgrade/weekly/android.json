@@ -1,0 +1,43 @@
+{
+ "ok": true,
+ "bytecode": [],
+ "bytecodeCount": 0,
+ "newMissingApis": [],
+ "allowlisted": [],
+ "knownMissingApis": [
+  "java.net.http.HttpClient",
+  "java.net.http.HttpClient$Builder",
+  "java.net.http.HttpClient$Builder.build()Ljava/net/http/HttpClient;",
+  "java.net.http.HttpClient$Builder.connectTimeout(Ljava/time/Duration;)Ljava/net/http/HttpClient$Builder;",
+  "java.net.http.HttpClient.newBuilder()Ljava/net/http/HttpClient$Builder;",
+  "java.net.http.HttpClient.send(Ljava/net/http/HttpRequest;Ljava/net/http/HttpResponse$BodyHandler;)Ljava/net/http/HttpResponse;",
+  "java.net.http.HttpRequest",
+  "java.net.http.HttpRequest$BodyPublisher",
+  "java.net.http.HttpRequest$BodyPublishers",
+  "java.net.http.HttpRequest$BodyPublishers.ofString(Ljava/lang/String;)Ljava/net/http/HttpRequest$BodyPublisher;",
+  "java.net.http.HttpRequest$Builder",
+  "java.net.http.HttpRequest$Builder.POST(Ljava/net/http/HttpRequest$BodyPublisher;)Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpRequest$Builder.build()Ljava/net/http/HttpRequest;",
+  "java.net.http.HttpRequest$Builder.header(Ljava/lang/String;Ljava/lang/String;)Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpRequest$Builder.timeout(Ljava/time/Duration;)Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpRequest$Builder.uri(Ljava/net/URI;)Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpRequest.newBuilder()Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpRequest.newBuilder(Ljava/net/URI;)Ljava/net/http/HttpRequest$Builder;",
+  "java.net.http.HttpResponse",
+  "java.net.http.HttpResponse$BodyHandler",
+  "java.net.http.HttpResponse$BodyHandlers",
+  "java.net.http.HttpResponse$BodyHandlers.ofString()Ljava/net/http/HttpResponse$BodyHandler;",
+  "java.net.http.HttpResponse.body()Ljava/lang/Object;",
+  "java.net.http.HttpResponse.statusCode()I",
+  "java.nio.file.Files.readString(Ljava/nio/file/Path;)Ljava/lang/String;",
+  "java.nio.file.Files.writeString(Ljava/nio/file/Path;Ljava/lang/CharSequence;[Ljava/nio/file/OpenOption;)Ljava/nio/file/Path;"
+ ],
+ "newLibraries": [],
+ "libraryVersions": [],
+ "platformReferences": 403,
+ "libraries": [
+  "kotlin",
+  "kotlinx/serialization",
+  "org/slf4j"
+ ]
+}

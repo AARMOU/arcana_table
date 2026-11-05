@@ -1,0 +1,2379 @@
+{
+  "library": {
+    "before": 19097,
+    "after": 20165,
+    "added": [
+      "70,000 Light-Years from Home",
+      "A Good Day to Die",
+      "Abandoned Sarcophagus",
+      "Abnormal Endurance",
+      "Academy Instructor",
+      "Adanto Vanguard",
+      "Admiral Beckett Brass",
+      "Admiral's Order",
+      "Adversary by Algorithm",
+      "Aerial Guide",
+      "Aeromunculus",
+      "Aether Tunnel",
+      "Ahn-Crop Invader",
+      "Ajani's Influence",
+      "Ajani's Last Stand",
+      "Ajani, Adversary of Tyrants",
+      "Ajani, Wise Counselor",
+      "All Good Things...",
+      "Alpine Moon",
+      "Ammit Eternal",
+      "Amok Time",
+      "Amplifire",
+      "Amulet of Safekeeping",
+      "Andromedan Automatons",
+      "Angel of Grace",
+      "Angel of the God-Pharaoh",
+      "Angelic Exaltation",
+      "Angrath's Fury",
+      "Angrath's Marauders",
+      "Angrath, Captain of Chaos",
+      "Angrath, Minotaur Pirate",
+      "Angrath, the Flame-Chained",
+      "Anointed Deacon",
+      "Antagonist Incorporator",
+      "Anthropological Mission",
+      "Apex of Power",
+      "Arboreal Grazer",
+      "Arcades, the Strategist",
+      "Arcane Adaptation",
+      "Arch of Orazca",
+      "Arclight Phoenix",
+      "Arguel's Blood Fast",
+      "Armus, Skin of Evil",
+      "Arrester's Admonition",
+      "Arrester's Zeal",
+      "Arterial Flow",
+      "Artificial Anomaly",
+      "Ashes of the Abhorrent",
+      "Assembly Specialist",
+      "Assure // Assemble",
+      "Astute Terraformer",
+      "Attendant of Vraska",
+      "Atzocan Archer",
+      "Augur of Bolas",
+      "Aurelia, Exemplar of Justice",
+      "Automated Warfare System",
+      "Aven Eternal",
+      "Aven Reedstalker",
+      "Aven of Enduring Hope",
+      "Avid Reclaimer",
+      "Awaken the Erstwhile",
+      "Awakened Amalgam",
+      "Awakening of Vitu-Ghazi",
+      "Axis of Mortality",
+      "Azor's Gateway",
+      "Azor, the Lawbringer",
+      "Azorius Skyguard",
+      "Baffling End",
+      "Barging Sergeant",
+      "Beacon Bolt",
+      "Beamsplitter Mage",
+      "Beckett Mariner, Impetuous Ensign",
+      "Bedeck // Bedazzle",
+      "Belligerent Brontodon",
+      "Bellowing Aegisaur",
+      "Beneath the Sands",
+      "Benthic Biomancer",
+      "Bioessence Hydra",
+      "Biogenic Ooze",
+      "Bishop of Binding",
+      "Bishop of the Bloodstained",
+      "Bitterbow Sharpshooters",
+      "Blade Instructor",
+      "Blade Juggler",
+      "Blastoneuron",
+      "Blazing Hope",
+      "Bleeding Edge",
+      "Blindblast",
+      "Blood Burglar",
+      "Blood Operative",
+      "Blood Sun",
+      "Blood for Bones",
+      "Bloodcrazed Paladin",
+      "Bloodmist Infiltrator",
+      "Bloom Hulk",
+      "Boarding Action",
+      "Bolrac-Clan Crusher",
+      "Bond of Discipline",
+      "Bond of Insight",
+      "Bond of Passion",
+      "Bond of Revival",
+      "Bonded Horncrest",
+      "Bone Dragon",
+      "Bone to Ash",
+      "Boneclad Necromancer",
+      "Boneyard Parley",
+      "Bontu's Last Reckoning",
+      "Book Devourer",
+      "Borg Cube",
+      "Boros Challenger",
+      "Bounty Agent",
+      "Bounty of Might",
+      "Brad Boimler, Eager Ensign",
+      "Brambleweft Behemoth",
+      "Branching Timeline",
+      "Brawl-Bash Ogre",
+      "Brazen Bluff",
+      "Brazen Buccaneers",
+      "Bright Reprisal",
+      "Brought Back",
+      "Burning Sun's Avatar",
+      "Burning-Fist Minotaur",
+      "Burning-Tree Vandal",
+      "Callous Dismissal",
+      "Camaraderie",
+      "Cantankerous Captain",
+      "Captain Benjamin Sisko",
+      "Captain James T. Kirk",
+      "Captain Jean-Luc Picard",
+      "Captain Jonathan Archer",
+      "Captain Kathryn Janeway",
+      "Captain Michael Burnham",
+      "Captain Pike, Fullness of Time",
+      "Captain's Hook",
+      "Captivating Crew",
+      "Captive Audience",
+      "Carnival // Carnage",
+      "Carrion Imp",
+      "Carrion Screecher",
+      "Castaway's Despair",
+      "Cavalcade of Calamity",
+      "Cavalier of Night",
+      "Cavalier of Thorns",
+      "Centaur Peacemaker",
+      "Chamber Sentry",
+      "Chance for Glory",
+      "Chandra's Defeat",
+      "Chandra's Triumph",
+      "Chandra, Fire Artisan",
+      "Chaos Wand",
+      "Charging Tuskodon",
+      "Charmed Stray",
+      "Charnel Troll",
+      "Chemister's Insight",
+      "Cherished Hatchling",
+      "Chillbringer",
+      "Chromium, the Mutable",
+      "Cindervines",
+      "Citywide Bust",
+      "Clan Guildmage",
+      "Class-F Shuttlecraft",
+      "Clear the Mind",
+      "Clear the Stage",
+      "Cleveland Booker, Empath",
+      "Cloak and Phaser",
+      "Code of Constraint",
+      "Collar the Culprit",
+      "Collation Trimatrix",
+      "Collision // Colossus",
+      "Combadge",
+      "Combine Guildmage",
+      "Command the Dreadhorde",
+      "Commence the Endgame",
+      "Commune with Dinosaurs",
+      "Conclave Cavalier",
+      "Conclave Guildmage",
+      "Conclave Tribunal",
+      "Connive // Concoct",
+      "Conquest Mission",
+      "Consecrate // Consume",
+      "Consider the Prime Directive",
+      "Contentious Plan",
+      "Cosmotronic Wave",
+      "Costly Plunder",
+      "Courage in Crisis",
+      "Crackling Drake",
+      "Crafty Cutpurse",
+      "Creeping Chill",
+      "Creeping Trailblazer",
+      "Crush Dissent",
+      "Cry of the Carnarium",
+      "Crypt of the Eternals",
+      "Crystalline Entity",
+      "Culber and Stamets, Star-Crossed",
+      "Curious Obsession",
+      "D'Ghor Bloodletter",
+      "D-7 Battle Cruiser",
+      "Dagger Caster",
+      "Daggersail Aeronaut",
+      "Dal R'El, Augment Orphan",
+      "Daniels, Temporal Agent",
+      "Daring Buccaneer",
+      "Daring Saboteur",
+      "Dark Inquiry",
+      "Darkblade Agent",
+      "Dathon and Picard at El-Adrel",
+      "Dathon, His Heart Open",
+      "Dauntless Aven",
+      "David and Carol Marcus, Creators",
+      "Davriel's Shadowfugue",
+      "Davriel, Rogue Shadowmage",
+      "Dazzling Lights",
+      "De-evolve",
+      "Dead Man's Chest",
+      "Dead Revels",
+      "Deadeye Brawler",
+      "Deadeye Quartermaster",
+      "Deadeye Rig-Hauler",
+      "Deadeye Tormentor",
+      "Deadeye Tracker",
+      "Deadly Visit",
+      "Deanna Troi, Psychic Counsel",
+      "Death Is Irrelevant",
+      "Deathgorge Scavenger",
+      "Deathsprout",
+      "Debtors' Transport",
+      "Deep Space 9",
+      "Deep Space Scan",
+      "Deliver Unto Evil",
+      "Demanding Dragon",
+      "Demotion",
+      "Departed Deckhand",
+      "Depose // Deploy",
+      "Deputy of Detention",
+      "Desert of the Fervent",
+      "Desert of the Glorified",
+      "Desert of the Indomitable",
+      "Desert of the True",
+      "Desperate Castaways",
+      "Detection Tower",
+      "Devotee of Strength",
+      "Devouring Hellion",
+      "Dimir Spybug",
+      "Dire Fleet Captain",
+      "Dire Fleet Daredevil",
+      "Dire Fleet Interloper",
+      "Dire Fleet Neckbreaker",
+      "Dire Fleet Poisoner",
+      "Dire Fleet Ravager",
+      "Direct Current",
+      "Discovery // Dispersal",
+      "Disinformation Campaign",
+      "District Guide",
+      "Diviner's Lockbox",
+      "Djeru's Renunciation",
+      "Dominion Assault Force",
+      "Dominion Infiltration",
+      "Dominion Saboteur",
+      "Dominion Supervisor",
+      "Domri's Ambush",
+      "Domri's Nodorog",
+      "Domri, Chaos Bringer",
+      "Domri, City Smasher",
+      "Doublecast",
+      "Dovin's Acuity",
+      "Dovin's Dismissal",
+      "Dovin, Architect of Law",
+      "Dovin, Grand Arbiter",
+      "Dovin, Hand of Control",
+      "Dr. Beverly Crusher",
+      "Dr. Joseph M'Benga",
+      "Dr. Leonard \"Bones\" McCoy",
+      "Dr. McCoy, Surly Surgeon",
+      "Dreadhorde Arcanist",
+      "Dreadhorde Butcher",
+      "Dreadhorde Twins",
+      "Dream Eater",
+      "Dreamcaller Siren",
+      "Drill Bit",
+      "Drowned Secrets",
+      "Druid of Horns",
+      "Dryad Greenseeker",
+      "Dual Shot",
+      "Dunes of the Dead",
+      "Dungeon Geists",
+      "Dusk Charger",
+      "Duskborne Skymarcher",
+      "Dwindle",
+      "Earthshaker Khenra",
+      "Eject the Warp Core",
+      "Elaborate Firecannon",
+      "Elim Garak, Simple Tailor",
+      "Elvish Clancaller",
+      "Emergence Zone",
+      "Emergency Holographic Crew",
+      "Emergency Powers",
+      "Emergent Growth",
+      "Emissary of Sunrise",
+      "Emmara, Soul of the Accord",
+      "Emperor's Vanguard",
+      "Encounter the Unknown",
+      "Energize",
+      "Engineered Explosives",
+      "Ensign Pavel Chekov",
+      "Enter the God-Eternals",
+      "Enter the Unknown",
+      "Enterprise NX-01",
+      "Entrancing Melody",
+      "Erica Ortegas, Plucky Pilot",
+      "Erratic Cyclops",
+      "Eternal Skylord",
+      "Eternal of Harsh Truths",
+      "Ethereal Absolution",
+      "Etrata, the Silencer",
+      "Everdawn Champion",
+      "Excalbian Gamemaster",
+      "Expansion // Explosion",
+      "Expel from Orazca",
+      "Experimental Frenzy",
+      "Exploratory Mission",
+      "Eyes Everywhere",
+      "Fathom Fleet Boarder",
+      "Fathom Fleet Captain",
+      "Fblthp, the Lost",
+      "Feather, the Redeemed",
+      "Federation Field Medic",
+      "Federation Outpost",
+      "Federation Resupply",
+      "Fell Flagship",
+      "Fell Specter",
+      "Fervent Paincaster",
+      "Final Frontier",
+      "Final Payment",
+      "Finale of Eternity",
+      "Finale of Glory",
+      "Finale of Promise",
+      "Fire Shrine Keeper",
+      "Fireblade Artist",
+      "Firemind Vessel",
+      "First Contact",
+      "Flames of the Raze-Boar",
+      "Fleet Swallower",
+      "Flood of Recollection",
+      "Flower // Flourish",
+      "Forbidding Spirit",
+      "Forced Landing",
+      "Forerunner of the Empire",
+      "Form of the Dinosaur",
+      "Fraying Omnipotence",
+      "Fresh-Faced Recruit",
+      "Frontline Devastator",
+      "Fugitive Listener",
+      "Gabriel Lorca, Mirror Menace",
+      "Galloping Lizrog",
+      "Gargos, Vicious Watcher",
+      "Gargoyle Sentinel",
+      "Garrison Sergeant",
+      "Gaseous Anomaly",
+      "Gatebreaker Ram",
+      "Gatekeeper Gargoyle",
+      "Gates Ablaze",
+      "Genesis Device",
+      "Genesis Effect",
+      "Georgiou, Terran Emperor",
+      "Ghastbark Twins",
+      "Ghost of Illyria",
+      "Gideon Blackblade",
+      "Gideon's Battle Cry",
+      "Gideon's Defeat",
+      "Gideon's Sacrifice",
+      "Gideon's Triumph",
+      "Gideon, the Oathsworn",
+      "Gift of Paradise",
+      "Gilded Cerodon",
+      "Gird for Battle",
+      "Glaive of the Guildpact",
+      "Glass of the Guildpact",
+      "Glowspore Shaman",
+      "Goblin Banneret",
+      "Goblin Cratermaker",
+      "Goblin Gathering",
+      "Goblin Locksmith",
+      "God-Eternal Kefnet",
+      "God-Eternal Oketra",
+      "God-Eternal Rhonas",
+      "God-Pharaoh's Statue",
+      "Golden Demise",
+      "Golden Guardian",
+      "Golgari Raiders",
+      "Golos, Tireless Pilgrim",
+      "Goring Ceratops",
+      "Gowron, Eager for Battle",
+      "Grafdigger's Cage",
+      "Grand Nagus Zek",
+      "Granitic Titan",
+      "Grasping Current",
+      "Grasping Scoundrel",
+      "Grateful Apparition",
+      "Gravewaker",
+      "Graveyard Marshal",
+      "Gravitic Punch",
+      "Gray and Adira, Forever Joined",
+      "Grim Captain's Call",
+      "Grim Initiate",
+      "Growth Cycle",
+      "Growth-Chamber Guardian",
+      "Gruesome Fate",
+      "Gruesome Menagerie",
+      "Gruul Beastmaster",
+      "Gruul Spellbreaker",
+      "Guidance Failure",
+      "Guild Globe",
+      "Guild Summit",
+      "Guildmages' Forum",
+      "Guildpact Informant",
+      "Gul Dukat, Colonial Prefect",
+      "Gutterbones",
+      "Gwyndala, the Progeny",
+      "Gyre Engineer",
+      "H.M.S. Bounty, Unlikely Timeship",
+      "Haazda Marshal",
+      "Hackrobat",
+      "Hadana's Climb",
+      "Hammer Dropper",
+      "Hardy Veteran",
+      "Hashep Oasis",
+      "Hatchery Spider",
+      "Hazoret's Undying Fury",
+      "Headstrong Brute",
+      "Heartless Pillage",
+      "Heartwarming Redemption",
+      "Hellkite Whelp",
+      "Hemmer, Fixing What Is Broken",
+      "Herald of Secret Streams",
+      "Herald of the Dreadhorde",
+      "Hieromancer's Cage",
+      "Hierophant's Chalice",
+      "High Alert",
+      "Highly Illogical",
+      "Hijack",
+      "Hive Mind Coprocessor",
+      "Holo-Engineer",
+      "Hologram Janeway",
+      "Hologram Stalker",
+      "Honor the God-Pharaoh",
+      "Hope Tender",
+      "Hornswoggle",
+      "Hoshi Sato, Exolinguist",
+      "Hostage Taker",
+      "House Guildmage",
+      "Huatli's Raptor",
+      "Huatli's Spurring",
+      "Huatli, Radiant Champion",
+      "Huatli, the Sun's Heart",
+      "Hungering Hydra",
+      "Hunt the Weak",
+      "Hypothesizzle",
+      "I'm a Doctor, Not a . . .",
+      "Ifnir Deadlands",
+      "Ilharg, the Raze-Boar",
+      "Immolation Shaman",
+      "Imperious Oligarch",
+      "Impossible Choice",
+      "In the Pale Moonlight",
+      "Incubation // Incongruity",
+      "Induced Amnesia",
+      "Infernal Reckoning",
+      "Inferno Hellion",
+      "Inferno Jet",
+      "Infinite Diversity",
+      "Integrity // Intervention",
+      "Interplanar Beacon",
+      "Intrusive Packbeast",
+      "Invade the City",
+      "Invading Manticore",
+      "Invert // Invent",
+      "Ionize",
+      "Ipnu Rivulet",
+      "Isareth the Awakener",
+      "Isolinear Processor",
+      "Ixalan's Binding",
+      "Ixalli's Diviner",
+      "Izoni, Thousand-Eyed",
+      "Jace's Defeat",
+      "Jace's Projection",
+      "Jace's Ruse",
+      "Jace's Sentinel",
+      "Jace's Triumph",
+      "Jace, Cunning Castaway",
+      "Jade Bearer",
+      "Jadelight Ranger",
+      "Jadzia Dax, Living Legacy",
+      "Jake Sisko, War Correspondent",
+      "Jaya, Venerated Firemage",
+      "Jett Reno, Problem Solver",
+      "Jiang Yanggu, Wildcrafter",
+      "Join Shields",
+      "Judith, the Scourge Diva",
+      "Justice Strike",
+      "Kai Winn, Faithless Leader",
+      "Kasmina's Transmutation",
+      "Kaya's Wrath",
+      "Kaya, Bane of the Dead",
+      "Kaya, Orzhov Usurper",
+      "Kefnet's Last Word",
+      "Khan, Despot by Design",
+      "Khan, Vengeful Heart",
+      "Khenra Eternal",
+      "Khenra Scrapper",
+      "Kinjalli's Sunwing",
+      "Kiora's Dambreaker",
+      "Kira Nerys, Firebrand",
+      "Kirk, Commanding Officer",
+      "Knight of Sorrows",
+      "Knight of the Last Breath",
+      "Kobayashi Maru Scenario",
+      "Kopala, Warden of Waves",
+      "Kumena's Awakening",
+      "Kumena's Speaker",
+      "Kumena, Tyrant of Orazca",
+      "La'An Noonien-Singh, Security",
+      "Lava Coil",
+      "Lawmage's Binding",
+      "Lazav, the Multifarious",
+      "Lazotep Reaver",
+      "Leafkin Druid",
+      "League Guildmage",
+      "Leapfrog",
+      "Ledev Champion",
+      "Legion Conquistador",
+      "Legion Guildmage",
+      "Legion's End",
+      "Lena, Selfless Champion",
+      "Lethal Sting",
+      "Leyline of Abundance",
+      "Lieutenant Commander Data",
+      "Light of the Legion",
+      "Liliana's Contract",
+      "Liliana's Defeat",
+      "Liliana's Spoils",
+      "Liliana's Triumph",
+      "Liliana, Untouched by Death",
+      "Liliana, the Necromancer",
+      "Live Long and Prosper",
+      "Living Twister",
+      "Loaming Shaman",
+      "Locutus, the One Who Speaks",
+      "Lore, Positronic Provocateur",
+      "Lotleth Giant",
+      "Lotus Field",
+      "Loxodon Sergeant",
+      "Lt. Cmdr. Geordi La Forge",
+      "Lumbering Battlement",
+      "Luminous Bonds",
+      "Lurching Rotbeast",
+      "Lurking Chupacabra",
+      "Lwaxana Troi, Charming Guest",
+      "MACO Strike Team",
+      "Macabre Mockery",
+      "Magistrate's Scepter",
+      "Majestic Heliopterus",
+      "Make It So",
+      "Manticore Eternal",
+      "March of the Drowned",
+      "Martyr for the Cause",
+      "Mass Manipulation",
+      "Massacre Girl",
+      "Mastermind's Acquisition",
+      "Mausoleum Harpy",
+      "Mausoleum Secrets",
+      "Maximize Altitude",
+      "Maximize Velocity",
+      "Mek'leth Berserker",
+      "Melkotian Adjudicator",
+      "Mephitic Vapors",
+      "Merciless Eternal",
+      "Merfolk Branchwalker",
+      "Merfolk Skydiver",
+      "Mesmerizing Benthid",
+      "Metamorphic Alteration",
+      "Miles O'Brien, Transporter Ops",
+      "Mirror March",
+      "Mirror Universe Intrusion",
+      "Mission Briefing",
+      "Mistcaller",
+      "Mizzium Tank",
+      "Mnemonic Betrayal",
+      "Moaning Wall",
+      "Mobilized District",
+      "Mowu, Loyal Companion",
+      "Mr. Spock, Science Officer",
+      "Mummy Paramount",
+      "Murmuring Mystic",
+      "Mutiny",
+      "Nahiri, Storm of Stone",
+      "Narcomoeba",
+      "Navigator's Ruin",
+      "Neelix, Moral Support",
+      "Neheb, Dreadhorde Champion",
+      "Neheb, the Eternal",
+      "Neoform",
+      "Netcaster Spider",
+      "Neuroflux Heirloom",
+      "Never Happened",
+      "New Planet",
+      "Nexus of Fate",
+      "Ni'Var Science Academy",
+      "Nicol Bolas, the Ravager",
+      "Nightmare's Thirst",
+      "Nikya of the Old Ways",
+      "Nissa's Defeat",
+      "Nissa's Triumph",
+      "Niv-Mizzet Reborn",
+      "Nog, Ambitious Cadet",
+      "Notion Rain",
+      "Novice Knight",
+      "Noxious Grasp",
+      "Nullhide Ferox",
+      "Nyota Uhura, Communications",
+      "Oasis Ritualist",
+      "Oath of Kaya",
+      "Oberth-Class Starship",
+      "Obsidian Order Operative",
+      "Ochran Assassin",
+      "Oketra's Last Mercy",
+      "Old-Growth Dryads",
+      "Omnispell Adept",
+      "Open Fire",
+      "Open the Gates",
+      "Orazca Relic",
+      "Orzhov Racketeers",
+      "Overflow Submatrix",
+      "Overgrowth Elemental",
+      "Overwhelming Splendor",
+      "Pack Mastiff",
+      "Pah-Wraith",
+      "Paladin of Atonement",
+      "Palladia-Mors, the Ruiner",
+      "Parhelion Patrol",
+      "Path of Mettle",
+      "Patient Rebuilding",
+      "Pattern Buffer Preservation",
+      "Peace in Our Time",
+      "Pelt Collector",
+      "Perils of the Past",
+      "Persistent Petitioners",
+      "Pestilent Spirit",
+      "Pet Sehlat",
+      "Phlox, Unorthodox Doctor",
+      "Photosynthetic Physician",
+      "Phylactery Lich",
+      "Pilfering Imp",
+      "Pious Interdiction",
+      "Piston-Fist Cyclops",
+      "Plague Mare",
+      "Plague Wight",
+      "Planetary Bombardment",
+      "Planewide Celebration",
+      "Plasma Cascade",
+      "Plaza of Harmony",
+      "Pledge of Unity",
+      "Pollenbright Druid",
+      "Polyraptor",
+      "Portal of Sanctuary",
+      "Precognitive Perception",
+      "Price of Betrayal",
+      "Price of Fame",
+      "Pride of Conquerors",
+      "Priest of the Wakening Sun",
+      "Prime Speaker Vannifar",
+      "Prison Realm",
+      "Profane Procession",
+      "Protean Raider",
+      "Prying Blade",
+      "Psychic Corrosion",
+      "Psychic Symbiont",
+      "Pteramander",
+      "Pulse of Murasa",
+      "Puncturing Blow",
+      "Pure Energy",
+      "Q Continuum",
+      "Q, Stacking the Deck",
+      "Quark's Bar",
+      "Quark, Humble Proprietor",
+      "Quasiduplicate",
+      "Queen's Agent",
+      "Quench",
+      "Radiant Destiny",
+      "Radical Idea",
+      "Rafter Demon",
+      "Raging Kronch",
+      "Raging Swordtooth",
+      "Rakdos Firewheeler",
+      "Rakdos Roustabout",
+      "Rakdos, the Showstopper",
+      "Ral's Dispersal",
+      "Ral's Staticaster",
+      "Ral, Caller of Storms",
+      "Ral, Izzet Viceroy",
+      "Rally to Battle",
+      "Rallying Roar",
+      "Rampage of the Clans",
+      "Rampaging Hippo",
+      "Ramunap Ruins",
+      "Ranging Raptors",
+      "Ravager Wurm",
+      "Ravenous Cosmozoan",
+      "Ravnica at War",
+      "Razaketh's Rite",
+      "Red Alert!",
+      "Regenesis",
+      "Rekindling Phoenix",
+      "Release to the Wind",
+      "Relentless Advance",
+      "Relentless Raptor",
+      "Remorseful Cleric",
+      "Repeating Barrage",
+      "Replicator",
+      "Repudiate // Replicate",
+      "Rescuer Sphinx",
+      "Resilient Khenra",
+      "Resistance Is Futile",
+      "Resolute Survivors",
+      "Resplendent Griffin",
+      "Response // Resurgence",
+      "Revival // Revenge",
+      "Rhonas's Last Stand",
+      "Rile",
+      "Rise from the Grave",
+      "Rising Populace",
+      "Risk Factor",
+      "Ritual of Rejuvenation",
+      "River Heralds' Boon",
+      "River Hoopoe",
+      "Riverwise Augur",
+      "Rix Maadi Reveler",
+      "Roalesk, Apex Hybrid",
+      "Rogue's Gloves",
+      "Rok-Tahk, Budding Scientist",
+      "Role Reversal",
+      "Romulan Bird-of-Prey",
+      "Rubblebelt Rioters",
+      "Rubblebelt Runner",
+      "Ruin Raider",
+      "Ruin Rat",
+      "Rules of Acquisition",
+      "Rumbling Ruin",
+      "Run Aground",
+      "Runaway Steam-Kin",
+      "Saavik, Stoic Student",
+      "Sadistic Skymarcher",
+      "Sagittars' Volley",
+      "Saheeli's Silverwing",
+      "Saheeli, Sublime Artificer",
+      "Salt Vampire",
+      "Salvager of Ruin",
+      "Salvager of Secrets",
+      "Samut, Tyrant Smasher",
+      "Sandblast",
+      "Sanguine Glorifier",
+      "Sanguine Sacrament",
+      "Sarcophagus, Ship of the Dead",
+      "Sarek, Federation Ambassador",
+      "Sarkhan the Masterless",
+      "Sarkhan's Dragonfire",
+      "Sarkhan's Unsealing",
+      "Sarkhan, Dragonsoul",
+      "Sarkhan, Fireblood",
+      "Saru, Unthreatened",
+      "Saurian Explorer",
+      "Sauroform Hybrid",
+      "Savage Smash",
+      "Savage Stomp",
+      "Savvy Profiteer",
+      "Scheming Symmetry",
+      "Scorchmark",
+      "Screaming Shield",
+      "Scrounger of Souls",
+      "Scuttlegator",
+      "Sea Legs",
+      "Search for Azcanta",
+      "Season of Growth",
+      "Secrets of the Golden City",
+      "See Red",
+      "Seekers' Squire",
+      "Seer of the Last Tomorrow",
+      "Sela, Tal Shiar Paradox",
+      "Selective Snare",
+      "Sentinel's Mark",
+      "Seraph of the Scales",
+      "Set Phasers to . . .",
+      "Seven of Nine",
+      "Seven of Nine, Unassimilated",
+      "Severed Strands",
+      "Shake the Foundations",
+      "Shapers of Nature",
+      "Shapers' Sanctuary",
+      "Shared Summons",
+      "Sharktocrab",
+      "Shefet Dunes",
+      "Shield Mare",
+      "Shields Up!",
+      "Shifting Ceratops",
+      "Shipwreck Looter",
+      "Shuttle Ace",
+      "Sickbay",
+      "Sigiled Sword of Valeron",
+      "Silent Gravestone",
+      "Silent Submersible",
+      "Silhana Wayfinder",
+      "Sinister Sabotage",
+      "Siren Lookout",
+      "Siren Reaver",
+      "Siren's Ruse",
+      "Skalla Wolf",
+      "Skarrgan Hellkite",
+      "Skatewing Spy",
+      "Skewer the Critics",
+      "Skitter Eel",
+      "Sky Tether",
+      "Skymarch Bloodletter",
+      "Skymarcher Aspirant",
+      "Skyrider Patrol",
+      "Slaughter the Strong",
+      "Sleep",
+      "Slice in Twain",
+      "Slippery Scoundrel",
+      "Smelt",
+      "Smelt-Ward Ignus",
+      "Snubhorn Sentry",
+      "Solar Blaze",
+      "Solemnity",
+      "Solitary Camel",
+      "Sonic Assault",
+      "Sorin's Guide",
+      "Sorin, Vampire Lord",
+      "Sorin, Vengeful Bloodlord",
+      "Soul Diviner",
+      "Spark Double",
+      "Spark Harvest",
+      "Spatial Anomaly",
+      "Spawn of Mayhem",
+      "Species 8472",
+      "Spell Swindle",
+      "Spellkeeper Weird",
+      "Sphinx of Foresight",
+      "Sphinx of New Prahv",
+      "Sphinx of the Guildpact",
+      "Sphinx's Decree",
+      "Sphinx's Insight",
+      "Spike-Tailed Ceratops",
+      "Spikewheel Acrobat",
+      "Spire Winder",
+      "Spock, Always Your Friend",
+      "Spreading Rot",
+      "Sprouting Renewal",
+      "Stable Wormhole",
+      "Stampeding Horncrest",
+      "Star-Crowned Stag",
+      "Starfleet Academy",
+      "Starfleet Security",
+      "Starfleet Spanner Jockey",
+      "Status // Statue",
+      "Steadfast Armasaur",
+      "Steadfast Sentinel",
+      "Steward of Solidarity",
+      "Storied Veteran",
+      "Storm Fleet Aerialist",
+      "Storm Fleet Arsonist",
+      "Storm Fleet Swashbuckler",
+      "Storm the Citadel",
+      "Storm the Vault",
+      "Storrev, Devkarin Lich",
+      "Stray from History",
+      "Street Riot",
+      "Strength of the Pack",
+      "Striped Riverwinder",
+      "Subcommander T'Pol",
+      "Subspace Anomaly",
+      "Sulu, Space Swashbuckler",
+      "Summary Judgment",
+      "Sun-Crested Pterodon",
+      "Suncleanser",
+      "Sunder Shaman",
+      "Sunhome Stalwart",
+      "Sunrise Seeker",
+      "Sunset Pyramid",
+      "Support Mission",
+      "Supreme Will",
+      "Surge Mare",
+      "Survivors' Encampment",
+      "Suurok-Class Science Vessel",
+      "Suus Mahna Practitioner",
+      "Swathcutter Giant",
+      "Switcheroo",
+      "Sylvia Tilly, Joy of Discovery",
+      "Syndicate Messenger",
+      "Tactical Officer",
+      "Tajic, Legion's Edge",
+      "Tal Shiar Analyst",
+      "Tal Shiar Operative",
+      "Tale's End",
+      "Tamiyo, Collector of Tales",
+      "Targ Wrangler",
+      "Tasha Yar, Out of Time",
+      "Teferi's Time Twist",
+      "Tell Me What You See",
+      "Tempest Caller",
+      "Temple Altisaur",
+      "Temporal Anomaly",
+      "Temporal Conqueror",
+      "Tenacious Drone",
+      "Tenth District Legionnaire",
+      "Tenth District Veteran",
+      "Test of Conviction",
+      "Test of Courage",
+      "Test of Identity",
+      "Test of Loyalty",
+      "Test of Priorities",
+      "Tetzimoc, Primal Death",
+      "Teyo, the Shieldmage",
+      "Tezzeret's Gatebreaker",
+      "Tezzeret, Cruel Machinist",
+      "The Caretaker",
+      "The City on the Edge of Forever",
+      "The Destruction of Praxis",
+      "The Doctor, EMH",
+      "The Duras Sisters",
+      "The Elderspell",
+      "The Haunt of Hightower",
+      "The Holodeck",
+      "The Immortal Sun",
+      "The Inner Light",
+      "The Measure of a Man",
+      "The Naked Time",
+      "The Needs of the Many",
+      "The Scorpion God",
+      "The Traveler",
+      "The Unicomplex",
+      "The Wanderer",
+      "The Wrath of Khan",
+      "Theater of Horrors",
+      "There's Coffee in that Nebula",
+      "Thief of Sanity",
+      "Thorn Lieutenant",
+      "Thorned Moloch",
+      "Those Old Scientists",
+      "Thought Collapse",
+      "Thought Distortion",
+      "Thought Erasure",
+      "Thoughtbound Phantasm",
+      "Thrash // Threat",
+      "Thrash of Raptors",
+      "Thud",
+      "Thunderherd Migration",
+      "Thundering Ceratok",
+      "Tibalt, Rakish Instigator",
+      "Tilonalli's Crown",
+      "Tilonalli's Summoner",
+      "Timestream Navigator",
+      "Tishana's Wayfinder",
+      "Tishana, Voice of Thunder",
+      "Tithe Taker",
+      "Tocatli Honor Guard",
+      "Toll of the Invasion",
+      "Tomb Robber",
+      "Tomebound Lich",
+      "Tomik, Distinguished Advokist",
+      "Topple the Statue",
+      "Torment of Venom",
+      "Transmogrifying Wand",
+      "Transporter Malfunction",
+      "Trapjaw Tyrant",
+      "Tricorder",
+      "Trollbred Guardian",
+      "Trostani Discordant",
+      "Truefire Captain",
+      "U.S.S. Cerritos, Following Up",
+      "U.S.S. Discovery, at Black Alert",
+      "U.S.S. Enterprise-A, Free Spirit",
+      "U.S.S. Enterprise-D, Galaxy-Class",
+      "U.S.S. Excelsior, Cutting Edge",
+      "U.S.S. Reliant, From Hell's Heart",
+      "U.S.S. Voyager, Lone Wanderer",
+      "Ugin's Conjurant",
+      "Ugin, the Ineffable",
+      "Una Chin-Riley, Number One",
+      "Unbreakable Formation",
+      "Uncomfortable Chill",
+      "Unconventional Tactics",
+      "Undead Servant",
+      "Undercity Necrolisk",
+      "Undercity Scavenger",
+      "Undercity Uprising",
+      "Undercity's Embrace",
+      "Unexplained Disappearance",
+      "Unholy Indenture",
+      "Unmoored Ego",
+      "Urban Utopia",
+      "Ursine Champion",
+      "V'Ger, the Intruder",
+      "Vaevictis Asmadi, the Dire",
+      "Vampire Sovereign",
+      "Vampire's Zeal",
+      "Vash, Freelance Archaeologist",
+      "Venerated Loxodon",
+      "Vengeance Mission",
+      "Vengeful Warchief",
+      "Verdant Rebirth",
+      "Verdant Sun's Avatar",
+      "Verity Circle",
+      "Vicious Rumors",
+      "Vigorspore Wurm",
+      "Vindictive Vampire",
+      "Vineshaper Mystic",
+      "Vivid Revival",
+      "Vivien of the Arkbow",
+      "Vivien's Grizzly",
+      "Vivien's Invocation",
+      "Vivien, Arkbow Ranger",
+      "Vivien, Champion of the Wilds",
+      "Vizier of the Anointed",
+      "Vizier of the Scorpion",
+      "Vizier of the True",
+      "Vona's Hunger",
+      "Voracious Hydra",
+      "Vraska's Conquistador",
+      "Vraska's Finisher",
+      "Vraska's Scorn",
+      "Vraska's Stoneglare",
+      "Vraska, Golgari Queen",
+      "Vraska, Regal Gorgon",
+      "Vraska, Relic Seeker",
+      "Vraska, Scheming Gorgon",
+      "Vraska, Swarm's Eminence",
+      "Vulcan Mind-Meld",
+      "Wakening Sun's Avatar",
+      "Waker of the Wilds",
+      "Wakeroot Elemental",
+      "Wall of Lost Thoughts",
+      "Wand of Vertebrae",
+      "Wanderer's Strike",
+      "War Screecher",
+      "Warkite Marauder",
+      "Warp Speed",
+      "Warrant // Warden",
+      "Waterknot",
+      "Wesley Crusher, Starfleet Cadet",
+      "Whispering Snitch",
+      "Widespread Brutality",
+      "Wildfire Eternal",
+      "Wildgrowth Walker",
+      "Will Riker, First in the Field",
+      "Windreader Sphinx",
+      "Without Weakness",
+      "Wojek Bodyguard",
+      "Wolfrider's Saddle",
+      "Worf, Honor-Bound Warrior",
+      "Worf, Intelligence Contractor",
+      "Wretched Camel",
+      "Yarok's Fenlurker",
+      "Yarok, the Desecrated",
+      "Year of Hell",
+      "Zacama, Primal Calamity",
+      "Zealot of the God-Pharaoh",
+      "Zefram Cochrane, Warp Pioneer",
+      "Zegana, Utopian Speaker",
+      "Zero, Incorporeal Sensate"
+    ],
+    "removed": []
+  },
+  "custom_cards": 316,
+  "now_upstream": [
+    "Arch of Orazca",
+    "Captain James T. Kirk",
+    "Desert of the Glorified",
+    "Kinjalli's Sunwing",
+    "Lotus Field",
+    "Polyraptor",
+    "Transmogrifying Wand",
+    "Ugin, the Ineffable",
+    "Verdant Sun's Avatar",
+    "Wakening Sun's Avatar",
+    "Zacama, Primal Calamity"
+  ],
+  "deck_cards_missing": {},
+  "deck_cards_newly_playable": {},
+  "deck_cards_still_swapped": [
+    "Goblin Welder",
+    "Ratchet, Field Medic // Ratchet, Rescue Racer"
+  ],
+  "deck_cards_changed": {
+    "Aang's Iceberg": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Aang, Swift Savior": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Aang, at the Crossroads": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Aang, the Last Airbender": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Abandoned Air Temple": [
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Abrade": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Adagia, Windswept Bastion": [
+      "Artificer v4 (Tails)"
+    ],
+    "Adventurer's Inn": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Aftermath Analyst": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Agna Qel'a": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Airbender Ascension": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Airbender's Reversal": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Airbending Lesson": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "An Offer You Can't Refuse": [
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Ancient Adamantoise": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Appa, Loyal Sky Bison": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Appa, Steadfast Guardian": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Arcane Signet": [
+      "Animated Army",
+      "Baylen (EDHREC average)",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Artificer v4 (Tails)",
+      "Hazel Squirrels",
+      "Velociramptor Beefcake"
+    ],
+    "Authority of the Consuls": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Avatar Aang": [
+      "Avatar Aang (EDHREC average)",
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Avatar's Wrath": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Ba Sing Se": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Badgermole Cub": [
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Ayula Bears"
+    ],
+    "Balamb Garden, SeeD Academy": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Banner of Kinship": [
+      "Ayula Bears"
+    ],
+    "Barkform Harvester": [
+      "Ayula Bears"
+    ],
+    "Baron, Airship Kingdom": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Baylen, the Haymaker": [
+      "Baylen (EDHREC average)",
+      "Baylen (EDHREC average)"
+    ],
+    "Bear Cub": [
+      "Ayula Bears"
+    ],
+    "Bender's Waterskin": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Beorn the Fierce": [
+      "Ayula Bears"
+    ],
+    "Beorn's Hospitality": [
+      "Ayula Bears"
+    ],
+    "Beorn, Reluctant Host": [
+      "Ayula Bears"
+    ],
+    "Beza, the Bounding Spring": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Biotech Specialist": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Blacksmith's Talent": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Blood Crypt": [
+      "Sliver Overlord"
+    ],
+    "Bloodline Bidding": [
+      "Hazel Squirrels"
+    ],
+    "Bloom Tender": [
+      "Animar (EDHREC average)",
+      "Hazel Squirrels"
+    ],
+    "Blooming Blast": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Bonehoard Dracosaur": [
+      "Velociramptor Beefcake"
+    ],
+    "Brambleguard Captain": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Brave-Kin Duo": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Breeding Pool": [
+      "Animar (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Sliver Overlord"
+    ],
+    "Builder's Talent": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Bumi, Unleashed": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Burnished Hart": [
+      "Animated Army"
+    ],
+    "Camellia, the Seedmiser": [
+      "Hazel Squirrels"
+    ],
+    "Capital City": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Caretaker's Talent": [
+      "Baylen (EDHREC average)",
+      "Artificer v4 (Tails)"
+    ],
+    "Cargo Ship": [
+      "Artificer v4 (Tails)"
+    ],
+    "Case of the Locked Hothouse": [
+      "Bello (EDHREC average)"
+    ],
+    "Cauldron of Essence": [
+      "Hazel Squirrels"
+    ],
+    "Cavern of Souls": [
+      "Ayula Bears",
+      "Sliver Overlord",
+      "Velociramptor Beefcake"
+    ],
+    "Celestial Reunion": [
+      "Ayula Bears"
+    ],
+    "Changeling Wayfinder": [
+      "Ayula Bears"
+    ],
+    "Chimil, the Inner Sun": [
+      "Bello (EDHREC average)"
+    ],
+    "Chocobo Racetrack": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Chomping Changeling": [
+      "Ayula Bears"
+    ],
+    "Chrome Companion": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Chronicle of Victory": [
+      "Hazel Squirrels"
+    ],
+    "Cid, Timeless Artificer": [
+      "Artificer v4 (Tails)"
+    ],
+    "Clarion Conqueror": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Clive's Hideaway": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Coiling Rebirth": [
+      "Hazel Squirrels"
+    ],
+    "Command Tower": [
+      "Animated Army",
+      "Baylen (EDHREC average)",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Artificer v4 (Tails)",
+      "Hazel Squirrels",
+      "Velociramptor Beefcake"
+    ],
+    "Commercial District": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Cosmic Cube": [
+      "Artificer v4 (Tails)"
+    ],
+    "Crashing Wave": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Craterhoof Behemoth": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Crossroads Village": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Crumb and Get It": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Cycle of Renewal": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Daggerfang Duo": [
+      "Hazel Squirrels"
+    ],
+    "Dalkovan Encampment": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Dancing from Dark to Dawn": [
+      "Ayula Bears"
+    ],
+    "Dawn's Truce": [
+      "Baylen (EDHREC average)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Dazzling Theater // Prop Room": [
+      "Baylen (EDHREC average)"
+    ],
+    "Dewdrop Cure": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Doubling Season": [
+      "Baylen (EDHREC average)",
+      "Hazel Squirrels"
+    ],
+    "Drover Grizzly": [
+      "Ayula Bears"
+    ],
+    "Earth King's Lieutenant": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Earthbender Ascension": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Earthbending Lesson": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Earthshaker Dreadmaw": [
+      "Velociramptor Beefcake"
+    ],
+    "Eden, Seat of the Sanctum": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Elegant Parlor": [
+      "Tokens Win 9/26 (Rocco)",
+      "Sliver Overlord"
+    ],
+    "Elspeth, Storm Slayer": [
+      "Baylen (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Emberheart Challenger": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Enter the Avatar State": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Essence Channeler": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Etali's Favor": [
+      "Velociramptor Beefcake"
+    ],
+    "Etali, Primal Storm": [
+      "Animated Army"
+    ],
+    "Evolving Wilds": [
+      "Animated Army"
+    ],
+    "Exalted Sunborn": [
+      "Tokens Win 9/26 (Rocco)",
+      "Artificer v4 (Tails)"
+    ],
+    "Expedition Map": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Fabled Passage": [
+      "Avatar Aang (EDHREC average)",
+      "Sliver Overlord",
+      "Hazel Squirrels",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Fanatic of Rhonas": [
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "Velociramptor Beefcake"
+    ],
+    "Fateful Discovery": [
+      "Artificer v4 (Tails)"
+    ],
+    "Feather of Flight": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Felidar Retreat": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Fierce Empath": [
+      "Animar (EDHREC average)"
+    ],
+    "Finneas, Ace Archer": [
+      "Baylen (EDHREC average)"
+    ],
+    "Firdoch Core": [
+      "Ayula Bears"
+    ],
+    "Fire Lord Zuko": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Fire Nation Palace": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Firebender Ascension": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Floodfarm Verge": [
+      "Artificer v4 (Tails)"
+    ],
+    "Flowerfoot Swordmaster": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "For the Common Good": [
+      "Baylen (EDHREC average)"
+    ],
+    "Forest": [
+      "Animated Army",
+      "Baylen (EDHREC average)",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Ayula Bears",
+      "Hazel Squirrels",
+      "Velociramptor Beefcake"
+    ],
+    "Formidable Speaker": [
+      "Tokens Win 9/26 (Rocco)",
+      "Hazel Squirrels"
+    ],
+    "Friendly Teddy": [
+      "Ayula Bears"
+    ],
+    "Frontier Bivouac": [
+      "Animar (EDHREC average)"
+    ],
+    "Frontline Rush": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Garruk's Uprising": [
+      "Animated Army",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "Velociramptor Beefcake"
+    ],
+    "Gathering Stone": [
+      "Ayula Bears"
+    ],
+    "Generous Plunderer": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Ghalta, Primal Hunger": [
+      "Animated Army",
+      "Bello (EDHREC average)",
+      "Velociramptor Beefcake"
+    ],
+    "Ghalta, Stampede Tyrant": [
+      "Velociramptor Beefcake"
+    ],
+    "Gigantic Big Bear": [
+      "Ayula Bears"
+    ],
+    "Gigantosaurus": [
+      "Velociramptor Beefcake"
+    ],
+    "Gilded Lotus": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Gishath, Sun's Avatar": [
+      "Velociramptor Beefcake"
+    ],
+    "Gladiolus Amicitia": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Gleaming Splendor": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Glider Staff": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Godless Shrine": [
+      "Sliver Overlord"
+    ],
+    "Gohn, Town of Ruin": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Gongaga, Reactor Town": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Gratuitous Violence": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Great Divide Guide": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Green Sun's Zenith": [
+      "Velociramptor Beefcake"
+    ],
+    "Growing Rites of Itlimoc": [
+      "Ayula Bears"
+    ],
+    "Guadosalam, Farplane Gateway": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Hakoda, Selfless Commander": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Haliya, Guided by Light": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Hallowed Fountain": [
+      "Avatar Aang (EDHREC average)",
+      "Artificer v4 (Tails)"
+    ],
+    "Hare Apparent": [
+      "Baylen (EDHREC average)"
+    ],
+    "Haru, Hidden Talent": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Heartfire Hero": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Hearthborn Battler": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Hedge Maze": [
+      "Sliver Overlord"
+    ],
+    "Hedron Archive": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Heirloom Epic": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Heraldic Banner": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Hermitic Herbalist": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Honored Dreyleader": [
+      "Hazel Squirrels"
+    ],
+    "Hop to It": [
+      "Baylen (EDHREC average)"
+    ],
+    "Horrid Vigor": [
+      "Ayula Bears"
+    ],
+    "Icetill Explorer": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Impact Tremors": [
+      "Baylen (EDHREC average)"
+    ],
+    "Innkeeper's Talent": [
+      "Ayula Bears"
+    ],
+    "Insidious Roots": [
+      "Hazel Squirrels"
+    ],
+    "Insomnia, Crown City": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Inspiring Call": [
+      "Ayula Bears"
+    ],
+    "Inspiring Vantage": [
+      "Velociramptor Beefcake"
+    ],
+    "Iroh, Grand Lotus": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Iron Spider, Stark Upgrade": [
+      "Artificer v4 (Tails)"
+    ],
+    "Ishgard, the Holy See": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Island": [
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Artificer v4 (Tails)",
+      "Sliver Overlord"
+    ],
+    "It'll Quench Ya!": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Itzquinth, Firstborn of Gishath": [
+      "Velociramptor Beefcake"
+    ],
+    "Ixalli's Lorekeeper": [
+      "Velociramptor Beefcake"
+    ],
+    "Jasmine Dragon Tea Shop": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Jidoor, Aristocratic Capital": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Katara, Bending Prodigy": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Katara, Water Tribe's Hope": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Katara, the Fearless": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Kyoshi Village": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Lady Octopus, Inspired Inventor": [
+      "Artificer v4 (Tails)"
+    ],
+    "Leyline of the Guildpact": [
+      "Sliver Overlord"
+    ],
+    "Lifecreed Duo": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Lindblum, Industrial Regency": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Linden, the Steadfast Queen": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Little Bear": [
+      "Ayula Bears"
+    ],
+    "Llanowar Elves": [
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)"
+    ],
+    "Loading Zone": [
+      "Ayula Bears"
+    ],
+    "Loot, Exuberant Explorer": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Lumra, Bellow of the Woods": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Ayula Bears"
+    ],
+    "Lupinflower Village": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Mabel's Mettle": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Mabel, Heir to Cragflame": [
+      "Mabel, Heir to Cragflame",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Maelstrom Pulse": [
+      "Hazel Squirrels"
+    ],
+    "Manifold Mouse": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Meditation Pools": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Mendicant Core, Guidelight": [
+      "Artificer v4 (Tails)"
+    ],
+    "Meticulous Archive": [
+      "Artificer v4 (Tails)"
+    ],
+    "Midgar, City of Mako": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Mirrormind Crown": [
+      "Artificer v4 (Tails)"
+    ],
+    "Mockingbird": [
+      "Sliver Overlord"
+    ],
+    "Moogles' Valor": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Moonlit Meditation": [
+      "Artificer v4 (Tails)"
+    ],
+    "Mountain": [
+      "Animated Army",
+      "Baylen (EDHREC average)",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Mabel, Heir to Cragflame",
+      "Velociramptor Beefcake"
+    ],
+    "Mouse Trapper": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Multiversal Passage": [
+      "Tokens Win 9/26 (Rocco)",
+      "Sliver Overlord"
+    ],
+    "Mutable Explorer": [
+      "Ayula Bears"
+    ],
+    "Nature's Rhythm": [
+      "Tokens Win 9/26 (Rocco)",
+      "Ayula Bears"
+    ],
+    "Nettle Guard": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "North Pole Gates": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "North Pole Patrol": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Oakhollow Village": [
+      "Hazel Squirrels"
+    ],
+    "Ojer Taq, Deepest Foundation": [
+      "Velociramptor Beefcake"
+    ],
+    "Omashu City": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Ordinary Bear": [
+      "Ayula Bears"
+    ],
+    "Origin of Metalbending": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Osteomancer Adept": [
+      "Hazel Squirrels"
+    ],
+    "Overgrown Tomb": [
+      "Sliver Overlord",
+      "Hazel Squirrels"
+    ],
+    "Overprotect": [
+      "Ayula Bears"
+    ],
+    "Parting Gust": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Patchwork Banner": [
+      "Ayula Bears",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Peerless Recycling": [
+      "Ayula Bears"
+    ],
+    "Plains": [
+      "Baylen (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Artificer v4 (Tails)",
+      "Sliver Overlord",
+      "Mabel, Heir to Cragflame",
+      "Velociramptor Beefcake"
+    ],
+    "Planar Engineering": [
+      "Ayula Bears"
+    ],
+    "Playful Shove": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Primeval Bounty": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Prishe's Wanderings": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "PuPu UFO": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Rabanastre, Royal City": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Raccoon Rallier": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Rampaging Baloths": [
+      "Animated Army",
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Reach the Horizon": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Reclamation Sage": [
+      "Animar (EDHREC average)"
+    ],
+    "Redirect Lightning": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Regal Bunnicorn": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Regal Imperiosaur": [
+      "Velociramptor Beefcake"
+    ],
+    "Repel Calamity": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Repurposing Bay": [
+      "Artificer v4 (Tails)"
+    ],
+    "Restless Cottage": [
+      "Hazel Squirrels"
+    ],
+    "Restoration Magic": [
+      "Artificer v4 (Tails)"
+    ],
+    "Roaming Throne": [
+      "Hazel Squirrels",
+      "Velociramptor Beefcake"
+    ],
+    "Rogue's Passage": [
+      "Velociramptor Beefcake"
+    ],
+    "Rooftop Percher": [
+      "Ayula Bears"
+    ],
+    "Rumble Arena": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "S.H.I.E.L.D. Flying Car": [
+      "Artificer v4 (Tails)"
+    ],
+    "Sabotender": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Sacred Foundry": [
+      "Baylen (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Sliver Overlord",
+      "Velociramptor Beefcake"
+    ],
+    "Sazh's Chocobo": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Scour for Scrap": [
+      "Artificer v4 (Tails)"
+    ],
+    "Season of the Bold": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Season of the Burrow": [
+      "Baylen (EDHREC average)"
+    ],
+    "Secluded Courtyard": [
+      "Sliver Overlord",
+      "Velociramptor Beefcake"
+    ],
+    "Secret Tunnel": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Shared Roots": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Sharlayan, Nation of Scholars": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Shrike Force": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Shuri, Wakandan Inventor": [
+      "Artificer v4 (Tails)"
+    ],
+    "Simic Guildgate": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Smaug the Magnificent": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Sokka, Tenacious Tactician": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Solemn Simulacrum": [
+      "Animar (EDHREC average)"
+    ],
+    "Spider-Ham, Peter Porker": [
+      "Ayula Bears",
+      "Hazel Squirrels"
+    ],
+    "Spider-Sense": [
+      "Artificer v4 (Tails)"
+    ],
+    "Spider-Woman, Stunning Savior": [
+      "Artificer v4 (Tails)"
+    ],
+    "Spirit Water Revival": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Squirrelanoids": [
+      "Hazel Squirrels"
+    ],
+    "Stalactite Dagger": [
+      "Ayula Bears"
+    ],
+    "Starfield Vocalist": [
+      "Artificer v4 (Tails)"
+    ],
+    "Starting Town": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Artificer v4 (Tails)",
+      "Sliver Overlord"
+    ],
+    "Steam Vents": [
+      "Animar (EDHREC average)",
+      "Sliver Overlord"
+    ],
+    "Stomping Ground": [
+      "Baylen (EDHREC average)",
+      "Bello (EDHREC average)",
+      "Animar (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Sliver Overlord"
+    ],
+    "Sun Warriors": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Sun-Blessed Peak": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Sunbillow Verge": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Swamp": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Hazel Squirrels"
+    ],
+    "Swiftfoot Boots": [
+      "Baylen (EDHREC average)",
+      "Animar (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Ayula Bears"
+    ],
+    "Tatyova, Benthic Druid": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Teapot Slinger": [
+      "Animated Army"
+    ],
+    "Temple Garden": [
+      "Baylen (EDHREC average)",
+      "Avatar Aang (EDHREC average)",
+      "Tokens Win 9/26 (Rocco)",
+      "Velociramptor Beefcake"
+    ],
+    "Temple of Abandon": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "Temple of Malady": [
+      "Hazel Squirrels"
+    ],
+    "Tendershoot Dryad": [
+      "Animated Army"
+    ],
+    "Terramorphic Expanse": [
+      "Animated Army",
+      "Hazel Squirrels"
+    ],
+    "Tezzeret, Cruel Captain": [
+      "Artificer v4 (Tails)"
+    ],
+    "The Earth Crystal": [
+      "Ayula Bears"
+    ],
+    "The Earth King": [
+      "Ayula Bears"
+    ],
+    "The Gold Saucer": [
+      "The Wandering Minstrel (EDHREC average)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "The Jolly Balloon Man": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "The Legend of Kuruk": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "The Legend of Kyoshi": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "The Legend of Roku": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "The Legend of Yangchen": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "The Lunar Whale": [
+      "Artificer v4 (Tails)"
+    ],
+    "The Regalia": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "The Seriema": [
+      "Artificer v4 (Tails)"
+    ],
+    "The Soul Stone": [
+      "Hazel Squirrels"
+    ],
+    "The Unbeatable Squirrel Girl": [
+      "Hazel Squirrels"
+    ],
+    "The Walls of Ba Sing Se": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "The Wandering Minstrel": [
+      "The Wandering Minstrel (EDHREC average)",
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "The Wind Crystal": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Thistledown Players": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Thopter Fabricator": [
+      "Artificer v4 (Tails)"
+    ],
+    "Thornspire Verge": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Thrashing Brontodon": [
+      "Velociramptor Beefcake"
+    ],
+    "Three Tree City": [
+      "Sliver Overlord"
+    ],
+    "Three Tree Mascot": [
+      "Ayula Bears"
+    ],
+    "Toph, Hardheaded Teacher": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Toph, the Blind Bandit": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Toph, the First Metalbender": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Town Greeter": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Travel the Overworld": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Traveling Chocobo": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Treno, Dark City": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Triceraton Commander": [
+      "Velociramptor Beefcake"
+    ],
+    "True Ancestry": [
+      "Ayula Bears"
+    ],
+    "Ultron, Artificial Malevolence": [
+      "Artificer v4 (Tails)"
+    ],
+    "Underground Mortuary": [
+      "Hazel Squirrels"
+    ],
+    "Uthros, Titanic Godcore": [
+      "Artificer v4 (Tails)"
+    ],
+    "Valkyrie's Call": [
+      "Artificer v4 (Tails)"
+    ],
+    "Valley Flamecaller": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Valley Mightcaller": [
+      "Hazel Squirrels"
+    ],
+    "Valley Questcaller": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Valley Rally": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Valley Rotcaller": [
+      "Hazel Squirrels"
+    ],
+    "Vaultborn Tyrant": [
+      "Velociramptor Beefcake"
+    ],
+    "Vector, Imperial Capital": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Veteran Guardmouse": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Virulent Emissary": [
+      "Hazel Squirrels"
+    ],
+    "Vizier of the Menagerie": [
+      "Animar (EDHREC average)"
+    ],
+    "Voice of Victory": [
+      "Artificer v4 (Tails)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Wandertale Mentor": [
+      "Animated Army",
+      "Bello (EDHREC average)"
+    ],
+    "War Squeak": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Warleader's Call": [
+      "Baylen (EDHREC average)"
+    ],
+    "Warren Warleader": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Wastewood Verge": [
+      "Hazel Squirrels"
+    ],
+    "Waterbender Ascension": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Waterbending Lesson": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Watery Grave": [
+      "Sliver Overlord"
+    ],
+    "Weftstalker Ardent": [
+      "Tokens Win 9/26 (Rocco)"
+    ],
+    "Whiskerquill Scribe": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Whiskervale Forerunner": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "White Lotus Tile": [
+      "Avatar Aang (EDHREC average)",
+      "Mabel, Heir to Cragflame"
+    ],
+    "Wildfire Howl": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Windcrag Siege": [
+      "Mabel, Heir to Cragflame"
+    ],
+    "Windurst, Federation Center": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Wizard's Staff": [
+      "Artificer v4 (Tails)"
+    ],
+    "World Map": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Ygra, Eater of All": [
+      "Hazel Squirrels"
+    ],
+    "Yue, the Moon Spirit": [
+      "Avatar Aang (EDHREC average)"
+    ],
+    "Zanarkand, Ancient Metropolis": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Zell Dincht": [
+      "The Wandering Minstrel (EDHREC average)"
+    ],
+    "Zetalpa, Primal Dawn": [
+      "Velociramptor Beefcake"
+    ]
+  },
+  "decks": 13,
+  "deck_cards_now_upstream": {
+    "Kinjalli's Sunwing": [
+      "Velociramptor Beefcake"
+    ],
+    "Lotus Field": [
+      "Artificer v4 (Tails)"
+    ],
+    "Polyraptor": [
+      "Velociramptor Beefcake"
+    ],
+    "Wakening Sun's Avatar": [
+      "Velociramptor Beefcake"
+    ],
+    "Zacama, Primal Calamity": [
+      "Velociramptor Beefcake"
+    ]
+  },
+  "collisions": [
+    "Akroma's Will",
+    "Ancient Copper Dragon",
+    "Arch of Orazca",
+    "Awakening Zone",
+    "Black Market Connections",
+    "Captain James T. Kirk",
+    "Celestine, the Living Saint",
+    "Chandra's Ignition",
+    "Commissar Severina Raine",
+    "Crashing Drawbridge",
+    "Cyberdrive Awakener",
+    "Defile",
+    "Desert of the Glorified",
+    "Elesh Norn, Grand Cenobite",
+    "Fell the Mighty",
+    "Forsaken Monument",
+    "Geier Reach Sanitarium",
+    "Jaheira, Friend of the Forest",
+    "Kenrith's Transformation",
+    "Kinjalli's Sunwing",
+    "Lotus Field",
+    "Migration Path",
+    "Morophon, the Boundless",
+    "Mother of Runes",
+    "Nekusar, the Mindrazer",
+    "Ninja Pizza",
+    "Polyraptor",
+    "Purphoros, God of the Forge",
+    "Rampaging Ferocidon",
+    "Reflecting Pool",
+    "Return of the Wildspeaker",
+    "Rewind",
+    "Sai, Master Thopterist",
+    "Savai Thundermane",
+    "Scurry Oak",
+    "Shorikai, Genesis Engine",
+    "Sifter of Skulls",
+    "Silence",
+    "Smuggler's Copter",
+    "Springleaf Parade",
+    "Stonecoil Serpent",
+    "Sunken Ruins",
+    "Tataru Taru",
+    "The Cabbage Merchant",
+    "Transmogrifying Wand",
+    "Ugin, the Ineffable",
+    "Unclaimed Territory",
+    "Urza's Saga",
+    "Verdant Sun's Avatar",
+    "Wakening Sun's Avatar",
+    "Wayward Swordtooth",
+    "Zacama, Primal Calamity"
+  ],
+  "precons": [
+    {
+      "name": "Forces of the Imperium",
+      "commander": "Inquisitor Greyfax",
+      "slots": 100,
+      "indexed_before": 85,
+      "indexed_after": 85,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    },
+    {
+      "name": "Tyranid Swarm",
+      "commander": "The Swarmlord",
+      "slots": 100,
+      "indexed_before": 81,
+      "indexed_after": 81,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    },
+    {
+      "name": "Necron Dynasties",
+      "commander": "Szarekh, the Silent King",
+      "slots": 100,
+      "indexed_before": 92,
+      "indexed_after": 92,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    },
+    {
+      "name": "The Ruinous Powers",
+      "commander": "Abaddon the Despoiler",
+      "slots": 100,
+      "indexed_before": 80,
+      "indexed_after": 80,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    },
+    {
+      "name": "Eldrazi Unbound",
+      "commander": "Zhulodok, Void Gorger",
+      "slots": 100,
+      "indexed_before": 88,
+      "indexed_after": 88,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    },
+    {
+      "name": "Eldrazi Incursion",
+      "commander": "Ulalek, Fused Atrocity",
+      "slots": 100,
+      "indexed_before": 100,
+      "indexed_after": 100,
+      "commander_indexed": true,
+      "newly_missing": [],
+      "newly_indexed": []
+    }
+  ]
+}

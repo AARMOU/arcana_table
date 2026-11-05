@@ -1,0 +1,16 @@
+{
+  "custom": {
+    "suites": 345,
+    "tests": 1082,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "app": {
+    "suites": 92,
+    "tests": 487,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  }
+}
