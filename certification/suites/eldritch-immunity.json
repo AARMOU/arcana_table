@@ -1,0 +1,9 @@
+{
+  "key": "eldritch-immunity",
+  "name": "Eldritch Immunity",
+  "issue": 964,
+  "source": "certification/EldritchImmunityIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldritchImmunityIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
