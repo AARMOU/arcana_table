@@ -5,6 +5,7 @@ Date: Sat, 1 Jan 2000 00:00:00 +0000
 Subject: [PATCH] arcana: 0011-stack-object-copying
 
 ---
+ ai/src/test/resources/ai-reading-baseline.tsv |   2 +-
  docs/card-sdk-language-reference.md           |  16 +-
  docs/sdk-index.md                             |   2 +-
  .../kotlin/com/wingedsheep/sdk/dsl/Effects.kt |  13 +-
@@ -31,12 +32,25 @@ Subject: [PATCH] arcana: 0011-stack-object-copying
  .../wingedsheep/engine/view/ClientEvent.kt    |   6 +
  .../scenarios/SpellCopyRetargetingTest.kt     |   4 +-
  .../scenarios/StackObjectCopyEngineTest.kt    | 276 ++++++++++++++++++
- 26 files changed, 635 insertions(+), 419 deletions(-)
+ 27 files changed, 636 insertions(+), 420 deletions(-)
  create mode 100644 mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
  delete mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
  create mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyStackObjectsExecutor.kt
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
 
+diff --git a/ai/src/test/resources/ai-reading-baseline.tsv b/ai/src/test/resources/ai-reading-baseline.tsv
+index ed173696fe..b933fb937b 100644
+--- a/ai/src/test/resources/ai-reading-baseline.tsv
++++ b/ai/src/test/resources/ai-reading-baseline.tsv
+@@ -4299,7 +4299,7 @@ Disperse	polarity: MoveToZoneEffect
+ Dispersing Orb	polarity: MoveToZoneEffect
+ Displacer Beast	intent: VentureIntoTheDungeonEffect
+ Displacer Kitten	polarity: MoveToZoneEffect
+-Display of Power	intent: CopyEachTargetSpellEffect; polarity: CopyEachTargetSpellEffect
++Display of Power	intent: CopyStackObjectsEffect; polarity: CopyStackObjectsEffect
+ Disrupt
+ Disrupting Scepter
+ Disruption Protocol
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
 index 5d04b1450d..01e7e5d24e 100644
 --- a/docs/card-sdk-language-reference.md
