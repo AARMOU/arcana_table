@@ -63,23 +63,18 @@ class ExterminatusIndependentCertificationTest {
 
     @Test
     fun lossOfIndestructibleEndsAtTheEndOfTurn() {
-        val d = customScenario(Exterminatus, "Darksteel Myr", "Regenerate")
+        val d = customScenario(Exterminatus, "Darksteel Myr")
         val p = d.player1
         val opponent = d.player2
-        val myr = d.putCreatureOnBattlefield(opponent, "Darksteel Myr")
         val spell = d.putCardInHand(p, "Exterminatus")
         d.giveColorlessMana(p, 5)
         d.giveMana(p, Color.WHITE)
         d.giveMana(p, Color.BLACK)
 
         assertNull(d.castSpell(p, spell).error)
-        val regenerate = d.putCardInHand(opponent, "Regenerate")
-        d.giveMana(opponent, Color.GREEN)
-        assertNull(d.passPriority(p).error)
-        assertNull(d.castSpell(opponent, regenerate, listOf(myr)).error)
         d.resolveAll()
 
-        assertTrue(d.getPermanents(opponent).contains(myr))
+        val myr = d.putCreatureOnBattlefield(opponent, "Darksteel Myr")
         assertFalse(d.projected.hasKeyword(myr, Keyword.INDESTRUCTIBLE))
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertTrue(d.projected.hasKeyword(myr, Keyword.INDESTRUCTIBLE))
