@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 141
-        versionName = "0.33.9-build141-ui-preview-20261104"
+        versionCode = 142
+        versionName = "0.34.2-build142-engine-preview-20261105"
         // Controlled by the release build after separate owner-approved Cloudflare deployment.
         // An empty endpoint makes request submission explicitly unavailable.
         val cardRequestUrl = providers.gradleProperty("arcanaCardRequestUrl").orNull.orEmpty()
