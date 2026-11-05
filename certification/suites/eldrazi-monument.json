@@ -1,0 +1,9 @@
+{
+  "key": "eldrazi-monument",
+  "name": "Eldrazi Monument",
+  "issue": 962,
+  "source": "certification/EldraziMonumentIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldraziMonumentIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
