@@ -15,10 +15,10 @@ Subject: [PATCH] arcana: 0039-graveyard-lookback-granted-types
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 9efd69021f..3e70c25202 100644
+index 9cf3808372..1feb98812e 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -9215,7 +9215,11 @@ in the repo today):
+@@ -9228,7 +9228,11 @@ in the repo today):
    etc.), regardless of how many or where they went. For the common "leave your graveyard
    **during your turn**" wording, add `triggerRestriction = Conditions.IsYourTurn`; for "this
    ability triggers only once each turn", add `oncePerTurn = true`. (Attuned Hunter, Kishla
@@ -31,7 +31,7 @@ index 9efd69021f..3e70c25202 100644
  - `Triggers.oneOrMore(filter).putIntoExile(from, includeTokens)` — batching trigger; fires once per event
    batch when one or more matching **cards** are put into exile from any of `fromZones` (default:
    graveyard and battlefield). Left unfiltered it is **not** scoped to one player's zones —
-@@ -11113,7 +11117,8 @@ staticAbility {
+@@ -11136,7 +11140,8 @@ staticAbility {
    battlefield only `filter`'s **card predicates** qualify an object (read against printed characteristics); its
    controller half is replaced by "spells the source's controller controls" / "cards that player owns". Honored by the
    `ProjectedState.crossZoneGrantedCardTypes` overlay, which `PredicateEvaluator`'s type predicates, cast triggers,
@@ -42,7 +42,7 @@ index 9efd69021f..3e70c25202 100644
  - `GrantSubtype(subtype, filter)` — Layer 4 type-changing static that adds a **fixed** creature subtype to the group,
    in addition to their other types ("is a Knight in addition to its other types"). (Dub, Angelic Destiny)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
-index 769ca47565..4e10a95acb 100644
+index b7b2914afd..3ce9094cc8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 @@ -599,6 +599,7 @@ val engineSerializersModule = SerializersModule {

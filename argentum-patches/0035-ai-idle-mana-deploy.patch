@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0035-ai-idle-mana-deploy
  create mode 100644 ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index 089da3c1da..1dfe0dd90d 100644
+index b7ce4b8f60..af7a4476f6 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-@@ -390,6 +390,7 @@ class AIPlayer(
+@@ -399,6 +399,7 @@ class AIPlayer(
                      holdUnusablePumps = profile.holdUnusablePumps,
                      targetPolarityFromEffect = profile.targetPolarityFromEffect,
                      permanentCastIsNotCardLoss = profile.permanentCastIsNotCardLoss,
@@ -26,7 +26,7 @@ index 089da3c1da..1dfe0dd90d 100644
                      defendPlaneswalkers = profile.defendPlaneswalkers,
                      spendFuelWalkers = profile.spendFuelWalkers,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
-index 609a5c883b..0624deb7d8 100644
+index 10421ec23b..67a937d800 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 @@ -566,6 +566,32 @@ data class AiProfile(
@@ -62,7 +62,7 @@ index 609a5c883b..0624deb7d8 100644
      /**
       * Score `ThreatAssessment`'s evasion term the way it reads after an attack, so attacking with a
       * flier the opponent cannot block stops reading as a loss.
-@@ -1540,11 +1566,21 @@ data class AiProfile(
+@@ -1555,11 +1581,21 @@ data class AiProfile(
          val LEGACY_V0 = AiProfile(id = "v0")
  
          /**
@@ -89,10 +89,10 @@ index 609a5c883b..0624deb7d8 100644
          /**
           * What a player faced in a real game **up to 2026-08-07**, when
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index fab7b99b8e..13b0d0b612 100644
+index 7a85bba7c6..0a1afb7404 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-@@ -187,6 +187,11 @@ class Strategist(
+@@ -189,6 +189,11 @@ class Strategist(
       * permanent cast. See [deploymentCredit].
       */
      private val permanentCastIsNotCardLoss: Boolean = false,
@@ -104,7 +104,7 @@ index fab7b99b8e..13b0d0b612 100644
      /**
       * [AiProfile.fuelLoyaltyIsNotBoardValue] — refund the board price of loyalty a minus-only
       * planeswalker spends on a loyalty ability. See [fuelLoyaltyCredit].
-@@ -828,8 +833,17 @@ class Strategist(
+@@ -836,8 +841,17 @@ class Strategist(
      private fun sacrificesItself(state: GameState, action: GameAction): Boolean {
          val activation = action as? ActivateAbility ?: return false
          val card = state.getEntity(activation.sourceId)?.get<CardComponent>() ?: return false
@@ -123,21 +123,21 @@ index fab7b99b8e..13b0d0b612 100644
          return when (val cost = ability.cost) {
              is AbilityCost.SacrificeSelf -> true
              is AbilityCost.Composite -> cost.costs.any { it is AbilityCost.SacrificeSelf }
-@@ -1027,10 +1041,12 @@ class Strategist(
-         if (spendFuelWalkers) fuelWalkerSpend(state, action, playerId, passScore, leafState)?.let { return it }
+@@ -1036,10 +1050,12 @@ class Strategist(
          val deployed = deploymentCredit(state, action, leafState, playerId)
          val fuel = fuelLoyaltyCredit(state, action, leafState, playerId)
--        val credit = deployed + fuel
+         val ban = castBanCredit(state, action, playerId)
+-        val credit = deployed + fuel + ban
 +        val idleMana = idleManaCredit(state, action, leafState, playerId)
-+        val credit = deployed + fuel + idleMana
++        val credit = deployed + fuel + ban + idleMana
          val leafScore = rawLeafScore + credit
          val creditNote = listOfNotNull(
              if (deployed > 0.0) "deployed, not spent %+.2f".format(deployed) else null,
 +            if (idleMana > 0.0) "mana held for no instant %+.2f".format(idleMana) else null,
              if (fuel > 0.0) "loyalty is only fuel %+.2f".format(fuel) else null,
+             if (ban > 0.0) "ban denies their turn %+.2f".format(ban) else null,
          ).joinToString("; ").ifEmpty { null }
-         rideForTheAttack(state, action, playerId, leafState, passScore)?.let { return it }
-@@ -1663,6 +1679,58 @@ class Strategist(
+@@ -1720,6 +1736,58 @@ class Strategist(
          return charge.coerceAtLeast(0.0)
      }
  

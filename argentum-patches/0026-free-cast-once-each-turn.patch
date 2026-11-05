@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0026-free-cast-once-each-turn
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 88ce261d11..6ca5a8af29 100644
+index ea1d954752..20e274c1a0 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -13614,7 +13614,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13649,7 +13649,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `GrantAlternativeCastingCost("{0}", listOf(Costs.additional.PayPlayerCounters(CounterType.ENERGY, 1)),
    spellFilter = GameObjectFilter.Creature.manaValueAtMost(3), asThoughFlash = true)`. Like every
    granted alternative cost it is offered for casts from hand only.
@@ -26,7 +26,7 @@ index 88ce261d11..6ca5a8af29 100644
    battlefield permission to cast a spell without paying its mana cost (CR 118.9). Like every
    "without paying its mana cost" cast (cascade, discover, `PlayWithoutPayingCostComponent`
    permissions), it is priced as a {0} base through the full cost-modifier pipeline
-@@ -13626,7 +13626,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13661,7 +13661,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    zero spells this turn; `oncePerTurn = true` allows one free cast during each of the caster's own
    turns (active player only) regardless of how many spells were cast first — unlike
    `firstSpellOfTurnOnly`, the caster may cast other spells before using it; each source tracks its
@@ -42,10 +42,10 @@ index 88ce261d11..6ca5a8af29 100644
    `GameObjectFilter.Any` = every spell). `fromZones` restricts the permission to spells cast **from** the listed zones (the zone the
    spell left, CR 601.2a; `null` = any zone): the free cast is offered on each listed zone's cast path
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 60030f8cbb..a977f2bc6e 100644
+index 99d283c6d0..21f5844ea5 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1975,7 +1975,7 @@ Families:
+@@ -1978,7 +1978,7 @@ Families:
  - `MaxCounters(counterType: CounterType, max: Int)` — "This permanent can't have more than max counterType counters on it" (Rasputin Dreamweaver).
  - `MayCastFromGraveyard(filter: GameObjectFilter, lifeCost: Int, duringYourTurnOnly: Boolean, entersWithCounter: CounterType?, addedSubtypeOnEntry: String?, oncePerTurn: Boolean, exileCastThisWay: CastThisWayExile, fromAnyGraveyard: Boolean, additionalCost: AdditionalCost?, playsLands: Boolean, grantedAbilityOnEntry: TriggeredAbility?)` — You may cast spells matching filter from your graveyard, optionally by paying lifeCost life in addition to their other costs.
  - `MayCastSelfFromZones(zones: List<Zone>, condition: Condition?, additionalCost: AdditionalCost?, castUsing: Keyword?, alternativeManaCost: ManaCost?, exileCastThisWay: CastThisWayExile)` — You may cast this card from specified zones (e.g., graveyard, exile).
@@ -55,7 +55,7 @@ index 60030f8cbb..a977f2bc6e 100644
  - `MayPlayCardsFromExile(filter: GameObjectFilter, condition: Condition?, withAnyManaType: Boolean, withAnyManaColor: Boolean, oncePerTurn: Boolean, spendAsAnyColor: ManaSpentAsAnyColor?, zones: Set<Zone>)` — You may play cards in exile matching filter — "play", so lands and spells alike (CR 601.3: a permission from an effect is what lets a player cast a card from a zone other than their hand).
  - `MayPlayLandsFromGraveyard` — You may play lands from your graveyard.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
-index 50dc365737..27b3630f28 100644
+index 1fb1c54a7a..ff53db0622 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 @@ -1171,7 +1171,19 @@ data class MayCastWithoutPayingManaCost(
@@ -91,10 +91,10 @@ index 50dc365737..27b3630f28 100644
          } else if (firstSpellOfTurnOnly) {
              if (controllerOnly) append("The first spell you cast each turn may be cast without paying its mana cost")
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-index f1b41102c4..ff4e518ee1 100644
+index c9046f4b0e..a7880bfb8a 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-@@ -2319,10 +2319,11 @@ class CostCalculator(
+@@ -2301,10 +2301,11 @@ class CostCalculator(
                      if (!state.isActiveTurnFor(casterId)) continue
                      if ((state.playerSpellsCastThisTurn[casterId] ?: 0) > 0) continue
                  }
@@ -109,7 +109,7 @@ index f1b41102c4..ff4e518ee1 100644
                      if (container.has<com.wingedsheep.engine.state.components.battlefield.MayCastWithoutPayingCostUsedThisTurnComponent>()) continue
                  }
                  // The permission may be scoped to a spell type (e.g. Dracogenesis — Dragons only).
-@@ -2462,7 +2463,7 @@ class CostCalculator(
+@@ -2444,7 +2445,7 @@ class CostCalculator(
                      !matchesCardDefinition(spellCardDef, ability.spellFilter, entityId, state, state.projectedState, spellColors = spellColorsFor(state, spellCardDef, casterId))
                  ) continue
                  if (ability.oncePerTurn) {

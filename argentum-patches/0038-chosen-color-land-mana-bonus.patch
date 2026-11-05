@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0038-chosen-color-land-mana-bonus
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index dc996c4552..9efd69021f 100644
+index 4c3c14c6c6..9cf3808372 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -12876,7 +12876,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -12904,7 +12904,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `{S}` spent. When auto-pay taps a snow land for a `{S}` pip, it also spends that land's any-color
    snow-aura bonus on a further `{S}` pip (a fixed-color bonus floats instead). (Elvish Guidance = fixed `{G}`; **Fertile
    Ground** = `anyColor`; **Glittering Frost** = `anyColor` + `GrantSupertype("SNOW")` on a snow Aura)
@@ -30,7 +30,7 @@ index dc996c4552..9efd69021f 100644
    a `<sourceFilter>` is tapped for mana, that player adds …". `color = null` mirrors the produced color.
    `rider` is an optional non-mana `Effect` resolved inline, controlled by the tapping player
    (`EffectTarget.Controller` = tapper, `EffectTarget.Self` = the static's source). (Lavaleaper = basic-land
-@@ -12891,6 +12891,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -12919,6 +12919,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    Oblivion** = `GameObjectFilter.Land.youControl()`, `color = null`, `whenProducing = COLORLESS`. Gated
    on all three mana paths (manual tap, color-choice-resume mirror, and the auto-pay `ManaSolver`, whose
    colorless bonus floats as a colorless `BonusManaEntry`).
@@ -50,10 +50,10 @@ index dc996c4552..9efd69021f 100644
    produces `<multiplier>` times as much of that mana instead." The **multiplicative** sibling of
    `AdditionalManaOnSourceTap`, sharing its filter convention (the filter is evaluated from the static's own
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index bd70f1602e..ceb57bd9b2 100644
+index 3e4431703a..99b643cb54 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1843,7 +1843,7 @@ Families:
+@@ -1846,7 +1846,7 @@ Families:
  - `AdditionalETBOrLTBTriggers(filter: GameObjectFilter, mustBeYouControl: Boolean, directions: Set<BattlefieldDirection>, description: String)` — When a permanent matching filter crosses the battlefield boundary in one of directions, triggered abilities of permanents controlled by this ability's controller that fired from that event trigger…
  - `AdditionalLifeGainTriggers` — If you gaining life causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time (CR 603.2d) — Dr.
  - `AdditionalManaForEntryCounters(spellFilter: GameObjectFilter, counterType: CounterType)` — "As an additional cost to cast spellFilter spells, you may pay any amount of mana.
@@ -258,7 +258,7 @@ index 0091bd548c..2846587f3f 100644
      else ExecutionResult.success(tracked, visible)
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 253d117b48..84b647a003 100644
+index 6163abcc28..8986054a77 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 @@ -2663,9 +2663,11 @@ class ManaSolver private constructor(

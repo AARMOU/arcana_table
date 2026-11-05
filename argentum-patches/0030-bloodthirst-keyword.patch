@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0030-bloodthirst-keyword
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 74bc25a980..519558a91d 100644
+index 124faede64..c9e2dab4b9 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -15095,6 +15095,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+@@ -15130,6 +15130,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
    permanent reanimated or blinked gets none; the counters go through `placeEntryCounters` (Hardened
    Scales / Solemnity apply). Don't hand-write an `EntersWithDynamicCounters` for it — it would stack.
    Converge (an ability word) is the hand-authored neighbour: `convergeEntersWithCounters()`.
@@ -166,7 +166,7 @@ index f0166edc20..6fd9445db4 100644
          fun fabricate(n: Int): KeywordAbility = Numeric(Keyword.FABRICATE, n)
          fun tribute(n: Int): KeywordAbility = Numeric(Keyword.TRIBUTE, n)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
-index 7b8cab2cfe..1c2f2ca5ce 100644
+index 72ad669005..112533f5f9 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 @@ -33,6 +33,7 @@ import com.wingedsheep.sdk.scripting.EntersWithChoice
@@ -177,7 +177,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
  import com.wingedsheep.sdk.scripting.Vanishing
  import com.wingedsheep.sdk.scripting.conditions.SourceChosenModeIs
  
-@@ -487,6 +488,24 @@ object EntersWithReplacements {
+@@ -490,6 +491,24 @@ object EntersWithReplacements {
          val events = mutableListOf<GameEvent>()
          val entityName = newState.getEntity(enteringEntityId)?.get<CardComponent>()?.name ?: ""
  
@@ -202,7 +202,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
          val sources = mutableListOf<GlobalReplacementSource>()
          val sourceState = replacementSourceState ?: newState
          for (sourceId in sourceState.getBattlefield()) {
-@@ -644,6 +663,47 @@ object EntersWithReplacements {
+@@ -647,6 +666,47 @@ object EntersWithReplacements {
       * applying to the objects entering simultaneously with this one and is purged at the next
       * event boundary ([com.wingedsheep.engine.replacement.ActiveReplacements.purgeSpent]).
       */
@@ -251,7 +251,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
          val index = source.grantIndex ?: return state
          val grant = state.grantedReplacementEffects.getOrNull(index) ?: return state
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
-index 1187cfdf51..aec44b8910 100644
+index b6d60e1022..6d44f351af 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
 @@ -40,7 +40,8 @@ internal class EffectApplicator(
@@ -278,7 +278,7 @@ index 1187cfdf51..aec44b8910 100644
              return
          }
          val prefix = keyword.substring(0, split + 1)
-@@ -561,3 +564,4 @@ private val CREW_PREFIX = "${com.wingedsheep.sdk.core.Keyword.CREW.name}_"
+@@ -565,3 +568,4 @@ private val CREW_PREFIX = "${com.wingedsheep.sdk.core.Keyword.CREW.name}_"
  
  /** Prefix of a granted renown keyword ([com.wingedsheep.sdk.scripting.KeywordAbility.grantedRenown]); see `addKeyword`. */
  private val RENOWN_PREFIX = "${com.wingedsheep.sdk.core.Keyword.RENOWN.name}_"

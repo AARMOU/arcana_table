@@ -13,10 +13,10 @@ Subject: [PATCH] arcana: 0037-static-attacking-chosen-player
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/AttackingChosenPlayerStaticTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 12e9f46204..dc996c4552 100644
+index c88d1af889..4c3c14c6c6 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -7939,8 +7939,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
+@@ -7950,8 +7950,16 @@ work for abilities-on-stack (which carry no `CardComponent`).
    `attackingDefenderOf(reference)`, which takes the whole defending side. Pairs with
    `Triggers.you.attacksAPlayer()`: Echoing Assault's "target nontoken creature that's attacking that
    player" is `TargetFilter(GameObjectFilter.Creature.nontoken().attackingPlayer(EffectTarget.PlayerRef(Player.TriggeringPlayer)))`.

@@ -28,10 +28,10 @@ index 3625608517..f95cf2963c 100644
          if (hybridIndex >= 0) {
              mutableSymbols.removeAt(hybridIndex)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-index d2cc4f59fe..f1b41102c4 100644
+index 17abe99afa..c9046f4b0e 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-@@ -1778,6 +1778,7 @@ class CostCalculator(
+@@ -1760,6 +1760,7 @@ class CostCalculator(
                  is ManaSymbol.HybridPhyrexian -> color == symbol.color1 || color == symbol.color2
                  is ManaSymbol.Phyrexian -> color == symbol.color
                  is ManaSymbol.MonocolorHybrid -> color == symbol.color
