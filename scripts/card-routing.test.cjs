@@ -135,6 +135,20 @@ test('packet-less queue units fail closed before chooseAutoQueue', () => {
   assert.equal(Q.chooseAutoQueue(p, [], []).suggestion, undefined);
 });
 
+test('queue feeder rejects empty Cardkit heading even with later Acceptance details', () => {
+  const name = 'Celestine, the Living Saint';
+  const result = Q.candidates({ gaps: PRECONS, openIssues: [] });
+  const body = unitBody(name).replace(
+    ['## Cardkit starting packet', 'Cardkit classify: SUPPORTED',
+      'No close tested custom-card match.'].join('\n'),
+    '## Cardkit starting packet');
+  assert.match(body, /## Cardkit starting packet\n\n## Acceptance/);
+  const payload = Q.queuePayload({ result, units: [{ name, body }], base: BASE, baseSha: SHA });
+  assert.equal(payload.suggestions[0].ready, false);
+  assert.ok(payload.suggestions[0].missing.includes('cardkit-starting-packet'));
+  assert.equal(Q.chooseAutoQueue(payload, [], []).suggestion, undefined);
+});
+
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
   workRequests: requests.map(enrichWork), resolvedRequests: resolved });
 const ULALEK = enrichWork({ name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
