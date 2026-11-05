@@ -40,9 +40,11 @@ async function relayReviewHandoffs({ github, owner, repo, core, now = () => Date
   const target = await allComments(github, owner, repo, GOOSE_INBOX);
   const existing = new Set();
   for (const c of target) {
-    // Ignore forged receipts from unrelated accounts in this public inbox.
-    if (String(c?.user?.login || '').toLowerCase() !== owner.toLowerCase() ||
-        c?.author_association !== 'OWNER') continue;
+    // Workflow uses GITHUB_TOKEN: its own receipts are github-actions[bot], not
+    // the repository owner's account. Verify both identity and GitHub Bot type;
+    // otherwise every scheduled run would repost the same handoff.
+    if (c?.user?.login !== 'github-actions[bot]' ||
+        c?.user?.type !== 'Bot') continue;
     const match = /^<!-- arcana-handoff-relay-v1 pr=([1-9]\d{0,7}) sha=([a-f0-9]{40}) -->/.exec(String(c.body || ''));
     if (match) existing.add(marker(Number(match[1]), match[2]));
   }
