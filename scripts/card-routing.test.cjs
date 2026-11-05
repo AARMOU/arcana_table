@@ -181,7 +181,7 @@ test('feeder preserves a still-capped prior card in its bot-maintained board com
   } };
   const result = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
   assert.deepEqual(result.cards, [{ name, issue: 360 }]);
-  assert.match(comments[883][0].body, /#360.*Celestine, the Living Saint/);
+  assert.match(comments[883][0].body, /Celestine, the Living Saint.*queue #360/);
   assert.equal(board.body, 'Owner decisions stay here.');
 });
 
