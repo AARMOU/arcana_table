@@ -5,6 +5,8 @@ Date: Sat, 1 Jan 2000 00:00:00 +0000
 Subject: [PATCH] arcana: 0011-stack-object-copying
 
 ---
+ .../ai/engine/knowledge/CardIntentAnalyzer.kt |   2 +-
+ .../ai/engine/knowledge/SynergyAxes.kt        |   4 +-
  ai/src/test/resources/ai-reading-baseline.tsv |   2 +-
  docs/card-sdk-language-reference.md           |  16 +-
  docs/sdk-index.md                             |   2 +-
@@ -19,43 +21,78 @@ Subject: [PATCH] arcana: 0011-stack-object-copying
  .../wingedsheep/engine/core/Serialization.kt  |   3 +-
  .../wingedsheep/engine/event/TriggerIndex.kt  |   1 +
  .../engine/handlers/ContinuationHandler.kt    |   5 +
- .../continuations/MiscContinuationResumer.kt  |  65 +----
+ .../continuations/MiscContinuationResumer.kt  |  65 +---
  .../ObjectReferencePropagation.kt             |   2 +
  .../effects/EffectExecutorRegistry.kt         |   2 +-
  .../stack/CopyEachTargetSpellExecutor.kt      | 173 -----------
  .../effects/stack/CopyStackObjectsExecutor.kt |  81 +++++
- .../stack/CopyTargetSpellOrAbilityExecutor.kt | 108 +++----
- .../CopyTargetTriggeredAbilityExecutor.kt     |  79 +----
+ .../stack/CopyTargetSpellOrAbilityExecutor.kt | 108 ++++---
+ .../CopyTargetTriggeredAbilityExecutor.kt     |  78 +----
  .../effects/stack/SpellCopyTargets.kt         |  90 ++++--
  .../handlers/effects/stack/StackExecutors.kt  |   5 +-
  .../engine/mechanics/stack/StackPlacement.kt  |  10 +-
  .../wingedsheep/engine/view/ClientEvent.kt    |   6 +
  .../scenarios/SpellCopyRetargetingTest.kt     |   4 +-
- .../scenarios/StackObjectCopyEngineTest.kt    | 276 ++++++++++++++++++
- 27 files changed, 636 insertions(+), 420 deletions(-)
+ .../scenarios/StackObjectCopyEngineTest.kt    | 279 ++++++++++++++++++
+ 29 files changed, 641 insertions(+), 423 deletions(-)
  create mode 100644 mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
  delete mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
  create mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyStackObjectsExecutor.kt
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
 
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
+index d674d9d4dc..674fbce85f 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
+@@ -1188,7 +1188,7 @@ object CardIntentAnalyzer {
+         // "Copy target spell", "copy target activated or triggered ability", "when you next cast an
+         // instant or sorcery spell this turn, copy it": see [IntentTag.SPELL_COPY].
+         is CopyTargetSpellEffect, is CopyTargetSpellOrAbilityEffect, is CopyTargetTriggeredAbilityEffect,
+-        is CopyEachTargetSpellEffect, is CopyForOtherPossibleTargetsEffect, is CopyNextSpellCastEffect,
++        is CopyStackObjectsEffect, is CopyForOtherPossibleTargetsEffect, is CopyNextSpellCastEffect,
+         is CopyEachSpellCastEffect -> setOf(IntentTag.SPELL_COPY)
+         is GainLifeEffect, is DrainLifeEffect -> setOf(IntentTag.LIFEGAIN)
+         // An exchange is carried out as a gain for the player whose total goes up (rule 701.12c),
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/SynergyAxes.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/SynergyAxes.kt
+index 7a608d1fea..fe02ff6da0 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/SynergyAxes.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/SynergyAxes.kt
+@@ -18,7 +18,7 @@ import com.wingedsheep.sdk.scripting.effects.MoveAllCountersEffect
+ import com.wingedsheep.sdk.scripting.effects.MoveAllLastKnownCountersEffect
+ import com.wingedsheep.sdk.scripting.effects.CardSource
+ import com.wingedsheep.sdk.scripting.effects.CopyEachSpellCastEffect
+-import com.wingedsheep.sdk.scripting.effects.CopyEachTargetSpellEffect
++import com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect
+ import com.wingedsheep.sdk.scripting.effects.CopyNextSpellCastEffect
+ import com.wingedsheep.sdk.scripting.effects.CopyTargetSpellEffect
+ import com.wingedsheep.sdk.scripting.effects.CopyTargetSpellOrAbilityEffect
+@@ -361,7 +361,7 @@ object SynergyAxes {
+             }
+         ) return true
+         val copiesTarget = leaves.any {
+-            it is CopyTargetSpellEffect || it is CopyTargetSpellOrAbilityEffect || it is CopyEachTargetSpellEffect
++            it is CopyTargetSpellEffect || it is CopyTargetSpellOrAbilityEffect || it is CopyStackObjectsEffect
+         }
+         return copiesTarget && requirements.any { req ->
+             when (req) {
 diff --git a/ai/src/test/resources/ai-reading-baseline.tsv b/ai/src/test/resources/ai-reading-baseline.tsv
-index ed173696fe..b933fb937b 100644
+index 650169c6b2..77ef3f8911 100644
 --- a/ai/src/test/resources/ai-reading-baseline.tsv
 +++ b/ai/src/test/resources/ai-reading-baseline.tsv
-@@ -4299,7 +4299,7 @@ Disperse	polarity: MoveToZoneEffect
- Dispersing Orb	polarity: MoveToZoneEffect
+@@ -4361,7 +4361,7 @@ Disperse
+ Dispersing Orb
  Displacer Beast	intent: VentureIntoTheDungeonEffect
- Displacer Kitten	polarity: MoveToZoneEffect
--Display of Power	intent: CopyEachTargetSpellEffect; polarity: CopyEachTargetSpellEffect
-+Display of Power	intent: CopyStackObjectsEffect; polarity: CopyStackObjectsEffect
+ Displacer Kitten
+-Display of Power	polarity: CopyEachTargetSpellEffect
++Display of Power	polarity: CopyStackObjectsEffect
  Disrupt
  Disrupting Scepter
  Disruption Protocol
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 5d04b1450d..01e7e5d24e 100644
+index 79bc252ce4..c0bc043d08 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -4049,7 +4049,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
+@@ -4085,7 +4085,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
    groups, final-set-dependent target planning, or multiple object visits of one entity in separate
    slots (LEA G60); these boundaries block printed Fork. No new effect vocabulary is introduced.
  
@@ -64,7 +101,7 @@ index 5d04b1450d..01e7e5d24e 100644
  - `CopyForOtherPossibleTargetsEffect(target = EffectTarget.TriggeringEntity, candidates, copier = Player.You, selection = PossibleTargetCopies.EACH)` (facades `Effects.CopyForEachOtherPossibleTarget(candidates, target, copier)` and `Effects.CopyForChosenOtherPossibleTarget(candidates, target, copier)`) — copy a spell **or an activated/triggered ability** once **for each other object it could target**, auto-assigning every copy a distinct one of those objects (CR 707.10d). The Zada family: **Mirrorwing Dragon**, **Agrus Kos, Eternal Soldier**, Zada, Hedron Grinder. This is the 707.10d shape, **not** 707.10c — no retarget decision is made (`ONE_CHOSEN` only picks which candidate), so contrast `CopyTargetSpellEffect(copies = …)`, which makes N copies and pauses to let the controller *choose* new targets for each. The engine dispatches on what `target` resolves to: a spell on the stack, or an ability (`EffectTarget.TargetingSource` for Agrus Kos's "copy that ability" in a becomes-the-target trigger). The candidate set is every object matching `candidates` that is a legal target for **every** instance of the word "target" on the original (the per-requirement legal-target sets are intersected, so hexproof/shroud/protection and per-requirement filters are honored — "any creature that couldn't be targeted … is just ignored"), minus the objects the original already targets (the "each **other** …" of the card text). Each copy fills *all* of the original's target slots with its one object; a modal spell or triggered ability keeps its chosen modes with its per-mode targets rewritten the same way (700.2g — "a different mode cannot be chosen"). `candidates` reads "this" as the **ability's source** (not the copied object), so `Creature.sourceItself()` is "the copy targets [this creature]" — **Ivy, Gleeful Spellthief** gets one copy aimed at herself when she is a legal target, none otherwise. **`copier` controls every copy and is the player `candidates` and each candidate's legality are read relative to** — so `GameObjectFilter.Creature.youControl()` reads "creature the copier controls". "You copy" is the default `Player.You` (Zada; Agrus Kos, whose controller gets the copies "no matter which player controlled the original ability"); Mirrorwing's "**that player** copies … each other creature **they** control" on a trigger watching every seat is `copier = Player.TriggeringPlayer`, the caster — cast Murder on an opponent's Mirrorwing Dragon and *your* creatures each get a Murder. Copies aren't cast or activated, so cast/activate triggers (including the Dragon's own) don't refire; an object flagged `cantBeCopied` yields no copies. Pair with `Triggers.anyPlayer.casts(InstantOrSorcery, requires = setOf(SpellCastPredicate.TargetsOnlySource))` or `Triggers.self.becomesTarget(abilitiesOnly = true, targetsOnlyIt = true)`. **`selection = PossibleTargetCopies.ONE_CHOSEN`** (`Effects.CopyForChosenOtherPossibleTarget`) is **Beamsplitter Mage**'s "if you control one or more other creatures that spell could target, choose one of those creatures. Copy that spell. The copy targets the chosen creature.": the same candidate set, but a single copy aimed at the one the copier picks — a board `SelectCardsDecision` when several qualify, no prompt when exactly one does, no copy when none does. Its intervening "if" (CR 603.4) is checked at cast time too, with `SpellCastPredicate.CouldTargetOther(filter)` in the trigger's `requires` — the same candidate set, so a lone Mage puts no trigger on the stack. A copy-count replacement (Twinning Staff) still adds ordinary copies to it.
  - `CopyTargetTriggeredAbilityEffect(target)` — copy a triggered ability on the stack. `target` is
    usually `ContextTarget(0)`; `EffectTarget.TargetingSource` copies the ability that just targeted
-@@ -21844,3 +21844,17 @@ controller with `storePlayer()` and compares each ranked bidder using
+@@ -21953,3 +21953,17 @@ controller with `storePlayer()` and compares each ranked bidder using
  `Conditions.PlayerIs(Player.You, originalController.asPlayers)`, so a later control change does
  not change which player earns the counters. `ChooseNumberThen` remains the public, single
  chooser combinator, and `SelectFromCollection` remains ordinary collection selection.
@@ -83,10 +120,10 @@ index 5d04b1450d..01e7e5d24e 100644
 +`CopyEachTargetSpell` serialization name and chosen-targets default for existing exported card data.
 +`Effects.CopyEachTargetSpell()` remains the facade for that default.
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 72205acd16..edcd97b6c3 100644
+index 8ecf622554..0cd9d04f16 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -806,9 +806,9 @@ Families:
+@@ -807,9 +807,9 @@ Families:
  - `CopyCardIntoCollectionEffect(source: EffectTarget, storeAs: String)` — Copy a single card referenced by source and store the copy's entity id in the pipeline collection storeAs.
  - `CopyCollectionIntoCollectionEffect(from: String, storeAs: String)` — Copy **every** card in the pipeline collection from and store all the copies' entity ids in the collection storeAs.
  - `CopyEachSpellCastEffect(copies: Int, spellFilter: GameObjectFilter)` — Until end of turn, whenever you cast a spell matching spellFilter, copy it.
@@ -98,10 +135,10 @@ index 72205acd16..edcd97b6c3 100644
  - `CopyTargetSpellOrAbilityEffect(target: EffectTarget, copies: DynamicAmount)` — Copy target spell **or** ability on the stack, dispatching at resolution on the chosen object's kind: an instant/sorcery spell copies via the spell-copy path; an activated or triggered ability copi…
  - `CopyTargetTriggeredAbilityEffect(target: EffectTarget)` — Copy target triggered ability on the stack.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
-index 1f2ace7284..f60f9a6668 100644
+index b11352a3ee..5f896e21c8 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
-@@ -5983,10 +5983,19 @@ object Effects {
+@@ -5996,10 +5996,19 @@ object Effects {
          keywordsForCopy: List<com.wingedsheep.sdk.core.Keyword> = emptyList(),
          removeLegendary: Boolean = false
      ): Effect =
@@ -211,7 +248,7 @@ index 0000000000..6e28f051f3
 +    }
 +})
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 950c025099..f314c140b6 100644
+index fd5ab68e4e..5d80be75ea 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -600,8 +600,8 @@ ConvertCountersToTokensEffect — Effect
@@ -309,7 +346,7 @@ index fbb73e5dfd..6c9ea6a32d 100644
  
  /**
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
-index 042aad25ac..ed05fe0ad0 100644
+index edb5234aac..a56d67adcb 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
 @@ -1002,9 +1002,20 @@ data class AbilityActivatedEvent(
@@ -335,7 +372,7 @@ index 042aad25ac..ed05fe0ad0 100644
  data class AbilityTriggeredEvent(
      val sourceId: EntityId,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
-index 0211a3d11d..b7b2914afd 100644
+index 140be6411e..2c31c35e2b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 @@ -74,6 +74,7 @@ val engineSerializersModule = SerializersModule {
@@ -346,7 +383,7 @@ index 0211a3d11d..b7b2914afd 100644
          subclass(ResolvedEvent::class)
          subclass(SpellCounteredEvent::class)
          subclass(SpellFizzledEvent::class)
-@@ -523,7 +524,7 @@ val engineSerializersModule = SerializersModule {
+@@ -526,7 +527,7 @@ val engineSerializersModule = SerializersModule {
          subclass(CopyActivatedAbilityTargetContinuation::class)
          subclass(CopyAbilityTargetContinuation::class)
          subclass(StormCopyTargetContinuation::class)
@@ -356,7 +393,7 @@ index 0211a3d11d..b7b2914afd 100644
          subclass(StormCopyModalTargetContinuation::class)
          subclass(ChangeSpellTargetContinuation::class)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
-index 1c6cc22106..1ed4306ca1 100644
+index a912c5ac38..dcbbeabaac 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
 @@ -498,6 +498,7 @@ class TriggerIndex(
@@ -485,10 +522,10 @@ index de5e1dcaea..3f60f2a138 100644
  
      private fun resumeStormCopyTarget(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
-index f0439b3527..65d6f97fe0 100644
+index dc5787316e..0acd68df5b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
-@@ -112,6 +112,7 @@ internal fun AnswerContinuation.objectReferences(): ObjectReferenceEnvironment?
+@@ -113,6 +113,7 @@ internal fun AnswerContinuation.objectReferences(): ObjectReferenceEnvironment?
      is ChooseActionContinuation -> context.objectReferences
      is TriggeredAbilityContinuation -> objectReferences
      is TriggerDamageDistributionContinuation -> objectReferences
@@ -496,7 +533,7 @@ index f0439b3527..65d6f97fe0 100644
      is MayAbilityContinuation -> effectContext.objectReferences
      is KeywordActionInsteadContinuation -> actionContext.objectReferences
      is GatedEffectContinuation -> effectContext.objectReferences
-@@ -247,6 +248,7 @@ internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnviro
+@@ -249,6 +250,7 @@ internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnviro
      is ChooseActionContinuation -> copy(context = context.copy(objectReferences = refs))
      is TriggeredAbilityContinuation -> copy(objectReferences = refs)
      is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)
@@ -505,7 +542,7 @@ index f0439b3527..65d6f97fe0 100644
      is KeywordActionInsteadContinuation -> copy(actionContext = actionContext.copy(objectReferences = refs))
      is GatedEffectContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
-index e8db479269..3eca59816b 100644
+index d3055e32cd..ac00738527 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
 @@ -78,7 +78,7 @@ class EffectExecutorRegistry(
@@ -946,7 +983,7 @@ index 7833b5c12b..67d0072b38 100644
  
          /** The ability on the stack, or — once it was countered — as it last existed there. */
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
-index 61d1fba70c..e585e5de83 100644
+index 61d1fba70c..be51078a1c 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
 @@ -48,78 +48,10 @@ class CopyTargetTriggeredAbilityExecutor(
@@ -1032,13 +1069,12 @@ index 61d1fba70c..e585e5de83 100644
      }
  
      companion object {
-@@ -136,6 +68,9 @@ class CopyTargetTriggeredAbilityExecutor(
+@@ -136,6 +68,8 @@ class CopyTargetTriggeredAbilityExecutor(
              return source.copy(
                  controllerId = copyController,
                  stateTriggerAbilityId = null,
-+                // A leading "you may" is a resolution choice, even when the original's UI
-+                // answered it early while targeting. The copy must make its own choice.
-+                consentAnsweredAtTargeting = false,
++                // Upstream retains optional consent in the effect itself; each copied
++                // instance therefore asks independently when that instance resolves.
                  description = "Copy of ${source.description}"
              )
          }
@@ -1269,7 +1305,7 @@ index 278288bc4a..25f65c4ee1 100644
          if (CrimeDetector.isCrime(newState, ability.controllerId, targets)) {
              events.add(CommitCrimeEvent(ability.controllerId, abilityId, sourceDisplayName))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
-index f9b3eaddd0..7635498dd2 100644
+index 9e3de2e6bb..604715f707 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
 @@ -1450,6 +1450,12 @@ object ClientEventTransformer {
@@ -1302,10 +1338,10 @@ index f2cf7c91c5..6dfdfc2f87 100644
          d.replaceState(result.state)
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
 new file mode 100644
-index 0000000000..c0f8a2cb90
+index 0000000000..d95a1a2411
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,279 @@
 +package com.wingedsheep.engine.scenarios
 +
 +import com.wingedsheep.engine.core.*
@@ -1560,15 +1596,18 @@ index 0000000000..c0f8a2cb90
 +        val d = setup()
 +        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
 +        val original = triggered(d, source, effect = Effects.May(Effects.GainLife(2)))
-+        d.replaceState(d.state.updateEntity(original) { entity ->
-+            entity.with(entity.get<TriggeredAbilityOnStackComponent>()!!.copy(consentAnsweredAtTargeting = true))
-+        })
++        val lifeBefore = d.getLifeTotal(d.player1)
 +        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
 +        val copy = d.state.getEntity(d.state.stack.last())!!.get<TriggeredAbilityOnStackComponent>()!!
-+        copy.consentAnsweredAtTargeting shouldBe false
++        copy.effect shouldBe d.state.getEntity(original)!!.get<TriggeredAbilityOnStackComponent>()!!.effect
 +        d.bothPass().error shouldBe null
 +        d.pendingDecision!!::class shouldBe YesNoDecision::class
 +        d.submitYesNo(d.player1, false).error shouldBe null
++        d.getLifeTotal(d.player1) shouldBe lifeBefore
++        d.bothPass().error shouldBe null
++        d.pendingDecision!!::class shouldBe YesNoDecision::class
++        d.submitYesNo(d.player1, true).error shouldBe null
++        d.getLifeTotal(d.player1) shouldBe lifeBefore + 2
 +    }
 +    test("ordering answers cannot omit, duplicate, or invent objects") {
 +        val d = setup()

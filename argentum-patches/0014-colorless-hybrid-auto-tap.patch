@@ -11,7 +11,7 @@ Subject: [PATCH] arcana: 0014-colorless-hybrid-auto-tap
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 6daa73aff4..6163abcc28 100644
+index 4dd83dd3d5..9ab971c641 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 @@ -868,10 +868,13 @@ class ManaSolver private constructor(
@@ -114,7 +114,7 @@ index 6daa73aff4..6163abcc28 100644
                  is ManaSymbol.MonocolorHybrid -> {
                      // Handle in pass 1a below, after all strict colored pips have claimed sources.
                  }
-@@ -3871,6 +3904,8 @@ class ManaSolver private constructor(
+@@ -3872,6 +3905,8 @@ class ManaSolver private constructor(
                  }
                  is ManaSymbol.MonocolorHybrid ->
                      colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1

@@ -17,7 +17,7 @@ Subject: [PATCH] arcana: 0007-ai-bounded-stack-search
  create mode 100644 ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index 336153132c..b7ce4b8f60 100644
+index 66d6743d11..a54e46588d 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 @@ -57,6 +57,8 @@ class AIPlayer(
@@ -63,7 +63,7 @@ index 336153132c..b7ce4b8f60 100644
      }
  
      /**
-@@ -431,6 +441,7 @@ class AIPlayer(
+@@ -434,6 +444,7 @@ class AIPlayer(
                  responder = responder,
                  useMeaningfulFilter = profile.useMeaningfulFilter,
                  opponentKnowledge = opponentKnowledge,
@@ -189,10 +189,10 @@ index 1e879c8d4f..8dbfd3c754 100644
       *
       * Two consumers, two answers, and the difference is whether the caller is producing a *move* or
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index f1100a1592..7a85bba7c6 100644
+index 5d2caa89b6..3fc0195514 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-@@ -357,7 +357,7 @@ class Strategist(
+@@ -362,7 +362,7 @@ class Strategist(
          // returns a single DeclareAttackers/DeclareBlockers with an empty default map).
          val combatAction = legalActions.find { it.actionType == "DeclareAttackers" || it.actionType == "DeclareBlockers" }
          if (combatAction != null) {
@@ -201,7 +201,7 @@ index f1100a1592..7a85bba7c6 100644
                  if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
              }
              return handleCombatDeclaration(evaluationState, combatAction, playerId, budget, startNanos)
-@@ -376,7 +376,7 @@ class Strategist(
+@@ -381,7 +381,7 @@ class Strategist(
              } else {
                  single
              }
@@ -210,7 +210,7 @@ index f1100a1592..7a85bba7c6 100644
                  if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
              }
              return only.copy(action = chooseCommittedTargets(state, only, playerId, budget))
-@@ -385,7 +385,9 @@ class Strategist(
+@@ -390,7 +390,9 @@ class Strategist(
          val pass = legalActions.find { it.actionType == "PassPriority" }
          val candidates = if (forcedPlay) {
              legalActions.filter { it.affordable && !it.hasUnfillableTargetRequirement }
@@ -221,7 +221,7 @@ index f1100a1592..7a85bba7c6 100644
          // A forced play has to play *something*, so nothing is vetoed there.
          val aimed = if (targetPolarityFromEffect && !forcedPlay) {
              candidates.filterNot { TargetSelection.aimsOnlyAtTheWrongSide(state, it, playerId, intents) }
-@@ -396,7 +398,7 @@ class Strategist(
+@@ -401,7 +403,7 @@ class Strategist(
  
          if (affordable.isEmpty()) return pass ?: legalActions.first()
  

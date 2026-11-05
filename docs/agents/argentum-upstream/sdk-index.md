@@ -102,6 +102,7 @@ Families:
 - `AbilityCost.PutSelfIntoLibrary(placement: ZonePlacement)` — Put self into its owner's library, on top or on the bottom — "Put this card from your graveyard on the bottom of your library: You gain 2 life." (Daniels, Temporal Agent), with `activateFromZone =…
 - `AbilityCost.RemoveAllCounters(counterType: CounterType, fromGrantingPermanent: Boolean)` — Remove every counterType counter from a permanent as part of the activation cost — "Remove all +1/+1 counters from Molten Hydra" on the ability's own source, or, with fromGrantingPermanent, "Remove…
 - `AbilityCost.ReturnSelfToHand` — Return self to its owner's hand — "Return this land to its owner's hand" as part of an activation cost (Maze's End).
+- `AbilityCost.RevealSelf` — Reveal this card from your hand — "{B}, Reveal Tetzimoc, Primal Death from your hand: …" (Tetzimoc, Primal Death), with `activateFromZone = Zone.HAND`.
 - `AbilityCost.SacrificeChosenCreatureType` — Sacrifice a creature of the type chosen when this permanent entered the battlefield.
 - `AbilityCost.SacrificeGrantingPermanent` — Sacrifice the permanent that granted this activated ability to the source.
 - `AbilityCost.SacrificeSelf` — Sacrifice self (the permanent with this ability)
@@ -893,7 +894,7 @@ Families:
 - `ForceBlockEffect(target: EffectTarget, attacker: EffectTarget)` — Force a target creature to block a specific attacker this combat if able.
 - `ForceExileMultiZoneEffect(count: DynamicAmount, target: EffectTarget)` — Force a player to exile cards from multiple zones (battlefield, hand, graveyard).
 - `ForcePlayEffect(from: String, player: EffectTarget, storePlayedTo: String?)` — Instruct a player to play the first gathered card if able, paying its costs.
-- `ForceSacrificeEffect(filter: GameObjectFilter, count: Int, target: EffectTarget, dynamicCount: DynamicAmount?)` — Force sacrifice effect: Target player sacrifices permanents matching a filter.
+- `ForceSacrificeEffect(filter: GameObjectFilter, count: Int, target: EffectTarget, dynamicCount: DynamicAmount?, countPerPlayer: Boolean)` — Force sacrifice effect: Target player sacrifices permanents matching a filter.
 - `GainAllActivatedAbilitiesOfEffect(donor: EffectTarget, target: EffectTarget, duration: Duration)` — The permanent target names **gains all activated abilities of the object donor names**, for duration.
 - `GainCitysBlessingEffect(target: EffectTarget)` — Grants the city's blessing to a player (CR 702.131 / 700.5).
 - `GainControlByActivePlayerEffect(target: EffectTarget)` — Gain control of target permanent for the active player (whoever's turn it is).
@@ -938,7 +939,7 @@ Families:
 - `GrantOneSpellAnyManaTypeEffect(spellFilter: GameObjectFilter)` — "For one spell this turn, you may spend mana as though it were mana of any type to pay that spell's mana cost.
 - `GrantPlayWithAdditionalCostEffect(from: String, additionalCost: AdditionalCost)` — Grant "play with an additional cost" to all cards in a named collection.
 - `GrantPlayWithCostIncreaseEffect(from: String, amount: Int, unlessTargets: GameObjectFilter?)` — Add a generic-mana tax to every card in a named collection so that when the effect controller later casts one of them, the spell costs amount more to cast.
-- `GrantPlayWithoutPayingCostEffect(from: String, expiry: MayPlayExpiry)` — Grant "play without paying mana cost" permission to all cards in a named collection.
+- `GrantPlayWithoutPayingCostEffect(from: String, expiry: MayPlayExpiry, ownerControls: Boolean)` — Grant "play without paying mana cost" permission to all cards in a named collection.
 - `GrantPlayerActionEffect(cost: PayCost, effect: Effect, timing: PlayerActionTiming, target: EffectTarget, duration: Duration, actionDescription: String)` — Creates a repeatable special action, retaining the granting resolution's references and values.
 - `GrantPlayerProtectionEffect(target: EffectTarget, scope: ProtectionScope, duration: Duration)` — Grant a **player** protection from scope (CR 702.16) for duration.
 - `GrantProtectionFromChosenCardTypeEffect(target: EffectTarget, duration: Duration)` — Grant "protection from the card type of your choice" to a target (CR 702.16).
@@ -1037,7 +1038,6 @@ Families:
 - `RedirectNextDamageEffect(protectedTargets: List<EffectTarget>, redirectTo: EffectTarget, amount: Int?, scope: RedirectScope, protectedFilter: GameObjectFilter?, optional: Boolean, fromSource: EffectTarget?, duration: Duration)` — Redirect damage that would be dealt to the protected targets (or a filtered class) for a duration.
 - `RedistributeLifeTotalsEffect` — "Redistribute any number of players' life totals." (Reverse the Sands).
 - `ReduceMaximumHandSizeEffect(amount: DynamicAmount, target: EffectTarget)` — Reduces the target player's maximum hand size by amount for the rest of the game ("your maximum hand size is reduced by three for the rest of the game" — Inspired Idea).
-- `ReflectCombatDamageEffect(target: EffectTarget)` — Creates a delayed trigger for the rest of the turn that reflects combat damage.
 - `ReflexiveTriggerEffect(action: Effect, optional: Boolean, reflexiveEffect: Effect, reflexiveTargetRequirements: List<TargetRequirement>, hint: String?, descriptionOverride: String?)` — Reflexive trigger - "When you do, effect." Used for abilities that trigger from the resolution of another effect.
 - `RegenerateEffect(target: EffectTarget)` — Regenerate target creature.
 - `RemoveAbilitiesFromSourceOfTargetedAbilityEffect(duration: Duration, sourceCardTypes: Set<CardType>)` — The ability-strip sibling of DestroySourceOfTargetedAbilityEffect.
@@ -1185,7 +1185,7 @@ Families:
 
 ## EventPattern
 
-- `EventPattern.AbilityActivatedEvent(player: Player, targetMatch: Recipient?, sourceFilter: GameObjectFilter?, tapInCost: TapSymbolInCost?, onceOnlyKind: OnceOnlyAbilityKind?, excludeManaAbilities: Boolean, includeManaAbilities: Boolean, requireLoyalty: Boolean, minLoyaltyRemoved: Int, keyword: Keyword?)` — When a player activates an activated ability.
+- `EventPattern.AbilityActivatedEvent(player: Player, targetMatch: Recipient?, sourceFilter: GameObjectFilter?, tapInCost: TapSymbolInCost?, onceOnlyKind: OnceOnlyAbilityKind?, excludeManaAbilities: Boolean, includeManaAbilities: Boolean, requireLoyalty: Boolean, minLoyaltyRemoved: Int, keywords: Set<Keyword>)` — When a player activates an activated ability.
 - `EventPattern.AbilityTriggeredEvent(player: Player, cause: AbilityTriggerCause?, sourceFilter: GameObjectFilter?)` — When a triggered ability is put onto the stack (CR 603.3), scoped by whose ability it is and — optionally — by what caused it to trigger.
 - `EventPattern.AnyOf(events: List<EventPattern>)` — Matches when any constituent event pattern matches.
 - `EventPattern.AttackEvent(filter: GameObjectFilter?, requires: Set<AttackPredicate>)` — When a creature attacks.
@@ -1244,7 +1244,7 @@ Families:
 - `EventPattern.EnlistedEvent` — This creature enlists another creature.
 - `EventPattern.EvidenceCollectedEvent(player: Player)` — Whenever player collects evidence (CR 701.59).
 - `EventPattern.EvolvedEvent` — When a creature evolves (CR 702.100b) — "A creature 'evolves' when one or more +1/+1 counters are put on it as a result of its evolve ability resolving." Watchful Radstag's "Whenever this creature…
-- `EventPattern.ExertedAsItAttacksEvent` — "When you do" after "you may exert this creature as it attacks" (CR 701.43d) — the triggered ability linked to com.wingedsheep.sdk.scripting.ExertAsItAttacks (CR 607.2h).
+- `EventPattern.ExertedEvent(filter: GameObjectFilter, exertedBy: Player, asItAttacks: Boolean)` — A permanent is exerted (CR 701.43a) — "whenever you exert a creature" (Vizier of the True, Resolute Survivors) and, with asItAttacks, the "When you do" after "you may exert this creature as it atta…
 - `EventPattern.ExpendEvent(threshold: Int, player: Player)` — When you expend N — i.e., you spend your Nth total mana to cast spells during a turn.
 - `EventPattern.ExploitedEvent(player: Player, requireNontokenExploited: Boolean)` — Whenever a creature exploits a creature (CR 702.110b) — a creature "exploits a creature" when the controller of its exploit ability sacrifices a creature as that ability resolves.
 - `EventPattern.ExploredEvent(filter: GameObjectFilter?, revealedType: ExploreReveal)` — Whenever a permanent matching filter explores (CR 701.44), optionally gated by whether the revealed card was a land (revealedType).
@@ -1787,6 +1787,7 @@ Families:
 - `StatePredicate.IsCommander` — Is a **commander** — any player's (CR 903.3).
 - `StatePredicate.IsEnchanted` — Has at least one Aura attached — the MTG adjective "enchanted" (CR 303.4: an Aura *enchants* the permanent it's attached to).
 - `StatePredicate.IsEnchantedByAura(auraController: ControllerPredicate)` — Has at least one attached Aura whose *controller* satisfies auraController — the narrower "enchanted by Auras you control" (Archon of the Wild Rose) as opposed to plain IsEnchanted, which is agnost…
+- `StatePredicate.IsEntity(reference: EffectTarget.SingleEntity)` — The candidate **is** the object reference names — an identity test, so negated with Not it reads "other than it" against a role the ability names rather than its source: Torment of Venom's "its con…
 - `StatePredicate.IsEquipped` — Has at least one Equipment attached
 - `StatePredicate.IsFaceDown` — Is face-down (morph, manifest)
 - `StatePredicate.IsFaceUp` — Is face-up (not face-down)
@@ -1999,15 +2000,16 @@ Families:
 - `PlayFromTopOfLibrary` — Play with the top card of your library revealed.
 - `PlayFromTopWithAlternativeCost(withoutPayingManaCost: Boolean, additionalCost: AdditionalCost?, filter: GameObjectFilter?, libraryOwner: EffectTarget, withAnyManaColor: Boolean)` — You may play cards from the top of your library, and a spell cast this way is cast with an alternative cost — its mana cost waived (withoutPayingManaCost) and/or an additionalCost substituted.
 - `PlayLandsAndCastFilteredFromTopOfLibrary(spellFilter: GameObjectFilter?, landFilter: GameObjectFilter)` — You may play lands and cast spells matching a filter from the top of your library.
-- `PlayersCantActivateAbilities(affected: Player, permanentFilter: GameObjectFilter, condition: Condition?, nonManaAbilitiesOnly: Boolean, anyZone: Boolean, loyaltyAbilitiesOnly: Boolean)` — A continuous prohibition on activating activated abilities, scoped along the same three independent axes as PlayersCantCastSpells — each a reused SDK primitive, so one type covers a whole family of…
+- `PlayersCantActivateAbilities(affected: Player, permanentFilter: GameObjectFilter, condition: Condition?, abilities: ActivatedAbilityScope, anyZone: Boolean)` — A continuous prohibition on activating activated abilities, scoped along the same three independent axes as PlayersCantCastSpells — each a reused SDK primitive, so one type covers a whole family of…
 - `PlayersCantCastSpells(affected: Player, spellFilter: GameObjectFilter, condition: Condition?, conditionFromCaster: Boolean, fromZones: Set<Zone>?)`
+- `PlayersCantGetCounters(affected: Player, counterType: CounterType?)` — "Players can't get counters" (Solemnity) — a static prohibition on players getting counters (CR 122.1: players can have counters too), for the affected players relative to the source's controller:…
 - `PlayersCantPayLifeForCosts(excludeManaAbilities: Boolean)` — "Players can't pay life to cast spells or to activate abilities that aren't mana abilities" — Karn's Sylex.
 - `PlayersCantPlayLands(affected: Player, condition: Condition?, landFilter: GameObjectFilter)`
 - `PlayersCantSearchLibraries(affected: Player, scope: LibrarySearchProhibition)` — A continuous prohibition on searching libraries (CR 701.23) for the affected players, relative to the source's controller, scoped by scope.
 - `PlayersPlayWithHandsRevealed` — **Every** player plays with their hand revealed (to all players).
 - `PlayersRevealTopOfLibrary` — **Every** player plays with the top card of their library revealed (to all players), without granting anyone permission to play it from there.
 - `PlotFromTopOfLibrary(filter: GameObjectFilter)` — You may **plot** (CR 718) the top card of your library if it matches filter, paying a plot cost equal to its mana cost.
-- `PreventActivatedAbilities(filter: GameObjectFilter, nonManaAbilitiesOnly: Boolean, anyZone: Boolean)` — Activated abilities of permanents matching filter can't be activated.
+- `PreventActivatedAbilities(filter: GameObjectFilter, abilities: ActivatedAbilityScope, anyZone: Boolean)` — Activated abilities of permanents matching filter can't be activated.
 - `PreventCycling` — Prevents all players from cycling cards.
 - `PreventEnchantment(auras: GameObjectFilter, exceptSource: Boolean, filter: GroupFilter)` — Prevents matching Auras from enchanting the affected permanents.
 - `PreventManaPoolEmptying` — Prevents mana pools from emptying as steps and phases end.

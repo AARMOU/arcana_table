@@ -4,7 +4,7 @@ Instructions for AI agents (GPT/Codex, Claude, Copilot, others). GitHub Copilot 
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 Arcana Table is an Android MTG table app whose offline rules come from the **Argentum** engine
-(`wingedsheep/argentum-engine`, pinned at `e2f08a7dc83ad8a9aa808589a2180f1ada367b10`, shipped as jars in
+(`wingedsheep/argentum-engine`, pinned at `173a09a2ed15763dce854e385b2df0d085e03975`, shipped as jars in
 `android/app/libs/`). Cards Argentum lacks are written in Argentum's own card DSL in
 `android/custom-cards/` and shipped to the app as data.
 

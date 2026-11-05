@@ -23,10 +23,10 @@ index d4e2a55b80..b6f3370fc7 100644
              is DynamicAmount.LastKnownSourceCounters, is DynamicAmount.LastKnownDamageDealtToSource,
              is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-index 56a0984f2a..ed718a58f5 100644
+index 674fbce85f..ff13aea7df 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-@@ -241,6 +241,7 @@ object CardIntentAnalyzer {
+@@ -259,6 +259,7 @@ object CardIntentAnalyzer {
          var expiringPump = false
          var pumpToughness = 0
          var expiringGroupPump = false
@@ -34,8 +34,8 @@ index 56a0984f2a..ed718a58f5 100644
          // Hand selection reads gated interiors too — see [handSelectionLeaves] for why only here.
          val handLeaves = scripts.flatMap { script ->
              EffectWalker.slots(script).map { it.effect } +
-@@ -270,6 +271,13 @@ object CardIntentAnalyzer {
-             if (isExpiringGroupPump(effect)) expiringGroupPump = true
+@@ -289,6 +290,13 @@ object CardIntentAnalyzer {
+             if (isExpiringCopy(effect)) expiringPump = true
          }
  
 +        // Modal instants can grant evasion, protection, or combat keywords through a group
@@ -48,7 +48,7 @@ index 56a0984f2a..ed718a58f5 100644
          var anthemBonus = 0
          for (static in scripts.flatMap { it.staticAbilities }) {
              tags += tagsOf(static)
-@@ -292,7 +300,7 @@ object CardIntentAnalyzer {
+@@ -316,7 +324,7 @@ object CardIntentAnalyzer {
          // A protective keyword that wears off at cleanup (Withstand Death's indestructible) is the
          // same trick without the stats: spent on a fight or on removal on the stack, or wasted.
          val speed = speedOf(card, scripts, tags)
@@ -57,7 +57,7 @@ index 56a0984f2a..ed718a58f5 100644
  
          val repeatable = repeatableOf(card, scripts)
          val arrivalTags = arrivalTagsOf(card, scripts, tags)
-@@ -1130,6 +1138,29 @@ object CardIntentAnalyzer {
+@@ -1656,6 +1664,29 @@ object CardIntentAnalyzer {
                  isExpiringPump(it) && (it as ModifyStatsEffect).target == EffectTarget.IterationEntity
              }
  
@@ -88,7 +88,7 @@ index 56a0984f2a..ed718a58f5 100644
          is DrawCardsEffect -> fixed(effect.count)
          is DrawUpToEffect -> effect.maxCards
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
-index c7d17b8fc4..d61d52adb9 100644
+index 79c9e945d9..eb4a3bb19d 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
 @@ -5,6 +5,14 @@ import com.wingedsheep.engine.state.components.identity.RoomComponent
@@ -106,7 +106,7 @@ index c7d17b8fc4..d61d52adb9 100644
  import com.wingedsheep.mtg.sets.definitions.dsk.cards.UnholyAnnexRitualChamber
  import com.wingedsheep.mtg.sets.definitions.war.cards.GodEternalKefnet
  import com.wingedsheep.mtg.sets.definitions.woe.cards.VirtueOfLoyalty
-@@ -115,6 +123,33 @@ class CardIntentAnalyzerTest : ScenarioTestBase() {
+@@ -121,6 +129,33 @@ class CardIntentAnalyzerTest : ScenarioTestBase() {
              }
          }
  

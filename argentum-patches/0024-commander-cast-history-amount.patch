@@ -16,10 +16,10 @@ Subject: [PATCH] arcana: 0024-commander-cast-history-amount
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index a641c1a93e..99d283c6d0 100644
+index bdbf5ef242..909950ab1f 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -647,6 +647,7 @@ Families:
+@@ -648,6 +648,7 @@ Families:
  - `DynamicAmount.CastChoice(slot: ChoiceSlot)` — A *numeric* value locked in for a com.wingedsheep.sdk.scripting.ChoiceSlot as this object was cast, read off the *current object* regardless of zone — the sibling of CastX for the other cast-choice…
  - `DynamicAmount.CastX` — The value of `{X}` this object was cast with, read off the *current object* regardless of what zone it is in.
  - `DynamicAmount.CombatDamageSourcesThisTurn(player: Player, sourceFilter: GameObjectFilter)` — How many distinct sources matching sourceFilter dealt *combat* damage to player this turn, each judged as it stood **when it dealt the damage** — "a player who was dealt combat damage by three or m…
@@ -67,10 +67,10 @@ index 14430ca9b9..194d46439b 100644
       * Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
       *
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 05e9263923..7857c752c8 100644
+index 2e411be7cb..4c8ab5c995 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1664,6 +1664,7 @@ Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duratio
+@@ -1663,6 +1663,7 @@ Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duratio
  Duration.WhileSourceEncodedOnAffected — Duration — Whispering Madness — Duration.WhileSourceOnBattlefield, Duration.WhileSourceAttachedToAffected — cipher's source is a card in exile, not a permanent, so the battlefield gate is always closed for it; the attachment gate reads AttachedToComponent between two permanents, while 'encoded' (CR 702.99b) is a link from an exiled card to a creature that must also be the same exiled object (CR 702.99c)
  DynamicAmount.CapturedAtCast — DynamicAmount — Lethal Exploit — DynamicAmount.CastChoice, DynamicAmount.VariableReference — CastChoice reads a number the player chose into a fixed ChoiceSlot enum (a closed set of player decisions), not a card-named game-state snapshot; VariableReference reads a pipeline variable that dies with the resolving effect, while a capture is frozen at cast and outlives the cast. Subsumes and deletes the CastTimeFlagSet condition (now Compare(CapturedAtCast, GT, 0))
  DynamicAmount.CombatDamageSourcesThisTurn — DynamicAmount — Admiral Beckett Brass — DynamicAmount.TurnTracking, StatePredicate.WasDealtDamageThisTurnBy — TurnTracking reads fixed per-player counters with no source-filter axis (a filter field would mean something for one tracker only); WasDealtDamageThisTurnBy reads the same frozen source record but on a damaged permanent, as a yes/no. Subsumes TurnTracker.DEALT_COMBAT_DAMAGE_BY_LEGENDARY_CREATURE (Blitzball migrated, tracker and its marker component deleted)

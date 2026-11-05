@@ -15,10 +15,10 @@ Subject: [PATCH] arcana: 0039-graveyard-lookback-granted-types
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 9cf3808372..1feb98812e 100644
+index 5aadedab0c..c1bdf75f31 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -9228,7 +9228,11 @@ in the repo today):
+@@ -9272,7 +9272,11 @@ in the repo today):
    etc.), regardless of how many or where they went. For the common "leave your graveyard
    **during your turn**" wording, add `triggerRestriction = Conditions.IsYourTurn`; for "this
    ability triggers only once each turn", add `oncePerTurn = true`. (Attuned Hunter, Kishla
@@ -31,7 +31,7 @@ index 9cf3808372..1feb98812e 100644
  - `Triggers.oneOrMore(filter).putIntoExile(from, includeTokens)` — batching trigger; fires once per event
    batch when one or more matching **cards** are put into exile from any of `fromZones` (default:
    graveyard and battlefield). Left unfiltered it is **not** scoped to one player's zones —
-@@ -11136,7 +11140,8 @@ staticAbility {
+@@ -11190,7 +11194,8 @@ staticAbility {
    battlefield only `filter`'s **card predicates** qualify an object (read against printed characteristics); its
    controller half is replaced by "spells the source's controller controls" / "cards that player owns". Honored by the
    `ProjectedState.crossZoneGrantedCardTypes` overlay, which `PredicateEvaluator`'s type predicates, cast triggers,
@@ -42,10 +42,10 @@ index 9cf3808372..1feb98812e 100644
  - `GrantSubtype(subtype, filter)` — Layer 4 type-changing static that adds a **fixed** creature subtype to the group,
    in addition to their other types ("is a Knight in addition to its other types"). (Dub, Angelic Destiny)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
-index b7b2914afd..3ce9094cc8 100644
+index 2c31c35e2b..f959588830 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
-@@ -599,6 +599,7 @@ val engineSerializersModule = SerializersModule {
+@@ -602,6 +602,7 @@ val engineSerializersModule = SerializersModule {
          subclass(CantBeCounteredComponent::class)
          subclass(CantBeCopiedComponent::class)
          subclass(PutIntoGraveyardThisTurnComponent::class)
@@ -54,10 +54,10 @@ index b7b2914afd..3ce9094cc8 100644
          subclass(EmblemSourceComponent::class)
          subclass(EmblemActivatedAbilityComponent::class)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-index e3cdbc1e08..7a14509803 100644
+index 8386b423a1..70ce88ebf7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-@@ -3023,7 +3023,12 @@ class TriggerDetector(
+@@ -3033,7 +3033,12 @@ class TriggerDetector(
  
                  // Which of the moved cards match the filter
                  val matchingIds = ownerEvents
@@ -71,7 +71,7 @@ index e3cdbc1e08..7a14509803 100644
                      .map { it.entityId }
                  val hasMatch = matchingIds.isNotEmpty()
                  if (hasMatch && trigger.firstTimeEachTurn &&
-@@ -3080,8 +3085,13 @@ class TriggerDetector(
+@@ -3090,8 +3095,13 @@ class TriggerDetector(
                  val ownerEvents = fromGravByOwner[controllerId] ?: continue
  
                  // Check if any of the departed cards match the filter
@@ -86,7 +86,7 @@ index e3cdbc1e08..7a14509803 100644
                  }
  
                  if (hasMatch) {
-@@ -3138,7 +3148,12 @@ class TriggerDetector(
+@@ -3148,7 +3158,12 @@ class TriggerDetector(
                              state = state,
                              entityId = event.entityId,
                              filter = trigger.filter,
@@ -100,7 +100,7 @@ index e3cdbc1e08..7a14509803 100644
                          )
                  }.map { it.entityId }
                  if (matchingIds.isEmpty()) continue
-@@ -3189,6 +3204,12 @@ class TriggerDetector(
+@@ -3199,6 +3214,12 @@ class TriggerDetector(
       * matches [filter] for graveyard batching triggers. Card-characteristic predicates are
       * evaluated against the card's base [CardComponent]; [GameObjectFilter.Any] always matches.
       */
@@ -113,7 +113,7 @@ index e3cdbc1e08..7a14509803 100644
      /**
       * "For the first time each turn": did a card matching [filter] reach [ownerId]'s graveyard this
       * turn *before* the current batch? The owner's [CardsPutIntoGraveyardThisTurnComponent] already
-@@ -3208,14 +3229,19 @@ class TriggerDetector(
+@@ -3218,14 +3239,19 @@ class TriggerDetector(
              val at = earlier.lastIndexOf(event.entityId)
              if (at >= 0) earlier.removeAt(at)
          }
@@ -135,7 +135,7 @@ index e3cdbc1e08..7a14509803 100644
      ): Boolean {
          // Tokens aren't cards (CR 111.6), so a token put into a graveyard never satisfies a
          // "one or more [permanent] cards are put into your graveyard" trigger — even though it
-@@ -3226,7 +3252,12 @@ class TriggerDetector(
+@@ -3236,7 +3262,12 @@ class TriggerDetector(
          val entity = state.getEntity(entityId) ?: return false
          if (!includeTokens && entity.has<TokenComponent>()) return false
          if (filter == GameObjectFilter.Any) return true
@@ -150,10 +150,10 @@ index e3cdbc1e08..7a14509803 100644
              when (predicate) {
                  is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsCreature ->
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
-index efafde757b..30a03f7d23 100644
+index ba1b364e4e..98568d67cc 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/GameState.kt
-@@ -888,7 +888,28 @@ data class GameState(
+@@ -905,7 +905,28 @@ data class GameState(
      fun removeFromZone(key: ZoneKey, entityId: EntityId): GameState {
          val current = zones[key] ?: return this
          val unlinked = if (key.zoneType == Zone.EXILE && entityId in current) forgetExileLinks(entityId) else this

@@ -17,10 +17,10 @@ Subject: [PATCH] arcana: 0032-per-player-target-binding
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 0e1ac91f75..124faede64 100644
+index 75c683f9a6..ca3df71e0e 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -6755,6 +6755,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
+@@ -6791,6 +6791,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
    "**For each other player, exile up to one target creature that player controls**" (Kaya, Spirits'
    Justice) is `TargetObject(filter = TargetFilter.CreatureOpponentControls, optional = true, dynamicMaxCount = DynamicAmount.PlayerCount(Player.EachOpponent), differentControllers = true, id = "one target creature each other player controls")`. Give it an `id` — the generated description
    reads "controlled by different players", which is the constraint, not the printed sentence.
@@ -162,10 +162,10 @@ index 25f65c4ee1..37afbfa2a3 100644
          }
          container = container.with(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
-index 542fd99816..d16b874a4c 100644
+index 9f45cade4f..264cc48348 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
-@@ -600,6 +600,16 @@ data class TargetsComponent(
+@@ -593,6 +593,16 @@ data class TargetsComponent(
      @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
      @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
      val targetingAttachmentHost: EntityId? = null,
@@ -182,7 +182,7 @@ index 542fd99816..d16b874a4c 100644
  ) : Component {
  
      /**
-@@ -609,7 +619,13 @@ data class TargetsComponent(
+@@ -602,7 +612,13 @@ data class TargetsComponent(
       * the two differ only when the source was moved after the ability was put on the stack.
       */
      fun retargeted(state: GameState, newTargets: List<ChosenTarget>): TargetsComponent =
@@ -197,7 +197,7 @@ index 542fd99816..d16b874a4c 100644
  
      companion object {
          /**
-@@ -653,9 +669,26 @@ data class TargetsComponent(
+@@ -646,9 +662,26 @@ data class TargetsComponent(
                      is ChosenTarget.Player -> null
                  }
                  id?.let { state.objectRef(it) }?.let { it.entityId to it }

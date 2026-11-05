@@ -34,10 +34,10 @@ index b6f3370fc7..65c9529573 100644
              // before state-based actions.
              is DynamicAmount.YourLifeTotal, is DynamicAmount.LifeTotal -> UNKNOWN
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index c9e2dab4b9..08a60336d7 100644
+index 190f238163..e3fc412482 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -17811,7 +17811,7 @@ read is available to other snapshot-backed entity references once their captured
+@@ -17903,7 +17903,7 @@ read is available to other snapshot-backed entity references once their captured
    **Pipeline-scoped counts get the same treatment, board-state counts deliberately do not.** A
    `CreateTokenEffect` scheduled into a delayed trigger has its `count` frozen at scheduling time *only
    if* the amount reads the pipeline that produced it — `DistinctEntitiesInCollections`,
@@ -46,7 +46,7 @@ index c9e2dab4b9..08a60336d7 100644
    `VariableReference`, or any arithmetic tree containing one. Those live in the resolving
    `EffectContext` and would silently read 0 an upkeep later. A *board-state* count
    (`AggregateBattlefield`, …) is left lazy, because "at the beginning of your end step, create a token
-@@ -18270,6 +18270,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
+@@ -18362,6 +18362,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
    graveyard). For "you mill X cards … that player loses life equal to the total mana value of those
    cards" — Palantír of Orthanc mills into the default `"milled"` collection
    (`Patterns.Library.mill(X)`), then `Effects.LoseLife(DynamicAmounts.manaValueSumOf("milled"), opponent)`.
@@ -66,10 +66,10 @@ index c9e2dab4b9..08a60336d7 100644
  ### `ManaColorSet`<a id="manacolorset"></a>
  
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 4357f66bd6..1d0749f463 100644
+index d779ed6e6c..6f845ccb26 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -690,6 +690,7 @@ Families:
+@@ -691,6 +691,7 @@ Families:
  - `DynamicAmount.PlayerCount(scope: Player)` — How many players are in scope — "for each opponent", "for each other player", "the number of players in the game".
  - `DynamicAmount.PlayerCounterCount(counterType: CounterType?, player: Player)` — How many counters of counterType a player currently has — the player-scoped sibling of EntityProperty's com.wingedsheep.sdk.scripting.values.EntityNumericProperty.CounterCount (which reads one obje…
  - `DynamicAmount.Power(base: Int, exponent: DynamicAmount)` — Raise a fixed base to the power of a dynamic exponent (`base^exponent`).
@@ -171,7 +171,7 @@ index 0b549b465d..cbe4fb4dd1 100644
      "TotalPowerSacrificedThisWay", "CountersRemovedAsCost", "StationCharge",
      "LastKnownSourceCounters", "LastKnownDamageDealtToSource",
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 55e3e87328..824c638027 100644
+index 4bba517601..3dc2962b2f 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -494,6 +494,7 @@ DynamicAmount.PermanentsSacrificedThisWay — DynamicAmount
