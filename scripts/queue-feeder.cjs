@@ -533,6 +533,17 @@ function hardCardSection(body, cards = []) {
   return marker >= 0 ? text.slice(0, marker) + section + '\n\n' + text.slice(marker) : text.trimEnd() + '\n\n' + section + '\n';
 }
 
+function existingHardCardEntries(body) {
+  const text = String(body || '');
+  const start = text.indexOf(HARD_CARD_SECTION_START), end = text.indexOf(HARD_CARD_SECTION_END);
+  if (start < 0 || end < start) return [];
+  const section = text.slice(start, end);
+  const entries = [];
+  const row = /^- \[#(\d+)\]\(https:\/\/github\.com\/AARMOU\/arcana_table\/issues\/\1\) — (.+?): Copilot stopped after two failed attempts; waiting for a worker\.$/gm;
+  for (const match of section.matchAll(row)) entries.push({ issue: Number(match[1]), name: match[2] });
+  return entries;
+}
+
 async function ensureHardCardLabels(github, owner, repo) {
   for (const [name, color, description] of [
     [HARD_CARD_LABEL, '6f42c1', 'Copilot stopped after the approved two failed attempts; route to a human worker.'],
@@ -548,7 +559,7 @@ async function ensureHardCardLabels(github, owner, repo) {
 }
 
 async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
-  const cards = [];
+  const cards = new Map();
   for (const item of held) {
     if (!Number.isSafeInteger(item.issue) || typeof item.name !== 'string') continue;
     const issue = (await github.rest.issues.get({ owner, repo, issue_number: item.issue })).data;
@@ -566,16 +577,41 @@ async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
         'An owner or PM may authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + '.';
       await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
     }
-    cards.push({ name: item.name, issue: issue.number });
+    cards.set(issue.number, { name: item.name, issue: issue.number });
   }
   const board = (await github.rest.issues.get({ owner, repo, issue_number: 883 })).data;
-  const nextBody = hardCardSection(board.body, cards);
+  const previousEntries = existingHardCardEntries(board.body);
+  if (previousEntries.length) {
+    const openIssues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+    for (const item of previousEntries) {
+      if (cards.has(item.issue)) continue;
+      let issue;
+      try { issue = (await github.rest.issues.get({ owner, repo, issue_number: item.issue })).data; }
+      catch (error) { throw Error('cannot-verify-existing-hard-card-' + item.issue + ': ' + error.message); }
+      const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+      const remainsCapped = issue.state === 'closed' && trustedIssue(issue) &&
+        String(issue.title || '').startsWith('[Arcana Queue]') &&
+        F.unitCards(issue.body).some(n => F.normName(n) === F.normName(item.name)) &&
+        labels.includes(HARD_CARD_LABEL) && !labels.includes(RETRY_CAP_LIFT_LABEL);
+      const isRequeued = openIssues.some(openIssue => trustedIssue(openIssue) &&
+        String(openIssue.title || '').startsWith('[Arcana Queue]') &&
+        F.unitCards(openIssue.body).some(n => F.normName(n) === F.normName(item.name)));
+      if (remainsCapped && !isRequeued) cards.set(item.issue, { name: item.name, issue: item.issue });
+    }
+  }
+  const nextBody = hardCardSection(board.body, [...cards.values()]);
   const boardUpdated = nextBody !== board.body;
-  if (boardUpdated) await github.rest.issues.update({ owner, repo, issue_number: 883, body: nextBody });
-  return { cards, boardUpdated };
+  if (boardUpdated) {
+    // Issue bodies have no conditional-write API. Re-read before replacement so an edit that
+    // lands while we validate the capped cards is preserved for the next feeder pass.
+    const latestBoard = (await github.rest.issues.get({ owner, repo, issue_number: 883 })).data;
+    if (latestBoard.body !== board.body) return { cards: [...cards.values()], boardUpdated: false, boardConflict: true };
+    await github.rest.issues.update({ owner, repo, issue_number: 883, body: nextBody });
+  }
+  return { cards: [...cards.values()], boardUpdated, boardConflict: false };
 }
 
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK,
-  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, syncHardCardHandoffs };
+  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, existingHardCardEntries, syncHardCardHandoffs };
