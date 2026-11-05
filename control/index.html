@@ -838,7 +838,23 @@
         try{return await controlInFlight;}finally{controlInFlight=null;}
       }
       let loading=false;
-      async function refreshOrders(){const O=window.ArcanaOrders;if(!O)return;const [iss,open]=await Promise.allSettled([api('/issues/'+O.ORDERS_ISSUE),api('/issues?state=open&per_page=100')]);const r=O.render(document,$('ownerBrief'),iss.status==='fulfilled'?iss.value.data:null,open.status==='fulfilled'?open.value.data:[]);text('ordersMeta',r.ok?('Updated '+timeAgo(r.updated)+(r.revision?' · revision '+r.revision:'')+(r.stale?' · may be out of date, ask Claude for a refresh':'')):'Orders unavailable');$('ordersMeta').style.color=r.ok&&!r.stale?'':'var(--amber)';}
+      async function refreshOrders(){
+        const O=window.ArcanaOrders;if(!O)return;
+        const [iss,open,activity]=await Promise.allSettled([
+          api('/issues/'+O.ORDERS_ISSUE),
+          api('/issues?state=open&per_page=100'),
+          api('/issues/'+O.ORDERS_ISSUE+'/comments?per_page=100')
+        ]);
+        const live=O.parseLive(activity.status==='fulfilled'?activity.value.data:null);
+        const r=O.render(document,$('ownerBrief'),
+          iss.status==='fulfilled'?iss.value.data:null,
+          open.status==='fulfilled'?open.value.data:[],Date.now(),live);
+        text('ordersMeta',!r.ok?'Orders unavailable':r.liveCheckedAt
+          ? 'Live checked '+timeAgo(r.liveCheckedAt)+(r.liveStale?' · refresh delayed':'')+
+            (r.revision?' · orders revision '+r.revision:'')
+          : 'Live status not available · orders updated '+timeAgo(r.updated));
+        $('ordersMeta').style.color=r.ok&&r.liveCheckedAt&&!r.liveStale?'':'var(--amber)';
+      }
       async function refresh(){if(loading)return;loading=true;staleFeeds=0;cachedFeeds=0;directFeedFallbacks=0;sourceTimes=[];staleSources=[];$('refresh').disabled=true;$('refreshIcon').classList.add('spin');text('connectionText','Checking cached GitHub feeds…');$('connectionDot').className='pulse';void refreshOrders().catch(()=>{});const checks=await Promise.allSettled([api('/pulls?state=open&sort=updated&direction=desc&per_page=100'),api('/actions/runs?per_page=30'),fetchNotes(),fetchUpgrade(),fetchControl()]);let successful=0;const failures=[];checks.slice(0,3).forEach((result,i)=>{if(result.status==='fulfilled'){try{if(i===0)renderPRs(result.value.data);if(i===1)renderRuns(result.value.data);if(i===2)renderNotes(result.value);successful++;}catch(err){failures.push(err.message);}}else{failures.push(result.reason?.message||'Network request failed');}});if(checks[0].status==='rejected'){text('prCount','—');text('prSub','Unavailable');$('prList').replaceChildren(e('div','empty','Cannot fetch pull requests. Use the GitHub links to inspect directly.'));}if(checks[1].status==='rejected'){text('ciResult','Unknown');text('ciSub','Workflow feed unavailable');text('runningCount','—');$('runList').replaceChildren(e('div','empty','Cannot fetch workflow runs.'));}if(checks[2].status==='rejected')$('noteList').replaceChildren(e('div','empty','Cannot fetch coordination notes.'));
         for(const result of checks.slice(3)){if(result.status==='rejected')failures.push(result.reason?.message||'Additional feed unavailable');else successful++;}
         $('connectionDot').className='pulse '+(successful===5&&!staleFeeds?'ok':'warn');
