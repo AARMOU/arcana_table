@@ -37,6 +37,13 @@ test('card-work body carries the trusted Oracle record and priority, and is revi
   assert.ok(A.reviewActionable(body(workRequest({ oracle: ORACLE.replace('Knuckles the Echidna', 'Other Card') }))).missing.includes('oracle-record'));
 });
 
+test('packet-less Card Work bodies fail closed at dispatcher auto-start', () => {
+  const packetless = body(workRequest()).replace('## Cardkit starting packet', '## Missing Cardkit starting packet');
+  const result = A.reviewActionable(packetless);
+  assert.equal(result.ok, false);
+  assert.ok(result.missing.includes('cardkit-starting-packet'));
+});
+
 test('trusted only when the feeder bot wrote it unedited', () => {
   const raw = { title: Q.cardWorkTitle(workRequest()), body: body(workRequest()), authorLogin: 'github-actions[bot]', authorType: 'Bot',
     authorAssociation: 'NONE', autoQueueUnedited: true, commenters: [] };
