@@ -59,8 +59,8 @@
     },
     "Hatchery Sliver": {
       "reason": "Missing a static Replicate grant that creates KeywordAbility.replicate using each matching spell's own mana cost. GrantKeywordToOwnSpells does not supply Replicate's optional additional-cost declaration; the cast handler only creates Replicate copies from a declared REPLICATED cost slot. Needed primitive: GrantReplicateToOwnSpells(spellFilter) or equivalent.",
-      "source": "Source review on pinned Argentum b38db9760cbf8c961bc548bf23420a13c763be95: docs/agents/argentum-upstream/card-sdk-language-reference.md (GrantKeywordToOwnSpells and Replicate); upstream HerigastEruptingNullkite.kt uses dedicated GrantEmergeToOwnSpells; ConsignToMemory.kt installs printed KeywordAbility.replicate; rules-engine CastTriggers.kt creates Replicate copies only for declaredCostSlot == REPLICATED. No other cached card uses this Replicate-grant wording.",
-      "verified": false
+      "source": "AARMOU/arcana_table#1010; source review of pinned Argentum 173a09a2ed15763dce854e385b2df0d085e03975: HerigastEruptingNullkite.kt uses GrantEmergeToOwnSpells, ConsignToMemory.kt installs printed KeywordAbility.replicate, CastSpellEnumerator.kt reads OffspringGrants.effectiveOptionalCosts (printed costs and dedicated offspring grants only), and CastTriggers.kt creates Replicate copies only for declaredCostSlot == REPLICATED; docs/agents/argentum-upstream/card-sdk-language-reference.md documents the grant and Replicate rails.",
+      "verified": true
     },
     "Heroes in a Half Shell": {
       "reason": "effect cannot see the whole group of creatures from one damage event",
