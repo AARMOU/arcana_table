@@ -63,6 +63,26 @@ test('goose picker shows recent unfinished cards, separates verified completed r
   assert.equal(category({...finished,integration:{...finished.integration,sourceSha:'z'.repeat(40)}},checkedAt),'older');
   assert.equal(items(null).length,0);
 });
+test('Control card tracker retains unresolved blockers after 72 hours without commits',()=>{
+  const {state}=progressHelpers();
+  const context=vm.createContext({});
+  vm.runInContext(progressSource,context);
+  const choices=vm.runInContext('cardProgressChoices',context);
+  const checkedAt='2026-11-04T18:16:07Z',oldAt='2026-10-29T12:34:05Z';
+  const held={...progressCard,pr:370,card:'Darksteel Monolith',state:'held',updatedAt:oldAt};
+  const approved={...progressCard,pr:714,card:'Abaddon the Despoiler',state:'approved',
+    certification:'certified',updatedAt:oldAt,
+    integration:{pr:714,sourceSha:progressCard.headSha,status:'blocked',reason:'Integration check failed'}};
+  const historical={...progressCard,pr:85,updatedAt:oldAt};
+  const report={checkedAt,items:[historical,held,approved]};
+  assert.deepEqual(Array.from(choices(report,'active'),x=>x.pr),[714,370],
+    'pending approval and engine blockers must not disappear when older than 72h');
+  assert.match(state(held).label,/On hold/,'held card must not claim green test means it is ready');
+  assert.match(state(approved).label,/Integration blocked/);
+  assert.deepEqual(Array.from(choices(report,'all','#85'),x=>x.pr),[85],
+    'historical no-action work remains searchable without being shown as current');
+});
+
 test('mobile goose picker uses bounded inline choices instead of a giant native select',()=>{
   assert.match(html,/data-progress-filter="active"/);
   assert.match(html,/data-progress-filter="completed"/);
