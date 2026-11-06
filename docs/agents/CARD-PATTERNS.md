@@ -483,3 +483,23 @@ Proof: `AlmsCollectorScenarioTest` (9 cases: opponent draws two; your own draws,
 draw step are untouched; two Collectors with "each player draws two" give both players two; four-player
 distribution; two Collectors vs a third player's draw apply once; a dredge prompt pausing the replacement
 doesn't leak the original card. That last case fails without 0042).
+
+### "… lose [keyword] and can't have [keyword]" (until end of turn)
+
+Needs engine patch 0043. `Patterns.Group.removeKeywordFromAll(keyword, group, cantHave = true)` (or
+`RemoveKeywordEffect(…, cantHave = true)` for one object). The group is locked as it resolves
+(CR 611.2c). For the duration those objects can't have the keyword at all, so a later spell, a static
+ability or a counter doesn't give it back. Without `cantHave` it's the ordinary timestamp-ordered loss.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArcaneLighthouse.kt -->
+```kotlin
+        effect = Patterns.Group.removeKeywordFromAll(
+            Keyword.HEXPROOF,
+            Filters.Group.creatures { opponentControls() },
+            cantHave = true,
+        ) then Patterns.Group.removeKeywordFromAll(
+```
+
+Proof: `ArcaneLighthouseScenarioTest` (7 cases, one per ruling: later Heroic Intervention doesn't restore
+hexproof, which fails with `cantHave = false`; a creature arriving later isn't affected; printed hexproof
+returns next turn; your own creatures keep it; four-player).

@@ -5307,7 +5307,7 @@
     "pumpAndGrantToAll(Int, Int, Keyword, GroupFilter, Duration): ForEachEffect"
    ],
    "removeKeywordFromAll": [
-    "removeKeywordFromAll(Keyword, GroupFilter, Duration): ForEachEffect"
+    "removeKeywordFromAll(Keyword, GroupFilter, Duration, Boolean): ForEachEffect"
    ],
    "returnAllToHand": [
     "returnAllToHand(GroupFilter): CompositeEffect"

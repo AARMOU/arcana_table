@@ -1,0 +1,194 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 10:56:38 -0700
+Subject: [PATCH] arcana: 0043-keyword-cant-have
+
+RemoveKeywordEffect / Modification.RemoveKeyword gain cantHave: for the
+effect's duration the object can't have the keyword at all. The projector
+strips forbidden keywords after all of Layer 6 (and after keyword-counter
+re-application), so later-timestamped grants, static abilities and counters
+don't restore it. removeKeywordFromAll(..., cantHave = true) for groups.
+Arcane Lighthouse: 'creatures your opponents control lose hexproof and
+shroud and can't have hexproof or shroud' (rulings 2014-11-07).
+---
+ docs/sdk-index.md                                      |  2 +-
+ .../kotlin/com/wingedsheep/sdk/dsl/GroupPatterns.kt    |  5 +++--
+ .../sdk/scripting/effects/KeywordAndAbilityEffects.kt  | 10 +++++++++-
+ .../permanent/abilities/RemoveKeywordExecutor.kt       |  2 +-
+ .../engine/mechanics/layers/ActiveFloatingEffect.kt    |  4 ++--
+ .../engine/mechanics/layers/EffectApplicator.kt        |  1 +
+ .../engine/mechanics/layers/ProjectionModels.kt        | 10 +++++++++-
+ .../engine/mechanics/layers/StateProjector.kt          |  9 +++++++++
+ .../view/projection/CardActiveEffectsProjector.kt      |  4 +++-
+ 9 files changed, 38 insertions(+), 9 deletions(-)
+
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 85500eb06f..2a74a28cf5 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1054,7 +1054,7 @@ Families:
+ - `RemoveCountersOfIteratedKindEffect(target: EffectTarget, count: Int)` — "Remove count counter(s) of that kind from target", where the kind is the one an enclosing counter-kind loop (`IterationSpace.CounterKindsOn` / `CounterKindsAmong`) is visiting — "for each kind of…
+ - `RemoveDamageShieldEffect(target: EffectTarget)` — One-shot destruction-replacement shield: the next time the target permanent would be destroyed this turn, remove all damage marked on it instead.
+ - `RemoveFromCombatEffect(target: EffectTarget, unblockSoleBlockedAttackers: Boolean)` — Remove a creature from combat.
+-- `RemoveKeywordEffect(keyword: String, target: EffectTarget, duration: Duration)` — Remove a keyword or ability flag from a target until end of turn.
++- `RemoveKeywordEffect(keyword: String, target: EffectTarget, duration: Duration, cantHave: Boolean)` — Remove a keyword or ability flag from a target until end of turn.
+ - `RemoveMaximumHandSizeEffect(target: EffectTarget, duration: Duration)` — Removes the target player's maximum hand size for the rest of the game ("you have no maximum hand size for the rest of the game"), or for a shorter duration ("you have no maximum hand size until yo…
+ - `RemoveSuspectedEffect(target: EffectTarget)` — "It's no longer suspected" (CR 701.60c) — the inverse of the whole suspect bundle.
+ - `RepeatDynamicTimesEffect(amount: DynamicAmount, body: Effect)` — Repeat a body effect N times, where N is determined by a DynamicAmount.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/GroupPatterns.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/GroupPatterns.kt
+index 153b6b7e16..4b5bf59e90 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/GroupPatterns.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/GroupPatterns.kt
+@@ -224,11 +224,12 @@ object GroupPatterns {
+     fun removeKeywordFromAll(
+         keyword: Keyword,
+         filter: GroupFilter,
+-        duration: Duration = Duration.EndOfTurn
++        duration: Duration = Duration.EndOfTurn,
++        cantHave: Boolean = false,
+     ): ForEachEffect =
+         ForEachInGroupEffect(
+             filter = filter,
+-            effect = RemoveKeywordEffect(keyword.name, EffectTarget.IterationEntity, duration)
++            effect = RemoveKeywordEffect(keyword.name, EffectTarget.IterationEntity, duration, cantHave = cantHave)
+         )
+ 
+     fun modifyStatsForAll(
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/KeywordAndAbilityEffects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/KeywordAndAbilityEffects.kt
+index 740274be78..308758feb3 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/KeywordAndAbilityEffects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/KeywordAndAbilityEffects.kt
+@@ -76,13 +76,21 @@ data class GrantKeywordEffect(
+ data class RemoveKeywordEffect(
+     val keyword: String,
+     val target: EffectTarget,
+-    val duration: Duration = Duration.EndOfTurn
++    val duration: Duration = Duration.EndOfTurn,
++    /**
++     * "… loses [keyword] and can't have [keyword]" (Arcane Lighthouse). For the duration the
++     * permanent can't have the keyword at all: grants with a later timestamp — resolved effects
++     * and static abilities alike — don't give it back (rulings 2014-11-07). The default `false`
++     * is the plain timestamp-ordered loss, which a later grant overrides (CR 613.7).
++     */
++    val cantHave: Boolean = false,
+ ) : Effect {
+     constructor(keyword: Keyword, target: EffectTarget, duration: Duration = Duration.EndOfTurn) :
+         this(keyword.name, target, duration)
+ 
+     override val description: String = buildString {
+         append(com.wingedsheep.sdk.scripting.util.describeKeywordLoss(target.description, keyword))
++        if (cantHave) append(" and can't have ${keyword.lowercase().replace('_', ' ')}")
+         if (duration.description.isNotEmpty()) append(" ${duration.description}")
+     }
+ }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/abilities/RemoveKeywordExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/abilities/RemoveKeywordExecutor.kt
+index cfc7d008e7..7c2be28b13 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/abilities/RemoveKeywordExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/abilities/RemoveKeywordExecutor.kt
+@@ -49,7 +49,7 @@ class RemoveKeywordExecutor : EffectExecutor<RemoveKeywordEffect> {
+ 
+         val newState = state.addFloatingEffect(
+             layer = Layer.ABILITY,
+-            modification = SerializableModification.RemoveKeyword(effect.keyword),
++            modification = SerializableModification.RemoveKeyword(effect.keyword, effect.cantHave),
+             affectedEntities = setOf(targetId),
+             duration = effect.duration,
+             context = context
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ActiveFloatingEffect.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ActiveFloatingEffect.kt
+index 7cba017646..c085a6f5bd 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ActiveFloatingEffect.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ActiveFloatingEffect.kt
+@@ -238,7 +238,7 @@ sealed interface SerializableModification {
+     data class GrantKeyword(val keyword: String) : SerializableModification
+ 
+     @Serializable
+-    data class RemoveKeyword(val keyword: String) : SerializableModification
++    data class RemoveKeyword(val keyword: String, val cantHave: Boolean = false) : SerializableModification
+ 
+     @Serializable
+     data class ChangeColor(val colors: Set<String>) : SerializableModification
+@@ -909,7 +909,7 @@ fun SerializableModification.toModification(): Modification = when (this) {
+     is SerializableModification.ModifyPowerToughnessDynamic -> Modification.ModifyPowerToughnessDynamic(powerBonus, toughnessBonus)
+     is SerializableModification.SwitchPowerToughness -> Modification.SwitchPowerToughness(EntityId(""))
+     is SerializableModification.GrantKeyword -> Modification.GrantKeyword(keyword)
+-    is SerializableModification.RemoveKeyword -> Modification.RemoveKeyword(keyword)
++    is SerializableModification.RemoveKeyword -> Modification.RemoveKeyword(keyword, cantHave)
+     is SerializableModification.ChangeColor -> Modification.ChangeColor(colors)
+     is SerializableModification.AddColor -> Modification.AddColor(colors)
+     is SerializableModification.AddType -> Modification.AddType(type)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
+index 6d44f351af..1bc664b2a9 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
+@@ -177,6 +177,7 @@ internal class EffectApplicator(
+                     ))
+                 }
+                 is Modification.RemoveKeyword -> {
++                    if (mod.cantHave) values.cantHaveKeywords.add(mod.keyword)
+                     values.keywords.remove(mod.keyword)
+                     values.grantedKeywordInstances.remove(mod.keyword)
+                     // CR 702.22b: losing banding loses every "bands with other" ability too, and
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ProjectionModels.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ProjectionModels.kt
+index 4727e47428..cbb16835fc 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ProjectionModels.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/ProjectionModels.kt
+@@ -584,8 +584,14 @@ sealed interface Modification {
+     ) : Modification {
+         override val layer get() = Layer.ABILITY
+     }
++    /**
++     * Removes [keyword]. With [cantHave] the object also can't have it for as long as the effect
++     * lasts: the projector strips it again after all of Layer 6, so a grant with a later timestamp
++     * doesn't restore it (Arcane Lighthouse — "lose hexproof and shroud and can't have hexproof or
++     * shroud").
++     */
+     @Serializable
+-    data class RemoveKeyword(val keyword: String) : Modification {
++    data class RemoveKeyword(val keyword: String, val cantHave: Boolean = false) : Modification {
+         override val layer get() = Layer.ABILITY
+     }
+ 
+@@ -943,6 +949,8 @@ internal data class MutableProjectedValues(
+     var baseToughness: Int? = null,
+     var name: String? = null,
+     val keywords: MutableSet<String> = mutableSetOf(),
++    /** Keywords a "can't have" effect forbids this pass; stripped after all of Layer 6. */
++    val cantHaveKeywords: MutableSet<String> = mutableSetOf(),
+     /** See [com.wingedsheep.engine.mechanics.layers.ProjectedValues.grantedKeywordInstances]. */
+     val grantedKeywordInstances: MutableMap<String, Int> = mutableMapOf(),
+     val staticAbilities: MutableList<com.wingedsheep.sdk.scripting.StaticAbility> = mutableListOf(),
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StateProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StateProjector.kt
+index f2770891ac..8172c8bc4a 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StateProjector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StateProjector.kt
+@@ -418,6 +418,15 @@ class StateProjector {
+             }
+         }
+ 
++        // "Can't have" (Arcane Lighthouse): a keyword a can't-have effect forbids stays off whatever
++        // granted it in Layer 6 and whenever — a later-timestamped grant, a static ability or a
++        // keyword counter (rulings 2014-11-07).
++        for (values in projectedValues.values) {
++            if (values.cantHaveKeywords.isEmpty()) continue
++            values.keywords.removeAll(values.cantHaveKeywords)
++            values.cantHaveKeywords.forEach { values.grantedKeywordInstances.remove(it) }
++        }
++
+         // CR 702.147a: Decayed's "can't block" half, realized off the final keyword set — so a
+         // printed Decayed, a token created "with decayed", a decayed counter and a granted Decayed
+         // all behave alike, and a creature that lost all abilities in Layer 6 can block again.
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
+index 82436e94b8..de2bcb6ff7 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardActiveEffectsProjector.kt
+@@ -303,7 +303,9 @@ internal class CardActiveEffectsProjector(
+         is SerializableModification.SetPowerToughness -> "base ${modification.power}/${modification.toughness}"
+         is SerializableModification.SwitchPowerToughness -> "power and toughness switched"
+         is SerializableModification.GrantKeyword -> keywordName(modification.keyword)
+-        is SerializableModification.RemoveKeyword -> "loses ${keywordName(modification.keyword)}"
++        is SerializableModification.RemoveKeyword ->
++            if (modification.cantHave) "loses and can't have ${keywordName(modification.keyword)}"
++            else "loses ${keywordName(modification.keyword)}"
+         // A prevent-all shield's temporary badge says what it shields against (Indestructible
+         // Aura, Fleeting Flight, Silhouette's targeted-cause form).
+         is SerializableModification.PreventAllDamageTo -> when {

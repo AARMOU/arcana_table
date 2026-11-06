@@ -50,7 +50,7 @@ The following 39 cards remain unimplemented: Pantlaza, Sun-Favored; Atla Palani,
 - Food Chain is not a true mana ability.
 - Urza's Saga keeps its own lore counters.
 - Sakashima of a Thousand Faces makes its copies nonlegendary.
-- Goblin Welder is left out because the engine cannot perform the required zone swap.
+- Goblin Welder is left out (re-checked 2026-11-06): besides the simultaneous swap, the engine can't express a second target that must be in the graveyard of the first target's controller (no legal activation is offered), nor the all-or-nothing "if both targets are still legal".
 - Ratchet, Field Medic is now included (engine patch 0041); `RatchetFieldMedicScenarioTest` covers both faces.
 
 The app's exported custom-card data does not add these cards to Argentum's online server. They are for offline games. The custom card definitions now carry Scryfall image links. Some older set and collector-number metadata remains inaccurate and was left unchanged; the image links were matched to the card name instead.
@@ -58,3 +58,4 @@ The app's exported custom-card data does not add these cards to Argentum's onlin
 ## Export and checks
 
 There are 103 registered custom-card definitions. The custom-card test suite completed 111 tests with 0 failures in this work session. `:custom-cards:exportCards` wrote 103 card records to `app/src/main/assets/argentum/custom-cards.jsonl` and 103 names to `custom-cards.index.tsv`; a second export produced byte-identical files.
+- **Arcane Lighthouse (2026-11-06):** implemented on engine patch 0043 (`cantHave` keyword loss). `ArcaneLighthouseScenarioTest` covers the three 2014-11-07 rulings and four-player.
