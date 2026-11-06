@@ -229,7 +229,17 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         pendingHand=null
         applied=draft;editing=false;capturing=false;panelOpen=false;recovered.clear();revision++
     }
-    fun chooseProfile(name:String){require(name in StudioProfiles(prefs,orientation).names());profile=name;applied=store().load();draft=store().draft() ?: applied;editing=true;undo.clear();redo.clear();revision++}
+    fun chooseProfile(name:String){require(name in StudioProfiles(prefs,orientation).names());profile=name;applied=store().load();draft=store().draft() ?: applied
+        pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null
+        editing=true;undo.clear();redo.clear();revision++}
+    fun copyProfile(name:String) {
+        require(problems().isEmpty()){problems().joinToString("\n")}
+        StudioControlProject.parse(draft.json())
+        StudioProfiles(prefs,orientation).copyProfile(profile,name,pendingHand)
+        StudioControlStore(prefs,orientation,name).apply(draft)
+        if(pendingHand!=null)prefs.edit().putBoolean("studio_controls_pending_hand_${orientation}_$name",true).commit()
+        chooseProfile(name)
+    }
     private fun owner(id:String)=draft.owners[id] ?: controls[id]?.screen ?: StudioSites.screen(id)
     fun density(screen:String?,value:String) {
         require(value in listOf("Minimal","Balanced","Detailed"))

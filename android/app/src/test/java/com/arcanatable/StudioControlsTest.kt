@@ -152,6 +152,21 @@ class StudioControlsTest {
         assertEquals(4,hand.load()!!.snap);assertEquals(controls,runtime.store().load())
         assertEquals("arcana-native",JSONObject(runtime.exportProject()).getString("renderer"))
     }
+    @Test fun importedHandDraftNeverLeaksIntoAnotherProfileAndCopyIncludesIt() {
+        val p=prefs();val original=StudioLayout.reference();StudioStore(p,"portrait").apply(original)
+        val runtime=StudioControlsRuntime(p,"portrait");runtime.begin()
+        val changed=original.copy(snap=4)
+        val bundle=JSONObject(runtime.exportProject()).put("hand",JSONObject(changed.json())).toString()
+        runtime.importProject(bundle);runtime.chooseProfile("Balanced");runtime.apply()
+        assertNull(StudioStore(p,"portrait","Balanced").load())
+        assertEquals(8,StudioStore(p,"portrait","Default").load()!!.snap)
+        runtime.begin();runtime.chooseProfile("Default");runtime.copyProfile("Copied draft");runtime.apply()
+        assertEquals(4,StudioStore(p,"portrait","Copied draft").load()!!.snap)
+        assertEquals(8,StudioStore(p,"portrait","Default").load()!!.snap)
+        runtime.begin();runtime.edit(a,StudioControlStyle(width=1f))
+        assertTrue(runCatching{runtime.copyProfile("Invalid copy")}.isFailure)
+        assertFalse("Invalid copy" in StudioProfiles(p,"portrait").names())
+    }
     @Test fun bundleRejectsWrongOrientationAndMalformedHandBeforeMutatingDraft() {
         val runtime=StudioControlsRuntime(prefs(),"portrait");runtime.begin()
         val bundle=JSONObject(runtime.exportProject()).put("orientation","landscape")

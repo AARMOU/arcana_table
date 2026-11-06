@@ -123,11 +123,14 @@ internal fun StudioText(site:String,screen:String,protectedLabel:Boolean,text:An
     inlineContent:Map<String,InlineTextContent> = emptyMap(),onTextLayout:((TextLayoutResult)->Unit)?=null,style:TextStyle=LocalTextStyle.current) {
     val parent=LocalStudioControlParent.current ?: modifier.studioMarker()?.parent()
     val w=if(parent==null)studioWidget(site,screen,"data",text.text.take(100),protectedLabel=true) else null
+    if(w!=null)SideEffect{w.runtime.text(w.id,text.text)}
+    StudioNativeCopies(w,action=false)
     val s=parent?.style ?: w?.style
     val reportKey="$site/$currentCompositeKeyHash"
     if(parent!=null)SideEffect{parent.report(reportKey,text.text.take(100))}
     if(s?.visible==false)return
-    androidx.compose.material3.Text(parent?.boundCaption?.let(::AnnotatedString) ?: text,modifier=modifier.studioWidget(w).then(if(w?.runtime?.editing==true)Modifier.clickable {w.runtime.select(w.id)} else Modifier),
+    val bound=if(s?.binding!=null && w!=null) {if(w.runtime.canDisplay(w.id,s.binding))w.runtime.text(s.binding) else "Information unavailable"} else null
+    androidx.compose.material3.Text((parent?.boundCaption ?: bound)?.let(::AnnotatedString) ?: text,modifier=modifier.studioWidget(w).then(if(w?.runtime?.editing==true)Modifier.clickable {w.runtime.select(w.id)} else Modifier),
         color=s?.ink?.let(::parseTableColorHex) ?: color,fontSize=s?.font?.coerceIn(8f,64f)?.sp ?: fontSize,fontStyle=fontStyle,fontWeight=fontWeight,
         fontFamily=fontFamily,letterSpacing=letterSpacing,textDecoration=textDecoration,textAlign=textAlign,lineHeight=s?.font?.coerceIn(8f,64f)?.let{(it*1.2f).sp} ?: lineHeight,
         overflow=overflow,softWrap=softWrap,maxLines=maxLines,minLines=minLines,inlineContent=inlineContent,onTextLayout=onTextLayout ?: {},style=style)

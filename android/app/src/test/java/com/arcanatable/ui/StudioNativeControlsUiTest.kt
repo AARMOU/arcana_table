@@ -66,7 +66,7 @@ class StudioNativeControlsUiTest {
         val life=mutableStateOf(40);val mana=mutableStateOf(3)
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides state.value){Column(Modifier.fillMaxSize()){
             StudioText("HomeScreen.Text.1","Home",true,"Life ${life.value}",Modifier.testTag("life"))
-            StudioText("HomeScreen.Text.2","Home",true,"Mana ${mana.value}",Modifier.testTag("mana"))
+            StudioText("HomeScreen.Text.2","Home",true,androidx.compose.ui.text.AnnotatedString("Mana ${mana.value}"),Modifier.testTag("mana"))
         }}}}
         rule.waitForIdle();var runtime=state.value
         val source=runtime.controls.values.single{it.title=="Life 40"}.id
@@ -87,6 +87,15 @@ class StudioNativeControlsUiTest {
         rule.onNodeWithTag("studio-copy-${copy.id}").assertTextEquals("Mana 2")
         assertFalse(runtime.invoke(copy.id))
         assertFalse(runtime.store().load().json().contains("Mana 2"))
+        rule.runOnIdle{runtime.begin(target);runtime.duplicate(target,rule.density.density)}
+        rule.waitForIdle();val richCopy=runtime.draft.copies.single{it.id!=copy.id}
+        rule.runOnIdle{runtime.edit(richCopy.id,richCopy.style.copy(dx=8f,dy=260f,width=160f,height=48f));runtime.edit(target,StudioControlStyle(visible=false));runtime.apply()}
+        rule.waitForIdle();rule.onNodeWithTag("mana").assertDoesNotExist()
+        rule.onNodeWithTag("studio-copy-${richCopy.id}").assertTextEquals("Mana 2")
+        rule.runOnIdle{mana.value=1};rule.waitForIdle()
+        rule.onNodeWithTag("studio-copy-${richCopy.id}").assertTextEquals("Mana 1")
+        rule.onNodeWithTag("studio-copy-${copy.id}").assertTextEquals("Mana 1")
+
     }
     @Test fun repeatedListControlsHaveDistinctCallbacksAndStableSlots() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-repeat",0),"portrait").also{it.enableCatalog()}

@@ -35,7 +35,7 @@ internal fun StudioControlsPage(runtime:StudioControlsRuntime,onApplied:()->Unit
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding().verticalScroll(rememberScrollState()).padding(12.dp)) {
                 Text("Arcana Studio",style=MaterialTheme.typography.headlineSmall)
                 Text("Native screens · ${runtime.orientation} · ${runtime.profile}")
-                Text("Inspect the real screen. Tap a control to edit; hold to move, or hold its lower-right corner to resize. Game actions are suspended while inspecting.")
+                Text("Inspect the real screen. Tap a control to edit; hold to move, or hold its lower-right corner to resize. Taps select controls; native game decisions remain authoritative.")
                 Row {
                     Button(onClick={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message}}){Text("Apply")}
                     TextButton(onClick={runtime.cancel()}){Text("Cancel")}
@@ -51,9 +51,7 @@ internal fun StudioControlsPage(runtime:StudioControlsRuntime,onApplied:()->Unit
                 }} }
                 OutlinedTextField(profileName,{profileName=it},label={Text("New profile name")},modifier=Modifier.fillMaxWidth())
                 TextButton(onClick={runCatching {
-                    StudioProfiles(runtime.prefs,runtime.orientation).copyProfile(runtime.profile,profileName)
-                    StudioControlStore(runtime.prefs,runtime.orientation,profileName).apply(runtime.draft)
-                    runtime.chooseProfile(profileName)
+                    runtime.copyProfile(profileName)
                 }.onFailure{message=it.message}}){Text("Copy profile")}
                 Text("Open a native screen",color=Mint)
                 destinations.entries.toList().chunked(2).forEach {group->Row {group.forEach {(name,destination)->
