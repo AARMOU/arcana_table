@@ -1,0 +1,9 @@
+{
+  "key": "for-the-emperor",
+  "name": "For the Emperor!",
+  "issue": 975,
+  "source": "certification/ForTheEmperorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ForTheEmperorIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
