@@ -2,7 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.ForgeOfHeroes
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Format
 import com.wingedsheep.sdk.core.ManaCost
@@ -35,8 +37,8 @@ class ForgeOfHeroesIndependentCertificationTest {
     )
 
     private fun commanderScenario(planeswalker: Boolean = false): GameTestDriver {
-        val ownCommanderName = if (planeswalker) "Ugin the Ineffable" else commander.name
-        val d = customScenario(ForgeOfHeroes, "Grizzly Bears", "Ugin the Ineffable")
+        val ownCommanderName = if (planeswalker) "Ugin, the Ineffable" else commander.name
+        val d = customScenario(ForgeOfHeroes, "Grizzly Bears", "Ugin, the Ineffable")
         d.registerCards(listOfNotNull(commander.takeUnless { planeswalker }, opponentCommander))
         d.initMultiplayer(
             decks = listOf(Deck.of("Plains" to 49), Deck.of("Plains" to 50)),
@@ -60,6 +62,16 @@ class ForgeOfHeroesIndependentCertificationTest {
 
     private fun GameTestDriver.counterCount(permanent: EntityId, type: CounterType): Int =
         state.getEntity(permanent)?.get<CountersComponent>()?.getCount(type) ?: 0
+
+    private fun GameTestDriver.activateCounter(player: EntityId, forge: EntityId, target: EntityId) =
+        submit(
+            ActivateAbility(
+                player,
+                forge,
+                cardRegistry.getCard("Forge of Heroes")!!.script.activatedAbilities[1].id,
+                targets = listOf(ChosenTarget.Permanent(target)),
+            ),
+        )
 
     @Test
     fun tapAbilityAddsColorlessManaAndCannotBeActivatedWhileTapped() {
@@ -85,23 +97,23 @@ class ForgeOfHeroesIndependentCertificationTest {
         val forge = d.putLandOnBattlefield(player, "Forge of Heroes")
 
         assertEquals(0, d.counterCount(target, CounterType.PLUS_ONE_PLUS_ONE))
-        assertNull(d.activate(player, forge, index = 1).error)
+        assertNull(d.activateCounter(player, forge, target).error)
         d.resolveAll(Choices(targets = listOf(target)))
 
         assertEquals(1, d.counterCount(target, CounterType.PLUS_ONE_PLUS_ONE))
         assertTrue(d.isTapped(forge))
-        assertNotNull(d.activate(player, forge, index = 1).error)
+        assertNotNull(d.activateCounter(player, forge, target).error)
     }
 
     @Test
     fun thisTurnsPlaneswalkerCommanderGetsALoyaltyCounter() {
         val d = commanderScenario(planeswalker = true)
         val player = d.player1
-        val target = d.castCommander("Ugin the Ineffable", colorlessMana = 6)
+        val target = d.castCommander("Ugin, the Ineffable", colorlessMana = 6)
         val forge = d.putLandOnBattlefield(player, "Forge of Heroes")
         val loyaltyBefore = d.counterCount(target, CounterType.LOYALTY)
 
-        assertNull(d.activate(player, forge, index = 1).error)
+        assertNull(d.activateCounter(player, forge, target).error)
         d.resolveAll(Choices(targets = listOf(target)))
 
         assertEquals(loyaltyBefore + 1, d.counterCount(target, CounterType.LOYALTY))
@@ -115,7 +127,7 @@ class ForgeOfHeroesIndependentCertificationTest {
         val forge = d.putLandOnBattlefield(player, "Forge of Heroes")
         val creature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
 
-        assertNotNull(d.activate(player, forge, index = 1).error)
+        assertNotNull(d.activateCounter(player, forge, creature).error)
         assertEquals(0, d.counterCount(creature, CounterType.PLUS_ONE_PLUS_ONE))
         assertFalse(d.isTapped(forge))
     }
@@ -129,7 +141,7 @@ class ForgeOfHeroesIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = player)
 
-        assertNotNull(d.activate(player, forge, index = 1).error)
+        assertNotNull(d.activateCounter(player, forge, target).error)
         assertEquals(0, d.counterCount(target, CounterType.PLUS_ONE_PLUS_ONE))
         assertFalse(d.isTapped(forge))
     }
