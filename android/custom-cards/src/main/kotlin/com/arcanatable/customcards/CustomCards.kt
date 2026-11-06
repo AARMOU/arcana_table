@@ -99,6 +99,7 @@ object CustomCards {
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
         Entry(BlightsteelColossus, "MBS", POOL),
+        Entry(GoblinWelder, "ULG", POOL),
         Entry(ArcaneLighthouse, "C14", POOL),
         Entry(AlmsCollector, "C17", POOL),
         Entry(NekusarTheMindrazer, "CMM", POOL),

@@ -33,14 +33,17 @@ class CustomDecksOfflineTest {
         return lines.first().second to lines.flatMap { (n, name) -> List(n) { name } }
     }
 
-    @Test fun tokensWinUsesCustomCardsAndOnlyLeavesOutGoblinWelder() {
+    @Test fun tokensWinUsesCustomCardsAndNowLeavesNothingOut() {
         assumeTrue(lib.isFullLibrary)
         val (commander, names) = deck("tokens-win.txt")
         val (setup, registry) = OfflineGameSetup.build(lib, "You", names, commander, premades, Random(3))
         assertEquals("Rocco, Cabaretti Caterer", setup.you.commander)
         assertEquals(99, setup.you.deck.size)
         listOf("Sneak Attack", "Food Chain", "Reflecting Pool", "Jaws, Relentless Predator").forEach { assertNotNull(it, registry.getCard(it)) }
-        assertTrue(setup.notes.toString(), setup.notes.any { "Goblin Welder" in it })
+        // Goblin Welder was this deck's last left-out card until engine patch 0044 (2026-11-06).
+        assertTrue(setup.notes.toString(), setup.notes.none { "Left out" in it })
+        assertNotNull(registry.getCard("Goblin Welder"))
+        assertTrue(setup.you.deck.contains("Goblin Welder"))
         assertTrue(setup.notes.toString(), setup.notes.none { "Sneak Attack" in it && "Left out" in it })
         // Preserve every previously custom card even when upstream now supplies its definition.
         // The custom-only count is expected to shrink as Argentum gains those implementations.
@@ -51,7 +54,7 @@ class CustomDecksOfflineTest {
             "Sneak Attack", "Tataru Taru", "The Cabbage Merchant",
         )
         preserved.forEach { name -> assertNotNull("Preserved card: $name", registry.getCard(name)) }
-        assertEquals(listOf("Goblin Welder"), names.filter { lib.canonical(it) == null }.distinct())
+        assertEquals(emptyList<String>(), names.filter { lib.canonical(it) == null }.distinct())
         val custom = (setup.you.deck + setup.you.commander!!).filter(lib::isCustom).distinct()
         assertTrue(setup.notes.toString(), setup.notes.any {
             it.startsWith("Using Arcana's own versions of ${custom.size} card(s)")

@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 13:40:13 -0700
+Subject: [PATCH] arcana: 0044-dependent-target-owned-by-target-controller
+
+DependentTargetSelection now treats OwnedByReferencedPlayer(TargetController)
+("target artifact card in that player's graveyard", where that player is
+the controller of the first target) as a dependent slot: the card slot is
+enumerated per chosen first target (validTargetsByPrefix), the ability is
+offered only when a legal pair exists, and a mismatched pair is rejected.
+Before, the slot was evaluated with no first target and found nothing, so
+Goblin Welder was never offered.
+---
+ .../wingedsheep/engine/handlers/DependentTargetSelection.kt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DependentTargetSelection.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DependentTargetSelection.kt
+index d525cf6e04..c2f1e6b19f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DependentTargetSelection.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DependentTargetSelection.kt
+@@ -50,7 +50,11 @@ object DependentTargetSelection {
+         // "target cards from target player's graveyard" (Drafna's Restoration, Quandrix Command):
+         // the card slot can't be offered until the player slot is chosen.
+         ControllerPredicate.OwnedByTargetPlayer -> true
+-        is ControllerPredicate.OwnedByReferencedPlayer -> isTargetReference(predicate.target)
++        // "target artifact a player controls and target artifact card in **that player's**
++        // graveyard" (Goblin Welder): the owner is the controller of the first target, so the
++        // graveyard slot can't be offered until the permanent slot is chosen.
++        is ControllerPredicate.OwnedByReferencedPlayer ->
++            isTargetReference(predicate.target) || predicate.target == EffectTarget.TargetController
+         else -> false
+     }
+ 
