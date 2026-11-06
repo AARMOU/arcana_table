@@ -129,10 +129,10 @@ index 0000000000..d9d2b59cdf
 +    }
 +})
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 6ca5a8af29..bb285b701c 100644
+index 9b82720e6b..7f6e6cb2e4 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11801,6 +11801,14 @@ in the declare-blockers step, even before the turn-based block action has comple
+@@ -11886,6 +11886,14 @@ in the declare-blockers step, even before the turn-based block action has comple
    `mechanics/combat`) is the shared reader — `AttackPhaseManager` validates with it and the AI
    repairs its planned attack with it. Honors face-down, lost abilities, Room faces and
    `ConditionalStaticAbility` wrappers. `staticAbility { ability = OpponentsMustAttackYou }`.
@@ -148,10 +148,10 @@ index 6ca5a8af29..bb285b701c 100644
    "change the target of target spell or ability with a single target" (Willbender). The two knobs
    are Reflecting Mirror's printed restrictions: fire only when the spell's single target is *you*,
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index a977f2bc6e..a663d4c90e 100644
+index 9442f1bebb..abf4eee468 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1993,6 +1993,7 @@ Families:
+@@ -1997,6 +1997,7 @@ Families:
  - `NoMaximumHandSize(player: Player)` — Removes the maximum hand size limit for a scoped set of players, by default the controller.
  - `NoncombatDamageBonus(bonusAmount: Int)` — If a source you control would deal noncombat damage to an opponent or a permanent an opponent controls, it deals that much damage plus the bonus amount instead.
  - `OpponentsCantCauseYouTo(actions: Set<CompelledAction>)` — Spells and abilities your opponents control can't cause you to discard cards and/or sacrifice permanents, per actions — Sigarda, Host of Herons (sacrifice), Tamiyo, Collector of Tales (both).
@@ -187,10 +187,10 @@ index d4daf46776..8fde11961f 100644
   * Sentence-subject rendering of an attacker filter: "creature with flying" → "Creatures with
   * flying". This string is user-visible — it is the attack-rejection message and the label of a
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 0d35dc6266..dcc8b847bc 100644
+index 4c8ab5c995..45afd44bb6 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1529,6 +1529,7 @@ MustBlock — StaticAbility
+@@ -1527,6 +1527,7 @@ MustBlock — StaticAbility
  MustBlockEachAttacker — StaticAbility
  NoMaximumHandSize — StaticAbility
  NoncombatDamageBonus — StaticAbility
@@ -199,7 +199,7 @@ index 0d35dc6266..dcc8b847bc 100644
  OpponentsPlayWithHandsRevealed — StaticAbility
  OverrideEnchantedLandManaColor — StaticAbility
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
-index fb3f2fa9ea..9b5a9b45f2 100644
+index e70348a560..7b45ebee27 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
 @@ -195,6 +195,12 @@ internal class AttackPhaseManager(
@@ -215,7 +215,7 @@ index fb3f2fa9ea..9b5a9b45f2 100644
          // Declaration taps precede optional attack costs. Keep an immutable checkpoint so a
          // cancelled attack-tax question can roll back the declaration without leaving tap triggers.
          var tappedState = state
-@@ -1208,6 +1214,34 @@ internal class AttackPhaseManager(
+@@ -1209,6 +1215,34 @@ internal class AttackPhaseManager(
          return null
      }
  
@@ -320,10 +320,10 @@ index c06d4d53fd..6013ff7c67 100644
      }
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
-index acba4b101a..f1dd5a7cb8 100644
+index 31491bebea..73324c4bff 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
-@@ -1320,6 +1320,7 @@ class StaticAbilityHandler(
+@@ -1328,6 +1328,7 @@ class StaticAbilityHandler(
              is com.wingedsheep.sdk.scripting.Goaded,
              is CantBeAttackedWhileAttached,
              is com.wingedsheep.sdk.scripting.OpponentsMustAttackYou,

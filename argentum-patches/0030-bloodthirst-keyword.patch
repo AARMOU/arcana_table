@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0030-bloodthirst-keyword
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 74bc25a980..519558a91d 100644
+index ca3df71e0e..190f238163 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -15095,6 +15095,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+@@ -15210,6 +15210,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
    permanent reanimated or blinked gets none; the counters go through `placeEntryCounters` (Hardened
    Scales / Solemnity apply). Don't hand-write an `EntersWithDynamicCounters` for it — it would stack.
    Converge (an ability word) is the hand-authored neighbour: `convergeEntersWithCounters()`.
@@ -46,10 +46,10 @@ index 74bc25a980..519558a91d 100644
    `keywordAbility(KeywordAbility.renown(1))` (Topan Freeblade). The engine supplies the CR 702.112
    ability from [`Renown`](../mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Renown.kt): a
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
-index 24e839baec..71d9ca42cd 100644
+index 4441f312d7..257195cf72 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
-@@ -852,6 +852,13 @@ enum class Keyword(val displayName: String) {
+@@ -866,6 +866,13 @@ enum class Keyword(val displayName: String) {
       */
      SUNBURST("Sunburst"),
  
@@ -166,7 +166,7 @@ index f0166edc20..6fd9445db4 100644
          fun fabricate(n: Int): KeywordAbility = Numeric(Keyword.FABRICATE, n)
          fun tribute(n: Int): KeywordAbility = Numeric(Keyword.TRIBUTE, n)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
-index 7b8cab2cfe..1c2f2ca5ce 100644
+index 72ad669005..112533f5f9 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EntersWithReplacements.kt
 @@ -33,6 +33,7 @@ import com.wingedsheep.sdk.scripting.EntersWithChoice
@@ -177,7 +177,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
  import com.wingedsheep.sdk.scripting.Vanishing
  import com.wingedsheep.sdk.scripting.conditions.SourceChosenModeIs
  
-@@ -487,6 +488,24 @@ object EntersWithReplacements {
+@@ -490,6 +491,24 @@ object EntersWithReplacements {
          val events = mutableListOf<GameEvent>()
          val entityName = newState.getEntity(enteringEntityId)?.get<CardComponent>()?.name ?: ""
  
@@ -202,7 +202,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
          val sources = mutableListOf<GlobalReplacementSource>()
          val sourceState = replacementSourceState ?: newState
          for (sourceId in sourceState.getBattlefield()) {
-@@ -644,6 +663,47 @@ object EntersWithReplacements {
+@@ -647,6 +666,47 @@ object EntersWithReplacements {
       * applying to the objects entering simultaneously with this one and is purged at the next
       * event boundary ([com.wingedsheep.engine.replacement.ActiveReplacements.purgeSpent]).
       */
@@ -251,7 +251,7 @@ index 7b8cab2cfe..1c2f2ca5ce 100644
          val index = source.grantIndex ?: return state
          val grant = state.grantedReplacementEffects.getOrNull(index) ?: return state
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
-index 1187cfdf51..aec44b8910 100644
+index b6d60e1022..6d44f351af 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/EffectApplicator.kt
 @@ -40,7 +40,8 @@ internal class EffectApplicator(
@@ -278,7 +278,7 @@ index 1187cfdf51..aec44b8910 100644
              return
          }
          val prefix = keyword.substring(0, split + 1)
-@@ -561,3 +564,4 @@ private val CREW_PREFIX = "${com.wingedsheep.sdk.core.Keyword.CREW.name}_"
+@@ -565,3 +568,4 @@ private val CREW_PREFIX = "${com.wingedsheep.sdk.core.Keyword.CREW.name}_"
  
  /** Prefix of a granted renown keyword ([com.wingedsheep.sdk.scripting.KeywordAbility.grantedRenown]); see `addKeyword`. */
  private val RENOWN_PREFIX = "${com.wingedsheep.sdk.core.Keyword.RENOWN.name}_"
@@ -461,10 +461,10 @@ index 0000000000..98083ec76b
 +    }
 +})
 diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
-index 5013cb8422..40f9731dfb 100644
+index 079d7e8076..6d1c90f871 100644
 --- a/web-client/src/types/enums.ts
 +++ b/web-client/src/types/enums.ts
-@@ -312,6 +312,7 @@ export enum Keyword {
+@@ -313,6 +313,7 @@ export enum Keyword {
    FADING = 'FADING',
    VANISHING = 'VANISHING',
    SUNBURST = 'SUNBURST',
@@ -472,7 +472,7 @@ index 5013cb8422..40f9731dfb 100644
    CUMULATIVE_UPKEEP = 'CUMULATIVE_UPKEEP',
    ECHO = 'ECHO',
    SUSPEND = 'SUSPEND',
-@@ -457,6 +458,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
+@@ -459,6 +460,7 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
    [Keyword.FADING]: 'Fading',
    [Keyword.VANISHING]: 'Vanishing',
    [Keyword.SUNBURST]: 'Sunburst',

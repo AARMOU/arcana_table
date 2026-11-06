@@ -13,10 +13,10 @@ Subject: [PATCH] arcana: 0017-colorless-eldrazi-source-mana
  5 files changed, 35 insertions(+)
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 974b0a278a..0c8736514e 100644
+index b87eb70e14..b632bbb425 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1421,6 +1421,7 @@ Families:
+@@ -1423,6 +1423,7 @@ Families:
  - `ManaRestriction.ClassLevelUpOnly` — "Spend this mana only to … gain a Class level." Satisfied only by paying the cost of a Class's level-up ability (CR 716.2c: "to gain a Class level" means to activate an ability indicated by a class…
  - `ManaRestriction.ColoredSpellsOnly(withoutXInCost: Boolean)` — "Spend this mana only to cast a spell that's one or more colors" — the complement of ColorlessSpellsOnly: a spell with at least one color (CR 105.2), read off the spell being cast, so a hybrid or d…
  - `ManaRestriction.ColorlessSpellsOnly` — "Spend this mana only to cast colorless spells." A spell is colorless when its colors are empty (CR 105.2c) — a devoid spell, an artifact with no colored symbols, and a face-down spell (CR 708.2) a…
@@ -52,10 +52,10 @@ index bff352a196..06055b8c38 100644
       * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
       * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 6bc911a776..f512e6be4d 100644
+index 40e85b0f32..e4c2a56c51 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1735,6 +1735,7 @@ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, Prev
+@@ -1737,6 +1737,7 @@ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, Prev
  ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaColorSet.Union, ManaColorSet.SourceChosenColor — Union only adds pools and has no subtraction; SourceChosenColor reads a color stored on the source permanent, while "any other color" reads the choice made earlier in the same resolution and removes it from a base pool
  ManaRestriction.CannotPayGenericCosts — ManaRestriction — Jegantha, the Wellspring — ManaRestriction.CannotCastSpellsFromHand, ManaRestriction.CannotCastSpellsOtherThan — every other restriction answers "may this payment spend the mana" through isSatisfiedBy; this one admits every payment and refuses a symbol (generic {N}/{X}, CR 107.4b), which no payment-context axis can express, and the negative pair are shipped data shapes about the spell being cast
  ManaRestriction.ClassLevelUpOnly — ManaRestriction — Sorcerer Class — ManaRestriction.EquipAbilityActivationOnly, ManaRestriction.AbilityActivationOnly — a Class level-up is one activated ability among the others its source's levels grant, so neither the any-ability atom nor a source type/subtype test can separate it; EquipAbilityActivationOnly is the same narrowing for a different spend context, and both are shipped data objects on the wire

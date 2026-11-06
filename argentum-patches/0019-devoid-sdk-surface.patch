@@ -10,10 +10,10 @@ Subject: [PATCH] arcana: 0019-devoid-sdk-surface
  2 files changed, 2 insertions(+)
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 0c8736514e..a65cdae707 100644
+index b632bbb425..bdbf5ef242 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1424,6 +1424,7 @@ Families:
+@@ -1426,6 +1426,7 @@ Families:
  - `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability's SOURCE must be colorless.
  - `ManaRestriction.CostsContainingXOnly` — "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana cost contains {X}, and by activating an ability whose mana cost contains {X} — both are costs, so unlike Sp…
  - `ManaRestriction.CreatureSpellsOnly` — "Spend this mana only to cast creature spells."
@@ -22,10 +22,10 @@ index 0c8736514e..a65cdae707 100644
  - `ManaRestriction.EquipAbilityActivationOnly` — "Spend this mana only to activate equip abilities." Satisfied only by paying the cost of an **equip** ability (CR 702.6a — "Cost: Attach this permanent to target creature you control.
  - `ManaRestriction.FaceDownSpellsOnly` — "Spend this mana only to cast face-down spells." Satisfied by casting a card face down for its morph (CR 702.37a) or disguise (CR 702.168a) cost — a spell with no name and no characteristics but "2…
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index f512e6be4d..8b0c7911bb 100644
+index e4c2a56c51..2e411be7cb 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1736,6 +1736,7 @@ ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaC
+@@ -1738,6 +1738,7 @@ ManaColorSet.ExceptChosenColor — ManaColorSet — Open the Omenpaths — ManaC
  ManaRestriction.CannotPayGenericCosts — ManaRestriction — Jegantha, the Wellspring — ManaRestriction.CannotCastSpellsFromHand, ManaRestriction.CannotCastSpellsOtherThan — every other restriction answers "may this payment spend the mana" through isSatisfiedBy; this one admits every payment and refuses a symbol (generic {N}/{X}, CR 107.4b), which no payment-context axis can express, and the negative pair are shipped data shapes about the spell being cast
  ManaRestriction.ClassLevelUpOnly — ManaRestriction — Sorcerer Class — ManaRestriction.EquipAbilityActivationOnly, ManaRestriction.AbilityActivationOnly — a Class level-up is one activated ability among the others its source's levels grant, so neither the any-ability atom nor a source type/subtype test can separate it; EquipAbilityActivationOnly is the same narrowing for a different spend context, and both are shipped data objects on the wire
  ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ManaRestriction — Eldrazi Temple — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.SubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly rejects every ability activation; SubtypeSpellsOrAbilitiesOnly permits colored Eldrazi abilities, so neither can constrain both subtype and colorlessness of a source while also admitting spells
