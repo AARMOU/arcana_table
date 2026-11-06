@@ -864,7 +864,11 @@ internal fun TableController.TableOverlaysB() {
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } }
     )
-    if (layoutLabOpen) AdjustUiPage(
+    if (layoutLabOpen && studioEditorOpen) ArcanaStudioPage(
+        onClassic = { studioEditorOpen = false },
+        onDismiss = { layoutLabOpen = false; optionsOpen = true },
+    )
+    if (layoutLabOpen && !studioEditorOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
         cardSize = cardSizeScale, onCardSize = { value -> cardSizeScale = value.coerceIn(.75f, 1.4f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
         spacing = boardSpacingScale, onSpacing = { value -> boardSpacingScale = value.coerceIn(.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
