@@ -322,9 +322,17 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
       const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
       const authorizedLiftIssues = payload.authorizedCapLiftIssues instanceof Set ? payload.authorizedCapLiftIssues : new Set();
       if (labels.includes(RETRY_CAP_LIFT_LABEL) && authorizedLiftIssues.has(i.number) &&
+          !consumedCapLiftIssues.has(i.number) &&
           (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
         capLiftedBy.set(k, i.number);
     }
+  // A cap-lift is consumed by the first successfully created retry queue. Keep this
+  // marker in that queue so a failed label removal cannot reuse the same approval later.
+  const consumedCapLiftIssues = new Set();
+  for (const i of closedIssues.filter(x => trustedIssue(x) && String(x.title || '').startsWith('[Arcana Queue]'))) {
+    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\\d+) -->/);
+    if (consumed) consumedCapLiftIssues.add(Number(consumed[1]));
+  }
   const held = [], attemptHistoryUnknown = [];
   let retryOf = null;
   let capLiftIssue = null;
@@ -444,16 +452,18 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
     ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
   if (!pick.suggestion) return { reason: pick.reason, ...notes, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
-  // A trusted owner/PM cap-lift label authorizes exactly one extra queue; consume it first.
-  if (pick.capLiftIssue) await github.rest.issues.removeLabel({ owner, repo, issue_number: pick.capLiftIssue, name: RETRY_CAP_LIFT_LABEL });
+  // Create first: a failed create must not consume the owner's audited approval.
+  // The durable marker also prevents reuse if label removal fails after creation.
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
+    ...(pick.capLiftIssue ? ['<!-- retry-cap-lift-consumed-from: #' + pick.capLiftIssue + ' -->'] : []),
     ...(s.requestedIssue ? ['<!-- owner-selected-card-request: #' + s.requestedIssue + ' -->'] : []),
     ...(pick.retryOf ? ['<!-- automatic-retry-of: #' + pick.retryOf + ' (one retry; a second closed attempt holds the card for the owner) -->'] : []),
     s.body.trim(), ''].join('\n');
   const issue = (await github.rest.issues.create({ owner, repo, title: s.title, body })).data;
   if (issue.user?.login !== 'github-actions[bot]' || issue.user?.type !== 'Bot')
     throw Error('auto-queue-issuer-not-github-actions-bot; no dispatch');
+  if (pick.capLiftIssue) await github.rest.issues.removeLabel({ owner, repo, issue_number: pick.capLiftIssue, name: RETRY_CAP_LIFT_LABEL });
   return { created: true, issue: issue.number, name: s.name, url: issue.html_url, ...(pick.retryOf ? { retryOf: pick.retryOf } : {}), ...notes };
 }
 
@@ -598,7 +608,7 @@ function hardCardSection(body, cards = []) {
       ': Copilot stopped after two failed attempts; waiting for a worker.');
   const section = [HARD_CARD_SECTION_START, '## Hard cards waiting for a worker',
     ...(entries.length ? entries : ['_None currently capped._']),
-    'An owner or PM can authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + ' to the capped issue.',
+    'Only the owner can authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + ' to the capped issue.',
     HARD_CARD_SECTION_END].join('\n');
   const text = String(body || '');
   const start = text.indexOf(HARD_CARD_SECTION_START), end = text.indexOf(HARD_CARD_SECTION_END);
@@ -621,7 +631,7 @@ function existingHardCardEntries(body) {
 async function ensureHardCardLabels(github, owner, repo) {
   for (const [name, color, description] of [
     [HARD_CARD_LABEL, '6f42c1', 'Copilot stopped after the approved two failed attempts; route to a human worker.'],
-    [RETRY_CAP_LIFT_LABEL, 'fbca04', 'Owner/PM authorization for exactly one additional Copilot queue attempt.'],
+    [RETRY_CAP_LIFT_LABEL, 'fbca04', 'Owner-only authorization for exactly one additional Copilot queue attempt.'],
   ]) {
     try { await github.rest.issues.getLabel({ owner, repo, name }); }
     catch (error) {
