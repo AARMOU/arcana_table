@@ -307,7 +307,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -404,7 +404,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -582,7 +582,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 38,
+   "count": 39,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1086,7 +1086,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -3099,7 +3099,7 @@
    ]
   },
   "Keyword.HEXPROOF": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3124,6 +3124,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LotusField.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LotusFieldScenarioTest.kt"
+    },
+    {
+     "card": "Arcane Lighthouse",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArcaneLighthouse.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArcaneLighthouseScenarioTest.kt"
     }
    ]
   },
@@ -3286,13 +3292,19 @@
    ]
   },
   "Keyword.SHROUD": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Crystalline Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CrystallineSliver.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CrystallineSliverScenarioTest.kt"
+    },
+    {
+     "card": "Arcane Lighthouse",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArcaneLighthouse.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArcaneLighthouseScenarioTest.kt"
     }
    ]
   },
@@ -4187,7 +4199,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4783,7 +4795,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4906,7 +4918,7 @@
    ]
   },
   "timing": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5176,6 +5188,17 @@
     }
    ]
   },
+  "Patterns.Group.removeKeywordFromAll": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Arcane Lighthouse",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArcaneLighthouse.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArcaneLighthouseScenarioTest.kt"
+    }
+   ]
+  },
   "Patterns.Hand.eachPlayerDiscards": {
    "count": 1,
    "examples": [
@@ -5419,7 +5442,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6269,6 +6292,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfBodyAndMind.kt",
      "lines": 51,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfBodyAndMindScenarioTest.kt"
+    }
+   ]
+  },
+  "Filters.Group": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Arcane Lighthouse",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ArcaneLighthouse.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ArcaneLighthouseScenarioTest.kt"
     }
    ]
   },

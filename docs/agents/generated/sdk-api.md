@@ -1994,7 +1994,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `modifyStatsForAll(Int, Int, GroupFilter, Duration): ForEachEffect`*
 - `modifyStatsForAll(DynamicAmount, DynamicAmount, GroupFilter, Duration): ForEachEffect`*
 - `pumpAndGrantToAll(Int, Int, Keyword, GroupFilter, Duration): ForEachEffect`*
-- `removeKeywordFromAll(Keyword, GroupFilter, Duration): ForEachEffect`*
+- `removeKeywordFromAll(Keyword, GroupFilter, Duration, Boolean): ForEachEffect`*
 - `returnAllToHand(GroupFilter): CompositeEffect`
 - `sacrificeAllPipeline(GameObjectFilter, Boolean): CompositeEffect`*
 - `tapAll(GroupFilter): ForEachEffect`

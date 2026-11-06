@@ -1,11 +1,6 @@
 {
   "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
-    "Arcane Lighthouse": {
-      "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
-      "source": "#134 / #135 / #141 Priority B",
-      "verified": false
-    },
     "Bruvac the Grandiloquent": {
       "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -78,8 +73,8 @@
       "verified": true
     },
     "Goblin Welder": {
-      "reason": "simultaneous battlefield/graveyard zone swap",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "reason": "needs (1) a second target whose legality depends on the first target's controller ('artifact card in that player's graveyard'): with OwnedByReferencedPlayer(PlayerRef(ControllerOf(target))) the engine offers zero legal activations; (2) an all-or-nothing 'if both targets are still legal' gate; (3) a simultaneous sacrifice-and-return exchange",
+      "source": "#883 Clyde rules-expansion probe 2026-11-06 (no activation offered on the shipped engine)",
       "verified": true
     },
     "Devil Dinosaur": {
@@ -135,13 +130,5 @@
       "verified": true
     }
   },
-  "patterns": [
-    {
-      "name": "lose and can't have hexproof/shroud",
-      "regex": "lose hexproof and shroud and can't have hexproof or shroud",
-      "reason": "duration effect that removes hexproof/shroud and prevents gaining them",
-      "source": "#141 Priority B (Arcane Lighthouse)",
-      "verified": false
-    }
-  ]
+  "patterns": []
 }
