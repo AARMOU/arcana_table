@@ -24,7 +24,7 @@ class CardArtTest {
         var attempts = 0
         val pauses = mutableListOf<Long>()
         val result = loadCardArtWithRetry("https://cards.scryfall.io/normal/abc.jpg",
-            pause = { pauses.add(it) }) {
+            pause = { pauses.add(it) }) { _ ->
             attempts++
             if (attempts == 2) CardArtLoadResult.Loaded("decoded art") else CardArtLoadResult.RetryableFailure
         }
@@ -38,7 +38,7 @@ class CardArtTest {
         var attempts = 0
         val pauses = mutableListOf<Long>()
         val result = loadCardArtWithRetry<String>("https://cards.scryfall.io/normal/missing.jpg",
-            pause = { pauses.add(it) }) {
+            pause = { pauses.add(it) }) { _ ->
             attempts++
             CardArtLoadResult.RetryableFailure
         }
@@ -52,7 +52,7 @@ class CardArtTest {
     @Test fun imageAlreadyAvailableIsNotRetried() = runBlocking {
         var attempts = 0
         val result = loadCardArtWithRetry("https://cards.scryfall.io/normal/ready.jpg",
-            pause = { fail("successful image must not wait") }) {
+            pause = { fail("successful image must not wait") }) { _ ->
             attempts++
             CardArtLoadResult.Loaded("ready")
         }
@@ -64,7 +64,7 @@ class CardArtTest {
         var attempts = 0
         try {
             loadCardArtWithRetry<String>("https://cards.scryfall.io/normal/cancel.jpg",
-                pause = { fail("cancelled image must not retry") }) {
+                pause = { fail("cancelled image must not retry") }) { _ ->
                 attempts++
                 throw CancellationException("off-screen or changed card")
             }
@@ -73,12 +73,51 @@ class CardArtTest {
             assertEquals(1, attempts)
         }
     }
+    @Test fun terminalImageEndpointIsNotRetriedWhenFallbackIsTransient() = runBlocking {
+        val context = CardArtRetryContext()
+        val requests = mutableMapOf<String, Int>()
+        val result = loadCardArtWithRetry<String>("card-art", pause = { }) { retryContext ->
+            loadCardArtEndpoints(listOf("image:primary-404", "image:fallback-503"), retryContext) { endpoint ->
+                val count = (requests[endpoint] ?: 0) + 1
+                requests[endpoint] = count
+                when (endpoint) {
+                    "image:primary-404" -> CardArtLoadResult.PermanentFailure
+                    "image:fallback-503" -> if (count == 1) CardArtLoadResult.RetryableFailure
+                        else CardArtLoadResult.Loaded("fallback art")
+                    else -> error("unexpected endpoint")
+                }
+            }
+        }
+        assertEquals("fallback art", result)
+        assertEquals(1, requests["image:primary-404"])
+        assertEquals(2, requests["image:fallback-503"])
+    }
+
+    @Test fun rateLimitedLookupIsNotRepeatedWhenTransientLookupRecovers() = runBlocking {
+        val requests = mutableMapOf<String, Int>()
+        val result = loadCardArtWithRetry<String>("card-art", pause = { }) { retryContext ->
+            loadCardArtEndpoints(listOf("lookup:primary-408", "lookup:fallback-429"), retryContext) { endpoint ->
+                val count = (requests[endpoint] ?: 0) + 1
+                requests[endpoint] = count
+                when (endpoint) {
+                    "lookup:primary-408" -> if (count == 1) CardArtLoadResult.RetryableFailure
+                        else CardArtLoadResult.Loaded("recovered")
+                    "lookup:fallback-429" -> CardArtLoadResult.PermanentFailure
+                    else -> error("unexpected endpoint")
+                }
+            }
+        }
+        assertEquals("recovered", result)
+        assertEquals(2, requests["lookup:primary-408"])
+        assertEquals(1, requests["lookup:fallback-429"])
+    }
+
     @Test fun permanentLoadFailureStopsImmediately() = runBlocking {
         var attempts = 0
         val result = loadCardArtWithRetry<String>(
             "https://cards.scryfall.io/normal/not-found.jpg",
             pause = { fail("permanent failure must not wait") }
-        ) {
+        ) { _ ->
             attempts++
             CardArtLoadResult.PermanentFailure
         }
@@ -101,7 +140,7 @@ class CardArtTest {
             loadCardArtWithRetry<String>(
                 "https://cards.scryfall.io/normal/changed.jpg",
                 pause = { pauseEntered.complete(Unit); pauseForever.await() }
-            ) {
+            ) { _ ->
                 attempts++
                 CardArtLoadResult.RetryableFailure
             }
