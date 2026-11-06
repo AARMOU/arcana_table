@@ -1185,7 +1185,7 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1210,6 +1210,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/JaheiraFriendOfTheForest.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/JaheiraFriendOfTheForestScenarioTest.kt"
+    },
+    {
+     "card": "Fortified Village",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FortifiedVillage.kt",
+     "lines": 56,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FortifiedVillageScenarioTest.kt"
     },
     {
      "card": "Celestial Colonnade",
@@ -1856,6 +1862,17 @@
     }
    ]
   },
+  "Effects.EnterTapped": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Fortified Village",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FortifiedVillage.kt",
+     "lines": 56,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FortifiedVillageScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.Exile": {
    "count": 3,
    "examples": [
@@ -2279,6 +2296,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavaiThundermane.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavaiThundermaneScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.MayRevealCardFromHand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Fortified Village",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FortifiedVillage.kt",
+     "lines": 56,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FortifiedVillageScenarioTest.kt"
     }
    ]
   },
@@ -4131,7 +4159,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4364,7 +4392,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4705,7 +4733,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4828,7 +4856,7 @@
    ]
   },
   "timing": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5341,7 +5369,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5521,8 +5549,14 @@
    ]
   },
   "OnEnterRun": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Fortified Village",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FortifiedVillage.kt",
+     "lines": 56,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FortifiedVillageScenarioTest.kt"
+    },
     {
      "card": "Urza's Saga",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UrzasSaga.kt",
@@ -6432,7 +6466,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
