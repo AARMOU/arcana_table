@@ -120,7 +120,10 @@ internal fun ArcanaStudioPage(onClassic: () -> Unit, onDismiss: () -> Unit) {
     val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val callback = fileCallback
         fileCallback = null
-        callback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+        // Only an explicit user-selected content:// URI can reach Studio's FileReader.
+        val picked = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+            ?.filter { it.scheme == "content" }?.take(1)?.toTypedArray()
+        callback?.onReceiveValue(picked?.takeIf { it.isNotEmpty() })
     }
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val export = pendingExport
@@ -176,7 +179,8 @@ internal fun ArcanaStudioPage(onClassic: () -> Unit, onDismiss: () -> Unit) {
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             allowFileAccess = false
-                            allowContentAccess = false
+                            // File inputs use only system-picker-selected content:// URIs; restrict schemes above.
+                            allowContentAccess = true
                             blockNetworkLoads = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             setSupportMultipleWindows(false)
