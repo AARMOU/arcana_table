@@ -31,22 +31,26 @@ import androidx.compose.ui.unit.sp
 @Composable
 internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()->Unit,onScreens:()->Unit,onLayers:()->Unit,
     layersOpen:Boolean,onMore:()->Unit,onApply:()->Unit) {
+    // Fold cover (~344dp): Apply becomes a 44dp check so the screen name keeps room to be read.
+    val narrow=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<380
     Surface(color=darkTableColors.panel,shape=RoundedCornerShape(bottomStart=16.dp,bottomEnd=16.dp),shadowElevation=6.dp,modifier=Modifier.fillMaxWidth().testTag("studio-top-bar")) {
-        Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=2.dp),verticalAlignment=Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=if(narrow)0.dp else 2.dp),verticalAlignment=Alignment.CenterVertically) {
             StudioBarIcon(Icons.Default.Close,"Close Studio","studio-close",onClick=onClose)
-            Row(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick=onScreens).padding(horizontal=6.dp).testTag("studio-screen-picker"),
+            Row(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(12.dp)).clickable(onClickLabel="Choose screen",onClick=onScreens).padding(horizontal=if(narrow)2.dp else 6.dp).testTag("studio-screen-picker"),
                 verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f,fill=false)) {
                     Text(screen,color=darkTableColors.text,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
-                    Text(runtime.profile,color=darkTableColors.muted,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text(if(narrow)"${runtime.profile} ▾" else runtime.profile,color=darkTableColors.muted,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
-                Icon(Icons.Default.ArrowDropDown,"Choose screen",tint=darkTableColors.text)
+                if(!narrow)Icon(Icons.Default.ArrowDropDown,"Choose screen",tint=darkTableColors.text)
             }
             StudioBarIcon(Icons.AutoMirrored.Filled.Undo,"Undo","studio-undo",enabled=runtime.canUndo){runtime.undo()}
             StudioBarIcon(Icons.AutoMirrored.Filled.Redo,"Redo","studio-redo",enabled=runtime.canRedo){runtime.redo()}
             StudioBarIcon(Icons.Default.Layers,"Layers","studio-layers",active=layersOpen,onClick=onLayers)
             StudioBarIcon(Icons.Default.MoreVert,"More options","studio-more",onClick=onMore)
-            Button(onClick=onApply,contentPadding=PaddingValues(horizontal=12.dp),modifier=Modifier.heightIn(min=44.dp).testTag("studio-apply"),
+            if(narrow)FilledIconButton(onClick=onApply,modifier=Modifier.size(44.dp).testTag("studio-apply"),
+                colors=IconButtonDefaults.filledIconButtonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)) {Icon(Icons.Default.Check,"Apply")}
+            else Button(onClick=onApply,contentPadding=PaddingValues(horizontal=12.dp),modifier=Modifier.heightIn(min=44.dp).testTag("studio-apply"),
                 colors=ButtonDefaults.buttonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)) {Text("Apply",fontWeight=FontWeight.SemiBold)}
         }
     }

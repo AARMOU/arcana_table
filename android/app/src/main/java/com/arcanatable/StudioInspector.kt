@@ -102,8 +102,8 @@ private fun StudioParentButton(runtime:StudioControlsRuntime,control:StudioLiveC
 @Composable
 private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,change:((StudioControlStyle)->StudioControlStyle)->Unit) {
     var step by remember{mutableFloatStateOf(4f)}
-    Row(verticalAlignment=Alignment.CenterVertically) {
-        // Directional pad: one tap moves by the chosen step; the step chip toggles fine/coarse.
+    val pad=@Composable {
+        // Directional pad: one tap moves by the chosen step; the centre chip cycles 4 → 16 → 1 dp.
         Column(horizontalAlignment=Alignment.CenterHorizontally) {
             StudioPadButton(Icons.Default.KeyboardArrowUp,"Move up","studio-nudge-up"){change{StudioEditorGeometry.nudge(it,0f,-step)}}
             Row {
@@ -114,15 +114,24 @@ private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,chan
             }
             StudioPadButton(Icons.Default.KeyboardArrowDown,"Move down","studio-nudge-down"){change{StudioEditorGeometry.nudge(it,0f,step)}}
         }
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            StudioStepper("Width","${(style.width ?: widthDp).toInt()}","studio-width",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,-step,0f)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,step,0f)}})
-            StudioStepper("Height","${(style.height ?: heightDp).toInt()}","studio-height",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,-step)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,step)}})
-            Text("Offset ${style.dx.toInt()}, ${style.dy.toInt()} dp",color=darkTableColors.muted,fontSize=11.sp)
-            Row {
-                StudioChip("Native size",style.width!=null || style.height!=null,"studio-native-size"){change{it.copy(width=null,height=null)}}
-                StudioChip("Native spot",style.dx!=0f || style.dy!=0f,"studio-native-position"){change{it.copy(dx=0f,dy=0f)}}
-            }
+    }
+    val sizes=@Composable {
+        StudioStepper("Width","${(style.width ?: widthDp).toInt()}","studio-width",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,-step,0f)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,step,0f)}})
+        StudioStepper("Height","${(style.height ?: heightDp).toInt()}","studio-height",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,-step)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,step)}})
+    }
+    val resets=@Composable {
+        Text("Offset ${style.dx.toInt()}, ${style.dy.toInt()} dp",color=darkTableColors.muted,fontSize=11.sp)
+        StudioChip("Native size",style.width!=null || style.height!=null,"studio-native-size"){change{it.copy(width=null,height=null)}}
+        StudioChip("Native spot",style.dx!=0f || style.dy!=0f,"studio-native-position"){change{it.copy(dx=0f,dy=0f)}}
+    }
+    BoxWithConstraints {
+        if(maxWidth<400.dp) Column {
+            // Narrow (Fold cover): pad and resets side by side, size steppers full width underneath.
+            Row(verticalAlignment=Alignment.CenterVertically){pad();Spacer(Modifier.width(8.dp));Column{resets()}}
+            sizes()
+        } else Row(verticalAlignment=Alignment.CenterVertically) {
+            pad();Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)){sizes();Row(verticalAlignment=Alignment.CenterVertically){resets()}}
         }
     }
 }
@@ -197,7 +206,7 @@ internal fun StudioPadButton(icon:androidx.compose.ui.graphics.vector.ImageVecto
 @Composable
 internal fun StudioStepper(label:String,value:String,tag:String,onMinus:()->Unit,onPlus:()->Unit) {
     Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
-        Text(label,color=darkTableColors.muted,fontSize=12.sp,modifier=Modifier.weight(1f))
+        Text(label,color=darkTableColors.muted,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
         IconButton(onClick=onMinus,modifier=Modifier.size(48.dp).testTag("$tag-minus")){Icon(Icons.Default.Remove,"Decrease $label",tint=darkTableColors.text)}
         Text(value,color=darkTableColors.text,fontSize=13.sp,modifier=Modifier.widthIn(min=44.dp).testTag("$tag-value"),textAlign=androidx.compose.ui.text.style.TextAlign.Center)
         IconButton(onClick=onPlus,modifier=Modifier.size(48.dp).testTag("$tag-plus")){Icon(Icons.Default.Add,"Increase $label",tint=darkTableColors.text)}

@@ -140,13 +140,14 @@ internal fun studioCurrentScreen(runtime:StudioControlsRuntime,window:Int,select
 
 @Composable
 private fun StudioToolSwitch(tool:StudioEditorTool,onTool:(StudioEditorTool)->Unit) {
+    val narrow=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<380
     Row(Modifier.padding(bottom=4.dp).clip(RoundedCornerShape(22.dp)).background(darkTableColors.panel.copy(alpha=0.94f))) {
         listOf(StudioEditorTool.Select to Icons.Default.TouchApp,StudioEditorTool.Scroll to Icons.Default.PanTool).forEach {(t,icon)->
             val on=t==tool
             Row(Modifier.heightIn(min=44.dp).clip(RoundedCornerShape(22.dp)).background(if(on)darkTableColors.accent.copy(alpha=0.25f) else Color.Transparent)
                 .clickable{onTool(t)}.padding(horizontal=14.dp).testTag("studio-tool-${t.name}"),verticalAlignment=Alignment.CenterVertically) {
-                Icon(icon,null,tint=if(on)darkTableColors.accent else darkTableColors.muted,modifier=Modifier.size(18.dp))
-                Text(" ${t.name}",color=if(on)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
+                Icon(icon,if(narrow)"${t.name} mode" else null,tint=if(on)darkTableColors.accent else darkTableColors.muted,modifier=Modifier.size(18.dp))
+                if(!narrow)Text(" ${t.name}",color=if(on)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
             }
         }
     }
