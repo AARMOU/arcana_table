@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 142
-        versionName = "0.34.2-build142-engine-preview-20261105"
+        versionName = "0.34.2-build142-images-palette-preview-20261106"
         // Controlled by the release build after separate owner-approved Cloudflare deployment.
         // An empty endpoint makes request submission explicitly unavailable.
         val cardRequestUrl = providers.gradleProperty("arcanaCardRequestUrl").orNull.orEmpty()

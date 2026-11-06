@@ -2299,6 +2299,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // BEGIN changelog-since-build121 — generated next-APK release notes
+                Text("BUILD 142 · NOV 6 IMAGES + COLORS TEST PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Adjust UI: choose four color presets or customize seven colors with HEX/RGB controls. Palette preferences are saved.\n• Card images retry temporary failures with bounded backoff; permanent failures are not repeatedly requested.\n• Includes the repaired-engine Build 142 base. Please test image loading, picker fit and saved colors on your phone.", color = SoftWhite, fontSize = 12.sp)
                 Text("BUILD 142 · NOV 5 ENGINE TEST PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Updated the offline rules engine and card library to the reviewed November 5 engine snapshot, with Arcana's compatibility patches.\n• Keeps the previous hand information and tap-to-assign combat preview.\n• This test preview does not include the pending Legion card update, colored attack lines or the UI Designer work. Slow AI turns and online reconnect issues remain under investigation.\n• Phone testing is still needed. This is a debug test preview, not a Play Store release.", color = SoftWhite, fontSize = 12.sp)
                 Text("BUILD 141 · NOV 4 GAME UI PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

@@ -68,7 +68,7 @@ internal fun AdjustUiPage(
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close", tint = Muted) }
                 }
                 // A live sample stays visible while the controls below scroll.
-                Column(Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF101917)).padding(10.dp)) {
+                Column(Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).background(Ink).padding(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("YOUR TURN · MAIN", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Text("40 life", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
@@ -105,6 +105,7 @@ internal fun AdjustUiPage(
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxWidth().padding(top = 7.dp).verticalScroll(rememberScrollState())) {
+                    TablePalettePicker()
                     Box(Modifier.tutorialTarget("layout-sizes")) { AdjustSection("TABLE SIZE") }
                     AdjustSlider("Card size", cardSize, .75f..1.4f, { "${(it * 100).toInt()}%" }, onCardSize)
                     AdjustSlider("Board spacing", spacing, .5f..2f, { "${(it * 100).toInt()}%" }, onSpacing)
