@@ -74,7 +74,6 @@ class CardArtTest {
         }
     }
     @Test fun terminalImageEndpointIsNotRetriedWhenFallbackIsTransient() = runBlocking {
-        val context = CardArtRetryContext()
         val requests = mutableMapOf<String, Int>()
         val result = loadCardArtWithRetry<String>("card-art", pause = { }) { retryContext ->
             loadCardArtEndpoints(listOf("image:primary-404", "image:fallback-503"), retryContext) { endpoint ->
