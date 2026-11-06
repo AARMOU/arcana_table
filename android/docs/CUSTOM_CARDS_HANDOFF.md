@@ -42,7 +42,7 @@ The following 39 cards remain unimplemented: Pantlaza, Sun-Favored; Atla Palani,
 
 ## Existing approximations and omissions
 
-- **Blightsteel Colossus:** infect is unsupported by the pinned engine, so it deals normal damage rather than giving poison counters. Trample, indestructible, and its library replacement are represented.
+- **Blightsteel Colossus:** full Oracle behaviour (2026-11-06): infect is native to the pinned engine (poison to players, -1/-1 counters to creatures, loss at ten poison); trample, indestructible and the from-anywhere library replacement are covered by `BlightsteelColossusScenarioTest` (11 cases incl. four-player).
 - **Constricting Sliver:** the pinned engine does not fire its static granted enters abilities in this test path, so the exile/return effect is implemented directly on Constricting Sliver. Only Constricting Sliver's own entry is tracked; other Slivers do not receive the ability.
 - Displaced Dinosaurs uses an enters trigger.
 - Flash Photography is sorcery speed.

@@ -289,6 +289,7 @@ its test. Count = number of tested cards using it. For hand-written walkthroughs
 | `Keyword.DEFENDER` | 1 | [Crashing Drawbridge](../../../android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CrashingDrawbridge.kt) → [test](../../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CrashingDrawbridgeScenarioTest.kt) |
 | `Keyword.EVOLVE` | 1 | [Tyranid Prime](../../../android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TyranidPrime.kt) → [test](../../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TyranidPrimeScenarioTest.kt) |
 | `Keyword.EXALTED` | 1 | [First Sliver's Chosen](../../../android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FirstSliversChosen.kt) → [test](../../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FirstSliversChosenScenarioTest.kt) |
+| `Keyword.INFECT` | 1 | [Blightsteel Colossus](../../../android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlightsteelColossus.kt) → [test](../../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlightsteelColossusScenarioTest.kt) |
 | `Keyword.SHROUD` | 1 | [Crystalline Sliver](../../../android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CrystallineSliver.kt) → [test](../../../android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CrystallineSliverScenarioTest.kt) |
 
 ## Targets and filters
