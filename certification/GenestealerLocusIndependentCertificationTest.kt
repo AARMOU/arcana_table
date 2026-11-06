@@ -66,15 +66,15 @@ class GenestealerLocusIndependentCertificationTest {
         assertNull(d.declareAttackers(opponent, listOf(attacker), player).error)
         d.resolveAll()
 
-        assertEquals(2, d.projected.getPower(attacker))
-        assertEquals(3, d.projected.getToughness(attacker))
-        assertEquals(3, d.projected.getPower(bystander))
-        assertEquals(3, d.projected.getToughness(bystander))
+        assertEquals(1, d.projected.getPower(attacker))
+        assertEquals(2, d.projected.getToughness(attacker))
+        assertEquals(2, d.projected.getPower(bystander))
+        assertEquals(2, d.projected.getToughness(bystander))
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = player)
 
-        assertEquals(3, d.projected.getPower(attacker))
-        assertEquals(3, d.projected.getToughness(attacker))
+        assertEquals(2, d.projected.getPower(attacker))
+        assertEquals(2, d.projected.getToughness(attacker))
     }
 
     @Test
@@ -92,15 +92,15 @@ class GenestealerLocusIndependentCertificationTest {
         assertNull(d.declareAttackers(player, listOf(attacker), opponent).error)
         d.resolveAll()
 
-        assertEquals(3, d.projected.getPower(attacker))
-        assertEquals(4, d.projected.getToughness(attacker))
-        assertEquals(3, d.projected.getPower(bystander))
-        assertEquals(3, d.projected.getToughness(bystander))
+        assertEquals(2, d.projected.getPower(attacker))
+        assertEquals(3, d.projected.getToughness(attacker))
+        assertEquals(2, d.projected.getPower(bystander))
+        assertEquals(2, d.projected.getToughness(bystander))
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = opponent)
 
-        assertEquals(3, d.projected.getPower(attacker))
-        assertEquals(3, d.projected.getToughness(attacker))
+        assertEquals(2, d.projected.getPower(attacker))
+        assertEquals(2, d.projected.getToughness(attacker))
     }
 
     @Test
@@ -112,9 +112,11 @@ class GenestealerLocusIndependentCertificationTest {
         val friendlyCreature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val opposingCreature = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
 
-        listOf(locus, friendlyCreature, opposingCreature).forEach { creature ->
-            assertEquals(3, d.projected.getPower(creature))
-            assertEquals(3, d.projected.getToughness(creature))
+        assertEquals(3, d.projected.getPower(locus))
+        assertEquals(3, d.projected.getToughness(locus))
+        listOf(friendlyCreature, opposingCreature).forEach { creature ->
+            assertEquals(2, d.projected.getPower(creature))
+            assertEquals(2, d.projected.getToughness(creature))
         }
     }
 }
