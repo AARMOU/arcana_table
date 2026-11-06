@@ -15,3 +15,9 @@ These are kept here (not pushed to Argentum). They could be offered upstream lat
   test-property edits in that file no longer conflict with it (they did on 2026-11-02: JDK 21 → 25). It also adds a local `:arcana-export` module that writes
   Portal as card data (`por-cards.jsonl`) with a round-trip check. The PC build runs
   `:mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run`.
+
+### 0040 — intrinsic zone-cast X selection
+
+Carries B141 PR #947's intrinsic `MayCastSelfFromZones` X picker and affordable ceiling,
+with the actual origin-zone price and eligible mana context. No SDK surface change.
+Regression: `IntrinsicZoneCastXTest`. Card implementation remains in the B141 candidate PR.
