@@ -206,6 +206,15 @@ internal fun TableScreen(onControllerReady: (TableController) -> Unit) {
                 .putString(TABLE_PALETTE_PREF, CUSTOM_TABLE_PALETTE)
                 .putBoolean("dark_mode", true).apply()
         },
+        onStudioTheme = { newColors ->
+            customPalette = newColors
+            customPaletteInitialized = true
+            paletteName = CUSTOM_TABLE_PALETTE
+            darkMode = true
+            optionPrefs.edit().writeCustomTablePalette(newColors)
+                .putString(TABLE_PALETTE_PREF, CUSTOM_TABLE_PALETTE)
+                .putBoolean("dark_mode", true).apply()
+        },
     )
     CompositionLocalProvider(
         LocalTableColors provides colors, LocalTablePaletteEditor provides paletteEditor, LocalCardZoom provides cardZoom
