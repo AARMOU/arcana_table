@@ -1,0 +1,9 @@
+{
+  "key": "gargoyle-flock",
+  "name": "Gargoyle Flock",
+  "issue": 983,
+  "source": "certification/GargoyleFlockIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GargoyleFlockIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
