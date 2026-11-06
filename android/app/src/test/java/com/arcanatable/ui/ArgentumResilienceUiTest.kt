@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -391,10 +393,12 @@ class ArgentumResilienceUiTest {
                 UiTestSupport.screenshot(activity,"studio-home-applied")
             }
             scenario.recreate();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-root-escape").assertIsDisplayed().performClick();UiTestSupport.settle(rule)
             scenario.onActivity {activity->
                 val runtime=activity.tableController!!.studioControlsRuntime!!
                 assertEquals(8f,runtime.style(id).dx);assertTrue(runtime.controls.containsKey(id))
-                runtime.begin();activity.tableController!!.optionsOpen=true;runtime.inspectNativeScreen()
+                assertTrue(runtime.editing && runtime.panelOpen)
+                activity.tableController!!.optionsOpen=true;runtime.inspectNativeScreen()
             }
             UiTestSupport.settle(rule)
             scenario.onActivity {activity->

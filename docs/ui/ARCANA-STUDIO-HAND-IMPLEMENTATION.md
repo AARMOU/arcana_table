@@ -40,7 +40,12 @@ state, source/target screen and real Android window. Bindings never create an
 engine action. Dynamic/private labels are not project values. Printed card art
 cannot be replaced with a fabricated static label. Rebound controls show their
 actual target caption. Required native actions recover when no reachable alternate
-exists. Duplicate buttons execute the genuine source callback in its real window.
+exists. Customized app screens retain an uneditable Arcana Studio recovery entry;
+customized native dialogs reserve a 48dp recovery footer, including dialogs that
+disable Back. It opens the editor without dismissing or making a game choice.
+This footer is present during both inspection and applied rendering, outside the
+editable native content. The owner hand canvas is unchanged.
+Duplicate buttons execute the genuine source callback in its real window.
 Live information modules duplicate or rebind a current native text source in the
 same screen/window. Full current text is held only in runtime memory, updates
 with state, survives a hidden original, and never enters exported project JSON.

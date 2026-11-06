@@ -296,9 +296,9 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             SideEffect { TutorialCoachState.model = coachModel }
             TutorialLayer(base = true)
             studioRuntime?.let {studio ->
-                if(!studio.editing && studio.recoveryReasons().isNotEmpty())androidx.compose.material3.TextButton(
-                    onClick={studio.begin()},modifier=Modifier.align(Alignment.BottomStart).navigationBarsPadding()
-                ){androidx.compose.material3.Text("Studio restored a control · Review",color=CounterGold)}
+                if(!studio.editing && (studio.active || studio.recoveryReasons().isNotEmpty()))androidx.compose.material3.TextButton(
+                    onClick={studio.begin()},modifier=Modifier.align(Alignment.BottomStart).navigationBarsPadding().testTag("studio-root-escape")
+                ){androidx.compose.material3.Text(if(studio.recoveryReasons().isEmpty())"Arcana Studio" else "Studio restored a control · Review",color=CounterGold)}
                 if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
                     onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
                 ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}

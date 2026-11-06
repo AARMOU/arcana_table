@@ -97,6 +97,28 @@ class StudioNativeControlsUiTest {
         rule.onNodeWithTag("studio-copy-${copy.id}").assertTextEquals("Mana 1")
 
     }
+    @Test fun nondismissableCustomizedDialogAlwaysKeepsStudioRecoveryReachable() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-window-recovery",0),"portrait").also{it.enableCatalog()}
+        var gameActions=0;var dismissed=0;val alert=mutableStateOf(false)
+        @Composable fun Choice() {StudioButton("HomeScreen.OutlinedButton.1","Choice",{gameActions++},Modifier.testTag("only-choice")){
+            StudioText("HomeScreen.Text.1","Choice",false,"Only choice")
+        }}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
+            val properties=androidx.compose.ui.window.DialogProperties(dismissOnBackPress=false,dismissOnClickOutside=false)
+            if(alert.value)StudioAlertDialog(onDismissRequest={dismissed++},confirmButton={Choice()},properties=properties)
+            else StudioDialog(onDismissRequest={dismissed++},properties=properties) {androidx.compose.material3.Surface{Choice()}}
+        }}}
+        listOf(false,true).forEach {useAlert->
+            rule.runOnIdle{alert.value=useAlert};rule.waitForIdle()
+            val source=runtime.controls.values.single{it.isAction}.id
+            rule.runOnIdle{runtime.begin(source);runtime.edit(source,StudioControlStyle(visible=false));runtime.apply()}
+            rule.waitForIdle();rule.onNodeWithTag("only-choice").assertIsNotDisplayed()
+            rule.onNodeWithTag("studio-window-escape").assertIsDisplayed().performClick()
+            assertTrue(runtime.editing);assertTrue(runtime.panelOpen)
+            assertEquals(0,gameActions);assertEquals(0,dismissed)
+            rule.runOnIdle{runtime.cancel()};rule.waitForIdle()
+        }
+    }
     @Test fun repeatedListControlsHaveDistinctCallbacksAndStableSlots() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-repeat",0),"portrait").also{it.enableCatalog()}
         val calls=mutableListOf<Int>()
