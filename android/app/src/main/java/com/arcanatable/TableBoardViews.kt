@@ -764,7 +764,7 @@ internal suspend fun <T : Any> loadCardArtWithRetry(
 internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null, label: String? = null) {
     var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
     LaunchedEffect(url, fallbackName) {
-        if (bitmap == null) bitmap = loadCardArtWithRetry(url) { CardImages.loadForCardArt(url, fallbackName, retryContext) }
+        if (bitmap == null) bitmap = loadCardArtWithRetry(url) { retryContext -> CardImages.loadForCardArt(url, fallbackName, retryContext) }
     }
     // Loaded art is named after the card, so screen readers (and tests) can still tell cards apart.
     if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = cardArtDescription(label, fallbackName), modifier = modifier, contentScale = contentScale)
