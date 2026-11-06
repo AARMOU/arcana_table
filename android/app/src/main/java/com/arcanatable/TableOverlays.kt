@@ -953,6 +953,13 @@ internal fun TableController.TableOverlays() {
     // While a combat board or another Argentum choice is open, the hand is for looking only.
     val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
 
+    val handActionsBusy = handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
+    val handActions = handDrawerActions(argentumSnapshot?.legalActions.orEmpty(), handActionsBusy)
+    val handCards = players.getOrNull(handSeat)?.hand.orEmpty()
+    val handCastActions = handDrawerCastActions(handActions, handCards.mapNotNull { argentumSnapshot?.serverCardIds?.get(it.id) }.toSet())
+    val handCastableIds = handCards.filter { card -> ArgentumActions.forCardServerId(handCastActions,
+        argentumSnapshot?.serverCardIds?.get(card.id)).isNotEmpty() }.map { it.id }.toSet()
+
     AnimatedVisibility(
         visible = handTrayVisible,
         modifier = Modifier.fillMaxSize(),
@@ -1036,13 +1043,28 @@ internal fun TableController.TableOverlays() {
                         argentumMode = argentumEnabled,
                         argentumPrimaryLabel = argentumPrimaryLabel?.takeIf { !argentumAwaitingUpdate && passToMyTurnFrom == null },
                         onUndo = if (argentumEnabled && argentumUndoAvailable && !argentumAwaitingUpdate) ({ requestArgentumUndo() }) else null,
-                        legalActionCount = ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size,
+                        legalActionCount = handActions.size,
+                        actionsBusy = handActionsBusy,
+                        castableIds = handCastableIds,
+                        libraryCount = players[handSeat].library.size,
+                        graveyardCount = players[handSeat].graveyard.size,
+                        exileCount = players[handSeat].exile.size,
+                        onActions = { if (!handActionsBusy) { argentumActionCard = null; argentumActionChoices = handActions } },
+                        onCast = { card ->
+                            if (!handActionsBusy) {
+                                if (card != null && card.id in handCastableIds) openArgentumActions(card)
+                                else if (card == null && handCastActions.isNotEmpty()) {
+                                    argentumActionCard = null; argentumActionChoices = handCastActions
+                                }
+                            }
+                        },
+                        onPreview = { card -> cardZoom.hold(card).also { cardZoom.release(false) } },
                         arrangement = handArrangement,
                         cardScale = handCardScale,
                         playableIds = argentumPlayableIds,
                         canRespond = argentumCanRespond && respondGlow,
                         commanderAffordable = argentumEnabled && players.getOrNull(handSeat)?.commanderCard?.id?.let { it in argentumPlayableIds } == true,
-                        onStack = { run { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else stackOpen = true } },
+                        onStack = { stackOpen = true },
                         onCastCommander = {
                             val commander = players.getOrNull(handSeat)?.commanderCard
                             if (argentumEnabled && commander != null) openArgentumActions(commander)
@@ -1078,7 +1100,7 @@ internal fun TableController.TableOverlays() {
                                 "REVEALED" -> zoneDialog = selectedPlayer to "Revealed"
                             }
                         },
-                        onSelect = { card -> run { if (handViewOnly) cardZoom.hold(card).also { cardZoom.release(false) } else if (argentumEnabled) openArgentumActions(card) else handActionCard = card } },
+                        onSelect = { card -> run { if (argentumEnabled && handActionsBusy) cardZoom.hold(card).also { cardZoom.release(false) } else if (argentumEnabled) openArgentumActions(card) else handActionCard = card } },
                         onDragDrop = { card, point ->
                             if (argentumEnabled) {
                                 // A drag is only a visual gesture in Arcana. Ask Argentum

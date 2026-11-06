@@ -2299,6 +2299,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // BEGIN changelog-since-build121 — generated next-APK release notes
+                Text("BUILD 142 · NOV 6 HAND DRAWER TEST", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Your hand follows the submitted layout: PASS, UNDO, ACTIONS and CAST above live Stack, Library, Graveyard and Exile counts.\n• ACTIONS shows legal choices; STACK inspects pending spells and abilities. CAST uses your selected card or offers legal hand plays. Library identities stay hidden.\n• Cards wrap into a responsive scrolling grid. Hold a card to inspect it; the tray still resizes. Keeps image retries and saved color palettes.\n• Separate Hand Preview install preserves previous B141/B142 apps. Phone and Fold acceptance is still needed.", color = SoftWhite, fontSize = 12.sp)
                 Text("BUILD 142 · NOV 6 IMAGES + COLORS TEST PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Adjust UI: choose four color presets or customize seven colors with HEX/RGB controls. Palette preferences are saved.\n• Card images retry temporary failures with bounded backoff; permanent failures are not repeatedly requested.\n• Includes the repaired-engine Build 142 base. Please test image loading, picker fit and saved colors on your phone.", color = SoftWhite, fontSize = 12.sp)
                 Text("BUILD 142 · NOV 5 ENGINE TEST PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

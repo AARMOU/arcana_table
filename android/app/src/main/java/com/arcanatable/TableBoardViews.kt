@@ -115,6 +115,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.compose.ui.window.Dialog
@@ -814,11 +815,21 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
     canRespond: Boolean = false, commanderAffordable: Boolean = false,
     autoPassing: Boolean = false, autoPassAvailable: Boolean = false, onAutoPass: () -> Unit = {},
-    turnContext: String? = null) {
+    turnContext: String? = null, onActions: () -> Unit = onStack, onCast: (GameCard?) -> Unit = {},
+    castableIds: Set<Int> = emptySet(), actionsBusy: Boolean = false,
+    libraryCount: Int = 0, graveyardCount: Int = 0, exileCount: Int = 0,
+    onPreview: (GameCard) -> Unit = onSelect) {
     val handScrollState = rememberScrollState()
+    var selectedId by remember { mutableStateOf<Int?>(null) }
+    val selectedCard = cards.firstOrNull { it.id == selectedId }
+    var libraryInfo by remember { mutableStateOf(false) }
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
+    if (libraryInfo) AlertDialog(onDismissRequest = { libraryInfo = false },
+        title = { Text("Your library") },
+        text = { Text("$libraryCount cards. Library cards stay hidden. Searches and reveals are available only when the game permits them.") },
+        confirmButton = { TextButton(onClick = { libraryInfo = false }) { Text("CLOSE") } })
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -828,25 +839,35 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
             }
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
         }
+        if (argentumMode) {
+            HandDrawerControls(
+                primaryLabel = when { autoPassing -> "AUTO-PASSING · STOP"; actionsBusy -> null; else -> argentumPrimaryLabel },
+                undoAvailable = onUndo != null && !actionsBusy,
+                actionCount = if (actionsBusy) 0 else legalActionCount,
+                castAvailable = !actionsBusy && (if (selectedCard == null) castableIds.isNotEmpty() else selectedCard.id in castableIds),
+                stackCount = stackCount, libraryCount = libraryCount, graveyardCount = graveyardCount, exileCount = exileCount,
+                onPass = { if (autoPassing) onAutoPass() else if (!actionsBusy) onPassTurn() },
+                onUndo = { onUndo?.invoke() }, onActions = onActions, onCast = { onCast(selectedCard) },
+                onStack = onStack, onLibrary = { libraryInfo = true },
+                onGraveyard = { onMoreAction("GRAVEYARD") }, onExile = { onMoreAction("EXILE") },
+                onPassHold = if (autoPassing || autoPassAvailable && !actionsBusy) onAutoPass else null)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(if (selectedCard != null) "Selected: ${selectedCard.name}" else "Select a card · hold to inspect", color = Muted,
+                    fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("hand-selection"))
+                Box {
+                    IconButton(onClick = { moreOpen = true }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.MoreVert, "More hand options", tint = Muted) }
+                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        if (commanderCanCast) DropdownMenuItem(text = { Text("Cast commander") }, enabled = !actionsBusy,
+                            onClick = { moreOpen = false; onCastCommander() })
+                        DropdownMenuItem(text = { Text("Game log") }, onClick = { moreOpen = false; onMoreAction("LOG") })
+                        DropdownMenuItem(text = { Text(if (autoPassing) "Stop auto-pass" else "Pass to my turn") },
+                            enabled = autoPassing || autoPassAvailable && !actionsBusy, onClick = { moreOpen = false; onAutoPass() })
+                    }
+                }
+            }
+        } else {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (argentumMode) {
-                // Argentum owns draws, reveals, steps and combat; show only actions it can take.
-                if (argentumPrimaryLabel != null || autoPassing || autoPassAvailable) PassButton(
-                    if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel ?: "WAITING · HOLD AUTO-PASS",
-                    onClick = when {
-                        autoPassing -> onAutoPass
-                        argentumPrimaryLabel != null -> onPassTurn
-                        else -> ({}) // No legal action to tap yet; a hold can arm auto-pass.
-                    },
-                    enabled = true, canRespond = canRespond && !autoPassing,
-                    modifier = Modifier.heightIn(min = 50.dp),
-                    onLongClick = onAutoPass,
-                )
-                if (onUndo != null) HeaderButton("UNDO", onUndo)
-                HeaderButton("ACTIONS · $legalActionCount", onStack, enabled = legalActionCount > 0, modifier = Modifier)
-                if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = Modifier, glow = commanderAffordable)
-                HeaderButton("LOG", { onMoreAction("LOG") })
-            } else actionOrder.forEach { action ->
+            actionOrder.forEach { action ->
                 when (action) {
                     "DRAW" -> if (canControl) HeaderButton("DRAW", onDraw)
                     "REVEAL" -> HeaderButton(if (handRevealed) "HIDE HAND" else "REVEAL HAND", { onToggleReveal(!handRevealed) })
@@ -876,14 +897,15 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 DropdownMenuItem(text = { Text("Open text chat") }, onClick = { moreOpen = false; onMoreAction("CHAT") })
             }
         }
+        }
         if (cards.isEmpty()) Text("Your hand is empty", color = Muted, modifier = Modifier.padding(12.dp))
         else BoxWithConstraints(Modifier.fillMaxWidth()) {
             // Tray height minus drag handle, hint, title and action rows (see HandLayout.kt).
-            val areaHeight = (availableHeight - 172.dp).coerceAtLeast(if (isLandscape) 96.dp else 120.dp)
-            val grid = HandLayout.compute(cards.size, maxWidth.value, areaHeight.value, arrangement, cardScale)
+            val areaHeight = (availableHeight - (if (argentumMode) 252.dp else 172.dp)).coerceAtLeast(if (isLandscape) 96.dp else 120.dp)
+            val grid = HandLayout.drawer(cards.size, maxWidth.value, areaHeight.value, arrangement, cardScale)
             val cardWidth = grid.cardWidth.dp
             val cardHeight = grid.cardHeight.dp
-            val gap = HandLayout.GAP.dp
+            val gap = (if (arrangement == HandArrangement.SINGLE_ROW) HandLayout.GAP else 4f).dp
             val cardStepPx = with(density) { (cardWidth + gap).roundToPx() }
             val rowStepPx = with(density) { (cardHeight + gap).roundToPx() }
             LaunchedEffect(highlightedCardId, cards, grid) {
@@ -903,6 +925,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 CardFace(
                     card,
                     Modifier.width(cardWidth).height(cardHeight)
+                        .semantics { selected = card.id == selectedId }
                         .tutorialTarget("hand-card:${card.name}")
                         .onGloballyPositioned { coordinates = it }
                         // Argentum games: holding a hand card previews it (no drag-to-play there).
@@ -919,8 +942,8 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                             )
                         })
                         .then(if (cards.firstOrNull()?.id == card.id) Modifier else Modifier)
-                        .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
-                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds, tutorialZone = "hand"
+                        .then(if (card.id == selectedId || card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
+                    onClick = { selectedId = card.id; onSelect(card) }, onLongClick = { selectedId = card.id; onPreview(card) }, showCounters = false, glow = card.id in playableIds, tutorialZone = "hand"
                 )
             }
             } }

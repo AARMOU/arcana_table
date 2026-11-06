@@ -2,6 +2,7 @@ package com.arcanatable.ui
 
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -355,5 +356,51 @@ class ArgentumResilienceUiTest {
         UiTestSupport.awaitReal(rule, 5_000, "home") { UiTestSupport.homeShown(rule) }
         assertFalse("no resume offer after a finished game", shown("RESUME GAME"))
         scenario.close()
+    }
+
+    @Test fun handDrawerStackAndZonesUseRealDestinationsAndNetworkWaitDisablesWrites() {
+        useServer(fake.origin)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            UiTestSupport.playWithArgentum(rule, scenario)
+            UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
+            scenario.onActivity { it.tableController!!.showHand = true }
+            UiTestSupport.settle(rule)
+            rule.onNode(hasTestTag("hand-stack")).performClick()
+            UiTestSupport.settle(rule)
+            rule.onNodeWithText("Argentum stack and priority").assertExists()
+            scenario.onActivity {
+                assertTrue(it.tableController!!.stackOpen)
+                assertTrue(it.tableController!!.argentumActionChoices.isEmpty())
+            }
+            rule.onNodeWithText("CLOSE").performClick()
+            UiTestSupport.settle(rule)
+            rule.onNode(hasTestTag("hand-library")).performClick()
+            UiTestSupport.settle(rule)
+            rule.onNodeWithText("Library cards stay hidden.", substring = true).assertExists()
+            rule.onNodeWithText("CLOSE").performClick()
+            UiTestSupport.settle(rule)
+            rule.onNode(hasTestTag("hand-graveyard")).performClick()
+            UiTestSupport.settle(rule)
+            scenario.onActivity {
+                val c = it.tableController!!
+                assertEquals(c.localSeat to "Graveyard", c.zoneDialog)
+                c.zoneDialog = null
+            }
+            UiTestSupport.settle(rule)
+            rule.onNode(hasTestTag("hand-exile")).performClick()
+            UiTestSupport.settle(rule)
+            scenario.onActivity {
+                val c = it.tableController!!
+                assertEquals(c.localSeat to "Exile", c.zoneDialog)
+                c.zoneDialog = null
+                c.argentumAwaitingUpdate = true
+            }
+            UiTestSupport.settle(rule)
+            listOf("hand-pass", "hand-undo", "hand-actions", "hand-cast").forEach {
+                rule.onNode(hasTestTag(it)).assertIsNotEnabled()
+            }
+        } finally { scenario.close() }
     }
 }

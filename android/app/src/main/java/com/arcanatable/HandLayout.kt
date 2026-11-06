@@ -3,6 +3,7 @@ package com.arcanatable
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** How the hand tray arranges cards. Persisted by name in arcana_options. */
 enum class HandArrangement(val label: String, val detail: String) {
@@ -39,6 +40,22 @@ object HandLayout {
     const val GAP = 8f
     const val MIN_CARD_WIDTH = 64f
     const val BASE_MAX_CARD_WIDTH = 230f
+
+    /** Owner's 92 x 132 reference cards, four across at the 408dp reference width.
+     * Keep readable cards and scroll additional rows rather than shrinking a large hand.
+     * The explicit single-row preference still uses the original layout.
+     */
+    fun drawer(cardCount: Int, areaWidth: Float, areaHeight: Float,
+               arrangement: HandArrangement, sizeScale: Float = 1f): HandGrid {
+        if (arrangement == HandArrangement.SINGLE_ROW) return compute(cardCount, areaWidth, areaHeight, arrangement, sizeScale)
+        val width = areaWidth.coerceAtLeast(1f)
+        val target = 92f * sizeScale.coerceIn(.6f, 1.6f)
+        val columns = ((width + 4f) / (target + 4f)).roundToInt().coerceAtLeast(1)
+        val cardWidth = ((width - (columns - 1) * 4f) / columns).coerceAtLeast(1f)
+        val rows = if (cardCount <= 0) 0 else ceil(cardCount / columns.toFloat()).toInt()
+        val height = cardWidth * 132f / 92f
+        return HandGrid(columns, rows, cardWidth, height, rows * (height + 4f) - 4f > areaHeight)
+    }
 
     fun compute(
         cardCount: Int,
