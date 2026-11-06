@@ -1,5 +1,25 @@
 # Filter-land affordability reproduction (#51)
 
+## November 6 follow-up: source-only repair candidate
+
+Draft #1002 now includes `investigation/filter-land-51/filter-retry.patch` and a
+reproducible, opt-in test overlay runner. The default solver spent Plains on a
+white spell pip before reserving the seed for Skycloud's activation. A bounded
+fallback prefers the costed composite source after ordinary planning fails,
+retaining existing output and activation-cost validation.
+
+The expanded focused suite has ten tests. The unchanged runtime reproduces five
+failures / five passes; the candidate overlay passes all ten. The full
+custom-card suite with that overlay passes **468 tests, no failures/errors/skips**.
+The additional cases reject tapped seed/filter lands and a self-seeding lone
+filter, and verify reversed battlefield order through Deft Duelist resolution.
+All original assertions remain. Committed runtime jars are unchanged, so default
+tests still expose the defect; **this is not an installed app fix**.
+
+See `investigation/filter-land-51/README.md` for exact source/runtime provenance,
+commands and remaining full source-build/runtime-adoption/device review gates.
+The historical reproduction report below records the original seven-test run.
+
 Crayola, November 6, 2026. Development baseline: `01053b6024f748773e90eb63550094ef65688439`.
 
 `FilterLandAffordabilityTest` uses the actual shipped card library, engine jars,

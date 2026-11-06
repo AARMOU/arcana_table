@@ -75,4 +75,45 @@ class FilterLandAffordabilityTest {
             if (expected) assertNull(result.error) else assertNotNull(result.error)
         }
     }
+
+    @Test fun tappedSeedOrTappedFilterCannotFundTheSpell() {
+        for (tapSeed in listOf(true, false)) {
+            val b = board("Voice of Victory")
+            b.d.tapPermanent(if (tapSeed) b.plains else b.filter)
+            assertFalse(b.affordable())
+            assertNotNull(b.d.castSpell(b.d.player1, b.spell).error)
+            assertTrue(b.d.state.stack.isEmpty())
+            assertEquals(tapSeed, b.d.isTapped(b.plains))
+            assertEquals(!tapSeed, b.d.isTapped(b.filter))
+        }
+    }
+
+    @Test fun filterCannotUseItsOwnFutureOutputToPayItsActivation() {
+        val d = scenario("Skycloud Expanse", "Voice of Victory")
+        val filter = d.putPermanentOnBattlefield(d.player1, "Skycloud Expanse")
+        val spell = d.putCardInHand(d.player1, "Voice of Victory")
+        val affordable = LegalActionEnricher(d.services.manaSolver, d.cardRegistry)
+            .enrich(d.legalActions(d.player1), d.state, d.player1)
+            .singleOrNull { (it.action as? CastSpell)?.cardId == spell }?.isAffordable ?: false
+        assertFalse(affordable)
+        assertNotNull(d.castSpell(d.player1, spell).error)
+        assertFalse(d.isTapped(filter))
+        assertTrue(d.state.stack.isEmpty())
+    }
+
+    @Test fun directPaymentResolvesWithReversedBattlefieldInsertionOrder() {
+        val d = scenario("Skycloud Expanse", "Deft Duelist")
+        val filter = d.putPermanentOnBattlefield(d.player1, "Skycloud Expanse")
+        val plains = d.putPermanentOnBattlefield(d.player1, "Plains")
+        val spell = d.putCardInHand(d.player1, "Deft Duelist")
+        assertNull(d.castSpell(d.player1, spell).error)
+        assertTrue(d.isTapped(plains))
+        assertTrue(d.isTapped(filter))
+        d.resolveStack()
+        assertTrue(d.state.stack.isEmpty())
+        assertTrue(d.state.getBattlefield(d.player1).contains(spell))
+        assertEquals(0, d.manaPool(d.player1).white)
+        assertEquals(0, d.manaPool(d.player1).blue)
+    }
+
 }
