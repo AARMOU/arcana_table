@@ -1,0 +1,93 @@
+name: Arcana Development CI
+# Build 131 integration: exact-head checks after generated assets are committed.
+on:
+  push:
+    branches:
+      - gpt/arcana-integration-next
+  pull_request:
+    paths:
+      - android/custom-cards/**
+      - android/app/src/main/java/**
+      - tools/check_android_regex.py
+      - tools/tests/test_android_regex.py
+      - AGENTS.md
+      - android/app/src/main/java/com/arcanatable/DeckSupport.kt
+      - android/app/src/test/java/com/arcanatable/DeckSupportTest.kt
+      - android/app/src/main/assets/argentum/custom-cards.*
+      - .github/workflows/arcana-development-ci.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: arcana-development-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards-and-android:
+    runs-on: ubuntu-latest
+    # Fail stalled Android tests promptly; a hanging card PR must not block certification for 90 minutes.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject Android-incompatible regex patterns before build
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+          python3 tools/check_android_regex.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Regenerate custom-card assets
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run custom-card scenario tests and Build 131 Android unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      # Debug-only test scenarios (PR #110) must never ship: release compiles the empty
+      # src/release stub. Only this test runs in the release variant, because the Compose UI
+      # tests need the debug-only ui-test-manifest and can't launch there.
+      - name: Check release build has no debug test scenarios
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Check exported index consistency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('android/app/src/main/assets/argentum')
+          index=[x.split('\t')[0] for x in (root/'custom-cards.index.tsv').read_text().splitlines() if x.strip()]
+          data=[json.loads(x)['name'] for x in (root/'custom-cards.jsonl').read_text().splitlines() if x.strip()]
+          assert index==data, 'custom-card index differs from data'
+          assert len(index)==len({x.casefold() for x in index}), 'duplicate custom card names'
+          for name in ('Rise of the Eldrazi','Transmogrifying Wand',"Ulamog's Dreadsire"):
+              assert name in index, f'missing {name}'
+          print('PASS:',len(index),'custom card definitions, including three PR #59 cards')
+          PY
+      - name: Check formatting
+        run: git diff --check
+      - name: Commit regenerated card assets when changed
+        if: github.event_name == 'push' && github.ref == 'refs/heads/gpt/arcana-integration-next'
+        run: |
+          set -euo pipefail
+          git add android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Regenerate B131 integrated custom-card assets'
+            git push origin HEAD:gpt/arcana-integration-next
+          else
+            echo 'Card assets already match source definitions'
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-development-validation
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
+            android/app/src/main/assets/argentum/custom-cards.jsonl

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +35,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import android.graphics.drawable.ColorDrawable
 
 /**
  * Tap-and-hold card preview. Holding any card shows it large. Letting go without moving keeps it
@@ -84,7 +88,12 @@ fun CardZoomOverlay(zoom: CardZoomController) {
     val card = zoom.card ?: return
     val screen = LocalConfiguration.current
     val width = minOf(screen.screenWidthDp * 0.82f, screen.screenHeightDp * 0.6f, 380f).dp
-    Popup(alignment = Alignment.Center, onDismissRequest = { zoom.dismiss() }, properties = PopupProperties(focusable = true)) {
+    // A Dialog, not a Popup: a Popup is a sub-window of the activity, so it drew *behind* any open
+    // dialog (graveyard, library search, stack, log, opening hand…). A Dialog opened at hold time is
+    // the newest window, so the preview is on top of whatever screen the card was held in.
+    Dialog(onDismissRequest = { zoom.dismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { window?.setDimAmount(0f); window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT)) }
         Box(
             Modifier.fillMaxSize().background(Color(0xCC000000)).clickable { zoom.dismiss() }.testTag("card-zoom"),
             contentAlignment = Alignment.Center

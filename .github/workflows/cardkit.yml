@@ -1,0 +1,189 @@
+name: Arcana Cardkit
+# Agent card toolkit (tools/cardkit, docs/agents). Read-only: never commits, merges or dispatches.
+# - toolkit: unit tests, card PR rules, generated-doc freshness, Oracle cache refresh + readiness report (artifacts)
+# - scaffold: proves `cardkit newcard` output compiles on the real engine, fails its test, and cannot be registered
+on:
+  push:
+    branches:
+      - 'claude/agent-card-toolkit-**'
+  pull_request:
+    paths:
+      - tools/cardkit/**
+      - docs/agents/**
+      - AGENTS.md
+      - .github/copilot-instructions.md
+      - android/custom-cards/**
+      - android/app/libs/argentum-*.jar
+      - investigation/argentum-six-precons/**
+      - .github/workflows/cardkit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-cardkit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  toolkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # a PR's merge commit and its base parent, for the finished-card rule
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Unit tests (real card definitions, registry, assets, SDK index)
+        run: python3 -m unittest discover -s tools/cardkit/tests -v
+      - name: Card PR rules
+        run: |
+          # a PR's own card files must be finished and registered; a red check routes the repair back to the
+          # PR's agent (failure routing) instead of reaching the owner's Verify unfinished
+          finished=()
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            mapfile -t finished < <(git diff --name-only --diff-filter=AM HEAD^1 HEAD -- \
+              'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/*.kt')
+          fi
+          echo "PR card files: ${finished[*]:-none}"
+          tools/cardkit/cardkit check --finished "${finished[@]}"
+      - name: Generated docs are current
+        run: |
+          tools/cardkit/cardkit sdk-index --check
+          tools/cardkit/cardkit patterns --check
+          tools/cardkit/cardkit docs-check
+      - name: Existing coverage audit still runs unchanged
+        run: python3 investigation/argentum-six-precons/coverage-audit.py
+      - name: Refresh Oracle cache for missing precon cards (Scryfall)
+        id: oracle
+        continue-on-error: true
+        run: tools/cardkit/cardkit oracle fetch --missing-only
+      - name: Readiness report for the six precons (with verified open-PR claims)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p cardkit-out
+          tools/cardkit/cardkit gaps --claims-from-github --json-output cardkit-out/gaps.json --markdown-output cardkit-out/gaps.md
+          cp tools/cardkit/data/oracle-cache.jsonl cardkit-out/ 2>/dev/null || true
+          git diff --stat -- tools/cardkit/data/oracle-cache.jsonl
+          {
+            echo '## Six-precon readiness'
+            tail -n +1 cardkit-out/gaps.md | head -40
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY'
+          import json
+          r = json.load(open('cardkit-out/gaps.json'))
+          t = r['totals']
+          print(f"::notice title=cardkit readiness::implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
+                f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}; routes "
+                + ", ".join(f"{k} {len(v)}" for k, v in r['dispatch'].items() if not isinstance(v, bool)) + f"; dispatchable {r['dispatch']['dispatchable']}")
+          for d in r['decks']:
+              print(f"::notice title={d['name']}::playable {d['playableSlots']}/{d['slots']}, supported {d['SUPPORTED']}, "
+                    f"review {d['NEEDS_REVIEW']}, blocked {d['ENGINE_BLOCKED']} (slots)")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cardkit-readiness
+          retention-days: 14
+          path: cardkit-out/
+
+  # Only on pushes to the toolkit's own claude/ branch: commit the refreshed Oracle cache so agents whose
+  # sandboxes cannot reach Scryfall still get exact card records. Never runs for PRs or other branches.
+  publish-oracle-cache:
+    needs: toolkit
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claude/agent-card-toolkit-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cardkit-readiness
+          path: cardkit-out
+      - name: Commit Oracle cache when it changed
+        run: |
+          set -eu
+          [ -f cardkit-out/oracle-cache.jsonl ] || { echo "no cache produced"; exit 0; }
+          cp cardkit-out/oracle-cache.jsonl tools/cardkit/data/oracle-cache.jsonl
+          git add tools/cardkit/data/oracle-cache.jsonl
+          if git diff --cached --quiet; then echo "Oracle cache unchanged"; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "data(cardkit): refresh Oracle cache from Scryfall ($(wc -l < tools/cardkit/data/oracle-cache.jsonl) cards)"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
+
+  scaffold:
+    needs: toolkit
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cardkit-readiness
+          path: cardkit-out
+      - name: Pick representative cards (one SUPPORTED, one not) from the readiness report
+        id: pick
+        run: |
+          cp cardkit-out/oracle-cache.jsonl tools/cardkit/data/oracle-cache.jsonl 2>/dev/null || true
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          r = json.load(open('cardkit-out/gaps.json'))
+          missing = [c for c in r['cards'] if c['readiness'] != 'IMPLEMENTED_AND_TESTED' and c.get('oracle')]
+          sup = [c['name'] for c in missing if c['readiness'] == 'SUPPORTED']
+          other = [c['name'] for c in missing if c['readiness'] != 'SUPPORTED']
+          print('supported=' + (sup[0] if sup else ''))
+          print('other=' + (other[0] if other else ''))
+          PY
+          cat "$GITHUB_OUTPUT"
+          echo "::notice title=scaffold picks::$(tr '\n' ' ' < "$GITHUB_OUTPUT")"
+      - name: Scaffold them
+        run: |
+          set -eu
+          for name in "${{ steps.pick.outputs.supported }}" "${{ steps.pick.outputs.other }}"; do
+            [ -n "$name" ] || continue
+            tools/cardkit/cardkit classify "$name" -v
+            tools/cardkit/cardkit newcard "$name" --offline
+          done
+          git status --short
+      - name: Scaffolds compile against the committed engine
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:compileTestKotlin
+          echo "::notice title=scaffold compile::generated scaffolds compile against the committed engine jars"
+      - name: Scaffold tests fail on purpose (scaffolding is not implementation)
+        working-directory: android
+        run: |
+          set +e
+          tests=$(git status --porcelain -- custom-cards/src/test | awk '{print $2}' | xargs -n1 basename | sed 's/\.kt$//' | tr '\n' ' ')
+          if [ -z "$tests" ]; then
+            if [ -n "${{ steps.pick.outputs.supported }}${{ steps.pick.outputs.other }}" ]; then echo "::error::cards were picked but no scaffold test was generated"; exit 1; fi
+            echo "::warning::no missing card with a cached Oracle record to scaffold"; exit 0
+          fi
+          args=""; for t in $tests; do args="$args --tests com.arcanatable.customcards.$t"; done
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test $args
+          code=$?
+          [ $code -ne 0 ] && echo "::notice title=scaffold tests::failed as designed ($tests)" || { echo "::error::a scaffold test passed"; exit 1; }
+      - name: cardkit check allows unregistered scaffolds and rejects registered ones
+        run: |
+          set -eu
+          tools/cardkit/cardkit check
+          val=$(git status --porcelain -- android/custom-cards/src/main | awk '{print $2}' | head -1 | xargs -r basename | sed 's/\.kt$//')
+          [ -n "$val" ] || exit 0
+          sed -i "s|^    val entries: List<Entry> = listOf(|&\n        Entry($val, \"TST\", \"cardkit-ci\"),|" android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt
+          if tools/cardkit/cardkit check; then echo "FAIL: registered scaffold accepted"; exit 1; fi
+          echo "::notice title=cardkit check::registered scaffold $val rejected as designed"

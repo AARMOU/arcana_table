@@ -1,0 +1,9 @@
+{
+  "keep_deleted": [
+    {
+      "path": "rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt",
+      "patch": "0011-stack-object-copying.patch",
+      "why": "Replaced by CopyStackObjectsExecutor, which hands each spell to CopyTargetSpellExecutor; upstream's copy-count replacement (Twinning Staff, #3663) lives there too, so it still applies."
+    }
+  ]
+}

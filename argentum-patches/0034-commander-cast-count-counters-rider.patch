@@ -1,0 +1,412 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0034-commander-cast-count-counters-rider
+
+---
+ docs/card-sdk-language-reference.md           |  16 +-
+ docs/sdk-index.md                             |   1 +
+ .../kotlin/com/wingedsheep/sdk/dsl/Effects.kt |   8 +-
+ .../sdk/scripting/effects/ManaSpellRider.kt   |  31 +++
+ .../test/resources/sdk-surface-baseline.txt   |   1 +
+ .../handlers/actions/spell/CastTriggers.kt    |  21 ++
+ .../CommanderCastCountCountersRiderTest.kt    | 216 ++++++++++++++++++
+ 7 files changed, 290 insertions(+), 4 deletions(-)
+ create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
+
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index e3fc412482..1358f067ec 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -2993,7 +2993,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
+   colors; sugar for `ManaColorSet.AmongLinkedExiledCards`). Pit of Offerings ("any of the exiled
+   cards' colors"). Pair with a `MoveToZoneEffect(linkToSource = true)` that records the exiled pile.
+ - `AddManaOfColorLandsCouldProduce(scope, restriction?, landFilter?)` — sugar for `AddManaOfChoice(ManaColorSet.LandsCouldProduce(scope, landFilter))`. Fellwar Stone / Exotic Orchard shape; `landFilter` narrows the lands read (Plaza of Harmony: `landFilter = GameObjectFilter.Land.withSubtype("Gate")`). Colors only — "any **type**" (Reflecting Pool, Naga Vitalist) adds a gated `{C}` ability, see `.couldProduceColorlessMana()`.
+-- `AddManaOfColorInCommanderColorIdentity()` — sugar for `AddManaOfChoice(ManaColorSet.CommanderIdentity)`. Arcane Signet / Command Tower shape.
++- `AddManaOfColorInCommanderColorIdentity(restriction?, riders?)` — sugar for `AddManaOfChoice(ManaColorSet.CommanderIdentity, restriction = …, riders = …)`. Arcane Signet / Command Tower shape; Opal Palace passes `riders = setOf(ManaSpellRider.CommanderEntersWithCastCountCounters())`.
+ - `AddAnyColorManaSpendOnChosenType(amount?, creatureOnly?, riders?)` — sugar for `AddManaOfChoice(ManaColorSet.AnyColor, restriction = ManaRestriction.OfChosenType(creatureOnly), riders)`: any-color mana spendable only on spells (and, unless `creatureOnly`, abilities) of the source's chosen creature type. Secluded Courtyard, Eclipsed Realms (default); Cavern of Souls (`creatureOnly = true, riders = setOf(MakesSpellUncounterable())`).
+ - `AddDynamicMana(amount, allowedColors, restriction?)` — split X across a fixed color set, distinct from `AddManaOfChoice` because it distributes the full X total across multiple colors rather than producing X copies of one chosen color.
+ - `AddManaInAnyCombination(amount, allowedColors?, restriction?, expiry?)` — "Add N mana in any combination of colors" (Wizard's Rockets, Thornvault Forager, Interdimensional Web Watch). Sugar for `AddDynamicMana`; `allowedColors` defaults to all five. `expiry` (`AddDynamicManaEffect.expiry`) is the `ManaExpiry` as on `AddMana` — Klauth, Unrivaled Ancient's "add X mana in any combination of colors … Until end of turn, you don't lose this mana as steps and phases end" is `AddManaInAnyCombination(totalAttackingPower, restriction = ManaRestriction.SpellsOnly, expiry = ManaExpiry.KEPT_UNTIL_END_OF_TURN)`; every pip, whichever split path colors it, carries the expiry. The controller colors **each** pip independently at resolution (3+ colors → pip-by-pip color choice; 2 colors → one "how much of the first" prompt; ≤0 → no mana, no prompt), so the result can mix colors — distinct from `AddAnyColorMana`, where all N share one color. For "any combination of **its** colors" (a looked-at card), repeat `AddManaOfChoice(ManaColorSet.ColorsOf(…))` N times.
+@@ -18623,6 +18623,20 @@ the rider twice (Pyromancer's Goggles: "That many copies will be created").
+   zone, a copy owes none, and each rider-carrying mana spent owes its own `count`. For the *triggered* wording —
+   "When you spend this mana to cast …, it enters with an additional +1/+1 counter" (Jade Orb of Dragonkind) —
+   use `TriggersWhenSpent` with `AddCounters(…, TriggeringEntity)` instead.
++- `ManaSpellRider.CommanderEntersWithCastCountCounters(counterType = CounterType.PLUS_ONE_PLUS_ONE)` —
++  Opal Palace: "If you spend this mana to cast your commander, it enters with a number of additional
++  +1/+1 counters on it equal to the number of times it's been cast from the command zone this game."
++  On consumption, if the spell is one of the **caster's own** commanders (its `CommanderComponent`
++  owner is the caster), owes the spell that commander's **own** `castsFromCommandZone` counters
++  (`SpellOnStackComponent.additionalEntryCounters`, placed as the permanent enters, CR 122.6) — never
++  a sum over a partner pair (contrast `DynamicAmount.CommanderCastsFromCommandZone`). Riders apply
++  after the cast is recorded, so a command-zone cast counts itself (ruling 2020-11-10: the first
++  command-zone cast gets one counter), a countered earlier cast still counted, and a cast from hand or
++  graveyard reads the count without adding to it. Provenance is the rider's: a commander cast with
++  other mana, or this mana spent on a noncommander, gets nothing; each rider-carrying mana spent adds
++  its own counters (Mana Reflection ruling). Attach to the mana ability:
++  `Effects.AddManaOfColorInCommanderColorIdentity(riders = setOf(ManaSpellRider.CommanderEntersWithCastCountCounters()))`
++  (or `AddManaOfChoice(ManaColorSet.CommanderIdentity, riders = …)`).
+ 
+ ### `ManaExpiry`<a id="manaexpiry"></a>
+ 
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 6f845ccb26..de3af7ceb6 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1450,6 +1450,7 @@ Families:
+ 
+ ## ManaSpellRider
+ 
++- `ManaSpellRider.CommanderEntersWithCastCountCounters(counterType: CounterType)` — If this mana is spent to cast your commander, it enters with additional counters equal to the number of times that commander has been cast from the command zone this game.
+ - `ManaSpellRider.EntersWithCountersWhenSpent(spellFilter: GameObjectFilter, counterType: CounterType, count: Int)` — "If that mana is spent on a spellFilter spell, that creature enters with count additional counterType counter(s) on it." (Guildmages' Forum, with `spellFilter = GameObjectFilter.Creature and GameOb…
+ - `ManaSpellRider.GrantsKeywordWhenSpent(keyword: String, spellFilter: GameObjectFilter, duration: Duration)` — "If that mana is spent on a spellFilter spell, it gains keyword until end of turn." (Carnelian Orb of Dragonkind, with `spellFilter = GameObjectFilter.Creature.withSubtype("Dragon")` and `keyword =…
+ - `ManaSpellRider.MakesSpellUncounterable(spellFilter: GameObjectFilter)` — "That spell can't be countered." (Cavern of Souls, with the default spellFilter.) "If that mana is spent on an instant or sorcery spell, that spell can't be countered." (Boseiju, Who Shelters All,…
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+index 5f896e21c8..58ce6d34d8 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+@@ -3386,11 +3386,13 @@ object Effects {
+     /**
+      * Add one mana of any color in your commander's color identity. Used by Arcane Signet
+      * and Command Tower. Sugar for
+-     * `AddManaOfChoice(ManaColorSet.CommanderIdentity)`.
++     * `AddManaOfChoice(ManaColorSet.CommanderIdentity)`. [riders] attach side-effects to the spell
++     * this mana pays for (Opal Palace's `ManaSpellRider.CommanderEntersWithCastCountCounters`).
+      */
+     fun AddManaOfColorInCommanderColorIdentity(
+-        restriction: ManaRestriction? = null
+-    ): Effect = AddManaOfChoiceEffect(ManaColorSet.CommanderIdentity, DynamicAmount.Fixed(1), restriction)
++        restriction: ManaRestriction? = null,
++        riders: Set<ManaSpellRider> = emptySet(),
++    ): Effect = AddManaOfChoiceEffect(ManaColorSet.CommanderIdentity, DynamicAmount.Fixed(1), restriction, riders)
+ 
+     // =========================================================================
+     // Token Effects
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
+index 771226f066..099982382d 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt
+@@ -185,6 +185,37 @@ sealed interface ManaSpellRider {
+                 (if (count == 1) "an additional ${counterType.printed} counter" else "$count additional ${counterType.printed} counters") +
+                 " on it"
+     }
++
++    /**
++     * If this mana is spent to cast your commander, it enters with additional counters equal to the
++     * number of times that commander has been cast from the command zone this game. Opal Palace:
++     * "If you spend this mana to cast your commander, it enters with a number of additional +1/+1
++     * counters on it equal to the number of times it's been cast from the command zone this game."
++     *
++     * On consumption the cast pipeline checks that the spell is one of the mana spender's own
++     * commanders (its `CommanderComponent` is owned by the caster) and reads **that** commander's
++     * own command-zone cast count — not a sum over a partner pair. The count is read after the cast
++     * is recorded, so it includes the cast in progress when the spell comes from the command zone
++     * (Opal Palace ruling 2020-11-10: the first command-zone cast gets one counter); a cast from any
++     * other zone doesn't add to it, and a countered earlier cast still counted. The counters are owed
++     * to the spell and placed as the permanent enters, so a spell that never resolves carries
++     * nothing. A noncommander spell, or a commander cast with other mana, gets nothing.
++     *
++     * Each rider-carrying mana spent adds its own counters: two such mana spent on one commander
++     * spell give twice the count (Opal Palace ruling 2020-11-10, Mana Reflection).
++     *
++     * @property counterType The kind of counter placed; +1/+1 for Opal Palace.
++     */
++    @SerialName("CommanderEntersWithCastCountCounters")
++    @Serializable
++    data class CommanderEntersWithCastCountCounters(
++        val counterType: CounterType = CounterType.PLUS_ONE_PLUS_ONE,
++    ) : ManaSpellRider {
++        override val description: String =
++            "If you spend this mana to cast your commander, it enters with a number of additional " +
++                "${counterType.printed} counters on it equal to the number of times it's been cast " +
++                "from the command zone this game"
++    }
+ }
+ 
+ /** "an instant or sorcery", "a creature" — the article a rider description puts before a filter. */
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 3dc2962b2f..ef5bb0bdab 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1747,6 +1747,7 @@ ManaRestriction.DevoidSpellsOnly — ManaRestriction — Corrupted Crossroads
+ ManaRestriction.ForetellOnly — ManaRestriction — Karfell Harbinger — ManaRestriction.UnlockDoorOnly, ManaRestriction.TurnPermanentsFaceUpOnly — each whitelists one special action's payment and is a shipped data object on the wire, so none can take another action as an axis; foretelling is its own special action (CR 702.143b), and casting the foretold card later is a spell cast that SpellsWithKeywordOnly covers
+ ManaRestriction.OfChosenType — ManaRestriction — The Ringhart Crest (Kolvori, God of Kinship) — ManaRestriction.SubtypeSpellsOrAbilitiesOnly, ManaRestriction.SubtypeSpellsOnly — both carry a fixed subtype baked into the pool entry; "the chosen type" is unknown until the producing source is known, and a sentinel subtype string would collide with a printed one, so this is the unbound template the engine binds to SubtypeSpellsOrAbilitiesOnly as the mana is made (it subsumes the deleted AddAnyColorManaSpendOnChosenTypeEffect)
+ ManaRestriction.SpellsWithKeywordOnly — ManaRestriction — Niko Defies Destiny — ManaRestriction.KickedSpellsOnly, ManaRestriction.SubtypeSpellsOnly — KickedSpellsOnly asks whether the kicker cost was paid, not whether the card has a keyword; SubtypeSpellsOnly reads type-line subtypes, and a keyword is not a subtype
++ManaSpellRider.CommanderEntersWithCastCountCounters — ManaSpellRider — Opal Palace — ManaSpellRider.ScryOnSharedTypeWithCommander, ManaSpellRider.TriggersWhenSpent — ScryOnSharedTypeWithCommander bakes in scry and a creature-type test, and TriggersWhenSpent filters by GameObjectFilter, which can't say "this caster's own commander" nor read that commander's own command-zone cast count at cast time; the counters are owed to the spell, not a trigger
+ ManaSpellRider.EntersWithCountersWhenSpent — ManaSpellRider — Guildmages' Forum — ManaSpellRider.GrantsKeywordWhenSpent, ManaSpellRider.TriggersWhenSpent — GrantsKeywordWhenSpent freezes a keyword, not counters, onto the spell; TriggersWhenSpent with AddCounters is the triggered reading (Jade Orb's "When you spend this mana"), which queues a respondable ability above the spell, while "If that mana is spent …" owes the counters at payment with nothing on the stack
+ ManaSpellRider.TriggersWhenSpent — ManaSpellRider — Scaled Nurturer — ManaSpellRider.ScryOnSharedTypeWithCommander, ManaSpellRider.GrantsKeywordWhenSpent — the first bakes in both its effect (scry) and a commander-relative test no GameObjectFilter expresses, the second is a continuous grant that queues nothing; this is the arbitrary-effect delayed trigger, and it subsumes the deleted CopySpellWhenSpent (Pyromancer's Goggles migrated to it with a copy effect)
+ MarkMustAttackEffect — Effect — Sizzling Soloist — MarkMustAttackThisTurnEffect (renamed into this), MarkMustBlockThisTurnEffect — renames MarkMustAttackThisTurnEffect and gives it a window axis (this turn / its controller's next combat phase), no net new type; the blocking mirror is a floating effect with its own blocker-side semantics and no cross-turn window
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
+index 8539326b83..9318bb69bb 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
+@@ -9,17 +9,20 @@ import com.wingedsheep.engine.event.TriggerContext
+ import com.wingedsheep.engine.handlers.ObjectReferenceEnvironment
+ import com.wingedsheep.engine.handlers.PredicateContext
+ import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.handlers.effects.EntersWithReplacements
+ import com.wingedsheep.engine.mechanics.mana.GrantedKeywordResolver
+ import com.wingedsheep.engine.mechanics.stack.StackResolver
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.engine.state.components.identity.CantBeCounteredComponent
+ import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
+ import com.wingedsheep.engine.state.components.identity.CommanderRegistryComponent
+ import com.wingedsheep.engine.state.components.player.GrantedSpellKeywordsComponent
+ import com.wingedsheep.engine.state.components.stack.AdditionalEntryCounters
+ import com.wingedsheep.engine.state.components.stack.EntryKeywordGrant
+ import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
+ import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
++import com.wingedsheep.sdk.core.CounterType
+ import com.wingedsheep.sdk.core.Keyword
+ import com.wingedsheep.sdk.core.Zone
+ import com.wingedsheep.sdk.dsl.Effects
+@@ -241,8 +244,26 @@ internal class CastTriggers(
+                 grantKeywordWhenSpent(state, spell, rider.keyword, rider.spellFilter, rider.duration) to emptyList()
+             is ManaSpellRider.EntersWithCountersWhenSpent ->
+                 oweEntryCountersWhenSpent(state, spell, rider) to emptyList()
++            is ManaSpellRider.CommanderEntersWithCastCountCounters ->
++                commanderCastCountCounters(state, spell, rider.counterType) to emptyList()
+         }
+ 
++    /**
++     * Opal Palace's rider: if the spell is one of the caster's own commanders, owe it as many
++     * [counterType] counters as **that** commander's own `castsFromCommandZone` (never a sum over a
++     * partner pair). Riders are applied after the cast is recorded, so a cast from the command zone
++     * already counts itself (Opal Palace ruling 2020-11-10); a cast from another zone adds nothing to
++     * the count but still reads it. The counters ride on the spell
++     * ([EntersWithReplacements.oweToSpell]) and are placed as the permanent enters, so a spell that
++     * never resolves carries nothing. Otherwise a no-op (the mana paid for something else).
++     */
++    private fun commanderCastCountCounters(state: GameState, spell: CastSpellOnStack, counterType: CounterType): GameState {
++        val action = spell.action
++        val commander = state.getEntity(action.cardId)?.get<CommanderComponent>() ?: return state
++        if (commander.ownerId != action.playerId) return state
++        return EntersWithReplacements.oweToSpell(state, action.cardId, counterType, commander.castsFromCommandZone) ?: state
++    }
++
+     private fun spellMatches(state: GameState, action: CastSpell, filter: GameObjectFilter): Boolean =
+         predicateEvaluator.matches(state, state.projectedState, action.cardId, filter, PredicateContext(controllerId = action.playerId))
+ 
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
+new file mode 100644
+index 0000000000..9138394bb9
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastCountCountersRiderTest.kt
+@@ -0,0 +1,216 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.ActivateAbility
++import com.wingedsheep.engine.state.ZoneKey
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
++import com.wingedsheep.engine.state.components.player.ManaPoolComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.CounterType
++import com.wingedsheep.sdk.core.Format
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Subtype
++import com.wingedsheep.sdk.core.Supertype
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.dsl.card
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.AbilityCost
++import com.wingedsheep.sdk.scripting.KeywordAbility
++import com.wingedsheep.sdk.scripting.TimingRule
++import com.wingedsheep.sdk.scripting.effects.AddManaOfChoiceEffect
++import com.wingedsheep.sdk.scripting.effects.ManaSpellRider
++import com.wingedsheep.sdk.scripting.values.DynamicAmount
++import com.wingedsheep.sdk.scripting.values.ManaColorSet
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.collections.shouldContain
++import io.kotest.matchers.nulls.shouldBeNull
++import io.kotest.matchers.shouldBe
++
++/**
++ * `ManaSpellRider.CommanderEntersWithCastCountCounters` — Opal Palace's "If you spend this mana to
++ * cast your commander, it enters with a number of additional +1/+1 counters on it equal to the
++ * number of times it's been cast from the command zone this game."
++ *
++ * Pins: the count is the cast commander's **own** (never a partner-pair sum); it includes the cast in
++ * progress (ruling 2020-11-10); provenance — only rider mana actually spent on that commander spell
++ * counts; each rider mana spent adds its own counters (ruling 2020-11-10, Mana Reflection); a cast
++ * from hand reads the count without adding to it.
++ */
++class CommanderCastCountCountersRiderTest : FunSpec({
++
++    val rider = ManaSpellRider.CommanderEntersWithCastCountCounters()
++
++    val whitePartner = CardDefinition.creature(
++        name = "Rider Test White Partner",
++        manaCost = ManaCost.parse("{1}{W}"),
++        subtypes = setOf(Subtype("Human")),
++        power = 2,
++        toughness = 2,
++        supertypes = setOf(Supertype.LEGENDARY),
++        oracleText = "Partner",
++    ).copy(keywordAbilities = listOf(KeywordAbility.partner()))
++
++    val bluePartner = CardDefinition.creature(
++        name = "Rider Test Blue Partner",
++        manaCost = ManaCost.parse("{U}"),
++        subtypes = setOf(Subtype("Wizard")),
++        power = 1,
++        toughness = 1,
++        supertypes = setOf(Supertype.LEGENDARY),
++        oracleText = "Partner",
++    ).copy(keywordAbilities = listOf(KeywordAbility.partner()))
++
++    val squire = CardDefinition.creature(
++        name = "Rider Test Squire",
++        manaCost = ManaCost.parse("{1}{W}"),
++        subtypes = setOf(Subtype("Human")),
++        power = 1,
++        toughness = 1,
++    )
++
++    val palace = card("Rider Test Palace") {
++        typeLine = "Land"
++        activatedAbility {
++            cost = AbilityCost.Tap
++            effect = Effects.AddManaOfColorInCommanderColorIdentity(riders = setOf(rider))
++            manaAbility = true
++            timing = TimingRule.ManaAbility
++        }
++    }
++
++    val twinPalace = card("Rider Test Twin Palace") {
++        typeLine = "Land"
++        activatedAbility {
++            cost = AbilityCost.Tap
++            effect = AddManaOfChoiceEffect(ManaColorSet.CommanderIdentity, DynamicAmount.Fixed(2), riders = setOf(rider))
++            manaAbility = true
++            timing = TimingRule.ManaAbility
++        }
++    }
++
++    fun game(): Pair<GameTestDriver, EntityId> {
++        val driver = GameTestDriver()
++        driver.registerCards(listOf(whitePartner, bluePartner, squire, palace, twinPalace))
++        val players = driver.initMultiplayer(
++            decks = listOf(Deck(cards = List(98) { squire.name }), Deck(cards = List(99) { squire.name })),
++            format = Format.Commander(alwaysDivertToCommand = true),
++            commanders = listOf(whitePartner.name, whitePartner.name),
++            partners = listOf(bluePartner.name, null),
++            skipMulligans = true,
++            startingPlayer = 0,
++        )
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return driver to players[0]
++    }
++
++    fun GameTestDriver.commander(owner: EntityId, name: String): EntityId =
++        state.getZone(ZoneKey(owner, Zone.COMMAND)).single { state.getEntity(it)?.get<CardComponent>()?.name == name }
++
++    fun GameTestDriver.setCasts(id: EntityId, casts: Int) = replaceState(
++        state.updateEntity(id) { c -> c.with(c.get<CommanderComponent>()!!.copy(castsFromCommandZone = casts)) }
++    )
++
++    fun GameTestDriver.tapFor(player: EntityId, land: CardDefinition, color: Color) {
++        val id = putPermanentOnBattlefield(player, land.name)
++        val ability = cardRegistry.requireCard(land.name).script.activatedAbilities.single()
++        submit(ActivateAbility(player, id, ability.id, manaColorChoice = color)).error.shouldBeNull()
++    }
++
++    fun GameTestDriver.plusOnes(id: EntityId): Int =
++        state.getEntity(id)?.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0
++
++    fun GameTestDriver.riderManaFloating(player: EntityId): Int =
++        state.getEntity(player)!!.get<ManaPoolComponent>()!!.restrictedMana.count { rider in it.riders }
++
++    fun GameTestDriver.resolveTop() {
++        bothPass()
++        state.stack.size shouldBe 0
++    }
++
++    test("rider mana on a commander's first command-zone cast: the cast counts itself, one counter") {
++        val (d, p) = game()
++        val white = d.commander(p, whitePartner.name)
++        d.tapFor(p, palace, Color.WHITE)
++        d.giveColorlessMana(p, 1)
++        d.castSpell(p, white).error.shouldBeNull()
++        d.riderManaFloating(p) shouldBe 0
++        d.resolveTop()
++        d.state.getZone(ZoneKey(p, Zone.BATTLEFIELD)) shouldContain white
++        d.plusOnes(white) shouldBe 1
++    }
++
++    test("the count is the cast commander's own, never the partner pair's sum") {
++        val (d, p) = game()
++        val white = d.commander(p, whitePartner.name)
++        val blue = d.commander(p, bluePartner.name)
++        d.setCasts(blue, 2)
++        d.tapFor(p, palace, Color.WHITE)
++        d.giveColorlessMana(p, 1)
++        d.castSpell(p, white).error.shouldBeNull()
++        d.resolveTop()
++        d.plusOnes(white) shouldBe 1
++
++        d.setCasts(white, 4)
++        d.tapFor(p, palace, Color.BLUE)
++        d.giveColorlessMana(p, 4) // commander tax for two earlier casts
++        d.castSpell(p, blue).error.shouldBeNull()
++        d.resolveTop()
++        d.plusOnes(blue) shouldBe 3 // blue's third command-zone cast; white's casts are not added
++    }
++
++    test("a commander cast with other mana gets nothing while rider mana floats unspent") {
++        val (d, p) = game()
++        val blue = d.commander(p, bluePartner.name)
++        d.tapFor(p, palace, Color.WHITE) // can't pay {U}
++        d.giveMana(p, Color.BLUE, 1)
++        d.castSpell(p, blue).error.shouldBeNull()
++        d.riderManaFloating(p) shouldBe 1
++        d.resolveTop()
++        d.plusOnes(blue) shouldBe 0
++    }
++
++    test("rider mana spent on a noncommander spell does nothing") {
++        val (d, p) = game()
++        val squireCard = d.putCardInHand(p, squire.name)
++        d.tapFor(p, palace, Color.WHITE)
++        d.giveColorlessMana(p, 1)
++        d.castSpell(p, squireCard).error.shouldBeNull()
++        d.riderManaFloating(p) shouldBe 0
++        d.resolveTop()
++        d.plusOnes(squireCard) shouldBe 0
++    }
++
++    test("each rider mana spent adds its own counters (two mana: twice the count)") {
++        val (d, p) = game()
++        val white = d.commander(p, whitePartner.name)
++        d.setCasts(white, 1)
++        d.tapFor(p, twinPalace, Color.WHITE)
++        d.riderManaFloating(p) shouldBe 2
++        d.giveColorlessMana(p, 2) // commander tax
++        d.castSpell(p, white).error.shouldBeNull()
++        d.riderManaFloating(p) shouldBe 0
++        d.resolveTop()
++        d.plusOnes(white) shouldBe 4 // second command-zone cast, two rider mana
++    }
++
++    test("a cast from hand reads the command-zone count without adding to it") {
++        val (d, p) = game()
++        val white = d.commander(p, whitePartner.name)
++        d.setCasts(white, 1)
++        d.replaceState(
++            d.state.removeFromZone(ZoneKey(p, Zone.COMMAND), white).addToZone(ZoneKey(p, Zone.HAND), white)
++        )
++        d.tapFor(p, palace, Color.WHITE)
++        d.giveColorlessMana(p, 1)
++        d.castSpell(p, white).error.shouldBeNull()
++        d.state.getEntity(white)!!.get<CommanderComponent>()!!.castsFromCommandZone shouldBe 1
++        d.resolveTop()
++        d.plusOnes(white) shouldBe 1
++    }
++})

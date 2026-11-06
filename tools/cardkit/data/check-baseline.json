@@ -1,0 +1,5 @@
+{
+  "_about": "Pre-existing exceptions when cardkit check was introduced. Do not add to these lists; fix the card instead.",
+  "untested": [],
+  "unregistered": []
+}

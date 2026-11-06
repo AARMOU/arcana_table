@@ -49,7 +49,12 @@ private val PrimalWellspring = card("Primal Wellspring") {
         cost = Costs.Tap
         manaAbility = true
         effect = Effects.AddManaOfChoice(
-            riders = setOf(ManaSpellRider.CopySpellWhenSpent(GameObjectFilter.InstantOrSorcery)),
+            // Upstream replaced CopySpellWhenSpent with the general TriggersWhenSpent rider (#3746);
+            // a copy of the triggering spell is the same behavior (Pyromancer's Goggles migrated identically).
+            riders = setOf(ManaSpellRider.TriggersWhenSpent(
+                GameObjectFilter.InstantOrSorcery,
+                Effects.CopyTargetSpell(EffectTarget.TriggeringEntity),
+            )),
         )
     }
     metadata {
