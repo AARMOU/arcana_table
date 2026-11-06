@@ -72,11 +72,6 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Gemstone Caverns": {
-      "reason": "starting-hand / game-start replacement effect",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Tippy-Toe, Terrific Partner": {
       "reason": "token-copy replacement behavior",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",

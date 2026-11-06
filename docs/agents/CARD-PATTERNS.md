@@ -425,3 +425,13 @@ What a reviewer rejects:
 - History of omissions and the few legacy approximations (do **not** add new ones):
   [`android/docs/CUSTOM_CARDS_HANDOFF.md`](../../android/docs/CUSTOM_CARDS_HANDOFF.md).
 - Engine primitive work is Claude's lane and tracked in issue #141.
+
+### Opening-hand actions ("if this card is in your opening hand, you may begin the game …")
+
+`mayBeginGameOnBattlefield(onlyIf, counters, then)` (and `RevealFromOpeningHandDsl` for the
+Chancellor-style reveals) runs in the engine's pregame phase, after every player keeps and before the
+first turn. The app's offline host runs that phase (`skipMulligans = false`), so these cards need no
+Arcana code. Argentum's Gemstone Caverns is the reference (`onlyIf = Conditions.IsNotYourTurn` is "you're
+not the starting player"; `then` is the "if you do" rider). Test them the way `GemstoneCavernsScenarioTest`
+does: `initGame(..., skipMulligans = false)`, deal the card into the opening hand, `KeepHand` for every
+seat, then answer the pregame `YesNoDecision`.
