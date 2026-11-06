@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 10:41:44 -0700
+Subject: [PATCH] arcana: 0042-announced-draw-replaced-whole
+
+A ReplaceDrawWith that matches the draw announcement (EventPattern.
+DrawCardsEvent: 'if a player would draw N or more cards, instead ...')
+replaces the whole draw instruction (CR 614.1a, 121.2a). Previously the
+announcement path reused the per-card shape and still drew N-1 cards
+afterwards. No printed card used this shape before; Alms Collector
+('If an opponent would draw two or more cards, instead you and that
+player each draw a card') is the first.
+---
+ .../handlers/effects/drawing/DrawReplacementDispatcher.kt  | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/drawing/DrawReplacementDispatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/drawing/DrawReplacementDispatcher.kt
+index 7b6fefbdff..0496c2f0df 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/drawing/DrawReplacementDispatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/drawing/DrawReplacementDispatcher.kt
+@@ -198,12 +198,17 @@ class DrawReplacementDispatcher(
+                         }
+                     }
+                     is ReplacementOutcome.Replaced -> {
++                        // An announcement-level replacement ("if an opponent would draw two or
++                        // more cards, instead …" — Alms Collector) replaces the whole draw
++                        // instruction (CR 614.1a, 121.2a): none of the announced cards are drawn
++                        // afterwards, unlike a per-card DrawEvent replacement, which replaces one
++                        // card and lets the rest of the instruction continue.
+                         val ctx = processorResult.executionContext
+                         if (ctx != null) {
+                             return executeReplacement(
+                                 processorResult.state, playerId,
+                                 outcome.newEffect, ctx,
+-                                totalCount - 1, isDrawStep,
++                                0, isDrawStep,
+                                 processorResult.identity, state.activeReplacementChain, cycledCardId
+                             )
+                         }
