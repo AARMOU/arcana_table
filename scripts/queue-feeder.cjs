@@ -330,7 +330,7 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   // marker in that queue so a failed label removal cannot reuse the same approval later.
   const consumedCapLiftIssues = new Set();
   for (const i of closedIssues.filter(x => trustedIssue(x) && String(x.title || '').startsWith('[Arcana Queue]'))) {
-    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\\d+) -->/);
+    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\d+) -->/);
     if (consumed) consumedCapLiftIssues.add(Number(consumed[1]));
   }
   const held = [], attemptHistoryUnknown = [];
