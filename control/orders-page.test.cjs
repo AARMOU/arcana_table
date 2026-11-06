@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const O = require('./orders-page.js');
 
 const BODY = [
-  '**Updated:** 2026-11-02 03:20 UTC · **Revision 2** · Maintained by Claude PM.',
+  '**Updated:** 2026-11-06 16:00 UTC · **Revision 49** · Coordinated by Goose (no PM position).',
   '',
   '## 1. Owner decisions (2026-11-01)',
   '- **D1 Priority:** the six original precons.',
@@ -89,7 +89,7 @@ test('render shows waiting items, orders and stale flag', () => {
   assert.ok(nodes.some(n => n.textContent === 'Waiting on you'));
   assert.ok(nodes.some(n => n.textContent === 'Twins of Discord'));
   assert.equal(nodes.filter(n => n.className === 'ob-order').length, 3);
-  assert.ok(nodes.some(n => n.tag === 'table'), 'extra PM sections render as tables');
+  assert.ok(nodes.some(n => n.tag === 'table'), 'extra coordination sections render as tables');
   assert.ok(!nodes.some(n => 'innerHTML' in n));
 });
 
