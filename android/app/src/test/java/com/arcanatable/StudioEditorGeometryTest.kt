@@ -52,6 +52,17 @@ class StudioEditorGeometryTest {
         assertTrue(StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.BottomRight,100f,50f,Offset(-500f,-500f)).problems().isEmpty())
     }
 
+    @Test fun absoluteHandCommitsSnapTravelAndStayOnTheCanvas() {
+        val moved=StudioEditorGeometry.commitAbsolute(113f,297f,63f,44f,StudioHandle.Move,3f,37f,8,24f,412f,296f)
+        assertEquals(113f,moved[0],0f);assertEquals(337f,moved[1],0f)
+        val clamped=StudioEditorGeometry.commitAbsolute(380f,300f,30f,30f,StudioHandle.Move,100f,-200f,8,24f,412f,296f)
+        assertEquals(382f,clamped[0],0f);assertEquals("never above the hand origin",296f,clamped[1],0f)
+        val left=StudioEditorGeometry.commitAbsolute(100f,300f,60f,44f,StudioHandle.Left,-17f,0f,8,24f,412f,296f)
+        assertEquals(84f,left[0],0f);assertEquals(76f,left[2],0f)
+        val tiny=StudioEditorGeometry.commitAbsolute(100f,300f,60f,44f,StudioHandle.BottomRight,-200f,-200f,1,24f,412f,296f)
+        assertEquals(24f,tiny[2],0f);assertEquals(24f,tiny[3],0f)
+    }
+
     @Test fun previewNeverInvertsTheFrame() {
         val p=StudioEditorGeometry.preview(Rect(0f,0f,100f,100f),StudioHandle.Right,Offset(-300f,0f),88f)
         assertEquals(88f,p.width,0f)

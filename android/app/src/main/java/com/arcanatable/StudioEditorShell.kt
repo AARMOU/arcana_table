@@ -52,7 +52,7 @@ internal enum class StudioEditorTool {Select,Scroll}
  */
 @Composable
 internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<String,Pair<Boolean,()->Unit>>,onApplied:()->Unit,
-    onClassic:()->Unit,onHand:(()->Unit)?) {
+    onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList()) {
     val window=System.identityHashCode(LocalView.current.rootView)
     val density=LocalDensity.current.density
     var tool by remember{mutableStateOf(StudioEditorTool.Select)}
@@ -66,9 +66,16 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     var message by remember{mutableStateOf<String?>(null)}
     var origin by remember{mutableStateOf(Offset.Zero)}
     var height by remember{mutableFloatStateOf(0f)}
-    val selected=runtime.selected?.let{runtime.controls[it]}
-    val screen=studioCurrentScreen(runtime,window,selected)
-    val foreign=runtime.controls.values.any{it.window!=0 && it.window!=window && it.bounds.width>0f}
+    // Hand mode edits the hand drawer's absolute layout with the same canvas, inspector, undo and Apply.
+    var handMode by remember{mutableStateOf(false)}
+    var handSelected by remember{mutableStateOf<String?>(null)}
+    val configuration=androidx.compose.ui.platform.LocalConfiguration.current
+    val handLayout=if(handMode)StudioHandEditing.layout(runtime,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat()) else null
+    val handElement=handLayout?.elements?.firstOrNull{it.id==handSelected}
+    val openHand:()->Unit={handMode=true;runtime.selected=null;handSelected=null}
+    val selected=if(handMode)null else runtime.selected?.let{runtime.controls[it]}
+    val screen=if(handMode)"Hand" else studioCurrentScreen(runtime,window,selected)
+    val foreign=!handMode && runtime.controls.values.any{it.window!=0 && it.window!=window && it.bounds.width>0f}
     val apply:()->Unit={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message ?: "Fix the listed problems before applying."}}
     val close:()->Unit={if(runtime.canUndo)confirmClose=true else runtime.cancel()}
     val problems=runtime.problems().distinct()
@@ -82,27 +89,36 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
         }
     }
     val inspector:@Composable (Modifier)->Unit={mod->
-        selected?.let {StudioInspector(runtime,it,density,collapsed,{v->collapsed=v},{m->message=m},mod)}
+        if(handLayout!=null)handElement?.let {StudioHandInspector(runtime,handLayout,it,collapsed,{v->collapsed=v},{id->handSelected=id},mod)}
+        else selected?.let {StudioInspector(runtime,it,density,collapsed,{v->collapsed=v},{m->message=m},mod)}
     }
     val sheets=@Composable {
         Box(Modifier.fillMaxSize()) {
-            if(layersOpen)StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},Modifier.align(Alignment.CenterEnd).statusBarsPadding().padding(top=56.dp))
-            if(screensOpen)StudioScreenMenu(destinations,screen,{name->screensOpen=false;runtime.selected=null;destinations[name]?.second?.invoke()},
-                onHand?.let{h->({screensOpen=false;h()})},{screensOpen=false})
-            if(moreOpen)StudioMorePanel(runtime,screen,snap,{snap=it},outlines,{outlines=it},onApplied,onClassic,onHand,{message=it},{moreOpen=false})
+            val layersModifier=Modifier.align(Alignment.CenterEnd).statusBarsPadding().padding(top=56.dp)
+            if(layersOpen)if(handLayout!=null)StudioHandLayersPanel(runtime,handLayout,handSelected,{handSelected=it},{layersOpen=false},layersModifier)
+                else StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},layersModifier)
+            if(screensOpen)StudioScreenMenu(destinations,screen,{name->screensOpen=false;handMode=false;runtime.selected=null;destinations[name]?.second?.invoke()},
+                {screensOpen=false;openHand()},{screensOpen=false})
+            if(moreOpen)StudioMorePanel(runtime,screen,snap,{snap=it},outlines,{outlines=it},onApplied,onClassic,
+                if(handMode)null else ({moreOpen=false;openHand()}),{message=it},{moreOpen=false},
+                hand=handLayout?.let{l->{confirm->StudioHandOptions(runtime,l,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat(),onApplied,{message=it},confirm)}})
         }
     }
     // Requests from inside game dialogs (their Studio button, or a back/outside dismissal held while editing).
     val firstMenuRequest=remember{StudioEditorRequests.menuRequests}
     LaunchedEffect(StudioEditorRequests.menuRequests){if(StudioEditorRequests.menuRequests!=firstMenuRequest)screensOpen=true}
+    val firstHandRequest=remember{StudioEditorRequests.handRequests-(if(StudioEditorRequests.handPending)1 else 0)}
+    LaunchedEffect(StudioEditorRequests.handRequests){if(StudioEditorRequests.handRequests!=firstHandRequest){StudioEditorRequests.handPending=false;openHand()}}
     DisposableEffect(runtime){StudioEditorRequests.clear();onDispose{StudioEditorRequests.clear()}}
     CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=darkTableColors.accent,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
         Box(Modifier.fillMaxSize().onGloballyPositioned{origin=it.boundsInRoot().topLeft;height=it.size.height.toFloat()}.testTag("studio-editor")) {
-            StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density)
+            if(handLayout!=null)StudioHandWorkspace(runtime,handLayout,handCards,handSelected,{handSelected=it},tool==StudioEditorTool.Select,snap,outlines,
+                topPad=60.dp,bottomPad=if(handElement!=null && !collapsed)420.dp else 120.dp)
+            else StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density)
             Column(Modifier.align(Alignment.TopCenter).statusBarsPadding()) {bar()}
             // Dock the inspector away from the selection so the element being edited is never hidden.
-            val dockTop=selected!=null && selected.window==window && (selected.bounds.center.y-origin.y)>height*0.55f
+            val dockTop=!handMode && selected!=null && selected.window==window && (selected.bounds.center.y-origin.y)>height*0.55f
             Column(Modifier.align(if(dockTop)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth()
                 .then(if(dockTop)Modifier.statusBarsPadding().padding(top=60.dp) else Modifier.navigationBarsPadding()).padding(horizontal=6.dp,vertical=4.dp)) {
                 if(!dockTop)StudioToolSwitch(tool){tool=it}

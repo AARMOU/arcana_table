@@ -46,7 +46,8 @@ class StudioEditorShellUiTest {
                 }
                 if(runtime.editing && showShell.value)StudioEditorShell(runtime,
                     mapOf("Home" to (true to {calls+="nav:Home"}),"Table" to (false to {calls+="nav:Table"})),
-                    onApplied={applied++},onClassic={calls+="classic"},onHand={calls+="hand"})
+                    onApplied={applied++},onClassic={calls+="classic"},
+                    handCards=(1..5).map{GameCard(it,"Real card $it","Creature",androidx.compose.ui.graphics.Color.DarkGray)})
             }
         }}}
         rule.waitForIdle()
@@ -241,6 +242,107 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-more-tab-Project").performClick();rule.waitForIdle()
         rule.onNodeWithTag("studio-classic").performClick();rule.waitForIdle()
         assertEquals(listOf("classic"),calls)
+    }
+
+    // ---- Hand screen: same editor, absolute hand layout, shared draft/undo/Apply ----
+    private fun prefs()=runtime.prefs
+    private fun hand()=rule.activity.resources.configuration.let{StudioHandEditing.layout(runtime,it.screenWidthDp.toFloat(),it.screenHeightDp.toFloat())}
+    private fun openHandScreen() {
+        rule.onNodeWithTag("studio-screen-picker").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-screen-Hand").performScrollTo().performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-hand-workspace").assertIsDisplayed()
+        rule.onNodeWithTag("studio-screen-picker").assertTextContains("Hand",substring=true)
+    }
+    /** Root-space point of a hand element → local point on the hand overlay (what a finger would touch). */
+    private fun handPoint(id:String,at:(androidx.compose.ui.geometry.Rect)->Offset={it.center}):Offset {
+        val overlay=bounds("studio-hand-canvas-overlay");return at(bounds("studio-bounds-$id"))-overlay.topLeft
+    }
+    private fun ownerHand()=rule.activity.assets.open("studio/owner-hand.json").bufferedReader().use{StudioLayout.parse(it.readText())}
+
+    @Test fun handScreenSelectsMovesResizesWithTheSharedUndo() {
+        render()
+        openHandScreen()
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint("undo"))};rule.waitForIdle()
+        rule.onNodeWithTag("studio-inspector").assertIsDisplayed().assert(hasAnyDescendant(hasText("UNDO",substring=true)))
+        assertTrue("selecting in the editor never runs the hand action",calls.isEmpty())
+        val before=hand().elements.single{it.id=="undo"}
+        val unit=bounds("studio-bounds-undo").width/before.w
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{
+            down(handPoint("undo"));repeat(8){moveBy(Offset(0f,40f*unit/8))};up()}
+        rule.waitForIdle()
+        val moved=hand().elements.single{it.id=="undo"}
+        assertEquals("travel snapped to the hand's 8-unit grid",before.y+40f,moved.y,0.01f);assertEquals(before.x,moved.x,0.01f)
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{
+            down(handPoint("undo"){it.bottomRight});repeat(8){moveBy(Offset(24f*unit/8,16f*unit/8))};up()}
+        rule.waitForIdle()
+        val resized=hand().elements.single{it.id=="undo"}
+        assertTrue(resized.w>moved.w && resized.h>moved.h)
+        rule.onNodeWithTag("studio-undo").performClick();rule.waitForIdle()
+        assertEquals(moved,hand().elements.single{it.id=="undo"})
+        rule.onNodeWithTag("studio-nudge-right").performClick();rule.waitForIdle()
+        assertEquals(moved.x+8f,hand().elements.single{it.id=="undo"}.x,0.01f)
+        rule.onNodeWithTag("studio-tab-Action").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-hand-binding-metric0").performScrollTo().performClick();rule.waitForIdle()
+        assertEquals("metric0",hand().elements.single{it.id=="undo"}.binding)
+        rule.onNodeWithTag("studio-notice").assertIsDisplayed() // undo is now unreachable, so Apply must refuse
+        rule.onNodeWithTag("studio-apply").performClick();rule.waitForIdle()
+        assertTrue(runtime.editing);assertEquals(0,applied)
+    }
+
+    @Test fun ownerHandJsonLoadsAndAppliesExactly() {
+        render("studio-owner-hand")
+        openHandScreen()
+        rule.onNodeWithTag("studio-more").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-more-tab-Hand").assertIsDisplayed()
+        rule.onNodeWithTag("studio-hand-owner").performClick();rule.waitForIdle()
+        val owner=ownerHand()
+        assertEquals(owner,hand());assertEquals(owner.json(),hand().json())
+        rule.onNodeWithTag("studio-more-panel-close").performClick();rule.waitForIdle()
+        UiTestSupport.screenshot(rule.activity,"studio-hand-owner-design")
+        rule.onNodeWithTag("studio-apply").performClick();rule.waitForIdle()
+        assertFalse(runtime.editing);assertEquals(1,applied)
+        val store=StudioStore(prefs(),"portrait",runtime.profile)
+        assertEquals("the gameplay hand drawer reads exactly the owner's design",owner,store.load());assertTrue(store.enabled())
+    }
+
+    @Test fun bareHandJsonImportsFromClipboardUnchanged() {
+        render()
+        openHandScreen()
+        val owner=ownerHand()
+        rule.activity.getSystemService(android.content.ClipboardManager::class.java)
+            .setPrimaryClip(android.content.ClipData.newPlainText("hand",rule.activity.assets.open("studio/owner-hand.json").bufferedReader().use{it.readText()}))
+        rule.onNodeWithTag("studio-more").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-more-tab-Project").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-export").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-json-import").performClick();rule.waitForIdle()
+        assertEquals(owner,hand())
+    }
+
+    @Test fun handLayersAndControlEditsShareOneDraftAndOneApply() {
+        val name="studio-shared-apply"
+        render(name)
+        tapCanvas(bounds("play").center);rule.waitForIdle()
+        rule.onNodeWithTag("studio-nudge-right").performClick();rule.waitForIdle()
+        openHandScreen()
+        rule.onNodeWithTag("studio-layers").performClick();rule.waitForIdle()
+        rule.onAllNodesWithTag("studio-layer-row").filterToOne(hasText("CAST",substring=true)).performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-layers-close").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-tab-Style").performClick()
+        rule.onNodeWithTag("studio-fill-Gold").performClick();rule.waitForIdle()
+        assertEquals(tableColorHex(darkTableColors.counter),hand().elements.single{it.id=="cast"}.color)
+        assertTrue("hand canvas cards are not registered as live controls",runtime.problems().isEmpty())
+        rule.onNodeWithTag("studio-apply").performClick();rule.waitForIdle()
+        assertFalse(runtime.editing)
+        assertEquals(4f,StudioControlStore(prefs(),"portrait",runtime.profile).load().controls.values.single().dx,0.01f)
+        assertEquals(tableColorHex(darkTableColors.counter),StudioStore(prefs(),"portrait",runtime.profile).load()!!.elements.single{it.id=="cast"}.color)
+    }
+
+    @Test @Config(qualifiers="w344dp-h800dp-port-xhdpi") fun foldCoverHandScreen() {
+        render()
+        openHandScreen()
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint("pass"))};rule.waitForIdle()
+        rule.onNodeWithTag("studio-inspector").assertIsDisplayed()
+        UiTestSupport.screenshot(rule.activity,"studio-hand-fold-cover-344x800")
     }
 
     private fun barFits(width:Int,name:String) {

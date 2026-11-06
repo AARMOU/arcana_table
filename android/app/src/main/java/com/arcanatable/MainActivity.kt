@@ -313,17 +313,19 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                         "Zones" to (gameInProgress to {zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
                         "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {homeOpen=false;showHand=false}),
                     )
+                // Every "Arcana Studio" hand entry point (menu, classic panel) now opens the hand screen in this editor.
+                LaunchedEffect(nativeStudioOpen) {if(nativeStudioOpen){nativeStudioOpen=false;studioClassic=false;StudioEditorRequests.openHand();if(!studio.editing)studio.begin()}}
                 if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
                     onApplied={nativeStudioRevision++},
                     onClassic={studioClassic=true;studio.panelOpen=true},
-                    onHand={studio.cancel();nativeStudioOpen=true})
+                    handCards=players.getOrNull(localSeat)?.hand.orEmpty())
                 else {
                 if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
                     onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
                 ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}
                 if(studio.panelOpen) StudioControlsPage(studio,
                     onApplied={nativeStudioRevision++},
-                    onHand={studio.cancel();nativeStudioOpen=true},
+                    onHand={studioClassic=false;StudioEditorRequests.openHand()},
                     destinations=studioDestinations)
                 }
             }

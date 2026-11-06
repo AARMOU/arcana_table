@@ -2,7 +2,6 @@ package com.arcanatable
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Which part of the selection frame a gesture grabbed. */
@@ -97,6 +96,24 @@ internal object StudioEditorGeometry {
         return next
     }
 
+    /**
+     * Absolute-layout variant used by the hand canvas (design units, not dp offsets). Returns x,y,w,h after a gesture,
+     * snapped to [grid] (1 = free), never smaller than [min], and kept inside the canvas left/right and below [originY].
+     */
+    fun commitAbsolute(x:Float,y:Float,w:Float,h:Float,handle:StudioHandle,dx:Float,dy:Float,grid:Int,min:Float,canvasWidth:Float,originY:Float):FloatArray {
+        // Snap the finger travel, not the absolute position: designs with off-grid coordinates (responsive or
+        // imported) keep their alignment, and a vertical drag never nudges x.
+        fun s(v:Float)=if(grid<=1)v.roundToInt().toFloat() else (v/grid).roundToInt()*grid.toFloat()
+        val sx=s(dx);val sy=s(dy)
+        if(handle==StudioHandle.Move)return floatArrayOf((x+sx).coerceIn(0f,(canvasWidth-w).coerceAtLeast(0f)),(y+sy).coerceAtLeast(originY),w,h)
+        var l=x;var t=y;var r=x+w;var b=y+h
+        if(handle.left)l=(l+sx).coerceIn(0f,r-min)
+        if(handle.right)r=(r+sx).coerceIn(l+min,canvasWidth)
+        if(handle.top)t=(t+sy).coerceIn(originY,b-min)
+        if(handle.bottom)b=(b+sy).coerceAtLeast(t+min)
+        return floatArrayOf(l,t,r-l,b-t)
+    }
+
     /** Arrow-key style nudge used by the inspector; keeps the result inside the persisted bounds. */
     fun nudge(style:StudioControlStyle,dxDp:Float,dyDp:Float)=
         style.copy(dx=(style.dx+dxDp).coerceIn(-2000f,2000f),dy=(style.dy+dyDp).coerceIn(-4000f,4000f))
@@ -105,5 +122,5 @@ internal object StudioEditorGeometry {
         width=if(dw==0f)style.width else ((style.width ?: widthDp)+dw).coerceIn(MIN_DP,2000f),
         height=if(dh==0f)style.height else ((style.height ?: heightDp)+dh).coerceIn(MIN_DP,4000f))
 
-    fun isMeaningfulDrag(drag:Offset,slop:Float)=abs(drag.x)>slop || abs(drag.y)>slop
+    fun isMeaningfulDrag(drag:Offset,slop:Float)=drag.getDistance()>slop
 }

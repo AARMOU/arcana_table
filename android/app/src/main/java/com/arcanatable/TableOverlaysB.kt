@@ -1011,7 +1011,8 @@ internal fun TableController.TableOverlaysB() {
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } },
     ) }
-    if (nativeStudioOpen && BuildConfig.DEBUG) NativeStudioWorkspace(
+    // The editor shell in MainActivity owns the hand screen whenever the Studio runtime exists.
+    if (nativeStudioOpen && BuildConfig.DEBUG && studioControlsRuntime == null) NativeStudioWorkspace(
         prefs = optionPrefs, orientation=layoutOrientationSuffix,
         width=configuration.screenWidthDp,height=configuration.screenHeightDp,
         cards = players.getOrNull(localSeat)?.hand.orEmpty(),

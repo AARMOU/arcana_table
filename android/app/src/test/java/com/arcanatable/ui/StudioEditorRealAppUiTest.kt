@@ -112,4 +112,35 @@ class StudioEditorRealAppUiTest {
             }
         } finally {scenario.close();StudioProfiles(prefs(),"portrait").resetAll()}
     }
+
+    /** The existing "Arcana Studio" hand entry point now opens the hand screen of the new editor, not the old page. */
+    @Test fun handEntryPointOpensTheNewEditorAndAppliesTheOwnerDesign() {
+        StudioProfiles(prefs(),"portrait").resetAll()
+        context.getSharedPreferences("arcana_tutorial",Context.MODE_PRIVATE).edit()
+            .putStringSet("first_visit_guides_v2",setOf("HOME","TABLE","PLAYER","HAND","MENU_MAIN","MENU_TOOLS","MENU_GAME","MENU_DECKS","LOBBY","OPTIONS","DECK_IMPORT","STACK","LOG")).commit()
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            if(rule.onAllNodesWithText("NOT NOW").fetchSemanticsNodes().isNotEmpty()){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
+            scenario.onActivity {it.tableController!!.nativeStudioOpen=true}
+            UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-hand-workspace").assertIsDisplayed()
+            rule.onAllNodesWithText("Native Argentum hand layout",substring=true).assertCountEquals(0)
+            scenario.onActivity {activity->
+                val c=activity.tableController!!
+                assertFalse(c.nativeStudioOpen);assertTrue(c.studioControlsRuntime!!.editing)
+                UiTestSupport.screenshot(activity,"studio-real-hand-editor")
+            }
+            rule.onNodeWithTag("studio-more").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-hand-owner").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-more-panel-close").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-apply").performClick();UiTestSupport.settle(rule)
+            val owner=context.assets.open("studio/owner-hand.json").bufferedReader().use{StudioLayout.parse(it.readText())}
+            scenario.onActivity {activity->
+                assertFalse(activity.tableController!!.studioControlsRuntime!!.editing)
+                val store=StudioProfiles(prefs(),"portrait").activeStore()
+                assertTrue(store.enabled());assertEquals("gameplay hand drawer source is the owner's design, unchanged",owner,store.load())
+            }
+        } finally {scenario.close();StudioProfiles(prefs(),"portrait").resetAll()}
+    }
 }

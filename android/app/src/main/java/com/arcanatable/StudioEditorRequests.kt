@@ -13,6 +13,10 @@ import androidx.compose.runtime.setValue
 internal object StudioEditorRequests {
     var pendingDismiss by mutableStateOf<(()->Unit)?>(null);private set
     var menuRequests by mutableIntStateOf(0);private set
+    var handRequests by mutableIntStateOf(0);private set
+    /** True from an entry point's request until the shell has opened the hand screen (the shell may not exist yet). */
+    var handPending by mutableStateOf(false)
+    fun openHand(){handRequests++;handPending=true}
     fun dismiss(close:()->Unit){pendingDismiss=close}
     fun openMenu(){menuRequests++}
     fun consumeDismiss():(()->Unit)?=pendingDismiss.also{pendingDismiss=null}

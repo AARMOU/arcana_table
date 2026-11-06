@@ -217,6 +217,10 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         change(draft.copy(copies=draft.copies+copy,owners=draft.owners+(source to control.screen)));selected=copy.id
     }
     fun removeCopy(id:String){change(draft.copy(copies=draft.copies.filterNot{it.id==id}));selected=null}
+    /** The hand layout being edited: this session's pending draft, else the saved draft or applied hand. */
+    fun handDraft():StudioLayout?=pendingHand ?: StudioStore(prefs,orientation,profile).let{it.draft() ?: it.load()}
+    fun hasPendingHand()=pendingHand!=null
+    fun changeHand(hand:StudioLayout)=change(draft,hand)
     fun undo(){if(undo.isNotEmpty()){redo.addLast(Revision(draft,pendingHand));val previous=undo.removeLast();draft=previous.controls;pendingHand=previous.hand;saveDraft();revision++}}
     fun redo(){if(redo.isNotEmpty()){undo.addLast(Revision(draft,pendingHand));val next=redo.removeLast();draft=next.controls;pendingHand=next.hand;saveDraft();revision++}}
     fun cancel(){prefs.edit().remove(pendingHandKey).apply();pendingHand=null;profile=StudioProfiles(prefs,orientation).activeName();applied=store().load();draft=applied;editing=false;capturing=false;panelOpen=false;revision++}

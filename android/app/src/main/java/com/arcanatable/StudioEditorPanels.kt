@@ -75,7 +75,7 @@ internal fun StudioScreenMenu(destinations:Map<String,Pair<Boolean,()->Unit>>,cu
                 if(!entry.first)Text(if(name in listOf("Setup","Lobby"))"Outside a game" else "Needs a live game",color=darkTableColors.muted,fontSize=11.sp)
             }
         }
-        onHand?.let {hand->StudioListRow("Hand layout (card canvas)",false,"studio-screen-Hand"){hand()}}
+        onHand?.let {hand->StudioListRow("Hand",current=="Hand","studio-screen-Hand"){hand()}}
     }
 }
 
@@ -118,20 +118,37 @@ internal fun StudioLayersPanel(runtime:StudioControlsRuntime,window:Int,onDismis
 /** Project-level settings that do not belong to one element. Opens on demand, so it never crowds the canvas. */
 @Composable
 internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Boolean,onSnap:(Boolean)->Unit,outlines:Boolean,onOutlines:(Boolean)->Unit,
-    onApplied:()->Unit,onClassic:()->Unit,onHand:(()->Unit)?,onMessage:(String)->Unit,onDismiss:()->Unit) {
+    onApplied:()->Unit,onClassic:(()->Unit)?,onHand:(()->Unit)?,onMessage:(String)->Unit,onDismiss:()->Unit,
+    hand:(@Composable ((String,()->Unit)->Unit)->Unit)?=null) {
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val saveFile=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) {uri->
+        if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.use{it.write(runtime.exportProject().toByteArray(Charsets.UTF_8))} ?: error("Could not write the file.")}
+            .onSuccess{onMessage("Project saved to file.")}.onFailure{onMessage(it.message ?: "Could not save.")}
+    }
+    val openFile=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) {uri->
+        if(uri!=null)runCatching{
+            val text=context.contentResolver.openInputStream(uri)?.bufferedReader()?.use{r->
+                val buffer=CharArray(5_000_001);var n=0
+                while(n<buffer.size){val k=r.read(buffer,n,buffer.size-n);if(k<0)break;n+=k}
+                require(n<=5_000_000){"Project is too large."};String(buffer,0,n)} ?: error("Could not open the file.")
+            studioImport(runtime,text)
+        }.onSuccess{onMessage("Imported into the draft. Review, then Apply.")}.onFailure{onMessage(it.message ?: "Import failed.")}
+    }
     val clipboard=LocalClipboardManager.current
     var profileName by remember{mutableStateOf("")}
     var json by remember{mutableStateOf<String?>(null)}
     var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
-    var page by remember{mutableStateOf("Layout")}
+    var page by remember{mutableStateOf(if(hand!=null)"Hand" else "Layout")}
+    val pages=listOfNotNull("Hand".takeIf{hand!=null},"Layout","Palette","Project")
     StudioSheet("Studio options",onDismiss,"studio-more-panel") {
         // Three short pages instead of one long form.
-        Row(Modifier.fillMaxWidth()) {listOf("Layout","Palette","Project").forEach {p->
+        Row(Modifier.fillMaxWidth()) {pages.forEach {p->
             Box(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(10.dp)).background(if(p==page)darkTableColors.raised else Color.Transparent)
                 .clickable{page=p}.testTag("studio-more-tab-$p"),contentAlignment=Alignment.Center) {
                 Text(p,color=if(p==page)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
             }
         }}
+        if(page=="Hand")hand?.invoke{q,a->confirm=q to a}
         if(page=="Layout") {
         StudioSection("Layout profile")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
@@ -170,9 +187,11 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         if(page=="Project") {
         StudioSection("Project")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
-            StudioChip("Export / import",true,"studio-export"){json=runtime.exportProject()}
-            onHand?.let{StudioChip("Hand layout",true,"studio-more-hand"){it()}}
-            StudioChip("Classic panel",true,"studio-classic",onClick=onClassic)
+            StudioChip("Copy / paste",true,"studio-export"){json=runtime.exportProject()}
+            StudioChip("Save file",true,"studio-save-file"){saveFile.launch("Arcana-Studio-${runtime.orientation}-${runtime.profile}.json")}
+            StudioChip("Open file",true,"studio-open-file"){openFile.launch(arrayOf("application/json","text/plain"))}
+            onHand?.let{StudioChip("Edit hand",true,"studio-more-hand"){it()}}
+            onClassic?.let{StudioChip("Classic panel",true,"studio-classic",onClick=it)}
         }
         StudioSection("Reset")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
@@ -192,7 +211,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             Text("Import replaces the current draft; nothing reaches the game until you Apply.",color=darkTableColors.muted,fontSize=12.sp)
         }},confirmButton={TextButton(onClick={
             val text=clipboard.getText()?.text.orEmpty()
-            runCatching{runtime.importProject(text)}.onSuccess{json=null;onMessage("Imported into the draft. Review, then Apply.")}
+            runCatching{studioImport(runtime,text)}.onSuccess{json=null;onMessage("Imported into the draft. Review, then Apply.")}
                 .onFailure{status=it.message ?: "The clipboard does not hold an Arcana Studio project."}
         },modifier=Modifier.heightIn(min=48.dp).testTag("studio-json-import")){Text("Import from clipboard")}},
             dismissButton={TextButton(onClick={clipboard.setText(AnnotatedString(project));status="Copied ${project.length/1024+1} KB to the clipboard."},
