@@ -425,3 +425,37 @@ What a reviewer rejects:
 - History of omissions and the few legacy approximations (do **not** add new ones):
   [`android/docs/CUSTOM_CARDS_HANDOFF.md`](../../android/docs/CUSTOM_CARDS_HANDOFF.md).
 - Engine primitive work is Claude's lane and tracked in issue #141.
+
+### Transformers: More Than Meets the Eye, Living metal, convert
+
+Needs engine patch `0041-more-than-meets-the-eye-living-metal`. Build the card as a transforming
+double-faced permanent. `moreThanMeetsTheEye("{cost}")` on the front face adds the alternative
+cost: the hand (and command-zone, for a commander) offer `CastConverted` puts the back face on the
+stack, and the permanent enters converted. `livingMetal()` on a Vehicle back face makes it a
+creature during its controller's turn. "Convert ~" is `Effects.Transform(EffectTarget.Self)`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RatchetFieldMedic.kt -->
+```kotlin
+    moreThanMeetsTheEye("{1}{W}")
+    keywords(Keyword.LIFELINK)
+```
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RatchetFieldMedic.kt -->
+```kotlin
+    livingMetal()
+    keywords(Keyword.LIFELINK)
+
+    triggeredAbility {
+        trigger = Triggers.oneOrMore(GameObjectFilter.Artifact.nontoken()).die()
+        oncePerTurn = true
+        effect = Effects.Transform(EffectTarget.Self)
+```
+
+"You may convert ~. When you do, …" is `Effects.ReflexiveTrigger(action = Effects.Transform(EffectTarget.Self), optional = true) { … }`.
+With 0041 the payoff fires only if the conversion really happened, so a second trigger that finds the
+permanent already converted (CR 701.28f) does nothing. A noncreature filter on
+`Triggers.oneOrMore(…).die()` means "put into a graveyard from the battlefield".
+
+Proof: `RatchetFieldMedicScenarioTest` (12 cases: the converted cast offer and its cost, the back face on
+the stack, Living metal on your turn and not on an opponent's, the reflexive return capped by life gained
+this turn, declining it, stacked triggers, once each turn, and token or opponent artifacts not counting).

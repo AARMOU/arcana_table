@@ -54,6 +54,7 @@ object CustomCards {
         Entry(FlashPhotography, "FIC", ARTIFICER),
         Entry(SakashimaOfAThousandFaces, "CMR", ARTIFICER),
         Entry(UrzasSaga, "MH2", ARTIFICER),
+        Entry(RatchetFieldMedic, "BOT", ARTIFICER),
         // Ayula, Queen Among Bears deck.
         Entry(MotherBear, "MH1", AYULA),
         Entry(Werebear, "ODY", AYULA),
