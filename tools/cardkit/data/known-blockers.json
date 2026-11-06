@@ -26,11 +26,6 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Ratchet, Field Medic": {
-      "reason": "Living metal and convert are not represented",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Vadrok, Apex of Thunder": {
       "reason": "mutate plus free cast from graveyard combination",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -142,16 +137,6 @@
     "Prowl": {
       "reason": "Prowl's alternative cost is not available",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Hunting Velociraptor)",
-      "verified": true
-    },
-    "Living metal": {
-      "reason": "Living metal is not represented",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Ratchet)",
-      "verified": true
-    },
-    "More Than Meets the Eye": {
-      "reason": "converting is not represented",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Transformers cards)",
       "verified": true
     }
   },

@@ -58,15 +58,17 @@ class CustomDecksOfflineTest {
         })
     }
 
-    @Test fun artificerUsesCustomCardsAndOnlyLeavesOutRatchet() {
+    @Test fun artificerUsesCustomCardsAndNowLeavesNothingOut() {
         assumeTrue(lib.isFullLibrary)
         val (commander, names) = deck("artificer.txt")
         val (setup, registry) = OfflineGameSetup.build(lib, "You", names, commander, premades, Random(3))
         assertEquals("Miles \"Tails\" Prower", setup.you.commander)
         assertEquals(10, setup.you.deck.count { it == "Cid, Timeless Artificer" })
         assertNotNull(registry.getCard("Urza's Saga"))
-        val leftOut = setup.notes.first { "Left out" in it }
-        assertTrue(leftOut, "Ratchet" in leftOut && "1 card" in leftOut)
+        // Ratchet, Field Medic was the deck's last left-out card until engine patch 0041 (2026-11-06).
+        assertNotNull(registry.getCard("Ratchet, Field Medic"))
+        assertTrue(setup.you.deck.contains("Ratchet, Field Medic"))
+        assertTrue(setup.notes.toString(), setup.notes.none { "Left out" in it })
     }
 
     /** Both custom decks, each run by Argentum's AI, play a whole game without the engine choking. */
