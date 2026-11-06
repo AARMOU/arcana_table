@@ -80,9 +80,12 @@ class CardArtTest {
                 val count = (requests[endpoint] ?: 0) + 1
                 requests[endpoint] = count
                 when (endpoint) {
-                    "image:primary-404" -> CardArtLoadResult.PermanentFailure
-                    "image:fallback-503" -> if (count == 1) CardArtLoadResult.RetryableFailure
-                        else CardArtLoadResult.Loaded("fallback art")
+                    "image:primary-404" -> if (isRetryableCardArtStatusCode(404)) {
+                        CardArtLoadResult.RetryableFailure
+                    } else CardArtLoadResult.PermanentFailure
+                    "image:fallback-503" -> if (count == 1 && isRetryableCardArtStatusCode(503)) {
+                        CardArtLoadResult.RetryableFailure
+                    } else CardArtLoadResult.Loaded("fallback art")
                     else -> error("unexpected endpoint")
                 }
             }
@@ -99,9 +102,12 @@ class CardArtTest {
                 val count = (requests[endpoint] ?: 0) + 1
                 requests[endpoint] = count
                 when (endpoint) {
-                    "lookup:primary-408" -> if (count == 1) CardArtLoadResult.RetryableFailure
-                        else CardArtLoadResult.Loaded("recovered")
-                    "lookup:fallback-429" -> CardArtLoadResult.PermanentFailure
+                    "lookup:primary-408" -> if (count == 1 && isRetryableCardArtStatusCode(408)) {
+                        CardArtLoadResult.RetryableFailure
+                    } else CardArtLoadResult.Loaded("recovered")
+                    "lookup:fallback-429" -> if (isRetryableCardArtStatusCode(429)) {
+                        CardArtLoadResult.RetryableFailure
+                    } else CardArtLoadResult.PermanentFailure
                     else -> error("unexpected endpoint")
                 }
             }
