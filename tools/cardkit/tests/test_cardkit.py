@@ -35,8 +35,13 @@ FAKE_UNKNOWN_KW = {"name": "Cardkit Test Gizmo", "mana_cost": "{3}", "type_line"
                    "oracle_text": "Flibberjig 3\nFlying", "power": "1", "toughness": "1", "color_identity": [],
                    "keywords": ["Flibberjig", "Flying"], "layout": "normal"}
 FAKE_INFECT = {"name": "Cardkit Test Plaguebearer", "mana_cost": "{1}{B}", "type_line": "Creature — Horror",
-               "oracle_text": "Infect", "power": "1", "toughness": "1", "color_identity": ["B"],
-               "keywords": ["Infect"], "layout": "normal"}
+               "oracle_text": "Prowl {B}", "power": "1", "toughness": "1", "color_identity": ["B"],
+               "keywords": ["Prowl"], "layout": "normal"}
+# Infect was a recorded keyword gap until 2026-11-06, when Blightsteel Colossus's scenario tests proved
+# the pinned engine models it (poison, -1/-1 counters, 704.5c); it must no longer block a card.
+FAKE_REAL_INFECT = {"name": "Cardkit Test Blightling", "mana_cost": "{1}{B}", "type_line": "Creature — Horror",
+                    "oracle_text": "Infect", "power": "1", "toughness": "1", "color_identity": ["B"],
+                    "keywords": ["Infect"], "layout": "normal"}
 FAKE_COMBO = {"name": "Cardkit Test Martyr", "mana_cost": "{1}{W}", "type_line": "Creature \u2014 Human Warrior",
               "oracle_text": "Martyrdom \u2014 Whenever this creature attacks, you gain 2 life and draw two cards.",
               "power": "2", "toughness": "2", "color_identity": ["W"], "keywords": ["Martyrdom"], "layout": "normal"}
@@ -46,7 +51,7 @@ FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identi
 FAKE_VARIANT = {"name": "Cardkit Test Monument", "mana_cost": "{5}", "type_line": "Artifact", "color_identity": [],
                 "keywords": [], "layout": "normal",
                 "oracle_text": "Whenever you tap a token for {C}, add an additional {C}."}
-FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO,
+FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_REAL_INFECT, FAKE_COMBO,
                                                      FAKE_REVEAL, FAKE_VARIANT)}
 
 
@@ -357,6 +362,11 @@ class ReadinessTests(unittest.TestCase):
     def test_blocked_keyword(self):
         v = readiness.classify("Cardkit Test Plaguebearer")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
+
+    @with_fake_oracle
+    def test_infect_is_no_longer_a_blocked_keyword(self):
+        v = readiness.classify("Cardkit Test Blightling")
+        self.assertNotEqual(v["readiness"], "ENGINE_BLOCKED", v)
 
 
 class UnitCommandTests(unittest.TestCase):

@@ -3134,6 +3134,17 @@
     }
    ]
   },
+  "Keyword.INFECT": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Blightsteel Colossus",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlightsteelColossus.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlightsteelColossusScenarioTest.kt"
+    }
+   ]
+  },
   "Keyword.LIFELINK": {
    "count": 7,
    "examples": [
@@ -5559,7 +5570,7 @@
     {
      "card": "Blightsteel Colossus",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlightsteelColossus.kt",
-     "lines": 40,
+     "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlightsteelColossusScenarioTest.kt"
     }
    ]
