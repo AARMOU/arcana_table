@@ -8,7 +8,8 @@ const SHA = 'b'.repeat(40), BASE = 'gpt/arcana-integration-next', REPO = 'AARMOU
 const record = { name: 'Ancient Stone Idol', type_line: 'Artifact Creature — Golem', oracle_text: 'Flash',
   scryfall_uri: 'https://scryfall.com/card/x/1/ancient-stone-idol' };
 const issueBody = Q.cardWorkBody({ name: 'Ancient Stone Idol', issue: 321, source: 'app', votes: 3, outcome: 'needs-review',
-  readiness: 'NEEDS_REVIEW', route: 'gpt', cardkitReasons: [], oracle: JSON.stringify(record) }, { runId: 1, baseSha: SHA, base: BASE });
+  readiness: 'NEEDS_REVIEW', route: 'gpt', cardkitReasons: [], oracle: JSON.stringify(record),
+  referencePacket: '## Cardkit starting packet\\nCardkit classify: NEEDS_REVIEW\\nNo close tested custom-card match.' }, { runId: 1, baseSha: SHA, base: BASE });
 const issue = { state: 'open', title: '[Card Work] Ancient Stone Idol — needs rules review', body: issueBody, user: { login: 'github-actions[bot]', type: 'Bot' } };
 const run = { name: 'Arcana Cardkit', event: 'pull_request', conclusion: 'success', head_sha: 'c'.repeat(40), head_repository: { full_name: REPO } };
 const pr = { state: 'open', base: { ref: BASE, repo: { full_name: REPO } }, head: { sha: 'c'.repeat(40), repo: { full_name: REPO } }, user: { login: 'Copilot' } };
