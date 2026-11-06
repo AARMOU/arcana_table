@@ -1,4 +1,6 @@
-# Arcana Table — shared GPT / Claude status
+# Arcana Table — historical shared GPT / Claude status
+
+> **Historical snapshot, not current authority.** Owner decision D30 (Nov 6, 2026) removes the dedicated PM position. Goose coordinates work and independently reviews; Claude has no PM authority. Each worker executes only specifically authorized work within existing safeguards. Current orders and owner decisions: [#883](https://github.com/AARMOU/arcana_table/issues/883); Goose/Elmer inbox [#950](https://github.com/AARMOU/arcana_table/issues/950); Boneknuckles inbox [#949](https://github.com/AARMOU/arcana_table/issues/949). Historical Claude task attributions below are not live assignments.
 
 > **Point-in-time index, not live truth.** Last reconciled against [Issue #81 comment 6380748058](https://github.com/AARMOU/arcana_table/issues/81#issuecomment-6380748058), dated 2026-10-24 UTC. Check deltas and exact branch heads before taking action. This file is intentionally short; linked issues, PRs, workflow logs, and commit SHAs are the evidence.
 
