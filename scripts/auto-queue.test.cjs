@@ -21,7 +21,7 @@ const payload = () => Q.queuePayload({
   units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA, runId: 555,
 });
 
-function fakeGitHub({ open = [], closed = [], comments = {}, events = {}, head = SHA, issuer = BOT } = {}) {
+function fakeGitHub({ open = [], closed = [], comments = {}, events = {}, head = SHA, issuer = BOT, createError = null, removeLabelError = null } = {}) {
   const calls = [];
   const github = {
     rest: {
@@ -31,10 +31,12 @@ function fakeGitHub({ open = [], closed = [], comments = {}, events = {}, head =
         listComments: () => {},
         listEventsForTimeline: () => {},
         removeLabel: async ({ issue_number, name }) => {
+          calls.push(['removeLabel', { issue_number, name }]);
+          if (removeLabelError) throw removeLabelError;
           const issue = closed.find(i => i.number === issue_number);
           if (issue) issue.labels = (issue.labels || []).filter(l => (typeof l === 'string' ? l : l.name) !== name);
         },
-        create: async args => { calls.push(['create', args]); return { data: { number: 777, user: issuer, html_url: 'https://github.com/AARMOU/arcana_table/issues/777' } }; },
+        create: async args => { calls.push(['create', args]); if (createError) throw createError; return { data: { number: 777, user: issuer, html_url: 'https://github.com/AARMOU/arcana_table/issues/777' } }; },
       },
     },
     paginate: async (fn, args) => {
@@ -93,6 +95,30 @@ test('one trusted bot issue is created with immutable provenance and exact unit 
   assert.equal(A.provenance({ authorAssociation: 'NONE', authorLogin: 'github-actions[bot]',
     authorType: 'Bot', body, title, autoQueueUnedited: true, commenters: [] }).ok, true);
 });
+test('B15 does not consume the owner cap-lift label when queue creation fails', async () => {
+  const source = queueIssue(901, CARD, ['arcana:lift-copilot-attempt-cap']);
+  const { github, calls } = fakeGitHub({
+    closed: [source],
+    comments: { 901: [...paidPair(901, 1), ...paidPair(901, 2)] },
+    events: { 901: [{ event: 'labeled', actor: { login: 'AARMOU' }, label: { name: 'arcana:lift-copilot-attempt-cap' } }] },
+    createError: new Error('synthetic issue-create failure'),
+  });
+  await assert.rejects(() => Q.createNextAutoQueue({
+    github, owner: 'AARMOU', repo: 'arcana_table', payload: payload(), runId: 123, enabled: true,
+  }), /synthetic issue-create failure/);
+  assert.equal(calls.some(([kind]) => kind === 'removeLabel'), false);
+});
+
+test('B15 consumed cap-lift marker prevents reusing approval if label removal failed', () => {
+  const source = queueIssue(901, CARD, ['arcana:lift-copilot-attempt-cap']);
+  const retry = queueIssue(902, CARD);
+  retry.body += '\n<!-- retry-cap-lift-consumed-from: #901 -->\n';
+  const p = { ...payload(), authorizedCapLiftIssues: new Set([901]) };
+  const pick = Q.chooseAutoQueue(p, [], [source, retry]);
+  assert.equal(pick.suggestion, undefined);
+  assert.deepEqual(pick.held, [{ name: CARD, issue: 902 }]);
+});
+
 test('existing complete unassigned issue is woken without opening another issue', async () => {
   const existing = [{ number: 99, title: '[Arcana Queue] Another Card', body: BODY, assignees: [], author_association: 'OWNER' }];
   const { result, calls } = await run({ open: existing });
