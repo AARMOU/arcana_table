@@ -88,6 +88,7 @@ class GenestealerLocusIndependentCertificationTest {
         d.removeSummoningSickness(attacker)
         d.removeSummoningSickness(bystander)
 
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = player)
         assertNull(d.declareAttackers(player, listOf(attacker), opponent).error)
         d.resolveAll()
 
@@ -100,5 +101,20 @@ class GenestealerLocusIndependentCertificationTest {
 
         assertEquals(3, d.projected.getPower(attacker))
         assertEquals(3, d.projected.getToughness(attacker))
+    }
+
+    @Test
+    fun neitherAbilityChangesCreaturesWhenNoAttackOccurs() {
+        val d = customScenario(GenestealerLocus, "Grizzly Bears")
+        val player = d.player1
+        val opponent = d.player2
+        val locus = d.putCreatureOnBattlefield(player, "Genestealer Locus")
+        val friendlyCreature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
+        val opposingCreature = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
+
+        listOf(locus, friendlyCreature, opposingCreature).forEach { creature ->
+            assertEquals(3, d.projected.getPower(creature))
+            assertEquals(3, d.projected.getToughness(creature))
+        }
     }
 }
