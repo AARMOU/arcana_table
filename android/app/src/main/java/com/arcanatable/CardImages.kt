@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.MalformedURLException
 import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -205,6 +206,8 @@ object CardImages {
                 URL(url).openConnection() as HttpURLConnection
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (_: MalformedURLException) {
+                return@withLock CardArtLoadResult.PermanentFailure
             } catch (_: IOException) {
                 return@withLock CardArtLoadResult.RetryableFailure
             } catch (_: Exception) {
@@ -228,6 +231,8 @@ object CardImages {
                 return@withLock CardArtLoadResult.Loaded(body)
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (_: MalformedURLException) {
+                return@withLock CardArtLoadResult.PermanentFailure
             } catch (_: IOException) {
                 return@withLock CardArtLoadResult.RetryableFailure
             } catch (_: Exception) {
@@ -243,6 +248,8 @@ object CardImages {
     private fun fetchBytes(url: String): CardArtLoadResult<ByteArray> {
         val connection = try {
             URL(url).openConnection() as HttpURLConnection
+        } catch (_: MalformedURLException) {
+            return CardArtLoadResult.PermanentFailure
         } catch (_: IOException) {
             return CardArtLoadResult.RetryableFailure
         } catch (_: Exception) {
