@@ -312,6 +312,13 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
     .filter(x => x.cards.length);
   const pending = waiting.find(i => !stuck.some(x => x.issue === i.number));
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting', stuck };
+  // A cap-lift is consumed by the first successfully created retry queue. Keep this
+  // marker in that queue so a failed label removal cannot reuse the same approval later.
+  const consumedCapLiftIssues = new Set();
+  for (const i of closedIssues.filter(x => trustedIssue(x) && String(x.title || '').startsWith('[Arcana Queue]'))) {
+    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\d+) -->/);
+    if (consumed) consumedCapLiftIssues.add(Number(consumed[1]));
+  }
   const attempted = new Map();
   const capLiftedBy = new Map();
   for (const i of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]')))
@@ -326,13 +333,6 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
           (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
         capLiftedBy.set(k, i.number);
     }
-  // A cap-lift is consumed by the first successfully created retry queue. Keep this
-  // marker in that queue so a failed label removal cannot reuse the same approval later.
-  const consumedCapLiftIssues = new Set();
-  for (const i of closedIssues.filter(x => trustedIssue(x) && String(x.title || '').startsWith('[Arcana Queue]'))) {
-    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\d+) -->/);
-    if (consumed) consumedCapLiftIssues.add(Number(consumed[1]));
-  }
   const held = [], attemptHistoryUnknown = [];
   let retryOf = null;
   let capLiftIssue = null;
