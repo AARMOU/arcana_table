@@ -1,5 +1,7 @@
 package com.arcanatable
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.cancellation.CancellationException
 import org.junit.Assert.assertEquals
@@ -24,7 +26,7 @@ class CardArtTest {
         val result = loadCardArtWithRetry("https://cards.scryfall.io/normal/abc.jpg",
             pause = { pauses.add(it) }) {
             attempts++
-            if (attempts == 2) "decoded art" else null
+            if (attempts == 2) CardArtLoadResult.Loaded("decoded art") else CardArtLoadResult.RetryableFailure
         }
         assertEquals("decoded art", result)
         assertEquals(2, attempts)
@@ -38,7 +40,7 @@ class CardArtTest {
         val result = loadCardArtWithRetry<String>("https://cards.scryfall.io/normal/missing.jpg",
             pause = { pauses.add(it) }) {
             attempts++
-            null
+            CardArtLoadResult.RetryableFailure
         }
         assertNull(result)
         assertEquals(3, attempts)
@@ -52,7 +54,7 @@ class CardArtTest {
         val result = loadCardArtWithRetry("https://cards.scryfall.io/normal/ready.jpg",
             pause = { fail("successful image must not wait") }) {
             attempts++
-            "ready"
+            CardArtLoadResult.Loaded("ready")
         }
         assertEquals("ready", result)
         assertEquals(1, attempts)
@@ -71,4 +73,30 @@ class CardArtTest {
             assertEquals(1, attempts)
         }
     }
+    @Test fun permanentHttpFailuresDoNotTriggerOuterRetryButTransientStatusesDo() {
+        assertEquals(false, isRetryableCardArtStatusCode(404))
+        assertEquals(false, isRetryableCardArtStatusCode(429))
+        assertEquals(true, isRetryableCardArtStatusCode(408))
+        assertEquals(true, isRetryableCardArtStatusCode(503))
+    }
+
+    @Test fun cancellationDuringRetryPauseStopsFurtherLoads() = runBlocking {
+        var attempts = 0
+        val pauseEntered = CompletableDeferred<Unit>()
+        val pauseForever = CompletableDeferred<Unit>()
+        val job = launch {
+            loadCardArtWithRetry<String>(
+                "https://cards.scryfall.io/normal/changed.jpg",
+                pause = { pauseEntered.complete(Unit); pauseForever.await() }
+            ) {
+                attempts++
+                CardArtLoadResult.RetryableFailure
+            }
+        }
+        pauseEntered.await()
+        job.cancel()
+        job.join()
+        assertEquals(1, attempts)
+    }
+
 }
