@@ -1,53 +1,38 @@
 {
   "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
-    "Arcane Lighthouse": {
-      "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
-      "source": "#134 / #135 / #141 Priority B",
-      "verified": false
-    },
     "Alms Collector": {
       "reason": "replace only the extra cards of a multi-card draw and redistribute them",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
+    },
+    "Arcane Lighthouse": {
+      "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
+      "source": "#134 / #135 / #141 Priority B",
+      "verified": false
     },
     "Bruvac the Grandiloquent": {
       "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Heroes in a Half Shell": {
-      "reason": "effect cannot see the whole group of creatures from one damage event",
+    "Chiss-Goria, Forge Tyrant": {
+      "reason": "Missing a cast-permission-scoped affinity rider: GrantMayPlayFromExile can permit casting artifact spells from the exiled group, but its onPlayRider is a post-cast trigger; GrantNextSpellAffinity applies to the next matching spell from any zone and cannot restrict affinity to a spell cast through that permission. The required cast-time cost discount cannot be expressed exactly.",
+      "source": "AARMOU/arcana_table#582; inspected pinned Ulamog.kt, JeskasWill.kt, ChandraHopesBeacon.kt, DonAndRaphHardScience.kt, DonAndRaphHardScienceTest.kt, and docs/agents/argentum-upstream/card-sdk-language-reference.md sections on GrantMayPlayFromExile and GrantNextSpellAffinity.",
+      "verified": false
+    },
+    "Determined Iteration": {
+      "reason": "cannot give the populated token haste and schedule its sacrifice",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Locke, Treasure Hunter": {
-      "reason": "cannot gather milled cards from every library and grant casting from that group",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Ratchet, Field Medic": {
-      "reason": "Living metal and convert are not represented",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Vadrok, Apex of Thunder": {
-      "reason": "mutate plus free cast from graveyard combination",
+    "Devil Dinosaur": {
+      "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
     "Doubling Cube": {
       "reason": "doubling the mana already in a mana pool",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Jeweled Lotus": {
-      "reason": "mana spend restriction to casting a commander",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Mox Diamond": {
-      "reason": "enters-the-battlefield replacement that discards a land card",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
@@ -62,28 +47,8 @@
       "source": "AARMOU/arcana_table#596; pinned Argentum 7fb073337e4389cfabe2ebf4c6416633a7fc63d2 SDK/API review plus source inspection of Ayula, Queen Among Bears and Longstalk Brawl (explicit fighter targets)",
       "verified": true
     },
-    "Determined Iteration": {
-      "reason": "cannot give the populated token haste and schedule its sacrifice",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Lotus Vale": {
-      "reason": "enters-the-battlefield replacement that sacrifices two untapped lands",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Gemstone Caverns": {
       "reason": "starting-hand / game-start replacement effect",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Tippy-Toe, Terrific Partner": {
-      "reason": "token-copy replacement behavior",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Pulmonic Sliver": {
-      "reason": "optional replacement effect",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
@@ -92,13 +57,48 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Devil Dinosaur": {
-      "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
+    "Hatchery Sliver": {
+      "reason": "Missing a static Replicate grant that creates KeywordAbility.replicate using each matching spell's own mana cost. GrantKeywordToOwnSpells does not supply Replicate's optional additional-cost declaration; the cast handler only creates Replicate copies from a declared REPLICATED cost slot. Needed primitive: GrantReplicateToOwnSpells(spellFilter) or equivalent.",
+      "source": "Source review on pinned Argentum b38db9760cbf8c961bc548bf23420a13c763be95: docs/agents/argentum-upstream/card-sdk-language-reference.md (GrantKeywordToOwnSpells and Replicate); upstream HerigastEruptingNullkite.kt uses dedicated GrantEmergeToOwnSpells; ConsignToMemory.kt installs printed KeywordAbility.replicate; rules-engine CastTriggers.kt creates Replicate copies only for declaredCostSlot == REPLICATED. No other cached card uses this Replicate-grant wording.",
+      "verified": false
+    },
+    "Heroes in a Half Shell": {
+      "reason": "effect cannot see the whole group of creatures from one damage event",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Zilortha, Strength Incarnate": {
-      "reason": "changes the lethal-damage rule",
+    "Jeweled Lotus": {
+      "reason": "mana spend restriction to casting a commander",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Locke, Treasure Hunter": {
+      "reason": "cannot gather milled cards from every library and grant casting from that group",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Lotus Vale": {
+      "reason": "enters-the-battlefield replacement that sacrifices two untapped lands",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Mox Diamond": {
+      "reason": "enters-the-battlefield replacement that discards a land card",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Opal Palace": {
+      "reason": "The pinned SDK has no dynamic amount for the number of times this commander was cast from the command zone this game. SpellsCastThisGame counts every spell from any zone, so it cannot supply the exact +1/+1 counter count for the mana-spent commander spell.",
+      "source": "AARMOU/arcana_table#671; pinned SDK inventory at c1c04ca3265c61df913af6db65460ad4ce409614 (docs/agents/generated/sdk-api.md DynamicAmount entries and docs/agents/argentum-upstream/sdk-index.md); inspected PathOfAncestry.kt and ManaSpellRider/EntersWithDynamicCounters language reference.",
+      "verified": true
+    },
+    "Pulmonic Sliver": {
+      "reason": "optional replacement effect",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Ratchet, Field Medic": {
+      "reason": "Living metal and convert are not represented",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
@@ -112,25 +112,25 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Chiss-Goria, Forge Tyrant": {
-      "reason": "Missing a cast-permission-scoped affinity rider: GrantMayPlayFromExile can permit casting artifact spells from the exiled group, but its onPlayRider is a post-cast trigger; GrantNextSpellAffinity applies to the next matching spell from any zone and cannot restrict affinity to a spell cast through that permission. The required cast-time cost discount cannot be expressed exactly.",
-      "source": "AARMOU/arcana_table#582; inspected pinned Ulamog.kt, JeskasWill.kt, ChandraHopesBeacon.kt, DonAndRaphHardScience.kt, DonAndRaphHardScienceTest.kt, and docs/agents/argentum-upstream/card-sdk-language-reference.md sections on GrantMayPlayFromExile and GrantNextSpellAffinity.",
-      "verified": false
-    },
-    "Treasure Nabber": {
-      "reason": "no trigger for 'whenever an opponent taps an artifact for mana': EventPattern.LandTappedForMana / Triggers.*.tapsLandForMana only cover lands, tappedForMana() is SELF/ATTACHED only, and taps(filter) is not mana-specific",
-      "source": "AARMOU/arcana_table#589",
-      "verified": false
-    },
-    "Opal Palace": {
-      "reason": "The pinned SDK has no dynamic amount for the number of times this commander was cast from the command zone this game. SpellsCastThisGame counts every spell from any zone, so it cannot supply the exact +1/+1 counter count for the mana-spent commander spell.",
-      "source": "AARMOU/arcana_table#671; pinned SDK inventory at c1c04ca3265c61df913af6db65460ad4ce409614 (docs/agents/generated/sdk-api.md DynamicAmount entries and docs/agents/argentum-upstream/sdk-index.md); inspected PathOfAncestry.kt and ManaSpellRider/EntersWithDynamicCounters language reference.",
+    "Tippy-Toe, Terrific Partner": {
+      "reason": "token-copy replacement behavior",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Hatchery Sliver": {
-      "reason": "Missing a static Replicate grant that creates KeywordAbility.replicate using each matching spell's own mana cost. GrantKeywordToOwnSpells does not supply Replicate's optional additional-cost declaration; the cast handler only creates Replicate copies from a declared REPLICATED cost slot. Needed primitive: GrantReplicateToOwnSpells(spellFilter) or equivalent.",
-      "source": "Source review on pinned Argentum b38db9760cbf8c961bc548bf23420a13c763be95: docs/agents/argentum-upstream/card-sdk-language-reference.md (GrantKeywordToOwnSpells and Replicate); upstream HerigastEruptingNullkite.kt uses dedicated GrantEmergeToOwnSpells; ConsignToMemory.kt installs printed KeywordAbility.replicate; rules-engine CastTriggers.kt creates Replicate copies only for declaredCostSlot == REPLICATED. No other cached card uses this Replicate-grant wording.",
-      "verified": false
+    "Treasure Nabber": {
+      "reason": "no trigger for 'whenever an opponent taps an artifact for mana': EventPattern.LandTappedForMana / Triggers.*.tapsLandForMana only cover lands, tappedForMana() is SELF/ATTACHED only, and TapEvent/becomesTapped(filter) cannot select mana abilities because TapReason has only UNSPECIFIED, TEAMWORK and ATTACK (mana-ability taps report UNSPECIFIED). Gain-control-until-end-of-your-next-turn of the triggering artifact would also need the trigger to bind it.",
+      "source": "AARMOU/arcana_table#1009; re-inspected docs/agents/generated/sdk-api.md (Triggers tappedForMana/tapsLandForMana/taps/becomesTapped) and docs/agents/argentum-upstream/card-sdk-language-reference.md TapReason section (~line 9118).",
+      "verified": true
+    },
+    "Vadrok, Apex of Thunder": {
+      "reason": "mutate plus free cast from graveyard combination",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Zilortha, Strength Incarnate": {
+      "reason": "changes the lethal-damage rule",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
     }
   },
   "keywords": {
