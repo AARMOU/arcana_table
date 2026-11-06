@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 142
-        versionName = "0.34.2-build142-hand-preview-20261106"
+        versionName = "0.34.2-build142-studio-preview-20261106"
         // Controlled by the release build after separate owner-approved Cloudflare deployment.
         // An empty endpoint makes request submission explicitly unavailable.
         val cardRequestUrl = providers.gradleProperty("arcanaCardRequestUrl").orNull.orEmpty()
@@ -34,9 +34,9 @@ android {
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
-            applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix").orElse(".b142hand").get()
+            applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix").orElse(".b142studio").get()
             // The build number follows versionCode, so the installer never shows a stale one.
-            manifestPlaceholders["appLabel"] = providers.gradleProperty("arcana.debugLabel").orElse("Arcana B142 Hand Preview").get()
+            manifestPlaceholders["appLabel"] = providers.gradleProperty("arcana.debugLabel").orElse("Arcana B142 Studio Preview").get()
         }
     }
 

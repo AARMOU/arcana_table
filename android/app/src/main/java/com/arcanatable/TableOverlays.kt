@@ -181,19 +181,19 @@ internal fun TableController.TableOverlays() {
         }
 
         if (homeOpen) {
-            if (offlineDiscardConfirm) AlertDialog(
+            if (offlineDiscardConfirm) StudioAlertDialog("Game dialog 1",
                 onDismissRequest = { offlineDiscardConfirm = false },
-                title = { Text("Discard saved offline game?") },
-                text = { Text("This permanently deletes the full offline checkpoint. It cannot be recovered.") },
+                title = { StudioText("TableOverlays.Text.1", "Dialogs and overlays", false, "Discard saved offline game?") },
+                text = { StudioText("TableOverlays.Text.2", "Dialogs and overlays", false, "This permanently deletes the full offline checkpoint. It cannot be recovered.") },
                 confirmButton = {
-                    TextButton(onClick = {
+                    StudioTextButton("TableOverlays.TextButton.1", "Dialogs and overlays", onClick = {
                         OfflineCheckpointStore.clear(context)
                         offlineResumeAvailable = false
                         offlineDiscardConfirm = false
-                    }) { Text("DISCARD SAVE", color = CounterGold) }
+                    }) { StudioText("TableOverlays.Text.3", "Dialogs and overlays", false, "DISCARD SAVE", color = CounterGold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { offlineDiscardConfirm = false }) { Text("CANCEL") }
+                    StudioTextButton("TableOverlays.TextButton.2", "Dialogs and overlays", onClick = { offlineDiscardConfirm = false }) { StudioText("TableOverlays.Text.4", "Dialogs and overlays", false, "CANCEL") }
                 }
             )
             if (quickUiTipsOpen) QuickUiTipsDialog(
@@ -227,7 +227,7 @@ internal fun TableController.TableOverlays() {
                 value = commanderName?.let { CardImages.bundledImage(context, it) }?.let { CardImages.atSize(it, "art_crop") }
             }
             val art = commanderName?.let { name -> homeArtUrl(tableArt, bundledArt, name) }
-            ArcanaHomeScreen(
+            StudioScreen("Home") { ArcanaHomeScreen(
                 wide = screenWidthDp >= 700,
                 deck = activeDeck, commanderArt = art,
                 argentumActive = argentumEnabled,
@@ -257,8 +257,8 @@ internal fun TableController.TableOverlays() {
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
                 onSettings = { optionsOpen = true; TutorialActions.tap("home-settings") },
                 onReturnToTable = { run { homeOpen = false } },
-            )
-            if (playSheetOpen) PlaySheet(
+            ) }
+            if (playSheetOpen) StudioScreen("Setup") { PlaySheet(
                 deckName = activeDeck?.name,
                 aiDecks = premadeDecks.map { DeckChoice(it.id, it.name, it.commander, builtIn = true) },
                 aiDeckId = offlineAiDeckId,
@@ -294,17 +294,17 @@ internal fun TableController.TableOverlays() {
                     onlineJoinOpen = true
                 } },
                 tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
-            )
-            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
+            ) }
+            if (deckPickerOpen) StudioScreen("Deck selection") { DeckPickerSheet(deckChoices, activeDeckId,
                 onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
                 onDismiss = { deckPickerOpen = false },
                 onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null,
-                tutorialStep = if (tutorialChapterId != null) tutorialStep else null)
+                tutorialStep = if (tutorialChapterId != null) tutorialStep else null) }
         }
         // The import dialog is also available while playing, so the builder must not
         // be restricted to the home-screen branch of this overlay.
-        if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
+        if (deckBuilderOpen && DeckBuilderFlag.enabled) StudioScreen("Decks") { DeckManagerDialog(
             decks = savedDecks,
             loadCatalog = { loadSupportCatalog() },
             onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
@@ -327,7 +327,7 @@ internal fun TableController.TableOverlays() {
                     deckBuilderReturnToImport = false
                     importOpen = true
                 }
-            })
+            }) }
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
@@ -336,9 +336,9 @@ internal fun TableController.TableOverlays() {
                     .verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("ARCANA TABLE", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
-                Text("ARGENTUM GAME", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
-                Text(
+                StudioText("TableOverlays.Text.5", "Dialogs and overlays", false, "ARCANA TABLE", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+                StudioText("TableOverlays.Text.6", "Dialogs and overlays", false, "ARGENTUM GAME", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+                StudioText("TableOverlays.Text.7", "Dialogs and overlays", true,
                     when {
                         argentumStatus == ArgentumConnectionStatus.CONNECTING -> "Connecting to Argentum…"
                         argentumStatus == ArgentumConnectionStatus.REPLACED -> "This Argentum session was opened on another device."
@@ -353,25 +353,25 @@ internal fun TableController.TableOverlays() {
                 val lobbyId = lobbyState?.optString("lobbyId")
                 if (!lobbyId.isNullOrBlank()) {
                     Column(Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(18.dp)).background(Panel).padding(18.dp)) {
-                        Text("ARGENTUM ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        StudioText("TableOverlays.Text.8", "Dialogs and overlays", false, "ARGENTUM ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         SelectionContainer {
-                            Text(lobbyId, color = CounterGold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                            StudioText("TableOverlays.Text.9", "Dialogs and overlays", true, lobbyId, color = CounterGold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                         }
                         if (lobbyState.optBoolean("vsAi", argentumVsAiLobby).not()) {
-                            OutlinedButton(
+                            StudioOutlinedButton("TableOverlays.OutlinedButton.1", "Dialogs and overlays",
                                 onClick = {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Argentum room code", lobbyId))
                                     message = "Argentum room code copied."
                                 },
                                 modifier = Modifier.padding(top = 10.dp).heightIn(min = 44.dp)
-                            ) { Text("COPY ROOM CODE") }
+                            ) { StudioText("TableOverlays.Text.10", "Dialogs and overlays", false, "COPY ROOM CODE") }
                         }
                     }
                 }
                 val lobbyPlayers = lobbyState?.optJSONArray("players")
                 if (lobbyPlayers != null) {
-                    Text("PLAYERS · ${lobbyPlayers.length()}/${if (lobbyState?.optBoolean("vsAi", argentumVsAiLobby) == true) 2 else 4}", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp))
+                    StudioText("TableOverlays.Text.11", "Dialogs and overlays", true, "PLAYERS · ${lobbyPlayers.length()}/${if (lobbyState?.optBoolean("vsAi", argentumVsAiLobby) == true) 2 else 4}", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp))
                     for (index in 0 until lobbyPlayers.length()) {
                         val lobbyPlayer = lobbyPlayers.optJSONObject(index) ?: continue
                         val status = when {
@@ -380,17 +380,17 @@ internal fun TableController.TableOverlays() {
                             lobbyPlayer.optBoolean("deckSelected") -> "DECK SELECTED"
                             else -> "CHOOSING A DECK"
                         }
-                        Text("${lobbyPlayer.optString("playerName", "PLAYER")} · $status · ${lobbyPlayer.optInt("deckCardCount")} cards", color = SoftWhite, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                        StudioText("TableOverlays.Text.12", "Dialogs and overlays", true, "${lobbyPlayer.optString("playerName", "PLAYER")} · $status · ${lobbyPlayer.optInt("deckCardCount")} cards", color = SoftWhite, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
-                Text(
+                StudioText("TableOverlays.Text.13", "Dialogs and overlays", false,
                     "Your Arcana table and card presentation stay here. Argentum validates the deck and controls every game action.",
                     color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 14.dp)
                 )
-                if (argentumLastError != null) Text(argentumLastError!!, color = Color(0xFFFFB4A8), fontSize = 13.sp, modifier = Modifier.padding(top = 18.dp))
+                if (argentumLastError != null) StudioText("TableOverlays.Text.14", "Dialogs and overlays", true, argentumLastError!!, color = Color(0xFFFFB4A8), fontSize = 13.sp, modifier = Modifier.padding(top = 18.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { argentumSocket.retryNow() }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("RECONNECT") }
-                    OutlinedButton(onClick = {
+                    StudioOutlinedButton("TableOverlays.OutlinedButton.2", "Dialogs and overlays", onClick = { argentumSocket.retryNow() }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { StudioText("TableOverlays.Text.15", "Dialogs and overlays", false, "RECONNECT") }
+                    StudioOutlinedButton("TableOverlays.OutlinedButton.3", "Dialogs and overlays", onClick = {
                         argentumSocket.leaveQuickGameLobby()
                         argentumSocket.close()
                         argentumEnabled = false
@@ -408,63 +408,63 @@ internal fun TableController.TableOverlays() {
                         turnTimerRunning = false
                         argentumLastError = null
                         homeOpen = true
-                    }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("LEAVE") }
+                    }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { StudioText("TableOverlays.Text.16", "Dialogs and overlays", false, "LEAVE") }
                 }
             }
         }
     }
 
-    if (argentumJoinDialogOpen) AlertDialog(
+    if (argentumJoinDialogOpen) StudioAlertDialog("Game dialog 2",
         onDismissRequest = { argentumJoinDialogOpen = false },
-        title = { Text("Join Argentum room") },
+        title = { StudioText("TableOverlays.Text.17", "Dialogs and overlays", false, "Join Argentum room") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Enter the room code shared by the host. Arcana will check your deck with Argentum before joining.")
-                OutlinedTextField(
+                StudioText("TableOverlays.Text.18", "Dialogs and overlays", false, "Enter the room code shared by the host. Arcana will check your deck with Argentum before joining.")
+                StudioOutlinedTextField("TableOverlays.OutlinedTextField.1", "Dialogs and overlays",
                     value = argentumJoinCode,
                     onValueChange = { argentumJoinCode = it.trim() },
-                    label = { Text("Room code") },
+                    label = { StudioText("TableOverlays.Text.19", "Dialogs and overlays", false, "Room code") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            TextButton(
+            StudioTextButton("TableOverlays.TextButton.3", "Dialogs and overlays",
                 enabled = argentumJoinCode.isNotBlank() && !argentumDeckValidationRunning,
                 onClick = {
                     val code = argentumJoinCode
                     argentumJoinDialogOpen = false
                     startArgentumPractice(vsAi = false, joinLobbyCode = code)
                 }
-            ) { Text(if (argentumDeckValidationRunning) "CHECKING…" else "CHECK DECK & JOIN") }
+            ) { StudioText("TableOverlays.Text.20", "Dialogs and overlays", true, if (argentumDeckValidationRunning) "CHECKING…" else "CHECK DECK & JOIN") }
         },
-        dismissButton = { TextButton(onClick = { argentumJoinDialogOpen = false }) { Text("CANCEL") } }
+        dismissButton = { StudioTextButton("TableOverlays.TextButton.4", "Dialogs and overlays", onClick = { argentumJoinDialogOpen = false }) { StudioText("TableOverlays.Text.21", "Dialogs and overlays", false, "CANCEL") } }
     )
 
     // Start-up problems (deck validation, connecting, resuming). In-game errors never reach here,
     // and errors already shown as a pop-up are not stored for it.
-    if (argentumLastError != null && argentumSnapshot == null && homeOpen) AlertDialog(
+    if (argentumLastError != null && argentumSnapshot == null && homeOpen) StudioAlertDialog("Game dialog 3",
         onDismissRequest = { argentumLastError = null },
-        title = { Text("Couldn't start the game") },
-        text = { Text(argentumLastError.orEmpty()) },
-        confirmButton = { TextButton(onClick = { argentumLastError = null }) { Text("OK") } }
+        title = { StudioText("TableOverlays.Text.22", "Dialogs and overlays", false, "Couldn't start the game") },
+        text = { StudioText("TableOverlays.Text.23", "Dialogs and overlays", true, argentumLastError.orEmpty()) },
+        confirmButton = { StudioTextButton("TableOverlays.TextButton.5", "Dialogs and overlays", onClick = { argentumLastError = null }) { StudioText("TableOverlays.Text.24", "Dialogs and overlays", false, "OK") } }
     )
 
 
     // Game over: result, then play again / look at the final board / go home.
     if (argentumEnabled && gameEndedOnline && !argentumGameOverDismissed) {
         val won = argentumWon ?: argentumSnapshot?.winnerName?.let { it == players.getOrNull(localSeat)?.name }
-        AlertDialog(
+        StudioAlertDialog("Game dialog 4",
             onDismissRequest = { argentumGameOverDismissed = true },
-            title = { Text(if (argentumMatchUnfinished) "Eliminated" else when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = if (argentumMatchUnfinished) Color(0xFFFFB4A8) else when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
+            title = { StudioText("TableOverlays.Text.25", "Dialogs and overlays", true, if (argentumMatchUnfinished) "Eliminated" else when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = if (argentumMatchUnfinished) Color(0xFFFFB4A8) else when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
             text = {
                 Column {
-                    Text(argentumGameOverText ?: argentumSnapshot?.winnerName?.let { "$it won." } ?: "The game has ended.", color = SoftWhite)
-                    Text("Turn ${argentumSnapshot?.turnNumber ?: turnNumber} · ${formatClock(elapsedGameSeconds)}", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    StudioText("TableOverlays.Text.26", "Dialogs and overlays", true, argentumGameOverText ?: argentumSnapshot?.winnerName?.let { "$it won." } ?: "The game has ended.", color = SoftWhite)
+                    StudioText("TableOverlays.Text.27", "Dialogs and overlays", true, "Turn ${argentumSnapshot?.turnNumber ?: turnNumber} · ${formatClock(elapsedGameSeconds)}", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             },
-            confirmButton = { TextButton(onClick = {
+            confirmButton = { StudioTextButton("TableOverlays.TextButton.6", "Dialogs and overlays", onClick = {
                 recordDiagnostic("Player chose Play again", DiagnosticCategory.ACTION)
                 val wasOffline = argentumOffline
                 val wifi = wifiRole
@@ -478,30 +478,30 @@ internal fun TableController.TableOverlays() {
                     wasOffline -> startOfflineGame()
                     else -> startArgentumPractice(vsAi = true)
                 }
-            }) { Text("PLAY AGAIN") } },
+            }) { StudioText("TableOverlays.Text.28", "Dialogs and overlays", false, "PLAY AGAIN") } },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { argentumGameOverDismissed = true }) { Text("VIEW BOARD") }
-                    TextButton(onClick = { closeArgentumSession(concede = false) }) { Text("HOME") }
+                    StudioTextButton("TableOverlays.TextButton.7", "Dialogs and overlays", onClick = { argentumGameOverDismissed = true }) { StudioText("TableOverlays.Text.29", "Dialogs and overlays", false, "VIEW BOARD") }
+                    StudioTextButton("TableOverlays.TextButton.8", "Dialogs and overlays", onClick = { closeArgentumSession(concede = false) }) { StudioText("TableOverlays.Text.30", "Dialogs and overlays", false, "HOME") }
                 }
             }
         )
     }
 
-    if (argentumLeaveConfirm) AlertDialog(
+    if (argentumLeaveConfirm) StudioAlertDialog("Game dialog 5",
         onDismissRequest = { argentumLeaveConfirm = false },
-        title = { Text("Leave Argentum game?") },
-        text = { Text(if (argentumSnapshot == null) "This will leave the Argentum room." else "Leaving a live game concedes the match to Argentum.") },
-        confirmButton = { TextButton(onClick = {
+        title = { StudioText("TableOverlays.Text.31", "Dialogs and overlays", false, "Leave Argentum game?") },
+        text = { StudioText("TableOverlays.Text.32", "Dialogs and overlays", true, if (argentumSnapshot == null) "This will leave the Argentum room." else "Leaving a live game concedes the match to Argentum.") },
+        confirmButton = { StudioTextButton("TableOverlays.TextButton.9", "Dialogs and overlays", onClick = {
             closeArgentumSession(concede = true)
             argentumLeaveConfirm = false
-        }) { Text("LEAVE GAME") } },
-        dismissButton = { TextButton(onClick = { argentumLeaveConfirm = false }) { Text("CANCEL") } }
+        }) { StudioText("TableOverlays.Text.33", "Dialogs and overlays", false, "LEAVE GAME") } },
+        dismissButton = { StudioTextButton("TableOverlays.TextButton.10", "Dialogs and overlays", onClick = { argentumLeaveConfirm = false }) { StudioText("TableOverlays.Text.34", "Dialogs and overlays", false, "CANCEL") } }
     )
 
     // The hand Argentum dealt (kept from the mulligan decision), falling back to the seat's hand.
     val openingHand = argentumOpeningHand.ifEmpty { players.getOrNull(localSeat)?.hand.orEmpty() }
-    if (argentumMulliganPrompt && argentumSnapshot == null) ArgentumOpeningHandScreen(
+    if (argentumMulliganPrompt && argentumSnapshot == null) StudioScreen("Opening hand") { ArgentumOpeningHandScreen(
         cards = openingHand,
         title = "Opening hand",
         subtitle = argentumMulliganInfo?.let { (count, onPlay, cardsToBottom) ->
@@ -519,12 +519,12 @@ internal fun TableController.TableOverlays() {
         onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
         onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
-    )
+    ) }
 
     argentumBottomCardIds?.let { ids ->
         val idFor = { serverId: String -> (serverId.hashCode() and 0x7fffffff).coerceAtLeast(1) }
         val hand = openingHand
-        ArgentumOpeningHandScreen(
+        StudioScreen("Opening hand") { ArgentumOpeningHandScreen(
             cards = ids.mapNotNull { id -> hand.firstOrNull { it.id == idFor(id) } },
             title = "Put ${argentumBottomCardCount} on the bottom",
             subtitle = "Tap ${if (argentumBottomCardCount == 1) "the card" else "$argentumBottomCardCount cards"} to put on the bottom of your library.",
@@ -539,10 +539,10 @@ internal fun TableController.TableOverlays() {
             primaryEnabled = argentumBottomSelection.size == argentumBottomCardCount && !argentumAwaitingUpdate,
             onPrimary = { if (argentumSocket.chooseBottomCards(argentumBottomSelection.toList())) { argentumBottomCardIds = null; argentumAwaitingUpdate = true } },
             secondaryLabel = null, secondaryEnabled = false, onSecondary = {},
-        )
+        ) }
     }
 
-    if (argentumActionChoices.isNotEmpty()) ArgentumActionSheet(
+    if (argentumActionChoices.isNotEmpty()) StudioScreen("Legal actions") { ArgentumActionSheet(
         card = argentumActionCard,
         choices = ArgentumActions.visibleChoices(argentumActionChoices),
         hidManaAbilities = false,
@@ -558,7 +558,7 @@ internal fun TableController.TableOverlays() {
         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
         onSecretNudge = { if (wifiRole != null) argentumSocket.send("arcanaNudge") },
             onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
-    )
+    ) }
 
     // Combat damage is split on the combat board rather than in a dialog.
     argentumPendingDecision?.takeIf { it.optString("type") == "CombatResolutionDecision" && it.optString("id") != argentumDeferredDecisionId }?.let { decision ->
@@ -578,23 +578,23 @@ internal fun TableController.TableOverlays() {
             val source = decision.optJSONObject("context")?.optString("sourceName")?.takeIf { it.isNotBlank() && it != "null" }
             if (source != null && !base.contains(source, ignoreCase = true)) "$source: $base" else base
         }
-        AlertDialog(
+        StudioAlertDialog("Game dialog 6",
             onDismissRequest = {},
-            title = { Text(prompt) },
+            title = { StudioText("TableOverlays.Text.35", "Dialogs and overlays", true, prompt) },
             text = {
                 Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
                     when (kind) {
-                        "YesNoDecision" -> Text(decision.optString("hint").takeIf(String::isNotBlank).orEmpty(), color = Muted)
+                        "YesNoDecision" -> StudioText("TableOverlays.Text.36", "Dialogs and overlays", true, decision.optString("hint").takeIf(String::isNotBlank).orEmpty(), color = Muted)
                         "ChooseOptionDecision" -> (decision.optJSONArray("options") ?: JSONArray()).let { options ->
                             var optionQuery by remember(decisionId) { mutableStateOf("") }
                             if (options.length() > SEARCH_THRESHOLD) PickSearchField(optionQuery, { optionQuery = it })
                             val shownOptions = (0 until options.length()).filter { matchesSearch(options.optString(it), optionQuery) }
-                            if (shownOptions.isEmpty()) Text("Nothing matches \"$optionQuery\".", color = Muted, fontSize = 12.sp)
+                            if (shownOptions.isEmpty()) StudioText("TableOverlays.Text.37", "Dialogs and overlays", true, "Nothing matches \"$optionQuery\".", color = Muted, fontSize = 12.sp)
                             for (index in shownOptions) {
                                 val option = options.optString(index)
-                                TextButton(onClick = {
+                                StudioTextButton("TableOverlays.TextButton.11", "Dialogs and overlays", onClick = {
                                     submitArgentumDecision(JSONObject().put("type", "OptionChosenResponse").put("optionIndex", index))
-                                }, modifier = Modifier.fillMaxWidth()) { Text(option, color = Mint) }
+                                }, modifier = Modifier.fillMaxWidth()) { StudioText("TableOverlays.Text.38", "Dialogs and overlays", true, option, color = Mint) }
                             }
                         }
                         "ChooseNumberDecision" -> {
@@ -602,9 +602,9 @@ internal fun TableController.TableOverlays() {
                             val max = decision.optInt("maxValue", min)
                             var chosenNumber by remember(decision.optString("id")) { mutableIntStateOf(min) }
                             NumberPicker(chosenNumber, min..maxOf(min, max), onChange = { chosenNumber = it })
-                            TextButton(onClick = {
+                            StudioTextButton("TableOverlays.TextButton.12", "Dialogs and overlays", onClick = {
                                 submitArgentumDecision(JSONObject().put("type", "NumberChosenResponse").put("number", chosenNumber))
-                            }, modifier = Modifier.fillMaxWidth()) { Text("CHOOSE $chosenNumber", color = Mint, fontWeight = FontWeight.Black) }
+                            }, modifier = Modifier.fillMaxWidth()) { StudioText("TableOverlays.Text.39", "Dialogs and overlays", true, "CHOOSE $chosenNumber", color = Mint, fontWeight = FontWeight.Black) }
                         }
                         "ChooseColorDecision" -> {
                             val colors = decision.optJSONArray("availableColors") ?: JSONArray()
@@ -615,10 +615,10 @@ internal fun TableController.TableOverlays() {
                                     argentumDecisionColors = if (multi && color in argentumDecisionColors) argentumDecisionColors - color
                                         else if (multi) argentumDecisionColors + color else setOf(color)
                                 }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (multi) Checkbox(checked = color in argentumDecisionColors, onCheckedChange = { checked ->
+                                    if (multi) StudioCheckbox("TableOverlays.Checkbox.1", "Dialogs and overlays", checked = color in argentumDecisionColors, onCheckedChange = { checked ->
                                         argentumDecisionColors = if (checked) argentumDecisionColors + color else argentumDecisionColors - color
-                                    }) else RadioButton(selected = color in argentumDecisionColors, onClick = { argentumDecisionColors = setOf(color) })
-                                    Text(color, color = SoftWhite)
+                                    }) else StudioRadioButton("TableOverlays.RadioButton.1", "Dialogs and overlays", selected = color in argentumDecisionColors, onClick = { argentumDecisionColors = setOf(color) })
+                                    StudioText("TableOverlays.Text.40", "Dialogs and overlays", true, color, color = SoftWhite)
                                 }
                             }
                         }
@@ -638,7 +638,7 @@ internal fun TableController.TableOverlays() {
                                 argentumDecisionSelection = if (id in argentumDecisionSelection) argentumDecisionSelection - id
                                     else if (maxSel == 1) setOf(id) else if (canAdd(id)) argentumDecisionSelection + id else argentumDecisionSelection
                             })
-                            Text("Choose ${decision.optInt("minSelections", 0)}–${decision.optInt("maxSelections", 1)} card(s).", color = Muted, fontSize = 11.sp)
+                            StudioText("TableOverlays.Text.41", "Dialogs and overlays", true, "Choose ${decision.optInt("minSelections", 0)}–${decision.optInt("maxSelections", 1)} card(s).", color = Muted, fontSize = 11.sp)
                         }
                         "ChooseTargetsDecision" -> {
                             val requirements = decision.optJSONArray("targetRequirements") ?: JSONArray()
@@ -649,7 +649,7 @@ internal fun TableController.TableOverlays() {
                                 val requirementIndex = requirement.optInt("index", requirementPosition)
                                 val chosen = argentumDecisionTargets[requirementIndex].orEmpty()
                                 val maxTargets = requirement.optInt("maxTargets", 1)
-                                Text(requirement.optString("description", "Choose target(s)"), color = Mint, fontSize = 12.sp)
+                                StudioText("TableOverlays.Text.42", "Dialogs and overlays", true, requirement.optString("description", "Choose target(s)"), color = Mint, fontSize = 12.sp)
                                 val prefixPools = requirement.optJSONObject("legalTargetsByPrefix")
                                 val prefixLength = requirement.optInt("prefixLength", requirementIndex)
                                 val prefixKey = (0 until prefixLength).joinToString(",") { priorIndex ->
@@ -675,7 +675,7 @@ internal fun TableController.TableOverlays() {
                                         put(requirementIndex, when { id in chosen -> chosen - id; maxTargets == 1 -> listOf(id); chosen.size < maxTargets -> chosen + id; else -> chosen })
                                     }
                                 })
-                                Text("Choose ${requirement.optInt("minTargets", 0)}–$maxTargets target(s).", color = Muted, fontSize = 11.sp)
+                                StudioText("TableOverlays.Text.43", "Dialogs and overlays", true, "Choose ${requirement.optInt("minTargets", 0)}–$maxTargets target(s).", color = Muted, fontSize = 11.sp)
                             }
                         }
                         "ChooseModeDecision" -> {
@@ -686,22 +686,22 @@ internal fun TableController.TableOverlays() {
                                 val index = mode.optInt("index", position)
                                 val available = mode.optBoolean("available", true)
                                 val on = index in argentumModeSelection
-                                Row(Modifier.fillMaxWidth().clickable(enabled = available) {
+                                Row(Modifier.fillMaxWidth().studioClickable("TableOverlays.clickable.1", "Dialogs and overlays", enabled = available) {
                                     argentumModeSelection = if (on) argentumModeSelection - index else if (maxModes == 1) setOf(index) else if (argentumModeSelection.size < maxModes) argentumModeSelection + index else argentumModeSelection
                                 }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (maxModes == 1) RadioButton(selected = on, enabled = available, onClick = { argentumModeSelection = setOf(index) })
-                                    else Checkbox(checked = on, enabled = available, onCheckedChange = { argentumModeSelection = if (it) argentumModeSelection + index else argentumModeSelection - index })
-                                    Text(mode.optString("text", "Mode ${index + 1}"), color = if (available) SoftWhite else Muted, fontSize = 12.sp)
+                                    if (maxModes == 1) StudioRadioButton("TableOverlays.RadioButton.2", "Dialogs and overlays", selected = on, enabled = available, onClick = { argentumModeSelection = setOf(index) })
+                                    else StudioCheckbox("TableOverlays.Checkbox.2", "Dialogs and overlays", checked = on, enabled = available, onCheckedChange = { argentumModeSelection = if (it) argentumModeSelection + index else argentumModeSelection - index })
+                                    StudioText("TableOverlays.Text.44", "Dialogs and overlays", true, mode.optString("text", "Mode ${index + 1}"), color = if (available) SoftWhite else Muted, fontSize = 12.sp)
                                 }
                             }
-                            Text("Choose ${decision.optInt("minModes", 1)}–$maxModes mode(s).", color = Muted, fontSize = 11.sp)
+                            StudioText("TableOverlays.Text.45", "Dialogs and overlays", true, "Choose ${decision.optInt("minModes", 1)}–$maxModes mode(s).", color = Muted, fontSize = 11.sp)
                         }
                         "SearchLibraryDecision" -> {
                             val options = decision.optJSONArray("options") ?: JSONArray()
                             val libraryInfo = decision.optJSONObject("cards") ?: decision.optJSONObject("cardInfo")
                             val maxSel = decision.optInt("maxSelections", 1)
-                            Text(decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
-                            if (options.length() == 0) Text("No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
+                            StudioText("TableOverlays.Text.46", "Dialogs and overlays", true, decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
+                            if (options.length() == 0) StudioText("TableOverlays.Text.47", "Dialogs and overlays", false, "No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
                             else {
                                 val allLibraryItems = remember(decision) {
                                     (0 until options.length()).map { index ->
@@ -716,17 +716,17 @@ internal fun TableController.TableOverlays() {
                                 if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
-                                        FilterChip(librarySort == sort, { librarySort = sort }, label = { Text(sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
+                                        StudioFilterChip("TableOverlays.FilterChip.1", "Dialogs and overlays", librarySort == sort, { librarySort = sort }, label = { StudioText("TableOverlays.Text.48", "Dialogs and overlays", true, sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
                                     }
                                     chips.forEach { (chip, n) ->
-                                        FilterChip(libraryChip == chip, { libraryChip = if (libraryChip == chip) null else chip }, label = { Text("${chip.label} $n") },
+                                        StudioFilterChip("TableOverlays.FilterChip.2", "Dialogs and overlays", libraryChip == chip, { libraryChip = if (libraryChip == chip) null else chip }, label = { StudioText("TableOverlays.Text.49", "Dialogs and overlays", true, "${chip.label} $n") },
                                             modifier = Modifier.testTag("library-chip-${chip.name}"))
                                     }
                                 }
                                 val libraryItems = arrangeLibrary(allLibraryItems, libraryChip, librarySort, keep = { it.id in argentumDecisionSelection },
                                     name = { it.name }, typeLine = { it.typeLine }, manaValue = { null })
                                     .map { (group, item) -> item.copy(group = group, groupOrder = LIBRARY_GROUP_ORDER.indexOf(group).coerceAtLeast(0)) }
-                                if (maxSel > 1) Text("${argentumDecisionSelection.size} of up to $maxSel chosen", color = if (argentumDecisionSelection.isEmpty()) Muted else Mint,
+                                if (maxSel > 1) StudioText("TableOverlays.Text.50", "Dialogs and overlays", true, "${argentumDecisionSelection.size} of up to $maxSel chosen", color = if (argentumDecisionSelection.isEmpty()) Muted else Mint,
                                     fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 CardPickGrid(libraryItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || argentumDecisionSelection.size < maxSel || maxSel == 1 }, onTap = { id ->
                                     argentumDecisionSelection = when {
@@ -737,7 +737,7 @@ internal fun TableController.TableOverlays() {
                                     }
                                 })
                             }
-                            Text("Choose ${decision.optInt("minSelections", 0)}–$maxSel card(s).", color = Muted, fontSize = 11.sp)
+                            StudioText("TableOverlays.Text.51", "Dialogs and overlays", true, "Choose ${decision.optInt("minSelections", 0)}–$maxSel card(s).", color = Muted, fontSize = 11.sp)
                         }
                         "OrderObjectsDecision", "ReorderLibraryDecision" -> ArgentumOrderEditor(
                             items = argentumOrderSelection,
@@ -746,12 +746,12 @@ internal fun TableController.TableOverlays() {
                             lastLabel = decision.optString("lastLabel").takeIf { it.isNotBlank() && it != "null" },
                             onChange = { argentumOrderSelection = it }
                         )
-                        "SelectManaSourcesDecision" -> Text("Pay ${decision.optString("requiredCost")}. Argentum can choose the mana sources for you.", color = SoftWhite, fontSize = 12.sp)
+                        "SelectManaSourcesDecision" -> StudioText("TableOverlays.Text.52", "Dialogs and overlays", true, "Pay ${decision.optString("requiredCost")}. Argentum can choose the mana sources for you.", color = SoftWhite, fontSize = 12.sp)
                         "AssignDamageDecision" -> {
                             val ids = (decision.optJSONArray("orderedTargets") ?: JSONArray()).let { t -> (0 until t.length()).map { t.optString(it) } } +
                                 listOfNotNull(decision.optString("defenderId").takeIf { it.isNotBlank() && it != "null" })
                             val minimums = decision.optJSONObject("minimumAssignments")
-                            Text("${argentumName(decision.optString("attackerId"))} assigns ${decision.optInt("availablePower")} damage" + (if (decision.optBoolean("hasTrample")) " (trample)" else "") + (if (decision.optBoolean("hasDeathtouch")) " (deathtouch)" else "") + ".", color = Muted, fontSize = 11.sp)
+                            StudioText("TableOverlays.Text.53", "Dialogs and overlays", true, "${argentumName(decision.optString("attackerId"))} assigns ${decision.optInt("availablePower")} damage" + (if (decision.optBoolean("hasTrample")) " (trample)" else "") + (if (decision.optBoolean("hasDeathtouch")) " (deathtouch)" else "") + ".", color = Muted, fontSize = 11.sp)
                             ArgentumAmountEditor(ids.distinct(), ::argentumName, argentumAmounts, decision.optInt("availablePower"),
                                 minEach = ids.associateWith { minimums?.optInt(it, 0) ?: 0 }, maxEach = emptyMap(), onChange = { argentumAmounts = it })
                         }
@@ -771,9 +771,9 @@ internal fun TableController.TableOverlays() {
                         }
                         else -> {
                             val reason = ArgentumDecisions.needsHandlingReason(decision) ?: "Arcana cannot present this choice."
-                            Text("NEEDS HANDLING", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                            Text(reason, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                            Text("Nothing has been chosen for you. You can " + (if (ArgentumDecisions.canCancel(decision)) "cancel this if Argentum allows it, " else "") +
+                            StudioText("TableOverlays.Text.54", "Dialogs and overlays", false, "NEEDS HANDLING", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            StudioText("TableOverlays.Text.55", "Dialogs and overlays", true, reason, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                            StudioText("TableOverlays.Text.56", "Dialogs and overlays", false, "Nothing has been chosen for you. You can " + (if (ArgentumDecisions.canCancel(decision)) "cancel this if Argentum allows it, " else "") +
                                 "refresh in case Argentum sends a different prompt, or hide this to inspect the table with Arcana's viewing tools (the game waits for this choice). The event is in the diagnostic log.",
                                 color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
                         }
@@ -783,24 +783,24 @@ internal fun TableController.TableOverlays() {
             confirmButton = {
                 when (kind) {
                     "YesNoDecision" -> Column(horizontalAlignment = Alignment.End) {
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { Text(decision.decisionDisplayText("yesText", "YES")) }
-                        TextButton(onClick = {
+                        StudioTextButton("TableOverlays.TextButton.13", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { StudioText("TableOverlays.Text.57", "Dialogs and overlays", true, decision.decisionDisplayText("yesText", "YES")) }
+                        StudioTextButton("TableOverlays.TextButton.14", "Dialogs and overlays", onClick = {
                             argentumAutoYes = argentumAutoYes + (autoYesKey(decision) to (argentumSnapshot?.turnNumber ?: 0))
                             submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true))
-                        }) { Text("${decision.decisionDisplayText("yesText", "YES").uppercase()} · ALWAYS THIS TURN", fontSize = 12.sp) }
+                        }) { StudioText("TableOverlays.Text.58", "Dialogs and overlays", true, "${decision.decisionDisplayText("yesText", "YES").uppercase()} · ALWAYS THIS TURN", fontSize = 12.sp) }
                     }
                     "BatchYesNoDecision" -> Column(horizontalAlignment = Alignment.End) {
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", false)) }) { Text("${decision.decisionDisplayText("yesText", "YES")} · ONCE") }
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", true)) }) { Text("${decision.decisionDisplayText("yesText", "YES")} · ALL") }
+                        StudioTextButton("TableOverlays.TextButton.15", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", false)) }) { StudioText("TableOverlays.Text.59", "Dialogs and overlays", true, "${decision.decisionDisplayText("yesText", "YES")} · ONCE") }
+                        StudioTextButton("TableOverlays.TextButton.16", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", true)) }) { StudioText("TableOverlays.Text.60", "Dialogs and overlays", true, "${decision.decisionDisplayText("yesText", "YES")} · ALL") }
                     }
-                    "ChooseColorDecision" -> TextButton(enabled = argentumDecisionColors.isNotEmpty() && argentumDecisionColors.size <= decision.optInt("maxColors", 1), onClick = {
+                    "ChooseColorDecision" -> StudioTextButton("TableOverlays.TextButton.17", "Dialogs and overlays", enabled = argentumDecisionColors.isNotEmpty() && argentumDecisionColors.size <= decision.optInt("maxColors", 1), onClick = {
                         val colors = argentumDecisionColors.toList()
                         submitArgentumDecision(JSONObject().put("type", "ColorChosenResponse").put("color", colors.first()).put("colors", JSONArray(colors)))
-                    }) { Text("CONFIRM") }
-                    "SelectCardsDecision" -> TextButton(enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
+                    }) { StudioText("TableOverlays.Text.61", "Dialogs and overlays", false, "CONFIRM") }
+                    "SelectCardsDecision" -> StudioTextButton("TableOverlays.TextButton.18", "Dialogs and overlays", enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
                         submitArgentumDecision(JSONObject().put("type", "CardsSelectedResponse").put("selectedCards", JSONArray(argentumDecisionSelection.toList())))
-                    }) { Text("CONFIRM") }
-                    "ChooseTargetsDecision" -> TextButton(enabled = run {
+                    }) { StudioText("TableOverlays.Text.62", "Dialogs and overlays", false, "CONFIRM") }
+                    "ChooseTargetsDecision" -> StudioTextButton("TableOverlays.TextButton.19", "Dialogs and overlays", enabled = run {
                         val requirements = decision.optJSONArray("targetRequirements") ?: JSONArray()
                         (0 until requirements.length()).all { position ->
                             val requirement = requirements.optJSONObject(position) ?: return@all false
@@ -818,60 +818,60 @@ internal fun TableController.TableOverlays() {
                         }
                         submitArgentumDecision(JSONObject().put("type", "TargetsResponse").put("selectedTargets", targets))
                         argentumDecisionTargets = emptyMap()
-                    }) { Text("CONFIRM TARGET") }
-                    "ChooseModeDecision" -> TextButton(enabled = argentumModeSelection.size in decision.optInt("minModes", 1)..decision.optInt("maxModes", 1), onClick = {
+                    }) { StudioText("TableOverlays.Text.63", "Dialogs and overlays", false, "CONFIRM TARGET") }
+                    "ChooseModeDecision" -> StudioTextButton("TableOverlays.TextButton.20", "Dialogs and overlays", enabled = argentumModeSelection.size in decision.optInt("minModes", 1)..decision.optInt("maxModes", 1), onClick = {
                         submitArgentumDecision(ArgentumDecisions.modesResponse(argentumModeSelection.sorted()))
-                    }) { Text("CONFIRM") }
-                    "SearchLibraryDecision" -> TextButton(enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
+                    }) { StudioText("TableOverlays.Text.64", "Dialogs and overlays", false, "CONFIRM") }
+                    "SearchLibraryDecision" -> StudioTextButton("TableOverlays.TextButton.21", "Dialogs and overlays", enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
                         submitArgentumDecision(ArgentumDecisions.cardsSelectedResponse(argentumDecisionSelection))
                     }, modifier = Modifier.testTag("library-confirm")) {
                         // Finding nothing is a legal answer to most tutors; say so instead of a bare CONFIRM.
-                        Text(if (argentumDecisionSelection.isEmpty() && decision.optInt("minSelections", 0) == 0) "FIND NOTHING"
+                        StudioText("TableOverlays.Text.65", "Dialogs and overlays", true, if (argentumDecisionSelection.isEmpty() && decision.optInt("minSelections", 0) == 0) "FIND NOTHING"
                             else if (argentumDecisionSelection.size > 1) "CONFIRM ${argentumDecisionSelection.size}" else "CONFIRM")
                     }
-                    "OrderObjectsDecision", "ReorderLibraryDecision" -> TextButton(enabled = argentumOrderSelection.isNotEmpty(), onClick = {
+                    "OrderObjectsDecision", "ReorderLibraryDecision" -> StudioTextButton("TableOverlays.TextButton.22", "Dialogs and overlays", enabled = argentumOrderSelection.isNotEmpty(), onClick = {
                         submitArgentumDecision(ArgentumDecisions.orderedResponse(argentumOrderSelection))
-                    }) { Text("CONFIRM ORDER") }
-                    "SelectManaSourcesDecision" -> TextButton(onClick = { submitArgentumDecision(ArgentumDecisions.autoPayManaResponse()) }) { Text("AUTO-PAY") }
-                    "AssignDamageDecision" -> TextButton(enabled = ArgentumDecisions.damageAssignmentComplete(decision, argentumAmounts), onClick = {
+                    }) { StudioText("TableOverlays.Text.66", "Dialogs and overlays", false, "CONFIRM ORDER") }
+                    "SelectManaSourcesDecision" -> StudioTextButton("TableOverlays.TextButton.23", "Dialogs and overlays", onClick = { submitArgentumDecision(ArgentumDecisions.autoPayManaResponse()) }) { StudioText("TableOverlays.Text.67", "Dialogs and overlays", false, "AUTO-PAY") }
+                    "AssignDamageDecision" -> StudioTextButton("TableOverlays.TextButton.24", "Dialogs and overlays", enabled = ArgentumDecisions.damageAssignmentComplete(decision, argentumAmounts), onClick = {
                         submitArgentumDecision(ArgentumDecisions.damageAssignmentResponse(argentumAmounts.filterValues { it > 0 }))
-                    }) { Text("ASSIGN") }
+                    }) { StudioText("TableOverlays.Text.68", "Dialogs and overlays", false, "ASSIGN") }
                     "SplitPilesDecision" -> ArgentumPileSplit(decision).let { split ->
-                        TextButton(enabled = split.problem(argentumAmounts) == null, onClick = { submitArgentumDecision(split.response(argentumAmounts)) }) { Text("CONFIRM PILES") }
+                        StudioTextButton("TableOverlays.TextButton.25", "Dialogs and overlays", enabled = split.problem(argentumAmounts) == null, onClick = { submitArgentumDecision(split.response(argentumAmounts)) }) { StudioText("TableOverlays.Text.69", "Dialogs and overlays", false, "CONFIRM PILES") }
                     }
-                    "ChooseReplacementDecision" -> TextButton(onClick = {
+                    "ChooseReplacementDecision" -> StudioTextButton("TableOverlays.TextButton.26", "Dialogs and overlays", onClick = {
                         submitArgentumDecision(ArgentumReplacementChoice(decision).response(argentumReplacementPick.first, argentumReplacementPick.second))
-                    }) { Text("CONFIRM") }
+                    }) { StudioText("TableOverlays.Text.70", "Dialogs and overlays", false, "CONFIRM") }
                     "BudgetModalDecision" -> ArgentumBudgetModes(decision).let { budget ->
-                        TextButton(enabled = budget.spent(argentumBudgetCounts) <= budget.budget, onClick = { submitArgentumDecision(budget.response(argentumBudgetCounts)) }) { Text("CONFIRM") }
+                        StudioTextButton("TableOverlays.TextButton.27", "Dialogs and overlays", enabled = budget.spent(argentumBudgetCounts) <= budget.budget, onClick = { submitArgentumDecision(budget.response(argentumBudgetCounts)) }) { StudioText("TableOverlays.Text.71", "Dialogs and overlays", false, "CONFIRM") }
                     }
                     "CombatResolutionDecision" -> {
                         val board = ArgentumCombatResolution.from(decision)
-                        TextButton(enabled = board != null && board.problem(argentumAmounts) == null, onClick = {
+                        StudioTextButton("TableOverlays.TextButton.28", "Dialogs and overlays", enabled = board != null && board.problem(argentumAmounts) == null, onClick = {
                             board?.let { submitArgentumDecision(it.response(decision.optString("playerId"), argentumAmounts)) }
-                        }) { Text("CONFIRM DAMAGE") }
+                        }) { StudioText("TableOverlays.Text.72", "Dialogs and overlays", false, "CONFIRM DAMAGE") }
                     }
-                    "DistributeDecision" -> TextButton(enabled = ArgentumDecisions.distributionComplete(decision, argentumAmounts), onClick = {
+                    "DistributeDecision" -> StudioTextButton("TableOverlays.TextButton.29", "Dialogs and overlays", enabled = ArgentumDecisions.distributionComplete(decision, argentumAmounts), onClick = {
                         submitArgentumDecision(ArgentumDecisions.distributionResponse(argentumAmounts))
-                    }) { Text("CONFIRM") }
+                    }) { StudioText("TableOverlays.Text.73", "Dialogs and overlays", false, "CONFIRM") }
                     else -> Row {
-                        if (ArgentumDecisions.canCancel(decision)) TextButton(onClick = { submitArgentumDecision(ArgentumDecisions.cancelResponse()) }) { Text("CANCEL CHOICE") }
-                        TextButton(onClick = { recordDiagnostic("Player requested refresh for unhandled ${kind}", DiagnosticCategory.UNSUPPORTED); argentumSocket.requestResync() }) { Text("REFRESH") }
+                        if (ArgentumDecisions.canCancel(decision)) StudioTextButton("TableOverlays.TextButton.30", "Dialogs and overlays", onClick = { submitArgentumDecision(ArgentumDecisions.cancelResponse()) }) { StudioText("TableOverlays.Text.74", "Dialogs and overlays", false, "CANCEL CHOICE") }
+                        StudioTextButton("TableOverlays.TextButton.31", "Dialogs and overlays", onClick = { recordDiagnostic("Player requested refresh for unhandled ${kind}", DiagnosticCategory.UNSUPPORTED); argentumSocket.requestResync() }) { StudioText("TableOverlays.Text.75", "Dialogs and overlays", false, "REFRESH") }
                     }
                 }
             },
             dismissButton = {
-                if (kind == "YesNoDecision") TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", false)) }) { Text(decision.decisionDisplayText("noText", "NO")) }
+                if (kind == "YesNoDecision") StudioTextButton("TableOverlays.TextButton.32", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", false)) }) { StudioText("TableOverlays.Text.76", "Dialogs and overlays", true, decision.decisionDisplayText("noText", "NO")) }
                 else if (kind == "BatchYesNoDecision") Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", false)) }) { Text("${decision.decisionDisplayText("noText", "NO")} · ONCE") }
-                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", true)) }) { Text("${decision.decisionDisplayText("noText", "NO")} · ALL") }
+                    StudioTextButton("TableOverlays.TextButton.33", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", false)) }) { StudioText("TableOverlays.Text.77", "Dialogs and overlays", true, "${decision.decisionDisplayText("noText", "NO")} · ONCE") }
+                    StudioTextButton("TableOverlays.TextButton.34", "Dialogs and overlays", onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", true)) }) { StudioText("TableOverlays.Text.78", "Dialogs and overlays", true, "${decision.decisionDisplayText("noText", "NO")} · ALL") }
                 }
-                else if (kind == "SelectCardsDecision" && decision.optInt("minSelections", 0) == 0) TextButton(onClick = {
+                else if (kind == "SelectCardsDecision" && decision.optInt("minSelections", 0) == 0) StudioTextButton("TableOverlays.TextButton.35", "Dialogs and overlays", onClick = {
                     submitArgentumDecision(JSONObject().put("type", "CardsSelectedResponse").put("selectedCards", JSONArray()))
-                }) { Text(decision.decisionDisplayText("declineLabel", "SELECT NONE")) }
-                else if (kind == "SelectManaSourcesDecision" && decision.optBoolean("canDecline")) TextButton(onClick = { submitArgentumDecision(ArgentumDecisions.declineManaResponse()) }) { Text("DECLINE") }
+                }) { StudioText("TableOverlays.Text.79", "Dialogs and overlays", true, decision.decisionDisplayText("declineLabel", "SELECT NONE")) }
+                else if (kind == "SelectManaSourcesDecision" && decision.optBoolean("canDecline")) StudioTextButton("TableOverlays.TextButton.36", "Dialogs and overlays", onClick = { submitArgentumDecision(ArgentumDecisions.declineManaResponse()) }) { StudioText("TableOverlays.Text.80", "Dialogs and overlays", false, "DECLINE") }
                 // Every decision can be set aside to look at the board; the status strip brings it back.
-                if (kind !in setOf("YesNoDecision", "BatchYesNoDecision")) TextButton(onClick = { argentumDeferredDecisionId = decisionId }) { Text("VIEW TABLE") }
+                if (kind !in setOf("YesNoDecision", "BatchYesNoDecision")) StudioTextButton("TableOverlays.TextButton.37", "Dialogs and overlays", onClick = { argentumDeferredDecisionId = decisionId }) { StudioText("TableOverlays.Text.81", "Dialogs and overlays", false, "VIEW TABLE") }
             }
         )
     }
@@ -939,10 +939,10 @@ internal fun TableController.TableOverlays() {
             onEditDeck = { argentumDeckReview = null; selectedPlayer = localSeat; deckEditorOpen = true },
             onCancel = { argentumDeckReview = null })
     }
-    if (diagnosticViewerOpen) DiagnosticLogDialog(diagnosticLog, diagnosticRevision,
+    if (diagnosticViewerOpen) StudioScreen("Diagnostics") { DiagnosticLogDialog(diagnosticLog, diagnosticRevision,
         onExport = { selection -> diagnosticExportSelection = selection; exportDiagnosticLog() },
         onClear = { diagnosticLog.clear(); diagnosticRevision++; optionPrefs.edit().putString("diagnostic_events", "").apply(); recordDiagnostic("Diagnostic log cleared", DiagnosticCategory.APP) },
-        onDismiss = { diagnosticViewerOpen = false })
+        onDismiss = { diagnosticViewerOpen = false }) }
 
     if (changelogOpen) ChangelogDialog(onDismiss = { changelogOpen = false })
 
@@ -953,14 +953,14 @@ internal fun TableController.TableOverlays() {
     // While a combat board or another Argentum choice is open, the hand is for looking only.
     val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
 
-    val handActionsBusy = handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
+    val handActionsBusy = LocalStudioControls.current?.editing==true || handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
     val handActions = handDrawerActions(argentumSnapshot?.legalActions.orEmpty(), handActionsBusy)
     val handCards = players.getOrNull(handSeat)?.hand.orEmpty()
     val handCastActions = handDrawerCastActions(handActions, handCards.mapNotNull { argentumSnapshot?.serverCardIds?.get(it.id) }.toSet())
     val handCastableIds = handCards.filter { card -> ArgentumActions.forCardServerId(handCastActions,
         argentumSnapshot?.serverCardIds?.get(card.id)).isNotEmpty() }.map { it.id }.toSet()
 
-    val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioStore(optionPrefs, layoutOrientationSuffix) }
+    val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioProfiles(optionPrefs, layoutOrientationSuffix).activeStore() }
     val studioLayout = remember(studioStore, nativeStudioRevision) {
         if (BuildConfig.DEBUG && studioStore.enabled()) studioStore.load() else null
     }
@@ -968,7 +968,7 @@ internal fun TableController.TableOverlays() {
         configuration.screenWidthDp.toFloat(), LocalDensity.current.fontScale, configuration.screenHeightDp.toFloat()).isEmpty()
     var studioHandFraction by remember(studioLayout, configuration.screenWidthDp, configuration.screenHeightDp) {
         // Reserve 36dp resize grip and 48dp close row above owner's y=344 origin.
-        mutableFloatStateOf(((configuration.screenHeightDp - 344f * configuration.screenWidthDp / 412f + 84f) /
+        mutableFloatStateOf(((configuration.screenHeightDp - (studioLayout?.originY ?: 344f) * configuration.screenWidthDp / (studioLayout?.canvasWidth ?: 412f) + 84f) /
             configuration.screenHeightDp.coerceAtLeast(1)).coerceIn(.38f,.95f))
     }
     AnimatedVisibility(
@@ -1023,8 +1023,8 @@ internal fun TableController.TableOverlays() {
                     ) {
                         BottomSheetDefaults.DragHandle(color = Muted)
                     }
-                    if (!studioFrame) Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
-                    HandSheet(
+                    if (!studioFrame) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
+                    StudioScreen("Hand") { HandSheet(
                         studioLayout = studioLayout,
                         turnContext = argentumSnapshot?.let { snap ->
                             "Turn ${snap.turnNumber} · ${snap.stepName.lowercase().replaceFirstChar(Char::uppercase)} · " +
@@ -1127,7 +1127,7 @@ internal fun TableController.TableOverlays() {
                                 }
                             }
                         }
-                    )
+                    ) }
                 }
             }
         }

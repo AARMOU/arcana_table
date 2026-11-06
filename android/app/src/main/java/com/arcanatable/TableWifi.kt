@@ -645,119 +645,119 @@ internal fun TableController.setGuestLobbyReady(ready: Boolean) {
 internal fun TableController.WifiDialogs() {
     // 2–4 player rooms (host and guests) use the full lobby screen; the dialogs below are the
     // one-guest paths and the host's room setup.
-    MultiplayerLobbyScreen()
+    StudioScreen("Room") { MultiplayerLobbyScreen() }
     if (wifiMultiConfigOpen) {
-        AlertDialog(
+        StudioAlertDialog("Table Wifi 1",
             onDismissRequest = { wifiMultiConfigOpen = false },
-            title = { Text(if (wifiMultiOnline) "Host online Commander" else "Host Wi-Fi Commander") },
+            title = { StudioText("TableWifi.Text.1", "Rooms and lobby", true, if (wifiMultiOnline) "Host online Commander" else "Host Wi-Fi Commander") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (wifiMultiOnline) "Choose 2–4 seats. Friends can join across different networks using the room code." else "Choose 2–4 seats. Friends must use the same Wi-Fi.")
+                    StudioText("TableWifi.Text.2", "Rooms and lobby", true, if (wifiMultiOnline) "Choose 2–4 seats. Friends can join across different networks using the room code." else "Choose 2–4 seats. Friends must use the same Wi-Fi.")
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         (2..4).forEach { size ->
-                            TextButton(onClick = {
+                            StudioTextButton("TableWifi.TextButton.1", "Rooms and lobby", onClick = {
                                 wifiMultiSeatCount = size
                                 wifiMultiFriendSlots = wifiMultiFriendSlots.filter { it < size }
                                     .toSet().ifEmpty { setOf(1) }
-                            }) { Text(if (wifiMultiSeatCount == size) "[$size]" else "$size") }
+                            }) { StudioText("TableWifi.Text.3", "Rooms and lobby", true, if (wifiMultiSeatCount == size) "[$size]" else "$size") }
                         }
                     }
                     (1 until wifiMultiSeatCount).forEach { seat ->
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Seat ${seat + 1}")
-                            TextButton(onClick = {
+                            StudioText("TableWifi.Text.4", "Rooms and lobby", true, "Seat ${seat + 1}")
+                            StudioTextButton("TableWifi.TextButton.2", "Rooms and lobby", onClick = {
                                 wifiMultiFriendSlots = if (seat in wifiMultiFriendSlots)
                                     wifiMultiFriendSlots - seat else wifiMultiFriendSlots + seat
                             }) {
-                                Text(if (seat in wifiMultiFriendSlots) "Friend · change to AI"
+                                StudioText("TableWifi.Text.5", "Rooms and lobby", true, if (seat in wifiMultiFriendSlots) "Friend · change to AI"
                                     else "AI · change to friend")
                             }
                         }
                     }
-                    Text("You can change seats in the lobby. Start the game once every friend has joined and is ready.")
+                    StudioText("TableWifi.Text.6", "Rooms and lobby", false, "You can change seats in the lobby. Start the game once every friend has joined and is ready.")
                 }
             },
-            confirmButton = { TextButton(
+            confirmButton = { StudioTextButton("TableWifi.TextButton.3", "Rooms and lobby",
                 enabled = (1 until wifiMultiSeatCount).any(wifiMultiFriendSlots::contains),
                 onClick = { if (wifiMultiOnline) startMultiOnlineHost() else startMultiWifiHost() }
-            ) { Text("HOST LOBBY") } },
-            dismissButton = { TextButton(onClick = { wifiMultiConfigOpen = false }) { Text("CANCEL") } },
+            ) { StudioText("TableWifi.Text.7", "Rooms and lobby", false, "HOST LOBBY") } },
+            dismissButton = { StudioTextButton("TableWifi.TextButton.4", "Rooms and lobby", onClick = { wifiMultiConfigOpen = false }) { StudioText("TableWifi.Text.8", "Rooms and lobby", false, "CANCEL") } },
         )
     }
     wifiWaitingAddress?.let { address ->
         if (wifiMultiLobbyState == null) {
-            AlertDialog(
+            StudioAlertDialog("Table Wifi 2",
                 onDismissRequest = {},
-                title = { Text("Waiting for your friend") },
+                title = { StudioText("TableWifi.Text.9", "Rooms and lobby", false, "Waiting for your friend") },
                 text = {
-                    Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
+                    StudioText("TableWifi.Text.10", "Rooms and lobby", false, "Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
                         "If it doesn't find you, type this address there:\n$address")
                 },
                 confirmButton = {},
-                dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+                dismissButton = { StudioTextButton("TableWifi.TextButton.5", "Rooms and lobby", onClick = { stopWifi() }) { StudioText("TableWifi.Text.11", "Rooms and lobby", false, "CANCEL") } },
             )
         }
     }
     // One-guest online host only; 2–4 player online rooms show the lobby screen.
     onlineRoomCode?.takeIf { wifiMultiLobbyState == null }?.let { code ->
-        AlertDialog(
+        StudioAlertDialog("Table Wifi 3",
             onDismissRequest = {},
-            title = { Text("Waiting for your friend") },
+            title = { StudioText("TableWifi.Text.12", "Rooms and lobby", false, "Waiting for your friend") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Share this code with your friend. They choose Join online.")
-                    Text(code, fontSize = androidx.compose.ui.unit.TextUnit(34f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(6f, androidx.compose.ui.unit.TextUnitType.Sp))
-                    Text("Keep this screen open until the other player joins.")
+                    StudioText("TableWifi.Text.13", "Rooms and lobby", false, "Share this code with your friend. They choose Join online.")
+                    StudioText("TableWifi.Text.14", "Rooms and lobby", true, code, fontSize = androidx.compose.ui.unit.TextUnit(34f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(6f, androidx.compose.ui.unit.TextUnitType.Sp))
+                    StudioText("TableWifi.Text.15", "Rooms and lobby", false, "Keep this screen open until the other player joins.")
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            dismissButton = { StudioTextButton("TableWifi.TextButton.6", "Rooms and lobby", onClick = { stopWifi() }) { StudioText("TableWifi.Text.16", "Rooms and lobby", false, "CANCEL") } },
         )
     }
     if (onlineJoinOpen) {
-        AlertDialog(
+        StudioAlertDialog("Table Wifi 4",
             onDismissRequest = { if (!wifiConnecting) onlineJoinOpen = false },
-            title = { Text("Join online Commander") },
+            title = { StudioText("TableWifi.Text.17", "Rooms and lobby", false, "Join online Commander") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (wifiConnecting) "Connecting…" else "Type the room code shown on your friend's phone.")
-                    OutlinedTextField(value = onlineCodeInput, onValueChange = { onlineCodeInput = ArgentumCloudLink.cleanCode(it).take(8) },
-                        label = { Text("Room code") }, singleLine = true)
+                    StudioText("TableWifi.Text.18", "Rooms and lobby", true, if (wifiConnecting) "Connecting…" else "Type the room code shown on your friend's phone.")
+                    StudioOutlinedTextField("TableWifi.OutlinedTextField.1", "Rooms and lobby", value = onlineCodeInput, onValueChange = { onlineCodeInput = ArgentumCloudLink.cleanCode(it).take(8) },
+                        label = { StudioText("TableWifi.Text.19", "Rooms and lobby", false, "Room code") }, singleLine = true)
                 }
             },
-            confirmButton = { TextButton(enabled = !wifiConnecting && onlineCodeInput.length >= 6, onClick = { joinMultiOnlineGame(onlineCodeInput) }) { Text("JOIN") } },
-            dismissButton = { TextButton(enabled = !wifiConnecting, onClick = { onlineJoinOpen = false }) { Text("CLOSE") } },
+            confirmButton = { StudioTextButton("TableWifi.TextButton.7", "Rooms and lobby", enabled = !wifiConnecting && onlineCodeInput.length >= 6, onClick = { joinMultiOnlineGame(onlineCodeInput) }) { StudioText("TableWifi.Text.20", "Rooms and lobby", false, "JOIN") } },
+            dismissButton = { StudioTextButton("TableWifi.TextButton.8", "Rooms and lobby", enabled = !wifiConnecting, onClick = { onlineJoinOpen = false }) { StudioText("TableWifi.Text.21", "Rooms and lobby", false, "CLOSE") } },
         )
     }
     if (wifiJoinOpen) {
-        AlertDialog(
+        StudioAlertDialog("Table Wifi 5",
             onDismissRequest = { if (!wifiConnecting) wifiJoinOpen = false },
-            title = { Text("Join a Wi-Fi game") },
+            title = { StudioText("TableWifi.Text.22", "Rooms and lobby", false, "Join a Wi-Fi game") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     when {
-                        wifiConnecting -> Text("Connecting…")
-                        wifiSearching -> Text("Looking for a phone hosting on this Wi-Fi…")
-                        wifiFound.isEmpty() -> Text("No host found yet. Check the other phone is hosting and on the same Wi-Fi, then search again, or type its address.")
+                        wifiConnecting -> StudioText("TableWifi.Text.23", "Rooms and lobby", false, "Connecting…")
+                        wifiSearching -> StudioText("TableWifi.Text.24", "Rooms and lobby", false, "Looking for a phone hosting on this Wi-Fi…")
+                        wifiFound.isEmpty() -> StudioText("TableWifi.Text.25", "Rooms and lobby", false, "No host found yet. Check the other phone is hosting and on the same Wi-Fi, then search again, or type its address.")
                     }
                     wifiFound.forEach { found ->
-                        Button(enabled = !wifiConnecting, onClick = { joinWifiGame(found.address) }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Join ${found.name}")
+                        StudioButton("TableWifi.Button.1", "Rooms and lobby", enabled = !wifiConnecting, onClick = { joinWifiGame(found.address) }, modifier = Modifier.fillMaxWidth()) {
+                            StudioText("TableWifi.Text.26", "Rooms and lobby", true, "Join ${found.name}")
                         }
                     }
-                    OutlinedTextField(
+                    StudioOutlinedTextField("TableWifi.OutlinedTextField.2", "Rooms and lobby",
                         value = wifiAddressInput, onValueChange = { wifiAddressInput = it.trim().take(40) },
-                        label = { Text("Host address (e.g. 192.168.1.20)") }, singleLine = true,
+                        label = { StudioText("TableWifi.Text.27", "Rooms and lobby", false, "Host address (e.g. 192.168.1.20)") }, singleLine = true,
                     )
                 }
             },
             confirmButton = {
-                TextButton(enabled = !wifiConnecting && wifiAddressInput.isNotBlank(), onClick = { joinWifiGame(wifiAddressInput) }) { Text("JOIN") }
+                StudioTextButton("TableWifi.TextButton.9", "Rooms and lobby", enabled = !wifiConnecting && wifiAddressInput.isNotBlank(), onClick = { joinWifiGame(wifiAddressInput) }) { StudioText("TableWifi.Text.28", "Rooms and lobby", false, "JOIN") }
             },
             dismissButton = {
                 Row {
-                    TextButton(enabled = !wifiSearching && !wifiConnecting, onClick = { searchWifiHosts() }) { Text("SEARCH AGAIN") }
-                    TextButton(enabled = !wifiConnecting, onClick = { wifiJoinOpen = false }) { Text("CLOSE") }
+                    StudioTextButton("TableWifi.TextButton.10", "Rooms and lobby", enabled = !wifiSearching && !wifiConnecting, onClick = { searchWifiHosts() }) { StudioText("TableWifi.Text.29", "Rooms and lobby", false, "SEARCH AGAIN") }
+                    StudioTextButton("TableWifi.TextButton.11", "Rooms and lobby", enabled = !wifiConnecting, onClick = { wifiJoinOpen = false }) { StudioText("TableWifi.Text.30", "Rooms and lobby", false, "CLOSE") }
                 }
             },
         )
@@ -788,7 +788,7 @@ internal fun TableController.FlashMessage() {
         if (flashMessage?.id == flash.id) flashMessage = null
     }
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-        Text(flash.text, color = androidx.compose.ui.graphics.Color(flash.color).copy(alpha = alpha.value),
+        StudioText("TableWifi.Text.31", "Rooms and lobby", true, flash.text, color = androidx.compose.ui.graphics.Color(flash.color).copy(alpha = alpha.value),
             fontSize = androidx.compose.ui.unit.TextUnit(54f, androidx.compose.ui.unit.TextUnitType.Sp),
             fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
             modifier = Modifier.clickable { if (flashMessage?.id == flash.id) flashMessage = null })

@@ -89,30 +89,30 @@ internal fun CardFilterSheet(
         delay(150)
         matchCount = withContext(Dispatchers.Default) { lib.search(baseQuery, filters, limit = 1).total }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Deck Builder Filters 1", onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to results", tint = SoftWhite) }
-                    Text("FILTERS", color = CounterGold, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                    StudioIconButton("DeckBuilderFilters.IconButton.1", "Decks", onClick = onDismiss, modifier = Modifier.size(48.dp)) { StudioIcon("DeckBuilderFilters.Icon.1", "Decks", Icons.AutoMirrored.Filled.ArrowBack, "Back to results", tint = SoftWhite) }
+                    StudioText("DeckBuilderFilters.Text.1", "Decks", false, "FILTERS", color = CounterGold, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
                     Box {
-                        TextButton(onClick = { loadMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("filters-load")) {
-                            Text("LOAD", color = Mint, fontWeight = FontWeight.Bold)
+                        StudioTextButton("DeckBuilderFilters.TextButton.1", "Decks", onClick = { loadMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("filters-load")) {
+                            StudioText("DeckBuilderFilters.Text.2", "Decks", false, "LOAD", color = Mint, fontWeight = FontWeight.Bold)
                         }
                         DropdownMenu(loadMenu, { loadMenu = false }) {
-                            if (presets.isEmpty()) DropdownMenuItem(text = { Text("No saved filters yet. Use SAVE below.", color = Muted) }, onClick = { loadMenu = false })
+                            if (presets.isEmpty()) StudioDropdownMenuItem("DeckBuilderFilters.DropdownMenuItem.1", "Decks", text = { StudioText("DeckBuilderFilters.Text.3", "Decks", false, "No saved filters yet. Use SAVE below.", color = Muted) }, onClick = { loadMenu = false })
                             presets.forEach { p ->
-                                DropdownMenuItem(
-                                    text = { Text(p.name) },
+                                StudioDropdownMenuItem("DeckBuilderFilters.DropdownMenuItem.2", "Decks",
+                                    text = { StudioText("DeckBuilderFilters.Text.4", "Decks", true, p.name) },
                                     onClick = { onChange(p.filters); loadMenu = false },
                                     trailingIcon = {
-                                        IconButton(onClick = { presets = presets - p; FilterPresetStore.save(context, presets) }) { Icon(Icons.Filled.Close, "Delete saved filter ${p.name}", tint = Muted) }
+                                        StudioIconButton("DeckBuilderFilters.IconButton.2", "Decks", onClick = { presets = presets - p; FilterPresetStore.save(context, presets) }) { StudioIcon("DeckBuilderFilters.Icon.2", "Decks", Icons.Filled.Close, "Delete saved filter ${p.name}", tint = Muted) }
                                     })
                             }
                         }
                     }
-                    TextButton(onClick = { onChange(filters.cleared()) }, enabled = filters.activeCount > 0, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("CLEAR ALL", color = if (filters.activeCount > 0) CounterGold else Muted, fontWeight = FontWeight.Bold)
+                    StudioTextButton("DeckBuilderFilters.TextButton.2", "Decks", onClick = { onChange(filters.cleared()) }, enabled = filters.activeCount > 0, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("DeckBuilderFilters.Text.5", "Decks", false, "CLEAR ALL", color = if (filters.activeCount > 0) CounterGold else Muted, fontWeight = FontWeight.Bold)
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -134,24 +134,24 @@ internal fun CardFilterSheet(
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable { onChange(filters.copy(commanderLegalOnly = !filters.commanderLegalOnly)) }
                             .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text("Commander-legal only", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Hides banned cards. Arcana custom cards have no legality data and always show.", color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
+                                StudioText("DeckBuilderFilters.Text.6", "Decks", false, "Commander-legal only", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                StudioText("DeckBuilderFilters.Text.7", "Decks", false, "Hides banned cards. Arcana custom cards have no legality data and always show.", color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
                             }
-                            Switch(filters.commanderLegalOnly, { onChange(filters.copy(commanderLegalOnly = it)) }, modifier = Modifier.testTag("filter-legal"),
+                            StudioSwitch("DeckBuilderFilters.Switch.1", "Decks", filters.commanderLegalOnly, { onChange(filters.copy(commanderLegalOnly = it)) }, modifier = Modifier.testTag("filter-legal"),
                                 colors = SwitchDefaults.colors(checkedThumbColor = Ink, checkedTrackColor = Mint))
                         }
                     }
                     SortSection(filters, onChange)
-                    Text("Price, artist and finish filters aren't here: Arcana's offline library has one printing per card and no price data.",
+                    StudioText("DeckBuilderFilters.Text.8", "Decks", false, "Price, artist and finish filters aren't here: Arcana's offline library has one printing per card and no price data.",
                         color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
                     Spacer(Modifier.height(8.dp))
                 }
                 Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { savingPreset = true }, enabled = filters.activeCount > 0 || filters.sort != CardSort.NAME,
-                        modifier = Modifier.heightIn(min = 52.dp)) { Text("SAVE", color = if (filters.activeCount > 0) SoftWhite else Muted, fontWeight = FontWeight.Bold) }
-                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("filters-show"),
+                    StudioOutlinedButton("DeckBuilderFilters.OutlinedButton.1", "Decks", onClick = { savingPreset = true }, enabled = filters.activeCount > 0 || filters.sort != CardSort.NAME,
+                        modifier = Modifier.heightIn(min = 52.dp)) { StudioText("DeckBuilderFilters.Text.9", "Decks", false, "SAVE", color = if (filters.activeCount > 0) SoftWhite else Muted, fontWeight = FontWeight.Bold) }
+                    StudioButton("DeckBuilderFilters.Button.1", "Decks", onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("filters-show"),
                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
-                        Text(when (val n = matchCount) { null -> "SHOW CARDS"; 0 -> "NO MATCHES"; 1 -> "SHOW 1 CARD"; else -> "SHOW $n CARDS" }, fontWeight = FontWeight.Black)
+                        StudioText("DeckBuilderFilters.Text.10", "Decks", true, when (val n = matchCount) { null -> "SHOW CARDS"; 0 -> "NO MATCHES"; 1 -> "SHOW 1 CARD"; else -> "SHOW $n CARDS" }, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -159,27 +159,27 @@ internal fun CardFilterSheet(
     }
     if (savingPreset) {
         var name by remember { mutableStateOf("") }
-        AlertDialog(onDismissRequest = { savingPreset = false }, title = { Text("Save these filters") },
+        StudioAlertDialog("Deck Builder Filters 2", onDismissRequest = { savingPreset = false }, title = { StudioText("DeckBuilderFilters.Text.11", "Decks", false, "Save these filters") },
             text = {
                 Column {
-                    Text(filters.summaryChips().joinToString(" · ") { it.first }.ifBlank { "Sort: ${filters.sort.label}" }, fontSize = 12.sp, color = Muted)
-                    OutlinedTextField(name, { name = it.take(40) }, singleLine = true, label = { Text("Name") }, placeholder = { Text("Cheap ramp") },
+                    StudioText("DeckBuilderFilters.Text.12", "Decks", true, filters.summaryChips().joinToString(" · ") { it.first }.ifBlank { "Sort: ${filters.sort.label}" }, fontSize = 12.sp, color = Muted)
+                    StudioOutlinedTextField("DeckBuilderFilters.OutlinedTextField.1", "Decks", name, { name = it.take(40) }, singleLine = true, label = { StudioText("DeckBuilderFilters.Text.13", "Decks", false, "Name") }, placeholder = { StudioText("DeckBuilderFilters.Text.14", "Decks", false, "Cheap ramp") },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                    if (presets.any { it.name.equals(name.trim(), true) }) Text("Replaces the saved filter with this name.", color = CounterGold, fontSize = 11.sp)
+                    if (presets.any { it.name.equals(name.trim(), true) }) StudioText("DeckBuilderFilters.Text.15", "Decks", false, "Replaces the saved filter with this name.", color = CounterGold, fontSize = 11.sp)
                 }
             },
-            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = {
+            confirmButton = { StudioTextButton("DeckBuilderFilters.TextButton.3", "Decks", enabled = name.isNotBlank(), onClick = {
                 presets = FilterPresets.upsert(presets, FilterPreset(name.trim(), filters)); FilterPresetStore.save(context, presets); savingPreset = false
-            }) { Text("SAVE") } },
-            dismissButton = { TextButton(onClick = { savingPreset = false }) { Text("CANCEL") } })
+            }) { StudioText("DeckBuilderFilters.Text.16", "Decks", false, "SAVE") } },
+            dismissButton = { StudioTextButton("DeckBuilderFilters.TextButton.4", "Decks", onClick = { savingPreset = false }) { StudioText("DeckBuilderFilters.Text.17", "Decks", false, "CANCEL") } })
     }
 }
 
 @Composable
 private fun SectionLabel(text: String, note: String? = null) {
     Row(Modifier.padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
-        Text(text, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        note?.let { Text("  $it", color = Muted, fontSize = 11.sp) }
+        StudioText("DeckBuilderFilters.Text.18", "Decks", true, text, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        note?.let { StudioText("DeckBuilderFilters.Text.19", "Decks", true, "  $it", color = Muted, fontSize = 11.sp) }
     }
 }
 
@@ -207,16 +207,16 @@ private fun TermSection(
     Column {
         SectionLabel(label)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(input, { input = it; error = null }, Modifier.weight(1f).testTag(tag), singleLine = true,
-                placeholder = { Text(placeholder, color = Muted) }, isError = error != null,
+            StudioOutlinedTextField("DeckBuilderFilters.OutlinedTextField.2", "Decks", input, { input = it; error = null }, Modifier.weight(1f).testTag(tag), singleLine = true,
+                placeholder = { StudioText("DeckBuilderFilters.Text.20", "Decks", true, placeholder, color = Muted) }, isError = error != null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { commit() }))
-            IconButton(onClick = ::commit, enabled = input.isNotBlank(), modifier = Modifier.size(52.dp).testTag("$tag-add")) {
+            StudioIconButton("DeckBuilderFilters.IconButton.3", "Decks", onClick = ::commit, enabled = input.isNotBlank(), modifier = Modifier.size(52.dp).testTag("$tag-add")) {
                 Box(Modifier.size(44.dp).clip(CircleShape).background(if (input.isNotBlank()) Mint else PanelLight), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Add, "Add $label", tint = if (input.isNotBlank()) Ink else Muted)
+                    StudioIcon("DeckBuilderFilters.Icon.3", "Decks", Icons.Filled.Add, "Add $label", tint = if (input.isNotBlank()) Ink else Muted)
                 }
             }
         }
-        Text(error ?: help, color = if (error != null) CounterGold else Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        StudioText("DeckBuilderFilters.Text.21", "Decks", true, error ?: help, color = if (error != null) CounterGold else Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         if (terms.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             terms.forEach { t -> RemovableChip(t) { onTerms(terms - t) } }
         }
@@ -226,9 +226,9 @@ private fun TermSection(
 @Composable
 internal fun RemovableChip(label: String, onRemove: () -> Unit) {
     Row(Modifier.clip(RoundedCornerShape(16.dp)).background(PanelLight).border(1.dp, Mint.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-        .clickable(onClick = onRemove).heightIn(min = 36.dp).padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = SoftWhite, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
-        Icon(Icons.Filled.Close, "Remove $label", tint = Muted, modifier = Modifier.padding(start = 4.dp).size(16.dp))
+        .studioClickable("DeckBuilderFilters.clickable.1", "Decks", onClick = onRemove).heightIn(min = 36.dp).padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        StudioText("DeckBuilderFilters.Text.22", "Decks", true, label, color = SoftWhite, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
+        StudioIcon("DeckBuilderFilters.Icon.4", "Decks", Icons.Filled.Close, "Remove $label", tint = Muted, modifier = Modifier.padding(start = 4.dp).size(16.dp))
     }
 }
 
@@ -237,13 +237,13 @@ internal fun RemovableChip(label: String, onRemove: () -> Unit) {
 private fun <T> MenuButton(current: String, options: List<T>, label: (T) -> String, onPick: (T) -> Unit, modifier: Modifier = Modifier, tag: String? = null) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
-        OutlinedButton(onClick = { open = true }, modifier = Modifier.heightIn(min = 48.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier),
+        StudioOutlinedButton("DeckBuilderFilters.OutlinedButton.2", "Decks", onClick = { open = true }, modifier = Modifier.heightIn(min = 48.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier),
             contentPadding = PaddingValues(horizontal = 14.dp)) {
-            Text(current, color = SoftWhite, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            Icon(Icons.Filled.ArrowDropDown, null, tint = SoftWhite)
+            StudioText("DeckBuilderFilters.Text.23", "Decks", true, current, color = SoftWhite, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            StudioIcon("DeckBuilderFilters.Icon.5", "Decks", Icons.Filled.ArrowDropDown, null, tint = SoftWhite)
         }
         DropdownMenu(open, { open = false }) {
-            options.forEach { o -> DropdownMenuItem(text = { Text(label(o)) }, onClick = { onPick(o); open = false }) }
+            options.forEach { o -> StudioDropdownMenuItem("DeckBuilderFilters.DropdownMenuItem.3", "Decks", text = { StudioText("DeckBuilderFilters.Text.24", "Decks", true, label(o)) }, onClick = { onPick(o); open = false }) }
         }
     }
 }
@@ -256,8 +256,8 @@ private fun ColorSection(filters: CardFilters, onChange: (CardFilters) -> Unit) 
             MenuButton(filters.colorMatch.label, ColorMatch.entries, { it.label }, { onChange(filters.copy(colorMatch = it)) }, tag = "filter-color-match")
             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(filters.copy(useIdentity = !filters.useIdentity)) }.heightIn(min = 48.dp).padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(filters.useIdentity, { onChange(filters.copy(useIdentity = it)) }, colors = CheckboxDefaults.colors(checkedColor = Mint, checkmarkColor = Ink))
-                Text("Color identity", color = SoftWhite, fontSize = 13.sp)
+                StudioCheckbox("DeckBuilderFilters.Checkbox.1", "Decks", filters.useIdentity, { onChange(filters.copy(useIdentity = it)) }, colors = CheckboxDefaults.colors(checkedColor = Mint, checkmarkColor = Ink))
+                StudioText("DeckBuilderFilters.Text.25", "Decks", false, "Color identity", color = SoftWhite, fontSize = 13.sp)
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -268,18 +268,18 @@ private fun ColorSection(filters: CardFilters, onChange: (CardFilters) -> Unit) 
             }
             ColorToggle("C", on = filters.colorless) { onChange(filters.copy(colorless = !filters.colorless, colors = emptySet())) }
         }
-        Text("Number of colors", color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.padding(top = 14.dp))
+        StudioText("DeckBuilderFilters.Text.26", "Decks", false, "Number of colors", color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.padding(top = 14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("0", color = Muted, fontSize = 13.sp)
-            RangeSlider(
+            StudioText("DeckBuilderFilters.Text.27", "Decks", false, "0", color = Muted, fontSize = 13.sp)
+            StudioRangeSlider("DeckBuilderFilters.RangeSlider.1", "Decks",
                 value = filters.minColors.toFloat()..filters.maxColors.toFloat(),
                 onValueChange = { r -> onChange(filters.copy(minColors = r.start.roundToInt(), maxColors = r.endInclusive.roundToInt())) },
                 valueRange = 0f..5f, steps = 4,
                 colors = SliderDefaults.colors(thumbColor = Mint, activeTrackColor = Mint, inactiveTrackColor = PanelLight),
                 modifier = Modifier.weight(1f).padding(horizontal = 10.dp).testTag("filter-color-count"))
-            Text("5", color = Muted, fontSize = 13.sp)
+            StudioText("DeckBuilderFilters.Text.28", "Decks", false, "5", color = Muted, fontSize = 13.sp)
         }
-        Text(when {
+        StudioText("DeckBuilderFilters.Text.29", "Decks", true, when {
             filters.minColors == 0 && filters.maxColors == 5 -> "Any number of colors"
             filters.minColors == filters.maxColors -> "Exactly ${filters.minColors} color${if (filters.minColors == 1) "" else "s"}"
             else -> "${filters.minColors} to ${filters.maxColors} colors"
@@ -289,7 +289,7 @@ private fun ColorSection(filters: CardFilters, onChange: (CardFilters) -> Unit) 
 
 @Composable
 private fun ColorToggle(symbol: String, on: Boolean, onClick: () -> Unit) {
-    Box(Modifier.size(52.dp).clip(CircleShape).clickable(onClick = onClick).border(if (on) 3.dp else 0.dp, if (on) Mint else Color.Transparent, CircleShape)
+    Box(Modifier.size(52.dp).clip(CircleShape).studioClickable("DeckBuilderFilters.clickable.2", "Decks", onClick = onClick).border(if (on) 3.dp else 0.dp, if (on) Mint else Color.Transparent, CircleShape)
         .alpha(if (on) 1f else 0.4f).testTag("filter-color-$symbol"), contentAlignment = Alignment.Center) {
         ManaPip(symbol)
     }
@@ -308,13 +308,13 @@ private fun SetSection(lib: CardLibrary, filters: CardFilters, onChange: (CardFi
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             MenuButton(if (filters.excludeSets) "≠" else "=", listOf(false, true), { if (it) "≠  Not in these sets" else "=  In these sets" },
                 { onChange(filters.copy(excludeSets = it)) })
-            OutlinedTextField(input, { input = it.take(6) }, Modifier.weight(1f).testTag("filter-set"), singleLine = true, placeholder = { Text("Set code, e.g. CMM", color = Muted) },
+            StudioOutlinedTextField("DeckBuilderFilters.OutlinedTextField.3", "Decks", input, { input = it.take(6) }, Modifier.weight(1f).testTag("filter-set"), singleLine = true, placeholder = { StudioText("DeckBuilderFilters.Text.30", "Decks", false, "Set code, e.g. CMM", color = Muted) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { suggestions.firstOrNull()?.let(::add) ?: if (input.trim().uppercase() in lib.setCodes) add(input.trim()) else Unit }))
         }
         if (suggestions.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            suggestions.forEach { code -> AssistChip(onClick = { add(code) }, label = { Text(code) }, modifier = Modifier.heightIn(min = 40.dp)) }
-        } else if (input.isNotBlank()) Text("No set code starts with “${input.trim().uppercase()}”.", color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            suggestions.forEach { code -> StudioAssistChip("DeckBuilderFilters.AssistChip.1", "Decks", onClick = { add(code) }, label = { StudioText("DeckBuilderFilters.Text.31", "Decks", true, code) }, modifier = Modifier.heightIn(min = 40.dp)) }
+        } else if (input.isNotBlank()) StudioText("DeckBuilderFilters.Text.32", "Decks", true, "No set code starts with “${input.trim().uppercase()}”.", color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         if (filters.sets.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             filters.sets.forEach { s -> RemovableChip(s.uppercase()) { onChange(filters.copy(sets = filters.sets - s)) } }
         }
@@ -328,8 +328,8 @@ private fun RaritySection(filters: CardFilters, onChange: (CardFilters) -> Unit)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CardFilters.RARITY_ORDER.forEach { r ->
                 val on = r in filters.rarities
-                FilterChip(on, { onChange(filters.copy(rarities = if (on) filters.rarities - r else filters.rarities + r)) },
-                    label = { Text(r.lowercase().replaceFirstChar(Char::uppercaseChar)) }, modifier = Modifier.heightIn(min = 44.dp).testTag("filter-rarity-$r"),
+                StudioFilterChip("DeckBuilderFilters.FilterChip.1", "Decks", on, { onChange(filters.copy(rarities = if (on) filters.rarities - r else filters.rarities + r)) },
+                    label = { StudioText("DeckBuilderFilters.Text.33", "Decks", true, r.lowercase().replaceFirstChar(Char::uppercaseChar)) }, modifier = Modifier.heightIn(min = 44.dp).testTag("filter-rarity-$r"),
                     leadingIcon = { Box(Modifier.size(10.dp).clip(CircleShape).background(rarityColor(r))) })
             }
         }
@@ -356,15 +356,15 @@ private fun StatsSection(filters: CardFilters, onChange: (CardFilters) -> Unit) 
             MenuButton(op.symbol, StatOp.entries, { if (it == StatOp.BETWEEN) "from … to" else it.symbol }, { op = it }, tag = "filter-stat-op")
         }
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(from, { from = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f).testTag("filter-stat-value"), singleLine = true,
-                placeholder = { Text(if (op == StatOp.BETWEEN) "from" else "value", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            if (op == StatOp.BETWEEN) OutlinedTextField(to, { to = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f), singleLine = true,
-                placeholder = { Text("to (∞)", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            Button(onClick = {
-                val range = StatRange(stat, op, a ?: return@Button, if (op == StatOp.BETWEEN) b else null)
+            StudioOutlinedTextField("DeckBuilderFilters.OutlinedTextField.4", "Decks", from, { from = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f).testTag("filter-stat-value"), singleLine = true,
+                placeholder = { StudioText("DeckBuilderFilters.Text.34", "Decks", true, if (op == StatOp.BETWEEN) "from" else "value", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            if (op == StatOp.BETWEEN) StudioOutlinedTextField("DeckBuilderFilters.OutlinedTextField.5", "Decks", to, { to = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f), singleLine = true,
+                placeholder = { StudioText("DeckBuilderFilters.Text.35", "Decks", false, "to (∞)", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            StudioButton("DeckBuilderFilters.Button.2", "Decks", onClick = {
+                val range = StatRange(stat, op, a ?: return@StudioButton, if (op == StatOp.BETWEEN) b else null)
                 onChange(filters.copy(stats = filters.stats.filterNot { it == range } + range)); from = ""; to = ""
             }, enabled = ready, modifier = Modifier.heightIn(min = 52.dp).testTag("filter-stat-add"),
-                colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("ADD", fontWeight = FontWeight.Bold) }
+                colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { StudioText("DeckBuilderFilters.Text.36", "Decks", false, "ADD", fontWeight = FontWeight.Bold) }
         }
         if (filters.stats.isNotEmpty()) FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             filters.stats.forEach { s -> RemovableChip(s.label) { onChange(filters.copy(stats = filters.stats - s)) } }
@@ -403,19 +403,19 @@ internal fun LibraryGrid(
             Column(Modifier.testTag("grid-${card.name}")) {
                 Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(Panel)
                     .border(if (inDeck > 0) 2.dp else 0.dp, if (inDeck > 0) Mint else Color.Transparent, RoundedCornerShape(8.dp))
-                    .combinedClickable(onClick = { onPreview(card) }, onLongClick = { onPreview(card) })) {
+                    .studioCombinedClickable("DeckBuilderFilters.combinedClickable.1", "Decks", onClick = { onPreview(card) }, onLongClick = { onPreview(card) })) {
                     val url = card.imageUrl
                     if (url != null) CardArt(url, Modifier.fillMaxSize(), ContentScale.Crop, fallbackName = card.name, fallbackType = card.typeLine)
-                    else Text(card.name, color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(6.dp))
-                    if (inDeck > 0) Text("×$inDeck", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Black,
+                    else StudioText("DeckBuilderFilters.Text.37", "Decks", true, card.name, color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(6.dp))
+                    if (inDeck > 0) StudioText("DeckBuilderFilters.Text.38", "Decks", true, "×$inDeck", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Black,
                         modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(6.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
-                    IconButton(onClick = { onAdd(card) }, modifier = Modifier.align(Alignment.BottomEnd).size(48.dp).testTag("grid-add-${card.name}")) {
+                    StudioIconButton("DeckBuilderFilters.IconButton.4", "Decks", onClick = { onAdd(card) }, modifier = Modifier.align(Alignment.BottomEnd).size(48.dp).testTag("grid-add-${card.name}")) {
                         Box(Modifier.size(34.dp).clip(CircleShape).background(Mint).border(1.dp, Ink, CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Add, "Add ${card.name}", tint = Ink)
+                            StudioIcon("DeckBuilderFilters.Icon.6", "Decks", Icons.Filled.Add, "Add ${card.name}", tint = Ink)
                         }
                     }
                 }
-                Text(card.name, color = SoftWhite, fontSize = 11.sp, maxLines = 2, lineHeight = 13.sp, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                StudioText("DeckBuilderFilters.Text.39", "Decks", true, card.name, color = SoftWhite, fontSize = 11.sp, maxLines = 2, lineHeight = 13.sp, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = 3.dp))
             }
         }

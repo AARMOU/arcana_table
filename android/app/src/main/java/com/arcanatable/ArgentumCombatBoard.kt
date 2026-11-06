@@ -106,11 +106,11 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
     val problem = resolution.problem(amounts)
     // The decision names every combatant; prefer that over a bare id when the card isn't on our table.
     val pieceOf: (String) -> CombatPiece = { id -> piece(id).let { p -> if (p.card == null && p.life == null) p.copy(name = resolution.names[id] ?: p.name) else p } }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Argentum Combat Board 1", onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize().padding(8.dp), shape = RoundedCornerShape(16.dp), color = Ink) {
             Column(Modifier.fillMaxSize().padding(12.dp).testTag("damage-board")) {
-                Text(if (resolution.firstStrike) "FIRST-STRIKE DAMAGE" else "COMBAT DAMAGE", color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black)
-                Text(if (mine.isEmpty()) "Nothing for you to adjust. Confirm to let Argentum apply combat damage." else "Use − and + under each card to split damage. Argentum's suggested split is already filled in.",
+                StudioText("ArgentumCombatBoard.Text.1", "Combat and targets", true, if (resolution.firstStrike) "FIRST-STRIKE DAMAGE" else "COMBAT DAMAGE", color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black)
+                StudioText("ArgentumCombatBoard.Text.2", "Combat and targets", true, if (mine.isEmpty()) "Nothing for you to adjust. Confirm to let Argentum apply combat damage." else "Use − and + under each card to split damage. Argentum's suggested split is already filled in.",
                     color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     mine.groupBy { it.sourceId }.forEach { (source, edges) ->
@@ -119,37 +119,37 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.width(96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 if (sourcePiece.card != null) CardFace(sourcePiece.card, Modifier.width(84.dp), onClick = {}, onLongClick = { zoomed = sourcePiece.card.toCombatPick() })
-                                Text(sourcePiece.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("${edges.maxOf { it.maximum }} dmg" + if (left > 0) " · $left left" else "", color = if (left > 0) CounterGold else Muted, fontSize = 9.sp)
+                                StudioText("ArgentumCombatBoard.Text.3", "Combat and targets", true, sourcePiece.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                StudioText("ArgentumCombatBoard.Text.4", "Combat and targets", true, "${edges.maxOf { it.maximum }} dmg" + if (left > 0) " · $left left" else "", color = if (left > 0) CounterGold else Muted, fontSize = 9.sp)
                             }
-                            Text("→", color = Mint, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 6.dp))
+                            StudioText("ArgentumCombatBoard.Text.5", "Combat and targets", false, "→", color = Mint, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 6.dp))
                             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 edges.forEach { edge ->
                                     val value = amounts[edge.id] ?: edge.defaultAmount
                                     val target = pieceOf(edge.targetId)
                                     Column(Modifier.width(92.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                         if (target.card != null) CardFace(target.card, Modifier.width(80.dp), onClick = {}, onLongClick = { zoomed = target.card.toCombatPick() })
-                                        else Text(target.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 18.dp))
-                                        if (target.card != null) Text(target.name, color = SoftWhite, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        else StudioText("ArgentumCombatBoard.Text.6", "Combat and targets", true, target.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 18.dp))
+                                        if (target.card != null) StudioText("ArgentumCombatBoard.Text.7", "Combat and targets", true, target.name, color = SoftWhite, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            TextButton(enabled = value > 0, onClick = { onChange(amounts + (edge.id to value - 1)) }, modifier = Modifier.size(40.dp)) { Text("−", fontSize = 18.sp) }
-                                            Text("$value", color = if (!edge.isTrampleDrain && value >= edge.lethal) Mint else SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 20.dp))
-                                            TextButton(enabled = value < edge.maximum && left > 0, onClick = { onChange(amounts + (edge.id to value + 1)) }, modifier = Modifier.size(40.dp)) { Text("+", fontSize = 18.sp) }
+                                            StudioTextButton("ArgentumCombatBoard.TextButton.1", "Combat and targets", enabled = value > 0, onClick = { onChange(amounts + (edge.id to value - 1)) }, modifier = Modifier.size(40.dp)) { StudioText("ArgentumCombatBoard.Text.8", "Combat and targets", false, "−", fontSize = 18.sp) }
+                                            StudioText("ArgentumCombatBoard.Text.9", "Combat and targets", true, "$value", color = if (!edge.isTrampleDrain && value >= edge.lethal) Mint else SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 20.dp))
+                                            StudioTextButton("ArgentumCombatBoard.TextButton.2", "Combat and targets", enabled = value < edge.maximum && left > 0, onClick = { onChange(amounts + (edge.id to value + 1)) }, modifier = Modifier.size(40.dp)) { StudioText("ArgentumCombatBoard.Text.10", "Combat and targets", false, "+", fontSize = 18.sp) }
                                         }
-                                        Text(if (edge.isTrampleDrain) "trample" else "lethal ${edge.lethal}" + if (value >= edge.lethal) " ✓" else "", color = Muted, fontSize = 8.sp)
+                                        StudioText("ArgentumCombatBoard.Text.11", "Combat and targets", true, if (edge.isTrampleDrain) "trample" else "lethal ${edge.lethal}" + if (value >= edge.lethal) " ✓" else "", color = Muted, fontSize = 8.sp)
                                     }
                                 }
                             }
                         }
                     }
                 }
-                problem?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+                problem?.let { StudioText("ArgentumCombatBoard.Text.12", "Combat and targets", true, it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("VIEW TABLE", color = Muted) }
+                    StudioTextButton("ArgentumCombatBoard.TextButton.3", "Combat and targets", onClick = onDismiss) { StudioText("ArgentumCombatBoard.Text.13", "Combat and targets", false, "VIEW TABLE", color = Muted) }
                     Spacer(Modifier.weight(1f))
                     val ok = !busy && problem == null
-                    TextButton(enabled = ok, onClick = onConfirm, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (ok) Mint else PanelLight)) {
-                        Text("CONFIRM DAMAGE", color = if (ok) Ink else Muted, fontWeight = FontWeight.Black)
+                    StudioTextButton("ArgentumCombatBoard.TextButton.4", "Combat and targets", enabled = ok, onClick = onConfirm, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (ok) Mint else PanelLight)) {
+                        StudioText("ArgentumCombatBoard.Text.14", "Combat and targets", false, "CONFIRM DAMAGE", color = if (ok) Ink else Muted, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -184,24 +184,24 @@ internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>, c
     var zoomed by remember { mutableStateOf<PickCard?>(null) }
     Column(Modifier.fillMaxWidth().padding(top = 4.dp).testTag("opponent-blockers")) {
         groups.forEach { (name, cards) ->
-            Text("${name.uppercase()} CAN BLOCK WITH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 4.dp))
+            StudioText("ArgentumCombatBoard.Text.15", "Combat and targets", true, "${name.uppercase()} CAN BLOCK WITH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 4.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 cards.forEach { card ->
                     val shape = RoundedCornerShape(6.dp)
                     Column(Modifier.width(cardWidth)) {
                         Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(shape).background(Color(0xFF1C2523))
                             .border(1.dp, Color.White.copy(alpha = 0.2f), shape)
-                            .combinedClickable(onClick = {}, onLongClick = {
+                            .studioCombinedClickable("ArgentumCombatBoard.combinedClickable.1", "Combat and targets", onClick = {}, onLongClick = {
                                 zoomed = PickCard(card.id.toString(), card.name, card.imageUrl?.takeIf { !card.isFaceDown }, card.type, group = name, groupOrder = 0, isToken = card.isToken)
                             })) {
                             val url = card.imageUrl
                             if (url != null && !card.isFaceDown) CardArt(url, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, fallbackName = card.name, fallbackType = card.type)
-                            else Text(card.name, color = SoftWhite, fontSize = 8.sp, modifier = Modifier.padding(3.dp))
-                            if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                            else StudioText("ArgentumCombatBoard.Text.16", "Combat and targets", true, card.name, color = SoftWhite, fontSize = 8.sp, modifier = Modifier.padding(3.dp))
+                            if (card.power != null && card.toughness != null) StudioText("ArgentumCombatBoard.Text.17", "Combat and targets", true, "${card.power}/${card.toughness}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black,
                                 modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xE6101615)).padding(horizontal = 3.dp, vertical = 1.dp))
                         }
                         blockingKeywords(card).forEach { kw ->
-                            Text(kw, color = CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                            StudioText("ArgentumCombatBoard.Text.18", "Combat and targets", true, kw, color = CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
                                 modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Panel).padding(horizontal = 3.dp))
                         }
                     }

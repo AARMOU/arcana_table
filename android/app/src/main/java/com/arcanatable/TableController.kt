@@ -383,6 +383,7 @@ internal class TableController(
     var layoutLabOpen by run { mutableStateOf(false) }
     var nativeStudioOpen by run { mutableStateOf(false) }
     var nativeStudioRevision by run { mutableIntStateOf(0) }
+    internal var studioControlsRuntime:StudioControlsRuntime?=null
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }

@@ -278,6 +278,13 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
         DisposableEffect(t) {
             onDispose { TutorialActions.onGesture = null }
         }
+        val studioRuntime = remember(layoutOrientationSuffix, nativeStudioRevision) {
+            if (BuildConfig.DEBUG) StudioControlsRuntime(optionPrefs,layoutOrientationSuffix) else null
+        }
+        SideEffect {studioControlsRuntime=studioRuntime}
+        CompositionLocalProvider(LocalStudioControls provides studioRuntime,
+            LocalStudioScreen provides "Table",
+            LocalTableColors provides (studioRuntime?.project()?.colors(LocalTableColors.current) ?: LocalTableColors.current)) {
         Box(Modifier.fillMaxSize().background(Ink)) {
             TableMainLayout()
             TableOverlays()
@@ -288,11 +295,35 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             }
             SideEffect { TutorialCoachState.model = coachModel }
             TutorialLayer(base = true)
+            studioRuntime?.let {studio ->
+                if(!studio.editing && studio.recoveryReasons().isNotEmpty())androidx.compose.material3.TextButton(
+                    onClick={studio.begin()},modifier=Modifier.align(Alignment.BottomStart).navigationBarsPadding()
+                ){androidx.compose.material3.Text("Studio restored a control · Review",color=CounterGold)}
+                if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
+                    onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
+                ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}
+                if(studio.panelOpen) StudioControlsPage(studio,
+                    onApplied={nativeStudioRevision++},
+                    onHand={studio.cancel();nativeStudioOpen=true},
+                    destinations=mapOf(
+                        "Home" to (true to {optionsOpen=false;showHand=false;homeOpen=true}),
+                        "Setup" to (!gameInProgress to {homeOpen=true;playSheetOpen=true}),
+                        "Table" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=true}),
+                        "Player" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
+                        "Lobby" to (!gameInProgress to {wifiMultiConfigOpen=true}),
+                        "Decks" to (true to {homeOpen=true;optionsOpen=false;deckPickerOpen=true}),
+                        "Settings" to (true to {optionsOpen=true}),
+                        "Stack" to (gameInProgress to {stackOpen=true}),
+                        "Zones" to (gameInProgress to {zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
+                        "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {homeOpen=false;showHand=false}),
+                    ))
+            }
             SnackbarHost(
                 hostState = automaticActionSnackbar,
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
                 snackbar = { data -> Snackbar(snackbarData = data, containerColor = PanelLight, contentColor = SoftWhite) }
             )
+        }
         }
     }
 }

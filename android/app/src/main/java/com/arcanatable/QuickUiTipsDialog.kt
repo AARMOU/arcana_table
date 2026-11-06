@@ -18,22 +18,22 @@ internal fun QuickUiTipsDialog(
     onDontRemind: () -> Unit,
     onOpenTutorials: () -> Unit
 ) {
-    AlertDialog(
+    StudioAlertDialog("Quick Ui Tips Dialog 1",
         modifier = Modifier.testTag("quick-ui-tips"),
         onDismissRequest = onDismiss,
-        title = { Text("Welcome to Arcana Table") },
+        title = { StudioText("QuickUiTipsDialog.Text.1", "Dialogs and overlays", false, "Welcome to Arcana Table") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Learn the controls and Commander rules in short offline lessons.")
-                Text("Start with Your first turn, browse 20 topics, or look up a term in the glossary. The lessons do not change your saved games.")
-                Text("You can reopen this guide from Settings → Help & diagnostics or the in-game menu.")
+                StudioText("QuickUiTipsDialog.Text.2", "Dialogs and overlays", false, "Learn the controls and Commander rules in short offline lessons.")
+                StudioText("QuickUiTipsDialog.Text.3", "Dialogs and overlays", false, "Start with Your first turn, browse 20 topics, or look up a term in the glossary. The lessons do not change your saved games.")
+                StudioText("QuickUiTipsDialog.Text.4", "Dialogs and overlays", false, "You can reopen this guide from Settings → Help & diagnostics or the in-game menu.")
             }
         },
         confirmButton = {
-            TextButton(onClick = onOpenTutorials, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPEN TUTORIALS") }
+            StudioTextButton("QuickUiTipsDialog.TextButton.1", "Dialogs and overlays", onClick = onOpenTutorials, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("QuickUiTipsDialog.Text.5", "Dialogs and overlays", false, "OPEN TUTORIALS") }
         },
         dismissButton = {
-            TextButton(onClick = onDontRemind, modifier = Modifier.heightIn(min = 48.dp)) { Text("NOT NOW") }
+            StudioTextButton("QuickUiTipsDialog.TextButton.2", "Dialogs and overlays", onClick = onDontRemind, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("QuickUiTipsDialog.Text.6", "Dialogs and overlays", false, "NOT NOW") }
         }
     )
 }

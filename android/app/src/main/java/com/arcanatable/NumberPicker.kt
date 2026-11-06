@@ -36,11 +36,11 @@ fun NumberPicker(value: Int, range: IntRange, onChange: (Int) -> Unit, label: St
     var editing by remember { mutableStateOf(false) }
     var text by remember(editing) { mutableStateOf(value.toString()) }
     Column {
-        if (label != null) Text(label, color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
+        if (label != null) StudioText("NumberPicker.Text.1", "Dialogs and overlays", true, label, color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            TextButton(enabled = value > range.first, onClick = { onChange(clampToRange(value - 5, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { Text("−5", fontSize = 14.sp) }
-            TextButton(enabled = value > range.first, onClick = { onChange(clampToRange(value - 1, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { Text("−", fontSize = 20.sp) }
-            if (editing) OutlinedTextField(
+            StudioTextButton("NumberPicker.TextButton.1", "Dialogs and overlays", enabled = value > range.first, onClick = { onChange(clampToRange(value - 5, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { StudioText("NumberPicker.Text.2", "Dialogs and overlays", false, "−5", fontSize = 14.sp) }
+            StudioTextButton("NumberPicker.TextButton.2", "Dialogs and overlays", enabled = value > range.first, onClick = { onChange(clampToRange(value - 1, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { StudioText("NumberPicker.Text.3", "Dialogs and overlays", false, "−", fontSize = 20.sp) }
+            if (editing) StudioOutlinedTextField("NumberPicker.OutlinedTextField.1", "Dialogs and overlays",
                 value = text,
                 onValueChange = { typed ->
                     text = typed.filter(Char::isDigit).take(4)
@@ -49,13 +49,13 @@ fun NumberPicker(value: Int, range: IntRange, onChange: (Int) -> Unit, label: St
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.width(76.dp).testTag("number-picker-field"),
-            ) else Text(
+            ) else StudioText("NumberPicker.Text.4", "Dialogs and overlays", true,
                 "$value", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.widthIn(min = 48.dp).clickable { editing = true }.padding(horizontal = 8.dp, vertical = 6.dp).testTag("number-picker-value"),
             )
-            TextButton(enabled = value < range.last, onClick = { onChange(clampToRange(value + 1, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { Text("+", fontSize = 20.sp) }
-            TextButton(enabled = value < range.last, onClick = { onChange(clampToRange(value + 5, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { Text("+5", fontSize = 14.sp) }
+            StudioTextButton("NumberPicker.TextButton.3", "Dialogs and overlays", enabled = value < range.last, onClick = { onChange(clampToRange(value + 1, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { StudioText("NumberPicker.Text.5", "Dialogs and overlays", false, "+", fontSize = 20.sp) }
+            StudioTextButton("NumberPicker.TextButton.4", "Dialogs and overlays", enabled = value < range.last, onClick = { onChange(clampToRange(value + 5, range)) }, modifier = Modifier.widthIn(min = 44.dp)) { StudioText("NumberPicker.Text.6", "Dialogs and overlays", false, "+5", fontSize = 14.sp) }
         }
-        Text(if (editing) "Type a number from ${range.first} to ${range.last}." else "Tap the number to type it · ${range.first}–${range.last}", color = Muted, fontSize = 10.sp)
+        StudioText("NumberPicker.Text.7", "Dialogs and overlays", true, if (editing) "Type a number from ${range.first} to ${range.last}." else "Tap the number to type it · ${range.first}–${range.last}", color = Muted, fontSize = 10.sp)
     }
 }

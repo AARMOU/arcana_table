@@ -117,44 +117,44 @@ internal fun TableController.ActiveGameLobbyDialog(onDismiss: () -> Unit) {
     val code = activeGameRoomCode(
         wifiRole, (wifiServer as? ArgentumCloudMultiHost)?.code, onlineCodeInput
     )
-    AlertDialog(
+    StudioAlertDialog("Table Multi Lobby 1",
         onDismissRequest = onDismiss,
-        title = { Text("LOBBY", color = SoftWhite, fontWeight = FontWeight.Black) },
+        title = { StudioText("TableMultiLobby.Text.1", "Rooms and lobby", false, "LOBBY", color = SoftWhite, fontWeight = FontWeight.Black) },
         text = {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Game in progress · view only. Your match stays connected.",
+                StudioText("TableMultiLobby.Text.2", "Rooms and lobby", false, "Game in progress · view only. Your match stays connected.",
                     color = Muted, fontSize = 12.sp)
-                Text("ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                StudioText("TableMultiLobby.Text.3", "Rooms and lobby", false, "ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 if (code != null) {
-                    Text(code, color = Mint, fontSize = 26.sp, fontWeight = FontWeight.Black,
+                    StudioText("TableMultiLobby.Text.4", "Rooms and lobby", true, code, color = Mint, fontSize = 26.sp, fontWeight = FontWeight.Black,
                         letterSpacing = 3.sp,
                         modifier = Modifier.semantics {
                             contentDescription = "Room code ${code.toList().joinToString(" ")}"
                         })
-                    OutlinedButton(onClick = { copyText(context, "Arcana Table room code", code) }) {
-                        Text("COPY ROOM CODE", color = Mint, fontWeight = FontWeight.Bold)
+                    StudioOutlinedButton("TableMultiLobby.OutlinedButton.1", "Rooms and lobby", onClick = { copyText(context, "Arcana Table room code", code) }) {
+                        StudioText("TableMultiLobby.Text.5", "Rooms and lobby", false, "COPY ROOM CODE", color = Mint, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    Text("Room code unavailable for this connection.", color = Muted)
+                    StudioText("TableMultiLobby.Text.6", "Rooms and lobby", false, "Room code unavailable for this connection.", color = Muted)
                 }
-                Text("PLAYERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                StudioText("TableMultiLobby.Text.7", "Rooms and lobby", false, "PLAYERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 players.forEachIndexed { index, seat ->
                     val roleLabel = when {
                         index == localSeat -> " · YOU"
                         seat.isComputer -> " · AI"
                         else -> ""
                     }
-                    Text("P${index + 1} · ${seat.name}$roleLabel",
+                    StudioText("TableMultiLobby.Text.8", "Rooms and lobby", true, "P${index + 1} · ${seat.name}$roleLabel",
                         color = SoftWhite, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("RETURN TO GAME", color = Mint, fontWeight = FontWeight.Bold)
+            StudioTextButton("TableMultiLobby.TextButton.1", "Rooms and lobby", onClick = onDismiss) {
+                StudioText("TableMultiLobby.Text.9", "Rooms and lobby", false, "RETURN TO GAME", color = Mint, fontWeight = FontWeight.Bold)
             }
         },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted,
@@ -186,17 +186,17 @@ internal fun TableController.MultiplayerLobbyScreen() {
     var removeTarget by remember { mutableStateOf<LobbySeat?>(null) }
     var confirmClose by remember { mutableStateOf(false) }
 
-    Dialog(
+    StudioDialog("Table Multi Lobby 2",
         onDismissRequest = {},
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false),
     ) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Header
-                Text(if (online) "ONLINE COMMANDER LOBBY" else "WI-FI COMMANDER LOBBY", color = SoftWhite,
+                StudioText("TableMultiLobby.Text.10", "Rooms and lobby", true, if (online) "ONLINE COMMANDER LOBBY" else "WI-FI COMMANDER LOBBY", color = SoftWhite,
                     fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
                 val readyCount = seats.count { it.ready }
-                Text(if (seats.isEmpty()) "Players" else "${seats.size} players · $readyCount of ${seats.size} ready",
+                StudioText("TableMultiLobby.Text.11", "Rooms and lobby", true, if (seats.isEmpty()) "Players" else "${seats.size} players · $readyCount of ${seats.size} ready",
                     color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
 
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp),
@@ -206,7 +206,7 @@ internal fun TableController.MultiplayerLobbyScreen() {
                         hosting && online -> RoomCodeCard(onlineRoomCode, context)
                         hosting -> WifiAddressCard(wifiWaitingAddress, context)
                         online -> onlineCodeInput.takeIf { it.isNotBlank() }?.let {
-                            Text("ROOM CODE · $it", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            StudioText("TableMultiLobby.Text.12", "Rooms and lobby", true, "ROOM CODE · $it", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -220,7 +220,7 @@ internal fun TableController.MultiplayerLobbyScreen() {
 
                     if (seats.isEmpty()) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 12.dp)) {
                         CircularProgressIndicator(Modifier.size(20.dp), color = Mint, strokeWidth = 2.dp)
-                        Text(lobbyStatusLine(null, hosting), color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 12.dp))
+                        StudioText("TableMultiLobby.Text.13", "Rooms and lobby", true, lobbyStatusLine(null, hosting), color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 12.dp))
                     }
                     seats.forEachIndexed { index, seat ->
                         SeatCard(
@@ -235,26 +235,26 @@ internal fun TableController.MultiplayerLobbyScreen() {
                             onRemove = { removeTarget = seat },
                         )
                     }
-                    if (multiLobbySeatChangePending) Text("Updating seats with the room service…", color = Muted, fontSize = 12.sp)
+                    if (multiLobbySeatChangePending) StudioText("TableMultiLobby.Text.14", "Rooms and lobby", false, "Updating seats with the room service…", color = Muted, fontSize = 12.sp)
                 }
 
                 // Status and actions
-                Text(lobbyStatusLine(state, hosting), color = if (state?.optBoolean("canStart") == true) Mint else CounterGold,
+                StudioText("TableMultiLobby.Text.15", "Rooms and lobby", true, lobbyStatusLine(state, hosting), color = if (state?.optBoolean("canStart") == true) Mint else CounterGold,
                     fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (hosting) {
-                        OutlinedButton(
+                        StudioOutlinedButton("TableMultiLobby.OutlinedButton.2", "Rooms and lobby",
                             onClick = { if (seats.any { it.kind == "human" }) confirmClose = true else stopWifi() },
                             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                        ) { Text("CLOSE ROOM", color = Danger, fontWeight = FontWeight.Bold, maxLines = 1) }
-                        Button(
+                        ) { StudioText("TableMultiLobby.Text.16", "Rooms and lobby", false, "CLOSE ROOM", color = Danger, fontWeight = FontWeight.Bold, maxLines = 1) }
+                        StudioButton("TableMultiLobby.Button.1", "Rooms and lobby",
                             onClick = { if (online) startMultiOnlineGame() else startMultiWifiGame() },
                             enabled = state?.optBoolean("canStart") == true && !multiLobbySeatChangePending,
                             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-                        ) { Text("START GAME", fontWeight = FontWeight.Black, maxLines = 1) }
+                        ) { StudioText("TableMultiLobby.Text.17", "Rooms and lobby", false, "START GAME", fontWeight = FontWeight.Black, maxLines = 1) }
                     } else {
-                        OutlinedButton(
+                        StudioOutlinedButton("TableMultiLobby.OutlinedButton.3", "Rooms and lobby",
                             onClick = {
                                 argentumSocket.close()
                                 stopWifi()
@@ -262,16 +262,16 @@ internal fun TableController.MultiplayerLobbyScreen() {
                                 homeOpen = true
                             },
                             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                        ) { Text("LEAVE LOBBY", color = Danger, fontWeight = FontWeight.Bold, maxLines = 1) }
+                        ) { StudioText("TableMultiLobby.Text.18", "Rooms and lobby", false, "LEAVE LOBBY", color = Danger, fontWeight = FontWeight.Bold, maxLines = 1) }
                         val me = seats.firstOrNull { it.seatId == wifiGuestSeatId }
                         val iAmReady = me?.ready == true
-                        Button(
+                        StudioButton("TableMultiLobby.Button.2", "Rooms and lobby",
                             onClick = { setGuestLobbyReady(!iAmReady) },
                             enabled = me != null,
                             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                             colors = if (iAmReady) ButtonDefaults.buttonColors(containerColor = PanelLight, contentColor = SoftWhite)
                                 else ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-                        ) { Text(if (iAmReady) "CANCEL READY" else "READY UP", fontWeight = FontWeight.Black, maxLines = 1) }
+                        ) { StudioText("TableMultiLobby.Text.19", "Rooms and lobby", true, if (iAmReady) "CANCEL READY" else "READY UP", fontWeight = FontWeight.Black, maxLines = 1) }
                     }
                 }
             }
@@ -279,23 +279,23 @@ internal fun TableController.MultiplayerLobbyScreen() {
     }
 
     removeTarget?.let { seat ->
-        AlertDialog(
+        StudioAlertDialog("Table Multi Lobby 3",
             onDismissRequest = { removeTarget = null },
-            title = { Text("Remove ${seat.name}?") },
-            text = { Text("They leave the lobby and their seat opens for another friend.") },
-            confirmButton = { TextButton(onClick = { removeMultiGuest(seat.seatId); removeTarget = null }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("REMOVE PLAYER", color = Danger, fontWeight = FontWeight.Bold) } },
-            dismissButton = { TextButton(onClick = { removeTarget = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL") } },
+            title = { StudioText("TableMultiLobby.Text.20", "Rooms and lobby", true, "Remove ${seat.name}?") },
+            text = { StudioText("TableMultiLobby.Text.21", "Rooms and lobby", false, "They leave the lobby and their seat opens for another friend.") },
+            confirmButton = { StudioTextButton("TableMultiLobby.TextButton.2", "Rooms and lobby", onClick = { removeMultiGuest(seat.seatId); removeTarget = null }, modifier = Modifier.heightIn(min = 48.dp)) {
+                StudioText("TableMultiLobby.Text.22", "Rooms and lobby", false, "REMOVE PLAYER", color = Danger, fontWeight = FontWeight.Bold) } },
+            dismissButton = { StudioTextButton("TableMultiLobby.TextButton.3", "Rooms and lobby", onClick = { removeTarget = null }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableMultiLobby.Text.23", "Rooms and lobby", false, "CANCEL") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted,
         )
     }
-    if (confirmClose) AlertDialog(
+    if (confirmClose) StudioAlertDialog("Table Multi Lobby 4",
         onDismissRequest = { confirmClose = false },
-        title = { Text("Close this room?") },
-        text = { Text("Everyone in the lobby is disconnected and the room code stops working.") },
-        confirmButton = { TextButton(onClick = { confirmClose = false; stopWifi() }, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text("CLOSE ROOM", color = Danger, fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = { confirmClose = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("KEEP OPEN") } },
+        title = { StudioText("TableMultiLobby.Text.24", "Rooms and lobby", false, "Close this room?") },
+        text = { StudioText("TableMultiLobby.Text.25", "Rooms and lobby", false, "Everyone in the lobby is disconnected and the room code stops working.") },
+        confirmButton = { StudioTextButton("TableMultiLobby.TextButton.4", "Rooms and lobby", onClick = { confirmClose = false; stopWifi() }, modifier = Modifier.heightIn(min = 48.dp)) {
+            StudioText("TableMultiLobby.Text.26", "Rooms and lobby", false, "CLOSE ROOM", color = Danger, fontWeight = FontWeight.Bold) } },
+        dismissButton = { StudioTextButton("TableMultiLobby.TextButton.5", "Rooms and lobby", onClick = { confirmClose = false }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableMultiLobby.Text.27", "Rooms and lobby", false, "KEEP OPEN") } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted,
     )
 }
@@ -307,22 +307,22 @@ private fun JSONArray?.toIntSet(): Set<Int> =
 private fun RoomCodeCard(code: String?, context: android.content.Context) {
     Surface(Modifier.fillMaxWidth(), color = Panel, shape = RoundedCornerShape(14.dp)) {
         Column(Modifier.padding(14.dp)) {
-            Text("ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            StudioText("TableMultiLobby.Text.28", "Rooms and lobby", false, "ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             if (code == null) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                 CircularProgressIndicator(Modifier.size(18.dp), color = Mint, strokeWidth = 2.dp)
-                Text("Opening a secure online room…", color = Mint, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp))
+                StudioText("TableMultiLobby.Text.29", "Rooms and lobby", false, "Opening a secure online room…", color = Mint, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp))
             } else {
-                Text(code, color = Mint, fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp,
+                StudioText("TableMultiLobby.Text.30", "Rooms and lobby", true, code, color = Mint, fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp,
                     modifier = Modifier.padding(top = 2.dp).semantics { contentDescription = "Room code ${code.toList().joinToString(" ")}" })
-                Text("Friends open Play, choose Join 2–4 players online, and enter this code.", color = Muted, fontSize = 12.sp)
+                StudioText("TableMultiLobby.Text.31", "Rooms and lobby", false, "Friends open Play, choose Join 2–4 players online, and enter this code.", color = Muted, fontSize = 12.sp)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { copyText(context, "Arcana Table room code", code) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text("COPY CODE", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
+                    StudioOutlinedButton("TableMultiLobby.OutlinedButton.4", "Rooms and lobby", onClick = { copyText(context, "Arcana Table room code", code) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        StudioText("TableMultiLobby.Text.32", "Rooms and lobby", false, "COPY CODE", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
-                    OutlinedButton(onClick = {
+                    StudioOutlinedButton("TableMultiLobby.OutlinedButton.5", "Rooms and lobby", onClick = {
                         shareText(context, "Join my Arcana Table Commander game! Open Play, choose Join 2–4 players online, and enter code $code")
                     }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text("SHARE INVITE", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
+                        StudioText("TableMultiLobby.Text.33", "Rooms and lobby", false, "SHARE INVITE", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
             }
@@ -334,13 +334,13 @@ private fun RoomCodeCard(code: String?, context: android.content.Context) {
 private fun WifiAddressCard(address: String?, context: android.content.Context) {
     Surface(Modifier.fillMaxWidth(), color = Panel, shape = RoundedCornerShape(14.dp)) {
         Column(Modifier.padding(14.dp)) {
-            Text("SAME WI-FI", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Text("Friends open Play, choose Join on Wi-Fi, and pick this phone. If it isn't listed, they type this address:",
+            StudioText("TableMultiLobby.Text.34", "Rooms and lobby", false, "SAME WI-FI", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            StudioText("TableMultiLobby.Text.35", "Rooms and lobby", false, "Friends open Play, choose Join on Wi-Fi, and pick this phone. If it isn't listed, they type this address:",
                 color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                Text(address ?: "—", color = Mint, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                if (address != null) OutlinedButton(onClick = { copyText(context, "Arcana Table host address", address) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("COPY ADDRESS", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
+                StudioText("TableMultiLobby.Text.36", "Rooms and lobby", true, address ?: "—", color = Mint, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                if (address != null) StudioOutlinedButton("TableMultiLobby.OutlinedButton.6", "Rooms and lobby", onClick = { copyText(context, "Arcana Table host address", address) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    StudioText("TableMultiLobby.Text.37", "Rooms and lobby", false, "COPY ADDRESS", color = Mint, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         }
@@ -350,19 +350,19 @@ private fun WifiAddressCard(address: String?, context: android.content.Context) 
 @Composable
 private fun SeatCountPicker(current: Int, allowed: Set<Int>, enabled: Boolean, onPick: (Int) -> Unit) {
     Column {
-        Text("PLAYERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        StudioText("TableMultiLobby.Text.38", "Rooms and lobby", false, "PLAYERS", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (2..4).forEach { count ->
                 val selected = count == current
                 val canPick = enabled && (selected || count in allowed)
-                OutlinedButton(
+                StudioOutlinedButton("TableMultiLobby.OutlinedButton.7", "Rooms and lobby",
                     onClick = { if (!selected) onPick(count) },
                     enabled = canPick,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     colors = if (selected) ButtonDefaults.outlinedButtonColors(containerColor = Mint, contentColor = Ink)
                         else ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
                     border = BorderStroke(1.dp, if (selected) Mint else PanelLight),
-                ) { Text("$count", fontWeight = FontWeight.Black) }
+                ) { StudioText("TableMultiLobby.Text.39", "Rooms and lobby", true, "$count", fontWeight = FontWeight.Black) }
             }
         }
     }
@@ -392,52 +392,52 @@ private fun SeatCard(
                     val commander = seat.commander
                     if (commander != null) CardArt(homeArtUrl(null, null, commander), Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop, fallbackName = commander, label = "$commander, commander of ${seat.name}")
-                    else Text(if (waiting) "?" else "P$number", color = Muted, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                    else StudioText("TableMultiLobby.Text.40", "Rooms and lobby", true, if (waiting) "?" else "P$number", color = Muted, fontSize = 20.sp, fontWeight = FontWeight.Black)
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text(seat.name, color = if (waiting) Muted else SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                    StudioText("TableMultiLobby.Text.41", "Rooms and lobby", true, seat.name, color = if (waiting) Muted else SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val role = listOfNotNull(
                         "P$number",
                         when (seat.kind) { "host" -> "HOST"; "ai" -> "AI"; "human" -> "FRIEND"; else -> "OPEN SEAT" },
                         "YOU".takeIf { isYou },
                     ).joinToString(" · ")
-                    Text(
+                    StudioText("TableMultiLobby.Text.42", "Rooms and lobby", true,
                         if (seat.kind == "ai") "$role · ${seat.difficulty.label}" else role,
                         color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp,
                     )
                     seat.commander?.let {
-                        Text(it, color = CounterGold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        StudioText("TableMultiLobby.Text.43", "Rooms and lobby", true, it, color = CounterGold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 StatusChip(seat)
             }
             if (hostControls && seat.kind == "ai") {
                 Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                    Text("AI DIFFICULTY", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    StudioText("TableMultiLobby.Text.44", "Rooms and lobby", false, "AI DIFFICULTY", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         AiDifficulty.entries.forEach { level ->
-                            OutlinedButton(
+                            StudioOutlinedButton("TableMultiLobby.OutlinedButton.8", "Rooms and lobby",
                                 onClick = { onDifficulty(level) }, enabled = controlsEnabled,
                                 modifier = Modifier.weight(1f).heightIn(min = 42.dp),
                                 colors = if (seat.difficulty == level)
                                     ButtonDefaults.outlinedButtonColors(containerColor = Mint, contentColor = Ink)
                                 else ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
-                            ) { Text(level.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                            ) { StudioText("TableMultiLobby.Text.45", "Rooms and lobby", true, level.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
                         }
                     }
-                    TextButton(onClick = onOpenForFriend, enabled = controlsEnabled, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp)) {
-                        Text("OPEN FOR A FRIEND", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold)
+                    StudioTextButton("TableMultiLobby.TextButton.6", "Rooms and lobby", onClick = onOpenForFriend, enabled = controlsEnabled, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp)) {
+                        StudioText("TableMultiLobby.Text.46", "Rooms and lobby", false, "OPEN FOR A FRIEND", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold)
                     }
                 }
             } else if (hostControls) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
                 when (seat.kind) {
-                    "waiting" -> TextButton(onClick = onMakeAi, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("PLAY AS AI", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold) }
-                    "ai" -> TextButton(onClick = onOpenForFriend, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("OPEN FOR A FRIEND", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold) }
-                    "human" -> TextButton(onClick = onRemove, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("REMOVE", color = if (controlsEnabled) Danger else Muted, fontWeight = FontWeight.Bold) }
+                    "waiting" -> StudioTextButton("TableMultiLobby.TextButton.7", "Rooms and lobby", onClick = onMakeAi, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableMultiLobby.Text.47", "Rooms and lobby", false, "PLAY AS AI", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold) }
+                    "ai" -> StudioTextButton("TableMultiLobby.TextButton.8", "Rooms and lobby", onClick = onOpenForFriend, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableMultiLobby.Text.48", "Rooms and lobby", false, "OPEN FOR A FRIEND", color = if (controlsEnabled) Mint else Muted, fontWeight = FontWeight.Bold) }
+                    "human" -> StudioTextButton("TableMultiLobby.TextButton.9", "Rooms and lobby", onClick = onRemove, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableMultiLobby.Text.49", "Rooms and lobby", false, "REMOVE", color = if (controlsEnabled) Danger else Muted, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -451,7 +451,7 @@ private fun StatusChip(seat: LobbySeat) {
         seat.ready -> "READY" to Mint
         else -> "NOT READY" to CounterGold
     }
-    Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
+    StudioText("TableMultiLobby.Text.50", "Rooms and lobby", true, label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
         modifier = Modifier.widthIn(min = 72.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
             .padding(horizontal = 10.dp, vertical = 8.dp))
 }

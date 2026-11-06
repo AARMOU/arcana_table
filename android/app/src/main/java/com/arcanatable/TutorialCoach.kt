@@ -150,12 +150,12 @@ private fun TutorialCompactCard(model: TutorialCoachModel, modifier: Modifier) {
     Column(modifier.padding(horizontal = 10.dp, vertical = 6.dp).background(Color(0xFF12241F), RoundedCornerShape(10.dp))
         .border(1.dp, Color(0xFFE6B65C), RoundedCornerShape(10.dp)).padding(10.dp).testTag("tutorial-coach-tip"),
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("${model.index + 1} / ${model.lesson.steps.size} · " + step.title, color = Color(0xFFE6B65C), fontWeight = FontWeight.Black, fontSize = 13.sp)
-        Text(step.body, color = Color.White, fontSize = 12.sp, lineHeight = 16.sp)
+        StudioText("TutorialCoach.Text.1", "Dialogs and overlays", true, "${model.index + 1} / ${model.lesson.steps.size} · " + step.title, color = Color(0xFFE6B65C), fontWeight = FontWeight.Black, fontSize = 13.sp)
+        StudioText("TutorialCoach.Text.2", "Dialogs and overlays", true, step.body, color = Color.White, fontSize = 12.sp, lineHeight = 16.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = model.onSkip, modifier = Modifier.height(40.dp)) { Text("EXIT") }
-            if (stepHasNext(step, model.practice)) Button(onClick = model.onNext, modifier = Modifier.height(40.dp)) { Text("NEXT") }
-            else Text(step.hint.ifBlank { "Use the highlighted control" }, color = Color(0xFFE6B65C), fontSize = 11.sp, modifier = Modifier.weight(1f))
+            StudioOutlinedButton("TutorialCoach.OutlinedButton.1", "Dialogs and overlays", onClick = model.onSkip, modifier = Modifier.height(40.dp)) { StudioText("TutorialCoach.Text.3", "Dialogs and overlays", false, "EXIT") }
+            if (stepHasNext(step, model.practice)) StudioButton("TutorialCoach.Button.1", "Dialogs and overlays", onClick = model.onNext, modifier = Modifier.height(40.dp)) { StudioText("TutorialCoach.Text.4", "Dialogs and overlays", false, "NEXT") }
+            else StudioText("TutorialCoach.Text.5", "Dialogs and overlays", true, step.hint.ifBlank { "Use the highlighted control" }, color = Color(0xFFE6B65C), fontSize = 11.sp, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -299,21 +299,21 @@ internal fun TutorialCoachOverlay(
                     Column(Modifier.weight(1f, fill = false).verticalScroll(scroll),
                         verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("ARCANA  /  " + lesson.title.uppercase(), color = gold,
+                            StudioText("TutorialCoach.Text.6", "Dialogs and overlays", false, "ARCANA  /  " + lesson.title.uppercase(), color = gold,
                                 fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                            Text((index + 1).toString() + " / " + lesson.steps.size, color = muted, fontSize = 11.sp)
+                            StudioText("TutorialCoach.Text.7", "Dialogs and overlays", true, (index + 1).toString() + " / " + lesson.steps.size, color = muted, fontSize = 11.sp)
                         }
-                        Text(step.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Text(step.body, color = Color(0xFFF0EEE6), fontSize = 13.sp, lineHeight = 18.sp)
+                        StudioText("TutorialCoach.Text.8", "Dialogs and overlays", true, step.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        StudioText("TutorialCoach.Text.9", "Dialogs and overlays", true, step.body, color = Color(0xFFF0EEE6), fontSize = 13.sp, lineHeight = 18.sp)
                     }
                     // Actions stay accessible while the instruction copy scrolls.
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
+                        StudioOutlinedButton("TutorialCoach.OutlinedButton.2", "Dialogs and overlays", onClick = onSkip, modifier = Modifier.height(45.dp)) { StudioText("TutorialCoach.Text.10", "Dialogs and overlays", false, "EXIT") }
                         if (stepHasNext(step, practice)) {
-                            Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
+                            StudioButton("TutorialCoach.Button.2", "Dialogs and overlays", onClick = onNext, modifier = Modifier.height(45.dp)) { StudioText("TutorialCoach.Text.11", "Dialogs and overlays", false, "NEXT") }
                         } else {
-                            Text(step.hint.ifBlank { "Use the highlighted control" },
+                            StudioText("TutorialCoach.Text.12", "Dialogs and overlays", true, step.hint.ifBlank { "Use the highlighted control" },
                                 color = gold, fontSize = 12.sp, modifier = Modifier.weight(1f))
                         }
                     }

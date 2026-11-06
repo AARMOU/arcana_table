@@ -166,7 +166,7 @@ internal fun TableController.TableOverlaysB() {
 
 
 
-    if (activeGameLobbyOpen) ActiveGameLobbyDialog(onDismiss = { activeGameLobbyOpen = false })
+    if (activeGameLobbyOpen) StudioScreen("Room") { ActiveGameLobbyDialog(onDismiss = { activeGameLobbyOpen = false }) }
 
     if (lobbyOpen) LobbyDialog(
         players = players,
@@ -430,23 +430,23 @@ internal fun TableController.TableOverlaysB() {
         onDismiss = { handActionCard = null }, onAction = { action -> run { performHandAction(card, action) } }
     ) }
 
-    if (connectionLostReason != null || reconnecting) AlertDialog(
+    if (connectionLostReason != null || reconnecting) StudioAlertDialog("Game dialog 1",
         onDismissRequest = { if (!reconnecting) connectionLostReason = null },
-        title = { Text(if (reconnecting) "Reconnecting…" else "Connection interrupted") },
+        title = { StudioText("TableOverlaysB.Text.1", "Dialogs and overlays", true, if (reconnecting) "Reconnecting…" else "Connection interrupted") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (reconnecting) CircularProgressIndicator(color = Mint, strokeWidth = 2.dp)
-                Text(connectionLostReason ?: "Arcana Table is trying to restore your room connection.", color = Muted)
-                if (reconnecting) Text("The host keeps your seat reserved while you reconnect.", color = Mint, fontSize = 11.sp)
+                StudioText("TableOverlaysB.Text.2", "Dialogs and overlays", true, connectionLostReason ?: "Arcana Table is trying to restore your room connection.", color = Muted)
+                if (reconnecting) StudioText("TableOverlaysB.Text.3", "Dialogs and overlays", false, "The host keeps your seat reserved while you reconnect.", color = Mint, fontSize = 11.sp)
             }
         },
         confirmButton = {
-            TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
-                Text(if (reconnecting) "TRYING…" else "RECONNECT", color = if (reconnecting) Muted else Mint)
+            StudioTextButton("TableOverlaysB.TextButton.1", "Dialogs and overlays", onClick = { reconnectToRoom() }, enabled = !reconnecting) {
+                StudioText("TableOverlaysB.Text.4", "Dialogs and overlays", true, if (reconnecting) "TRYING…" else "RECONNECT", color = if (reconnecting) Muted else Mint)
             }
         },
         dismissButton = {
-            TextButton(onClick = {
+            StudioTextButton("TableOverlaysB.TextButton.2", "Dialogs and overlays", onClick = {
                 reconnectJob?.cancel()
                 reconnectJob = null
                 reconnecting = false
@@ -457,7 +457,7 @@ internal fun TableController.TableOverlaysB() {
                     onlineStatus = "Disconnected"
                 }
                 connectionLostReason = null
-            }) { Text(if (reconnecting) "CANCEL" else "STAY OFFLINE", color = Muted) }
+            }) { StudioText("TableOverlaysB.Text.5", "Dialogs and overlays", true, if (reconnecting) "CANCEL" else "STAY OFFLINE", color = Muted) }
         },
         containerColor = Panel,
         titleContentColor = SoftWhite,
@@ -466,20 +466,20 @@ internal fun TableController.TableOverlaysB() {
 
     if (importOpen) {
         LaunchedEffect(Unit) { loadSupportCatalog() }
-        Dialog(onDismissRequest = { if (!importing) cancelDeckImport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        StudioDialog("Game dialog 2", onDismissRequest = { if (!importing) cancelDeckImport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             val maxImportDialogHeight = LocalConfiguration.current.screenHeightDp.dp * 0.86f
             Surface(Modifier.fillMaxWidth(0.96f).heightIn(max = maxImportDialogHeight), shape = RoundedCornerShape(18.dp), color = Panel) {
                 Box(Modifier.fillMaxWidth().heightIn(max = maxImportDialogHeight)) {
                     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${if (players[selectedPlayer].deckLoaded) "Replace deck for" else "Import deck for"} ${players[selectedPlayer].name}", color = SoftWhite, fontSize = 19.sp, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Cancel deck import", tint = Muted) }
+                            StudioText("TableOverlaysB.Text.6", "Dialogs and overlays", true, "${if (players[selectedPlayer].deckLoaded) "Replace deck for" else "Import deck for"} ${players[selectedPlayer].name}", color = SoftWhite, fontSize = 19.sp, modifier = Modifier.weight(1f))
+                            StudioIconButton("TableOverlaysB.IconButton.1", "Dialogs and overlays", onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.size(44.dp)) { StudioIcon("TableOverlaysB.Icon.1", "Dialogs and overlays", Icons.Filled.Close, "Cancel deck import", tint = Muted) }
                         }
-                        Text("Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                        TextButton(onClick = { run { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("SAVED DECKS · ${savedDecks.size}", color = Mint) }
+                        StudioText("TableOverlaysB.Text.7", "Dialogs and overlays", false, "Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        StudioTextButton("TableOverlaysB.TextButton.3", "Dialogs and overlays", onClick = { run { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { StudioText("TableOverlaysB.Text.8", "Dialogs and overlays", true, "SAVED DECKS · ${savedDecks.size}", color = Mint) }
                         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            OutlinedButton(onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CHOOSE FILE", fontSize = 9.sp) }
-                            if (DeckBuilderFlag.enabled) OutlinedButton(
+                            StudioOutlinedButton("TableOverlaysB.OutlinedButton.1", "Dialogs and overlays", onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.9", "Dialogs and overlays", false, "CHOOSE FILE", fontSize = 9.sp) }
+                            if (DeckBuilderFlag.enabled) StudioOutlinedButton("TableOverlaysB.OutlinedButton.2", "Dialogs and overlays",
                                 onClick = { run {
                                     if (!importing) {
                                         deckBuilderReturnToImport = true
@@ -489,50 +489,50 @@ internal fun TableController.TableOverlaysB() {
                                 } },
                                 enabled = !importing,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("import-open-deck-builder")
-                            ) { Text("DECK BUILDER", fontSize = 9.sp, color = Mint) }
+                            ) { StudioText("TableOverlaysB.Text.10", "Dialogs and overlays", false, "DECK BUILDER", fontSize = 9.sp, color = Mint) }
                         }
-                        OutlinedTextField(
+                        StudioOutlinedTextField("TableOverlaysB.OutlinedTextField.1", "Dialogs and overlays",
                             value = importText,
                             onValueChange = { importText = it; importError = null },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 260.dp).padding(top = 6.dp),
-                            placeholder = { Text("1 Sol Ring\n36 Island\n...") },
+                            placeholder = { StudioText("TableOverlaysB.Text.11", "Dialogs and overlays", false, "1 Sol Ring\n36 Island\n...") },
                             minLines = 5,
                             maxLines = 10,
                             enabled = !importing
                         )
                         if (importText.isNotBlank()) {
                             val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
-                            Text("${importedCardCount} cards in list · scroll inside the box to review", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                            StudioText("TableOverlaysB.Text.12", "Dialogs and overlays", true, "${importedCardCount} cards in list · scroll inside the box to review", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                             // Offline pre-check against the shipped Argentum library (names as written; typo fixes happen on Import).
                             val supportReport = remember(importText, supportCatalog) { supportCatalog?.check(parseDeckList(importText)) }
                             if (supportReport != null) {
-                                Text(supportReport.summary(), color = if (supportReport.unsupportedCopies > 0) CounterGold else Muted, fontSize = 10.sp)
-                                if (supportReport.unsupportedNames.isNotEmpty()) Text(
+                                StudioText("TableOverlaysB.Text.13", "Dialogs and overlays", true, supportReport.summary(), color = if (supportReport.unsupportedCopies > 0) CounterGold else Muted, fontSize = 10.sp)
+                                if (supportReport.unsupportedNames.isNotEmpty()) StudioText("TableOverlaysB.Text.14", "Dialogs and overlays", true,
                                     "Not in Argentum: ${supportReport.unsupportedNames.take(8).joinToString()}${if (supportReport.unsupportedNames.size > 8) ", +${supportReport.unsupportedNames.size - 8} more" else ""}",
                                     color = CounterGold, fontSize = 10.sp, maxLines = 3, overflow = TextOverflow.Ellipsis
                                 )
                                 if (supportReport.unsupportedNames.isNotEmpty()) {
-                                    OutlinedButton(
+                                    StudioOutlinedButton("TableOverlaysB.OutlinedButton.3", "Dialogs and overlays",
                                         onClick = openCardRequest,
                                         enabled = !importing,
                                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp)
                                     ) {
-                                        Text("REQUEST MISSING CARDS (" + supportReport.unsupportedNames.size + ")", fontSize = 11.sp, color = Mint)
+                                        StudioText("TableOverlaysB.Text.15", "Dialogs and overlays", false, "REQUEST MISSING CARDS (" + supportReport.unsupportedNames.size + ")", fontSize = 11.sp, color = Mint)
                                     }
-                                    Text("Optional. Review the names before submitting a public card request.", fontSize = 10.sp, color = Muted)
+                                    StudioText("TableOverlaysB.Text.16", "Dialogs and overlays", false, "Optional. Review the names before submitting a public card request.", fontSize = 10.sp, color = Muted)
                                 }
-                            } else Text(if (supportCatalogFailed) "Argentum library check unavailable in this build." else "Checking Argentum's card library…", color = Muted, fontSize = 10.sp)
+                            } else StudioText("TableOverlaysB.Text.17", "Dialogs and overlays", true, if (supportCatalogFailed) "Argentum library check unavailable in this build." else "Checking Argentum's card library…", color = Muted, fontSize = 10.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = importSaveToLibrary, onCheckedChange = { importSaveToLibrary = it }, enabled = !importing)
-                            Text("Save this imported deck for later", color = SoftWhite, fontSize = 11.sp)
+                            StudioCheckbox("TableOverlaysB.Checkbox.1", "Dialogs and overlays", checked = importSaveToLibrary, onCheckedChange = { importSaveToLibrary = it }, enabled = !importing)
+                            StudioText("TableOverlaysB.Text.18", "Dialogs and overlays", false, "Save this imported deck for later", color = SoftWhite, fontSize = 11.sp)
                         }
-                        if (importSaveToLibrary) OutlinedTextField(importSaveName, { importSaveName = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Saved deck name (optional)") }, enabled = !importing)
-                        importError?.let { Text(it, color = Color(0xFFFF9C91), fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
-                        if (importing) Text("Matching card names and trying automatic fixes…", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                        if (importSaveToLibrary) StudioOutlinedTextField("TableOverlaysB.OutlinedTextField.2", "Dialogs and overlays", importSaveName, { importSaveName = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { StudioText("TableOverlaysB.Text.19", "Dialogs and overlays", false, "Saved deck name (optional)") }, enabled = !importing)
+                        importError?.let { StudioText("TableOverlaysB.Text.20", "Dialogs and overlays", true, it, color = Color(0xFFFF9C91), fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
+                        if (importing) StudioText("TableOverlaysB.Text.21", "Dialogs and overlays", false, "Matching card names and trying automatic fixes…", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                            Button(onClick = { run { importDeck(importText) } }, enabled = !importing, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (importing) "LOADING" else "IMPORT") }
+                            StudioTextButton("TableOverlaysB.TextButton.4", "Dialogs and overlays", onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.22", "Dialogs and overlays", false, "CANCEL", color = Muted) }
+                            StudioButton("TableOverlaysB.Button.1", "Dialogs and overlays", onClick = { run { importDeck(importText) } }, enabled = !importing, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.23", "Dialogs and overlays", true, if (importing) "LOADING" else "IMPORT") }
                         }
                     }
                 }
@@ -542,24 +542,24 @@ internal fun TableController.TableOverlaysB() {
 
 
     // Requests never change the deck or start a paid card-implementation worker.
-    if (cardRequestOpen) AlertDialog(
+    if (cardRequestOpen) StudioAlertDialog("Game dialog 3",
         onDismissRequest = { if (!cardRequestSending) cardRequestOpen = false },
-        title = { Text("Request missing cards") },
+        title = { StudioText("TableOverlaysB.Text.24", "Dialogs and overlays", false, "Request missing cards") },
         text = {
             Column(
                 modifier = Modifier.heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.55f)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Choose unsupported card names to share with Arcana's public request tracker. We never send your decklist, name, room, or device details.",
+                StudioText("TableOverlaysB.Text.25", "Dialogs and overlays", false, "Choose unsupported card names to share with Arcana's public request tracker. We never send your decklist, name, room, or device details.",
                     color = Muted, fontSize = 12.sp)
                 if (cardRequestNames.size > 10) {
-                    Text("Select up to 10 names per request. You can request the others separately.",
+                    StudioText("TableOverlaysB.Text.26", "Dialogs and overlays", false, "Select up to 10 names per request. You can request the others separately.",
                         color = CounterGold, fontSize = 11.sp)
                 }
                 cardRequestNames.take(cardRequestVisibleCount).forEach { name ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
+                        StudioCheckbox("TableOverlaysB.Checkbox.2", "Dialogs and overlays",
                             checked = name in cardRequestSelected,
                             enabled = !cardRequestSending && !cardRequestCompleted,
                             onCheckedChange = { checked ->
@@ -570,25 +570,25 @@ internal fun TableController.TableOverlaysB() {
                                 }
                             }
                         )
-                        Text(name, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        StudioText("TableOverlaysB.Text.27", "Dialogs and overlays", true, name, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     }
                 }
                 if (cardRequestNames.size > cardRequestVisibleCount) {
-                    TextButton(
+                    StudioTextButton("TableOverlaysB.TextButton.5", "Dialogs and overlays",
                         onClick = { cardRequestVisibleCount = (cardRequestVisibleCount + 40).coerceAtMost(cardRequestNames.size) },
                         enabled = !cardRequestSending && !cardRequestCompleted
-                    ) { Text("SHOW MORE (${cardRequestNames.size - cardRequestVisibleCount} remaining)", color = Mint) }
+                    ) { StudioText("TableOverlaysB.Text.28", "Dialogs and overlays", true, "SHOW MORE (${cardRequestNames.size - cardRequestVisibleCount} remaining)", color = Mint) }
                 }
-                if (!CardRequestApi.isConfigured) Text(
+                if (!CardRequestApi.isConfigured) StudioText("TableOverlaysB.Text.29", "Dialogs and overlays", false,
                     "This build does not yet have a request service configured. No information has been sent.",
                     color = CounterGold, fontSize = 11.sp
                 )
-                cardRequestFeedback?.let { Text(it, fontSize = 12.sp, color = if (cardRequestCompleted) Mint else CounterGold) }
+                cardRequestFeedback?.let { StudioText("TableOverlaysB.Text.30", "Dialogs and overlays", true, it, fontSize = 12.sp, color = if (cardRequestCompleted) Mint else CounterGold) }
                 if (cardRequestSending) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
-            TextButton(
+            StudioTextButton("TableOverlaysB.TextButton.6", "Dialogs and overlays",
                 onClick = {
                     if (cardRequestCompleted) {
                         cardRequestOpen = false
@@ -618,12 +618,12 @@ internal fun TableController.TableOverlaysB() {
                 },
                 enabled = !cardRequestSending && (cardRequestCompleted ||
                     (CardRequestApi.isConfigured && cardRequestSelected.isNotEmpty()))
-            ) { Text(if (cardRequestCompleted) "DONE" else if (cardRequestSending) "SENDING…" else "SEND REQUEST", color = Mint) }
+            ) { StudioText("TableOverlaysB.Text.31", "Dialogs and overlays", true, if (cardRequestCompleted) "DONE" else if (cardRequestSending) "SENDING…" else "SEND REQUEST", color = Mint) }
         },
-        dismissButton = { TextButton(
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.7", "Dialogs and overlays",
             enabled = !cardRequestSending,
             onClick = { cardRequestOpen = false }
-        ) { Text(if (cardRequestCompleted) "CLOSE" else "CANCEL") } },
+        ) { StudioText("TableOverlaysB.Text.32", "Dialogs and overlays", true, if (cardRequestCompleted) "CLOSE" else "CANCEL") } },
         containerColor = Panel,
         titleContentColor = SoftWhite,
         textContentColor = Muted
@@ -653,15 +653,15 @@ internal fun TableController.TableOverlaysB() {
                 .filter { it.id in importReviewCardIds && it.importIssue != null }
                 .distinctBy { it.id }
         }.orEmpty()
-        AlertDialog(
+        StudioAlertDialog("Game dialog 4",
             onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
-            title = { Text("Review imported cards") },
-            text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
+            title = { StudioText("TableOverlaysB.Text.33", "Dialogs and overlays", false, "Review imported cards") },
+            text = { StudioText("TableOverlaysB.Text.34", "Dialogs and overlays", true, importReviewMessage, color = Muted, fontSize = 12.sp) },
             // All actions stack in one right-aligned column, so the dismiss button
             // is not stranded beside a multi-row group.
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (cardsNeedingReview.isNotEmpty()) TextButton(
+                        if (cardsNeedingReview.isNotEmpty()) StudioTextButton("TableOverlaysB.TextButton.8", "Dialogs and overlays",
                             modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
@@ -737,8 +737,8 @@ internal fun TableController.TableOverlaysB() {
                                     importAutoFixInProgress = false
                                 }
                             }
-                        ) { Text(if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
-                        if (importOverflowCardIds.isNotEmpty()) TextButton(
+                        ) { StudioText("TableOverlaysB.Text.35", "Dialogs and overlays", true, if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
+                        if (importOverflowCardIds.isNotEmpty()) StudioTextButton("TableOverlaysB.TextButton.9", "Dialogs and overlays",
                             modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
@@ -748,14 +748,14 @@ internal fun TableController.TableOverlaysB() {
                                 importOverflowCardIds = emptySet()
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
-                        ) { Text("TRIM EXCESS", color = Mint) }
-                    if (cardRequestNames.isNotEmpty()) TextButton(onClick = openCardRequest, enabled = !importAutoFixInProgress) { Text("REQUEST MISSING CARDS", color = Mint) }
-                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("OPEN EDITOR", color = Mint)
+                        ) { StudioText("TableOverlaysB.Text.36", "Dialogs and overlays", false, "TRIM EXCESS", color = Mint) }
+                    if (cardRequestNames.isNotEmpty()) StudioTextButton("TableOverlaysB.TextButton.10", "Dialogs and overlays", onClick = openCardRequest, enabled = !importAutoFixInProgress) { StudioText("TableOverlaysB.Text.37", "Dialogs and overlays", false, "REQUEST MISSING CARDS", color = Mint) }
+                    if (cardsNeedingReview.isNotEmpty()) StudioTextButton("TableOverlaysB.TextButton.11", "Dialogs and overlays", onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableOverlaysB.Text.38", "Dialogs and overlays", false, "OPEN EDITOR", color = Mint)
                     }
                     val reviewFinished = cardsNeedingReview.isEmpty() && importOverflowCardIds.isEmpty()
-                    TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(if (reviewFinished) "CLOSE" else "LATER", color = SoftWhite)
+                    StudioTextButton("TableOverlaysB.TextButton.12", "Dialogs and overlays", onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableOverlaysB.Text.39", "Dialogs and overlays", true, if (reviewFinished) "CLOSE" else "LATER", color = SoftWhite)
                     }
                 }
             },
@@ -793,17 +793,17 @@ internal fun TableController.TableOverlaysB() {
             ArgentumActions.forCardServerId(snap.legalActions, snap.serverCardIds[top.id])
                 .filter { it.optJSONObject("action")?.optString("type") in setOf("CastSpell", "PlayLand") }
         else emptyList()
-        AlertDialog(
+        StudioAlertDialog("Game dialog 5",
             onDismissRequest = { argentumTopLibraryOpen = false },
-            title = { Text("Top of your library · private") },
+            title = { StudioText("TableOverlaysB.Text.40", "Dialogs and overlays", false, "Top of your library · private") },
             text = {
-                if (top == null) Text("Argentum is not currently allowing you to look at the top card.", color = Muted)
+                if (top == null) StudioText("TableOverlaysB.Text.41", "Dialogs and overlays", false, "Argentum is not currently allowing you to look at the top card.", color = Muted)
                 else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(top.name, color = SoftWhite)
-                    Text(top.type, color = Muted)
+                    StudioText("TableOverlaysB.Text.42", "Dialogs and overlays", true, top.name, color = SoftWhite)
+                    StudioText("TableOverlaysB.Text.43", "Dialogs and overlays", true, top.type, color = Muted)
                     if (!top.manaCost.isNullOrBlank()) ManaCostPips(top.manaCost.orEmpty())
-                    Text(top.oracleText.orEmpty(), color = SoftWhite)
-                    Text(
+                    StudioText("TableOverlaysB.Text.44", "Dialogs and overlays", true, top.oracleText.orEmpty(), color = SoftWhite)
+                    StudioText("TableOverlaysB.Text.45", "Dialogs and overlays", true,
                         if (playChoices.isEmpty()) "You may look without priority. Playing or casting is not currently legal."
                         else "Argentum controls timing, available land plays, targets, and mana payment.",
                         color = Muted
@@ -812,18 +812,18 @@ internal fun TableController.TableOverlaysB() {
             },
             confirmButton = {
                 if (top != null && playChoices.isNotEmpty())
-                    TextButton(onClick = {
+                    StudioTextButton("TableOverlaysB.TextButton.13", "Dialogs and overlays", onClick = {
                         argentumTopLibraryOpen = false
                         openArgentumActions(top)
-                    }) { Text("PLAY / CAST OPTIONS", color = Mint) }
+                    }) { StudioText("TableOverlaysB.Text.46", "Dialogs and overlays", false, "PLAY / CAST OPTIONS", color = Mint) }
             },
             dismissButton = {
                 Row {
-                    if (top != null) TextButton(onClick = {
+                    if (top != null) StudioTextButton("TableOverlaysB.TextButton.14", "Dialogs and overlays", onClick = {
                         argentumTopLibraryOpen = false
                         preview = CardPreview(localSeat, top, fromHand = false, canManipulate = false)
-                    }) { Text("LARGE VIEW", color = Muted) }
-                    TextButton(onClick = { argentumTopLibraryOpen = false }) { Text("CLOSE", color = Muted) }
+                    }) { StudioText("TableOverlaysB.Text.47", "Dialogs and overlays", false, "LARGE VIEW", color = Muted) }
+                    StudioTextButton("TableOverlaysB.TextButton.15", "Dialogs and overlays", onClick = { argentumTopLibraryOpen = false }) { StudioText("TableOverlaysB.Text.48", "Dialogs and overlays", false, "CLOSE", color = Muted) }
                 }
             },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
@@ -846,7 +846,7 @@ internal fun TableController.TableOverlaysB() {
                 ArgentumActions.forCardServerId(snapshot.legalActions, snapshot.serverCardIds[card.id]).isNotEmpty()
             }.map { it.id }.toSet()
         } else emptySet()
-        CardZoneDialog(
+        StudioScreen("Zones") { CardZoneDialog(
             zone, players[index].name, cards, onDismiss = { zoneDialog = null },
             onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) },
             manualPlayAllowed = !argentumEnabled && zone in setOf("Graveyard", "Exile") &&
@@ -899,12 +899,12 @@ internal fun TableController.TableOverlaysB() {
             },
             commanderId = players[index].commanderCard?.id,
             canMoveCommander = !onlineMode || index == localSeat && !gameEndedOnline
-        )
+        ) }
     }
 
-    if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!, modifier = Modifier.clickable { message = null }) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
+    if (message != null) StudioAlertDialog("Game dialog 6", onDismissRequest = { message = null }, title = { StudioText("TableOverlaysB.Text.49", "Dialogs and overlays", false, "Arcana Table") }, text = { StudioText("TableOverlaysB.Text.50", "Dialogs and overlays", true, message!!, modifier = Modifier.clickable { message = null }) }, confirmButton = { StudioTextButton("TableOverlaysB.TextButton.16", "Dialogs and overlays", onClick = { message = null }) { StudioText("TableOverlaysB.Text.51", "Dialogs and overlays", false, "OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
 
-    if (logOpen) GameLogDialog(
+    if (logOpen) StudioScreen("Game log") { GameLogDialog(
         entries = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.description } else gameLog,
         ownership = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { if (it.isTurnMarker) null else it.isYours } else null,
         turnMarkers = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.isTurnMarker } else null,
@@ -915,7 +915,7 @@ internal fun TableController.TableOverlaysB() {
         },
         onPreviewCard = { owner, card -> preview = CardPreview(owner, card, fromHand = false, canManipulate = false) },
         onDismiss = { run { logOpen = false } }
-    )
+    ) }
     if (rulesOpen) RulesLookupDialog(onDismiss = { rulesOpen = false })
     AnimatedVisibility(
         visible = chatOpen,
@@ -926,7 +926,7 @@ internal fun TableController.TableOverlaysB() {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)).clickable { chatOpen = false }, contentAlignment = Alignment.CenterEnd) {
             LocalChatPanel(
                 players = players, activePlayer = if (onlineMode) localSeat else activePlayer, messages = chatMessages, draft = chatDraft,
-                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.88f).clickable(enabled = false) {},
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.88f).studioClickable("TableOverlaysB.clickable.1", "Dialogs and overlays", enabled = false) {},
                 onDraft = { chatDraft = it }, onDismiss = { run { chatOpen = false } }, onSend = { run {
             val text = chatDraft.trim()
             if (text.isNotEmpty()) {
@@ -945,7 +945,7 @@ internal fun TableController.TableOverlaysB() {
         onStart = { id, index -> startTutorial(id, index) },
         gameRunning = argentumEnabled
     )
-    if (optionsOpen) OptionsPage(
+    if (optionsOpen) StudioScreen("Settings") { OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
         backgroundAlertsEnabled = backgroundAlertsEnabled, showEngineStatus = showEngineStatus,
         followActivePlayer = followActivePlayer,
@@ -1010,12 +1010,14 @@ internal fun TableController.TableOverlaysB() {
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } },
-    )
-    if (nativeStudioOpen && BuildConfig.DEBUG) NativeStudioPage(
-        store = remember(layoutOrientationSuffix) { StudioStore(optionPrefs, layoutOrientationSuffix) },
+    ) }
+    if (nativeStudioOpen && BuildConfig.DEBUG) NativeStudioWorkspace(
+        prefs = optionPrefs, orientation=layoutOrientationSuffix,
+        width=configuration.screenWidthDp,height=configuration.screenHeightDp,
         cards = players.getOrNull(localSeat)?.hand.orEmpty(),
         onApplied = { nativeStudioRevision++ },
         onDismiss = { nativeStudioOpen = false },
+        onViewGame=if(gameInProgress) ({nativeStudioOpen=false;showHand=true}) else null,
     )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
@@ -1053,43 +1055,43 @@ internal fun TableController.TableOverlaysB() {
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
     )
 
-    if (resetConfirmOpen) AlertDialog(
+    if (resetConfirmOpen) StudioAlertDialog("Game dialog 7",
         onDismissRequest = { resetConfirmOpen = false },
-        title = { Text("Reset this game?") },
-        text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
-        confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } },
+        title = { StudioText("TableOverlaysB.Text.52", "Dialogs and overlays", false, "Reset this game?") },
+        text = { StudioText("TableOverlaysB.Text.53", "Dialogs and overlays", false, "This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
+        confirmButton = { StudioTextButton("TableOverlaysB.TextButton.17", "Dialogs and overlays", onClick = { resetGame() }) { StudioText("TableOverlaysB.Text.54", "Dialogs and overlays", false, "RESET GAME", color = Color(0xFFE9978B)) } },
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.18", "Dialogs and overlays", onClick = { resetConfirmOpen = false }) { StudioText("TableOverlaysB.Text.55", "Dialogs and overlays", false, "CANCEL") } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
     if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
         val proposer = players.getOrNull(endProposalBy)?.name ?: "A player"
-        AlertDialog(
+        StudioAlertDialog("Game dialog 8",
             onDismissRequest = { submitEndVote(false) },
-            title = { Text("End this game?") },
-            text = { Text("$proposer proposes ending the game. Everyone must agree. If you decline, the game continues.") },
-            confirmButton = { TextButton(onClick = { submitEndVote(true) }) { Text("AGREE TO END", color = Mint) } },
-            dismissButton = { TextButton(onClick = { submitEndVote(false) }) { Text("KEEP PLAYING", color = SoftWhite) } },
+            title = { StudioText("TableOverlaysB.Text.56", "Dialogs and overlays", false, "End this game?") },
+            text = { StudioText("TableOverlaysB.Text.57", "Dialogs and overlays", true, "$proposer proposes ending the game. Everyone must agree. If you decline, the game continues.") },
+            confirmButton = { StudioTextButton("TableOverlaysB.TextButton.19", "Dialogs and overlays", onClick = { submitEndVote(true) }) { StudioText("TableOverlaysB.Text.58", "Dialogs and overlays", false, "AGREE TO END", color = Mint) } },
+            dismissButton = { StudioTextButton("TableOverlaysB.TextButton.20", "Dialogs and overlays", onClick = { submitEndVote(false) }) { StudioText("TableOverlaysB.Text.59", "Dialogs and overlays", false, "KEEP PLAYING", color = SoftWhite) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
     LaunchedEffect(gameEndedOnline) { if (!gameEndedOnline) gameEndedNoticeDismissed = false }
     // Its buttons must dismiss it, or it would sit on top of the lobby it opens.
-    if (onlineMode && gameEndedOnline && !argentumEnabled && !gameEndedNoticeDismissed) AlertDialog(
+    if (onlineMode && gameEndedOnline && !argentumEnabled && !gameEndedNoticeDismissed) StudioAlertDialog("Game dialog 9",
         onDismissRequest = { gameEndedNoticeDismissed = true },
-        title = { Text("Game ended by unanimous vote") },
-        text = { Text("Every player agreed to end the game. The table is now read-only.") },
-        confirmButton = { TextButton(onClick = { gameEndedNoticeDismissed = true; homeOpen = true; showOverview = true; lobbyOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPEN LOBBY", color = Mint) } },
-        dismissButton = { TextButton(onClick = { gameEndedNoticeDismissed = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("VIEW TABLE", color = SoftWhite) } },
+        title = { StudioText("TableOverlaysB.Text.60", "Dialogs and overlays", false, "Game ended by unanimous vote") },
+        text = { StudioText("TableOverlaysB.Text.61", "Dialogs and overlays", false, "Every player agreed to end the game. The table is now read-only.") },
+        confirmButton = { StudioTextButton("TableOverlaysB.TextButton.21", "Dialogs and overlays", onClick = { gameEndedNoticeDismissed = true; homeOpen = true; showOverview = true; lobbyOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.62", "Dialogs and overlays", false, "OPEN LOBBY", color = Mint) } },
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.22", "Dialogs and overlays", onClick = { gameEndedNoticeDismissed = true }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.63", "Dialogs and overlays", false, "VIEW TABLE", color = SoftWhite) } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
-    if (clearAllConfirmOpen) AlertDialog(
+    if (clearAllConfirmOpen) StudioAlertDialog("Game dialog 10",
         onDismissRequest = { clearAllConfirmOpen = false },
-        title = { Text("Clear all app data?") },
-        text = { Text("This clears the current game, room, chat, logs, and game settings. The Internet room URL resets to your default. Saved decks are kept.") },
-        confirmButton = { TextButton(onClick = { clearAllData() }) { Text("CLEAR EVERYTHING", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { clearAllConfirmOpen = false }) { Text("CANCEL") } },
+        title = { StudioText("TableOverlaysB.Text.64", "Dialogs and overlays", false, "Clear all app data?") },
+        text = { StudioText("TableOverlaysB.Text.65", "Dialogs and overlays", false, "This clears the current game, room, chat, logs, and game settings. The Internet room URL resets to your default. Saved decks are kept.") },
+        confirmButton = { StudioTextButton("TableOverlaysB.TextButton.23", "Dialogs and overlays", onClick = { clearAllData() }) { StudioText("TableOverlaysB.Text.66", "Dialogs and overlays", false, "CLEAR EVERYTHING", color = Color(0xFFE9978B)) } },
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.24", "Dialogs and overlays", onClick = { clearAllConfirmOpen = false }) { StudioText("TableOverlaysB.Text.67", "Dialogs and overlays", false, "CANCEL") } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
@@ -1118,25 +1120,25 @@ internal fun TableController.TableOverlaysB() {
             }
             landEntryPrompt = null
         }
-        AlertDialog(
+        StudioAlertDialog("Game dialog 11",
             onDismissRequest = { landEntryPrompt = null },
-            title = { Text(if (prompt.isShockLand) "Pay 2 life for ${prompt.card.name}?" else "How should ${prompt.card.name} enter?") },
+            title = { StudioText("TableOverlaysB.Text.68", "Dialogs and overlays", true, if (prompt.isShockLand) "Pay 2 life for ${prompt.card.name}?" else "How should ${prompt.card.name} enter?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (prompt.conditionText.isNotBlank()) Text(prompt.conditionText, color = Muted)
-                    if (prompt.isShockLand) Text("Pay 2 life to have it enter untapped, or let it enter tapped.", color = SoftWhite)
-                    else Text("Choose the entry state. Check the condition above; Arcana will track the tapped state you choose.", color = SoftWhite)
+                    if (prompt.conditionText.isNotBlank()) StudioText("TableOverlaysB.Text.69", "Dialogs and overlays", true, prompt.conditionText, color = Muted)
+                    if (prompt.isShockLand) StudioText("TableOverlaysB.Text.70", "Dialogs and overlays", false, "Pay 2 life to have it enter untapped, or let it enter tapped.", color = SoftWhite)
+                    else StudioText("TableOverlaysB.Text.71", "Dialogs and overlays", false, "Choose the entry state. Check the condition above; Arcana will track the tapped state you choose.", color = SoftWhite)
                 }
             },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
-                    } else TextButton(onClick = { placeLand(enterTapped = false) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("ENTER UNTAPPED", color = Mint)
+                    if (prompt.isShockLand) StudioTextButton("TableOverlaysB.TextButton.25", "Dialogs and overlays", onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableOverlaysB.Text.72", "Dialogs and overlays", false, "PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
+                    } else StudioTextButton("TableOverlaysB.TextButton.26", "Dialogs and overlays", onClick = { placeLand(enterTapped = false) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        StudioText("TableOverlaysB.Text.73", "Dialogs and overlays", false, "ENTER UNTAPPED", color = Mint)
                     }
-                    TextButton(onClick = { placeLand(enterTapped = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ENTER TAPPED", color = Mint) }
-                    TextButton(onClick = { landEntryPrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
+                    StudioTextButton("TableOverlaysB.TextButton.27", "Dialogs and overlays", onClick = { placeLand(enterTapped = true) }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.74", "Dialogs and overlays", false, "ENTER TAPPED", color = Mint) }
+                    StudioTextButton("TableOverlaysB.TextButton.28", "Dialogs and overlays", onClick = { landEntryPrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.75", "Dialogs and overlays", false, "CANCEL", color = Muted) }
                 }
             },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
@@ -1148,61 +1150,61 @@ internal fun TableController.TableOverlaysB() {
         val tax = if (commanderCast) (players.getOrNull(owner)?.commanderCastCount ?: 0) * 2 else 0
         val payable = paySimpleManaCost(players.getOrNull(owner)?.manaPool.orEmpty(), card.manaCost, tax)
         val costKnown = card.manaCost != null
-        AlertDialog(
+        StudioAlertDialog("Game dialog 12",
             onDismissRequest = { paymentCard = null; paymentSourceZone = null; handActionCard = null },
-            title = { Text(if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name} from ${paymentSourceZone ?: "Hand"}?") },
+            title = { StudioText("TableOverlaysB.Text.76", "Dialogs and overlays", true, if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name} from ${paymentSourceZone ?: "Hand"}?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Mana cost:")
-                    if (card.manaCost.isNullOrBlank()) Text("unknown") else ManaCostPips(card.manaCost.orEmpty())
-                    if (tax > 0) Text("+ $tax commander tax")
+                    StudioText("TableOverlaysB.Text.77", "Dialogs and overlays", false, "Mana cost:")
+                    if (card.manaCost.isNullOrBlank()) StudioText("TableOverlaysB.Text.78", "Dialogs and overlays", false, "unknown") else ManaCostPips(card.manaCost.orEmpty())
+                    if (tax > 0) StudioText("TableOverlaysB.Text.79", "Dialogs and overlays", true, "+ $tax commander tax")
                 }
-                    Text("Tracked pool: ${players.getOrNull(owner)?.manaPool?.entries?.joinToString { (color, amount) -> "${color} $amount" }?.ifBlank { "empty" } ?: "empty"}", color = Muted)
-                    if (!costKnown) Text("No parsed mana cost is available. Use manual payment after checking the card.", color = CounterGold)
-                    else if (!supportsSimpleManaCost(card.manaCost)) Text("This cost uses hybrid, phyrexian, X, or other special symbols. Review and pay it manually.", color = CounterGold)
-                    else if (payable == null) Text("The tracked pool does not have the required colored and generic mana.", color = CounterGold)
+                    StudioText("TableOverlaysB.Text.80", "Dialogs and overlays", true, "Tracked pool: ${players.getOrNull(owner)?.manaPool?.entries?.joinToString { (color, amount) -> "${color} $amount" }?.ifBlank { "empty" } ?: "empty"}", color = Muted)
+                    if (!costKnown) StudioText("TableOverlaysB.Text.81", "Dialogs and overlays", false, "No parsed mana cost is available. Use manual payment after checking the card.", color = CounterGold)
+                    else if (!supportsSimpleManaCost(card.manaCost)) StudioText("TableOverlaysB.Text.82", "Dialogs and overlays", false, "This cost uses hybrid, phyrexian, X, or other special symbols. Review and pay it manually.", color = CounterGold)
+                    else if (payable == null) StudioText("TableOverlaysB.Text.83", "Dialogs and overlays", false, "The tracked pool does not have the required colored and generic mana.", color = CounterGold)
                 }
             },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown, modifier = Modifier.heightIn(min = 48.dp)) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("I PAID MANUALLY", color = CounterGold) }
-                    TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
+                    StudioTextButton("TableOverlaysB.TextButton.29", "Dialogs and overlays", onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.84", "Dialogs and overlays", false, "PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
+                    StudioTextButton("TableOverlaysB.TextButton.30", "Dialogs and overlays", onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.85", "Dialogs and overlays", false, "I PAID MANUALLY", color = CounterGold) }
+                    StudioTextButton("TableOverlaysB.TextButton.31", "Dialogs and overlays", onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.86", "Dialogs and overlays", false, "CANCEL", color = Muted) }
                 }
             },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
         )
     }
 
-    if (stackOpen && argentumEnabled) Dialog(onDismissRequest = { stackOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    if (stackOpen && argentumEnabled) StudioDialog("Game dialog 13", onDismissRequest = { stackOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = 620.dp), shape = RoundedCornerShape(18.dp), color = Panel) {
             Box {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Argentum stack and priority", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                StudioText("TableOverlaysB.Text.87", "Dialogs and overlays", false, "Argentum stack and priority", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val snap = argentumSnapshot
                     val stackItems = snap?.stack.orEmpty()
-                    Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}  ·  top resolves first", color = Mint, fontWeight = FontWeight.Bold)
+                    StudioText("TableOverlaysB.Text.88", "Dialogs and overlays", true, if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}  ·  top resolves first", color = Mint, fontWeight = FontWeight.Bold)
                     val priorityName = snap?.let { s -> s.players.getOrNull(s.priorityPlayer)?.let { if (s.priorityPlayer == s.viewingPlayer) "You" else it.name } }
-                    Text("PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    StudioText("TableOverlaysB.Text.89", "Dialogs and overlays", true, "PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.tutorialTarget("priority-indicator"))
                     Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("stack-items")) { StackCardList(stackItems) }
-                    Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
-                    TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
-                        Text("VIEW LEGAL ACTIONS", color = Mint)
+                    StudioText("TableOverlaysB.Text.90", "Dialogs and overlays", false, "Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
+                    StudioTextButton("TableOverlaysB.TextButton.32", "Dialogs and overlays", onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
+                        StudioText("TableOverlaysB.Text.91", "Dialogs and overlays", false, "VIEW LEGAL ACTIONS", color = Mint)
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }, modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-close")) { Text("CLOSE", color = SoftWhite) }
-                    TextButton(onClick = {
+                    StudioTextButton("TableOverlaysB.TextButton.33", "Dialogs and overlays", onClick = { stackOpen = false; TutorialActions.tap("stack-close") }, modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-close")) { StudioText("TableOverlaysB.Text.92", "Dialogs and overlays", false, "CLOSE", color = SoftWhite) }
+                    StudioTextButton("TableOverlaysB.TextButton.34", "Dialogs and overlays", onClick = {
                         // The stack drill's next gesture is CLOSE. Keep the real sheet open
                         // through the confirmed pass so that control remains available.
                         if (!tutorialGated) stackOpen = false
                         sendArgentumPriority()
                     }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true,
                         modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-pass")) {
-                        Text("PASS PRIORITY", color = Mint, fontWeight = FontWeight.Bold)
+                        StudioText("TableOverlaysB.Text.93", "Dialogs and overlays", false, "PASS PRIORITY", color = Mint, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1237,7 +1239,7 @@ internal fun TableController.TableOverlaysB() {
     val targetSelectionItem = stackActions.firstOrNull { it.id == targetSelectionStackItemId }
     targetSelectionItem?.let { item ->
         val controllerIndex = players.indexOfFirst { it.id == item.controllerId }.coerceAtLeast(0)
-        TargetSelectionDialog(
+        StudioScreen("Targets") { TargetSelectionDialog(
             stackItem = item,
             candidates = buildTargetCandidates(players, stackActions, item.id, players.getOrNull(controllerIndex)?.id.orEmpty()),
             onConfirm = { selectedTargets ->
@@ -1249,7 +1251,7 @@ internal fun TableController.TableOverlaysB() {
                     pendingStackOpen = false
                 }
             }
-        )
+        ) }
     }
 
     if (trackerPlayer in players.indices) PlayerTrackerDialog(
@@ -1263,34 +1265,34 @@ internal fun TableController.TableOverlaysB() {
         onDismiss = { trackerPlayer = -1 }
     )
 
-    if (concedePlayer in players.indices) AlertDialog(
+    if (concedePlayer in players.indices) StudioAlertDialog("Game dialog 14",
         onDismissRequest = { concedePlayer = -1 },
-        title = { Text("Concede this game?") },
-        text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
-        confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
+        title = { StudioText("TableOverlaysB.Text.94", "Dialogs and overlays", false, "Concede this game?") },
+        text = { StudioText("TableOverlaysB.Text.95", "Dialogs and overlays", true, "${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
+        confirmButton = { StudioTextButton("TableOverlaysB.TextButton.35", "Dialogs and overlays", onClick = { concede(concedePlayer); concedePlayer = -1 }) { StudioText("TableOverlaysB.Text.96", "Dialogs and overlays", false, "CONCEDE", color = Color(0xFFE9978B)) } },
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.36", "Dialogs and overlays", onClick = { concedePlayer = -1 }) { StudioText("TableOverlaysB.Text.97", "Dialogs and overlays", false, "CANCEL") } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
-    if (shuffleConfirmPlayer in players.indices) AlertDialog(
+    if (shuffleConfirmPlayer in players.indices) StudioAlertDialog("Game dialog 15",
         onDismissRequest = { shuffleConfirmPlayer = -1 },
-        title = { Text("Shuffle library?") },
-        text = { Text("This will randomize ${players[shuffleConfirmPlayer].name}’s library order.") },
+        title = { StudioText("TableOverlaysB.Text.98", "Dialogs and overlays", false, "Shuffle library?") },
+        text = { StudioText("TableOverlaysB.Text.99", "Dialogs and overlays", true, "This will randomize ${players[shuffleConfirmPlayer].name}’s library order.") },
         confirmButton = {
-            TextButton(onClick = {
+            StudioTextButton("TableOverlaysB.TextButton.37", "Dialogs and overlays", onClick = {
                 val target = shuffleConfirmPlayer
                 shuffleConfirmPlayer = -1
                 updatePlayer(target) { it.copy(library = it.library.shuffled()) }
                 logAction(target, "shuffled their library")
-            }) { Text("SHUFFLE") }
+            }) { StudioText("TableOverlaysB.Text.100", "Dialogs and overlays", false, "SHUFFLE") }
         },
-        dismissButton = { TextButton(onClick = { shuffleConfirmPlayer = -1 }) { Text("CANCEL") } },
+        dismissButton = { StudioTextButton("TableOverlaysB.TextButton.38", "Dialogs and overlays", onClick = { shuffleConfirmPlayer = -1 }) { StudioText("TableOverlaysB.Text.101", "Dialogs and overlays", false, "CANCEL") } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
     if (librarySearchPlayer in players.indices) {
         val owner = librarySearchPlayer
-        LibrarySearchDialog(
+        StudioScreen("Library search") { LibrarySearchDialog(
             player = players[owner],
             onPreview = { preview = CardPreview(owner, it, fromHand = false, canManipulate = false) },
             onTakeToHand = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, hand = p.hand + card) }; logAction(owner, "found ${card.name} and put it into hand") },
@@ -1306,18 +1308,18 @@ internal fun TableController.TableOverlaysB() {
             onMoveToBottom = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id } + card) }; logAction(owner, "put ${card.name} on the bottom of the library") },
             onShuffle = { updatePlayer(owner) { it.copy(library = it.library.shuffled()) }; logAction(owner, "shuffled their library") },
             onDismiss = { librarySearchPlayer = -1 }
-        )
+        ) }
     }
 
     manaChoicePrompt?.let { prompt ->
-        AlertDialog(
+        StudioAlertDialog("Game dialog 16",
             onDismissRequest = { manaChoicePrompt = null },
-            title = { Text("Choose mana · ${prompt.cardName}") },
-            text = { Text("Which mana did this permanent produce?") },
+            title = { StudioText("TableOverlaysB.Text.102", "Dialogs and overlays", true, "Choose mana · ${prompt.cardName}") },
+            text = { StudioText("TableOverlaysB.Text.103", "Dialogs and overlays", false, "Which mana did this permanent produce?") },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     prompt.options.forEach { option ->
-                        TextButton(onClick = {
+                        StudioTextButton("TableOverlaysB.TextButton.39", "Dialogs and overlays", onClick = {
                             updatePlayer(prompt.playerIndex) { player ->
                                 player.copy(manaPool = player.manaPool.toMutableMap().apply {
                                     option.pool.forEach { (color, count) -> put(color, ((get(color) ?: 0) + count).coerceAtMost(99)) }
@@ -1329,7 +1331,7 @@ internal fun TableController.TableOverlaysB() {
                             ManaSymbolText(option.label, color = Mint, fontSize = 14.sp)
                         }
                     }
-                    TextButton(onClick = { manaChoicePrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
+                    StudioTextButton("TableOverlaysB.TextButton.40", "Dialogs and overlays", onClick = { manaChoicePrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableOverlaysB.Text.104", "Dialogs and overlays", false, "CANCEL", color = Muted) }
                 }
             },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
@@ -1368,24 +1370,24 @@ internal fun TableController.TableOverlaysB() {
             "TARGET_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose a target for: ${prompt.effectText}"
             else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
         }
-        AlertDialog(
+        StudioAlertDialog("Game dialog 17",
             // A tap outside must not make the pay-or-not decision for anyone.
             onDismissRequest = {},
-            title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
+            title = { StudioText("TableOverlaysB.Text.105", "Dialogs and overlays", true, if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
             text = { Column {
-                Text(promptText, color = SoftWhite)
+                StudioText("TableOverlaysB.Text.106", "Dialogs and overlays", true, promptText, color = SoftWhite)
                 if (prompt.targetRule != null) {
-                    Text("TARGET", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                    StudioText("TableOverlaysB.Text.107", "Dialogs and overlays", false, "TARGET", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
                     targetCandidates.forEach { target ->
-                        TextButton(onClick = { selectedTriggerTarget = target }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) {
-                            Text("${if (selectedTriggerTarget == target) "✓ " else ""}${players[target].name}", color = if (selectedTriggerTarget == target) Mint else SoftWhite, fontWeight = FontWeight.Bold)
+                        StudioTextButton("TableOverlaysB.TextButton.41", "Dialogs and overlays", onClick = { selectedTriggerTarget = target }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) {
+                            StudioText("TableOverlaysB.Text.108", "Dialogs and overlays", true, "${if (selectedTriggerTarget == target) "✓ " else ""}${players[target].name}", color = if (selectedTriggerTarget == target) Mint else SoftWhite, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
                 if (payment > 0) {
-                    Text("Tracked mana for ${players.getOrNull(prompt.eventPlayerIndex)?.name ?: "player"}: ${trackedMana(prompt.eventPlayerIndex)}", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-                    if (!canPay) Text("Paying is unavailable until enough mana is tracked.", color = CounterGold, fontSize = 10.sp)
-                    TextButton(onClick = { manaTarget = prompt.eventPlayerIndex; manaPoolOpen = true }, modifier = Modifier.heightIn(min = 42.dp)) { Text("UPDATE MANA POOL", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    StudioText("TableOverlaysB.Text.109", "Dialogs and overlays", true, "Tracked mana for ${players.getOrNull(prompt.eventPlayerIndex)?.name ?: "player"}: ${trackedMana(prompt.eventPlayerIndex)}", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (!canPay) StudioText("TableOverlaysB.Text.110", "Dialogs and overlays", false, "Paying is unavailable until enough mana is tracked.", color = CounterGold, fontSize = 10.sp)
+                    StudioTextButton("TableOverlaysB.TextButton.42", "Dialogs and overlays", onClick = { manaTarget = prompt.eventPlayerIndex; manaPoolOpen = true }, modifier = Modifier.heightIn(min = 42.dp)) { StudioText("TableOverlaysB.Text.111", "Dialogs and overlays", false, "UPDATE MANA POOL", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                 }
             } },
             confirmButton = {
@@ -1395,8 +1397,8 @@ internal fun TableController.TableOverlaysB() {
                     "MANUAL" -> prompt.targetRule == null || selectedTriggerTarget in targetCandidates
                     else -> true
                 }
-                TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
-                    Text(when (prompt.kind) {
+                StudioTextButton("TableOverlaysB.TextButton.43", "Dialogs and overlays", onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
+                    StudioText("TableOverlaysB.Text.112", "Dialogs and overlays", true, when (prompt.kind) {
                         "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} PAYS {1}"
                         "TITHE" -> "${players[prompt.eventPlayerIndex].name} PAYS {2}"
                         "AUTO_EFFECT" -> "RESOLVE EFFECT"
@@ -1407,9 +1409,9 @@ internal fun TableController.TableOverlaysB() {
             },
             dismissButton = {
                 when (prompt.kind) {
-                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} DRAWS") }
-                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} GETS TREASURE") }
-                    "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
+                    "RHYSTIC" -> StudioTextButton("TableOverlaysB.TextButton.44", "Dialogs and overlays", onClick = { resolveTrigger(prompt, paid = false) }) { StudioText("TableOverlaysB.Text.113", "Dialogs and overlays", true, "DON'T PAY · ${players[prompt.controllerIndex].name} DRAWS") }
+                    "TITHE" -> StudioTextButton("TableOverlaysB.TextButton.45", "Dialogs and overlays", onClick = { resolveTrigger(prompt, paid = false) }) { StudioText("TableOverlaysB.Text.114", "Dialogs and overlays", true, "DON'T PAY · ${players[prompt.controllerIndex].name} GETS TREASURE") }
+                    "AUTO_EFFECT", "TARGET_EFFECT" -> StudioTextButton("TableOverlaysB.TextButton.46", "Dialogs and overlays", onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { StudioText("TableOverlaysB.Text.115", "Dialogs and overlays", false, "RESOLVE MANUALLY", color = Muted) }
                 }
             },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted

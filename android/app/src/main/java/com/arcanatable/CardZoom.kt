@@ -91,7 +91,7 @@ fun CardZoomOverlay(zoom: CardZoomController) {
     // A Dialog, not a Popup: a Popup is a sub-window of the activity, so it drew *behind* any open
     // dialog (graveyard, library search, stack, log, opening hand…). A Dialog opened at hold time is
     // the newest window, so the preview is on top of whatever screen the card was held in.
-    Dialog(onDismissRequest = { zoom.dismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Card Zoom 1", onDismissRequest = { zoom.dismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect { window?.setDimAmount(0f); window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT)) }
         Box(
@@ -103,18 +103,18 @@ fun CardZoomOverlay(zoom: CardZoomController) {
                     .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp))) {
                     val url = card.imageUrl
                     when {
-                        card.isFaceDown -> Text("FACE DOWN", color = Mint, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center))
+                        card.isFaceDown -> StudioText("CardZoom.Text.1", "Dialogs and overlays", false, "FACE DOWN", color = Mint, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center))
                         !url.isNullOrBlank() -> CardArt(url, Modifier.fillMaxSize(), fallbackName = card.name, fallbackType = card.type)
                         else -> Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(card.name, color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
-                            card.manaCost?.let { Text(it, color = CounterGold, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
-                            Text(card.type, color = Muted, fontSize = 13.sp)
-                            card.oracleText?.let { Text(it, color = SoftWhite, fontSize = 14.sp) }
-                            if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                            StudioText("CardZoom.Text.2", "Dialogs and overlays", true, card.name, color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                            card.manaCost?.let { StudioText("CardZoom.Text.3", "Dialogs and overlays", true, it, color = CounterGold, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                            StudioText("CardZoom.Text.4", "Dialogs and overlays", true, card.type, color = Muted, fontSize = 13.sp)
+                            card.oracleText?.let { StudioText("CardZoom.Text.5", "Dialogs and overlays", true, it, color = SoftWhite, fontSize = 14.sp) }
+                            if (card.power != null && card.toughness != null) StudioText("CardZoom.Text.6", "Dialogs and overlays", true, "${card.power}/${card.toughness}", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
-                Text("Tap anywhere to close", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                StudioText("CardZoom.Text.7", "Dialogs and overlays", false, "Tap anywhere to close", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }

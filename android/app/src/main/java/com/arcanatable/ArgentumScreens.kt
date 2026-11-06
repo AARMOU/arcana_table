@@ -145,20 +145,20 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
                     val url = card.imageUrl
                     if (url != null && !card.isFaceDown) CardArt(url, Modifier.fillMaxSize(), fallbackName = card.name, fallbackType = card.type)
-                    else Text(card.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(6.dp))
+                    else StudioText("ArgentumScreens.Text.1", "Stack and actions", true, card.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(6.dp))
                 }
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                    Text(card.name, color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                    StudioText("ArgentumScreens.Text.2", "Stack and actions", true, card.name, color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
                     card.manaCost?.takeIf { it.isNotBlank() }?.let { ManaCostPips(it) }
-                    Text(card.type, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
-                    if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}" + if (card.damage > 0) " · ${card.damage} damage" else "", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
+                    StudioText("ArgentumScreens.Text.3", "Stack and actions", true, card.type, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+                    if (card.power != null && card.toughness != null) StudioText("ArgentumScreens.Text.4", "Stack and actions", true, "${card.power}/${card.toughness}" + if (card.damage > 0) " · ${card.damage} damage" else "", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
                     card.oracleText?.let { ManaSymbolText(it, SoftWhite, 12.sp, Modifier.padding(top = 6.dp)) }
                 }
             }
-            Text(if (card == null) "ACTIONS" else if (choices.isEmpty() && manaChoices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else if (choices.isEmpty()) "MANA" else "WHAT YOU CAN DO NOW",
+            StudioText("ArgentumScreens.Text.5", "Stack and actions", true, if (card == null) "ACTIONS" else if (choices.isEmpty() && manaChoices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else if (choices.isEmpty()) "MANA" else "WHAT YOU CAN DO NOW",
                 color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp).tutorialTarget("legal-action-sheet"))
-            if (choices.isEmpty() && manaChoices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
-            if (hidManaAbilities) Text("Mana is paid automatically: your lands and mana sources are tapped for you when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+            if (choices.isEmpty() && manaChoices.isEmpty()) StudioText("ArgentumScreens.Text.6", "Stack and actions", true, if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
+            if (hidManaAbilities) StudioText("ArgentumScreens.Text.7", "Stack and actions", false, "Mana is paid automatically: your lands and mana sources are tapped for you when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
             // Things you can do first; ones you can't afford right now go to the bottom.
             choices.sortedBy { !it.optBoolean("isAffordable", true) }.forEach { info ->
                 val unsupported = ArgentumActions.needsHandlingReason(info)
@@ -167,31 +167,31 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp))
                         .background(if (unsupported == null && affordable) PanelLight else Panel)
                         .border(1.dp, if (unsupported == null && affordable) Mint.copy(alpha = 0.5f) else Muted.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                        .combinedClickable(enabled = !busy && affordable && unsupported == null, onClick = { onChoose(info) })
+                        .studioCombinedClickable("ArgentumScreens.combinedClickable.1", "Stack and actions", enabled = !busy && affordable && unsupported == null, onClick = { onChoose(info) })
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    Text(if (ArgentumActions.isSacrificeMana(info)) ArgentumActions.menuLabel(info) else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    if (ArgentumActions.isSacrificeMana(info)) Text(info.optString("description"), color = Muted, fontSize = 11.sp)
+                    StudioText("ArgentumScreens.Text.8", "Stack and actions", true, if (ArgentumActions.isSacrificeMana(info)) ArgentumActions.menuLabel(info) else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    if (ArgentumActions.isSacrificeMana(info)) StudioText("ArgentumScreens.Text.9", "Stack and actions", true, info.optString("description"), color = Muted, fontSize = 11.sp)
                     info.optString("manaCostString").takeIf { it.isNotBlank() && it != "null" }?.let { ManaCostPips(it) }
                     val copies = if (unsupported == null && affordable) stackCount(info) else 1
                     if (copies > 1) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (copies > 5) OutlinedButton(enabled = !busy, onClick = { onChooseMany(info, 5) }, modifier = Modifier.heightIn(min = 44.dp)) { Text("USE 5", color = Mint, fontWeight = FontWeight.Black) }
-                        OutlinedButton(enabled = !busy, onClick = { onChooseMany(info, copies) }, modifier = Modifier.heightIn(min = 44.dp)) { Text("USE ALL ($copies)", color = Mint, fontWeight = FontWeight.Black) }
+                        if (copies > 5) StudioOutlinedButton("ArgentumScreens.OutlinedButton.1", "Stack and actions", enabled = !busy, onClick = { onChooseMany(info, 5) }, modifier = Modifier.heightIn(min = 44.dp)) { StudioText("ArgentumScreens.Text.10", "Stack and actions", false, "USE 5", color = Mint, fontWeight = FontWeight.Black) }
+                        StudioOutlinedButton("ArgentumScreens.OutlinedButton.2", "Stack and actions", enabled = !busy, onClick = { onChooseMany(info, copies) }, modifier = Modifier.heightIn(min = 44.dp)) { StudioText("ArgentumScreens.Text.11", "Stack and actions", true, "USE ALL ($copies)", color = Mint, fontWeight = FontWeight.Black) }
                     }
                     when {
-                        unsupported != null -> Text("NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
-                        !affordable -> Text("Not enough spendable mana. Activate conditional mana sources first.", color = Muted, fontSize = 10.sp)
-                        info.optBoolean("requiresTargets") || info.optBoolean("hasXCost") -> Text("You'll choose targets or X next.", color = Muted, fontSize = 10.sp)
+                        unsupported != null -> StudioText("ArgentumScreens.Text.12", "Stack and actions", true, "NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
+                        !affordable -> StudioText("ArgentumScreens.Text.13", "Stack and actions", false, "Not enough spendable mana. Activate conditional mana sources first.", color = Muted, fontSize = 10.sp)
+                        info.optBoolean("requiresTargets") || info.optBoolean("hasXCost") -> StudioText("ArgentumScreens.Text.14", "Stack and actions", false, "You'll choose targets or X next.", color = Muted, fontSize = 10.sp)
                     }
                 }
             }
             // Float mana: this source's mana abilities, last and quieter (auto-pay still taps for you).
             if (manaChoices.isNotEmpty()) {
-                if (choices.isNotEmpty()) Text("ADD MANA (FLOATS UNTIL THE STEP ENDS)", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
-                else Text("Floats in your mana pool until the step ends. Casting uses floating mana first.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+                if (choices.isNotEmpty()) StudioText("ArgentumScreens.Text.15", "Stack and actions", false, "ADD MANA (FLOATS UNTIL THE STEP ENDS)", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+                else StudioText("ArgentumScreens.Text.16", "Stack and actions", false, "Floats in your mana pool until the step ends. Casting uses floating mana first.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     manaChoices.forEach { info ->
-                        OutlinedButton(enabled = !busy, onClick = { onChoose(info) }, modifier = Modifier.heightIn(min = 44.dp).testTag("float-mana"),
+                        StudioOutlinedButton("ArgentumScreens.OutlinedButton.3", "Stack and actions", enabled = !busy, onClick = { onChoose(info) }, modifier = Modifier.heightIn(min = 44.dp).testTag("float-mana"),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Muted.copy(alpha = 0.35f))) {
                             ManaSymbolText(floatManaLabel(info.optString("description")), Muted, 12.sp)
                         }
@@ -203,12 +203,12 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
             BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 val spot = 28.dp
                 Box(Modifier.offset(x = maxWidth * 0.2f - spot / 2).align(Alignment.CenterStart).size(spot)
-                    .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { leftTapAt = System.currentTimeMillis() })
+                    .studioClickable("ArgentumScreens.clickable.1", "Stack and actions", interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { leftTapAt = System.currentTimeMillis() })
                 Box(Modifier.offset(x = maxWidth * 0.67f - spot / 2).align(Alignment.CenterStart).size(spot)
-                    .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                    .studioClickable("ArgentumScreens.clickable.2", "Stack and actions", interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
                         if (leftTapAt > 0 && System.currentTimeMillis() - leftTapAt <= 1_000) { leftTapAt = 0; onSecretNudge() } else leftTapAt = 0
                     })
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd).heightIn(min = 48.dp)) { Text("CLOSE", color = Muted) }
+                StudioTextButton("ArgentumScreens.TextButton.1", "Stack and actions", onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd).heightIn(min = 48.dp)) { StudioText("ArgentumScreens.Text.17", "Stack and actions", false, "CLOSE", color = Muted) }
             }
         }
         TutorialLayer(Modifier.matchParentSize())
@@ -229,14 +229,14 @@ internal fun ArgentumOpeningHandScreen(
     val tableZoom = LocalCardZoom.current
     LaunchedEffect(tableZoom) { tableZoom.dismiss() } // a table preview would otherwise hide behind the hand
     val handZoom = remember { CardZoomController().apply { enabled = true } }
-    Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
+    StudioDialog("Argentum Screens 1", onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
       CompositionLocalProvider(LocalCardZoom provides handZoom) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
           Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
-                Text("ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
-                Text(title, color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).tutorialTarget("opening-hand-header"))
+                StudioText("ArgentumScreens.Text.18", "Stack and actions", false, "ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                StudioText("ArgentumScreens.Text.19", "Stack and actions", true, title, color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                StudioText("ArgentumScreens.Text.20", "Stack and actions", true, subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).tutorialTarget("opening-hand-header"))
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().then(if (selectable) Modifier.tutorialTarget("mulligan-bottom-choice") else Modifier)) {
                     val grid = HandLayout.compute(cards.size, maxWidth.value, maxHeight.value, HandArrangement.AUTO_FIT, 1.25f)
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(HandLayout.GAP.dp)) {
@@ -247,7 +247,7 @@ internal fun ArgentumOpeningHandScreen(
                                     Box(Modifier.width(grid.cardWidth.dp)) {
                                         CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card").then(if (card.id == cards.firstOrNull()?.id) Modifier.tutorialTarget("opening-hand-card") else Modifier), onClick = { if (selectable) onToggle(card) },
                                             onLongClick = {}, showCounters = false, glow = chosen) // hold → handZoom
-                                        if (chosen) Text("BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                                        if (chosen) StudioText("ArgentumScreens.Text.21", "Stack and actions", false, "BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
                                             modifier = Modifier.align(Alignment.TopCenter).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
@@ -255,11 +255,11 @@ internal fun ArgentumOpeningHandScreen(
                         }
                     }
                 }
-                Text("Hold a card to see it large.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
+                StudioText("ArgentumScreens.Text.22", "Stack and actions", false, "Hold a card to see it large.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp).tutorialTarget("mulligan-button")) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
-                    Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp).tutorialTarget(if (selectable) "mulligan-bottom-confirm" else "keep-hand"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text(primaryLabel, fontWeight = FontWeight.Black) }
+                    if (secondaryLabel != null) StudioOutlinedButton("ArgentumScreens.OutlinedButton.4", "Stack and actions", onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp).tutorialTarget("mulligan-button")) { StudioText("ArgentumScreens.Text.23", "Stack and actions", true, secondaryLabel, fontWeight = FontWeight.Bold) }
+                    StudioButton("ArgentumScreens.Button.1", "Stack and actions", onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp).tutorialTarget(if (selectable) "mulligan-bottom-confirm" else "keep-hand"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { StudioText("ArgentumScreens.Text.24", "Stack and actions", true, primaryLabel, fontWeight = FontWeight.Black) }
                 }
             }
             TutorialLayer(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing))

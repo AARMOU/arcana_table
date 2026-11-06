@@ -62,11 +62,11 @@ internal fun EngineProcessingPanel(
             .border(1.dp, CounterGold, RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(data.label, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text("Elapsed: ${data.elapsedSeconds}s · No artificial action/trigger limits",
+        StudioText("EngineProcessingPanel.Text.1", "Dialogs and overlays", true, data.label, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        StudioText("EngineProcessingPanel.Text.2", "Dialogs and overlays", true, "Elapsed: ${data.elapsedSeconds}s · No artificial action/trigger limits",
             color = CounterGold, fontSize = 10.sp)
         data.lastCompletedMs?.let {
-            Text("Previous engine update: ${it}ms (not an ETA)", color = Muted, fontSize = 9.sp)
+            StudioText("EngineProcessingPanel.Text.3", "Dialogs and overlays", true, "Previous engine update: ${it}ms (not an ETA)", color = Muted, fontSize = 9.sp)
         }
     }
 }

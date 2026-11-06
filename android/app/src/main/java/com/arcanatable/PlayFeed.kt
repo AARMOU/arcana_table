@@ -186,44 +186,44 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
         Column(Modifier.width(230.dp).pointerInput(shown.key) {
             detectTapGestures(onTap = { onDismissPopup() }, onPress = { holding = true; tryAwaitRelease(); holding = false })
         }, horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (shown.byYou) "YOU PLAYED" else "OPPONENT PLAYED", color = TurnColors.forSeat(shown.byYou), fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            StudioText("PlayFeed.Text.1", "Dialogs and overlays", true, if (shown.byYou) "YOU PLAYED" else "OPPONENT PLAYED", color = TurnColors.forSeat(shown.byYou), fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(RoundedCornerShape(12.dp)).border(2.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(12.dp)).background(Color(0xFF1C2523))) {
                 if (shown.imageUrl != null) CardArt(shown.imageUrl, Modifier.fillMaxWidth().aspectRatio(0.716f), contentScale = ContentScale.Crop, fallbackName = shown.name)
-                else Text(shown.name, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center).padding(12.dp))
+                else StudioText("PlayFeed.Text.2", "Dialogs and overlays", true, shown.name, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center).padding(12.dp))
             }
-            Text(shown.detail, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
+            StudioText("PlayFeed.Text.3", "Dialogs and overlays", true, shown.detail, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
                 .heightIn(max = 132.dp).verticalScroll(rememberScrollState())
                 .clip(RoundedCornerShape(6.dp)).background(Color(0xCC101615)).padding(horizontal = 8.dp, vertical = 3.dp))
         }
     }
     // The strip can be folded into a small tab at the screen edge, and opened again from there.
-    if (feed.isNotEmpty() && !feedOpen) Text("›  ${feed.size.coerceAtMost(5)}", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black,
+    if (feed.isNotEmpty() && !feedOpen) StudioText("PlayFeed.Text.4", "Dialogs and overlays", true, "›  ${feed.size.coerceAtMost(5)}", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black,
         modifier = Modifier.align(Alignment.CenterStart).clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp)).background(Color(0xE6101615))
             .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
-            .combinedClickable(onClick = onToggleFeed).padding(horizontal = 8.dp, vertical = 14.dp).testTag("played-card-feed-tab"))
+            .studioCombinedClickable("PlayFeed.combinedClickable.1", "Dialogs and overlays", onClick = onToggleFeed).padding(horizontal = 8.dp, vertical = 14.dp).testTag("played-card-feed-tab"))
     if (feed.isNotEmpty() && feedOpen) Column(Modifier.align(Alignment.CenterStart).padding(start = 4.dp).testTag("played-card-feed"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("‹ hide", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(44.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xCC101615)).combinedClickable(onClick = onToggleFeed).padding(vertical = 6.dp).testTag("played-card-feed-hide"))
+        StudioText("PlayFeed.Text.5", "Dialogs and overlays", false, "‹ hide", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(44.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xCC101615)).studioCombinedClickable("PlayFeed.combinedClickable.2", "Dialogs and overlays", onClick = onToggleFeed).padding(vertical = 6.dp).testTag("played-card-feed-hide"))
         feed.takeLast(5).reversed().forEach { item ->
             Box(Modifier.width(44.dp).aspectRatio(0.716f).clip(RoundedCornerShape(5.dp)).border(1.5.dp, TurnColors.forSeat(item.byYou), RoundedCornerShape(5.dp)).background(Color(0xFF1C2523))
-                .combinedClickable(onClick = { onPreview(item) }, onLongClick = { onPreview(item) })) {
+                .studioCombinedClickable("PlayFeed.combinedClickable.3", "Dialogs and overlays", onClick = { onPreview(item) }, onLongClick = { onPreview(item) })) {
                 if (item.imageUrl != null) CardArt(item.imageUrl, Modifier.fillMaxWidth().aspectRatio(0.716f), contentScale = ContentScale.Crop, fallbackName = item.name)
-                else Text(item.name, color = SoftWhite, fontSize = 7.sp, maxLines = 4, modifier = Modifier.padding(2.dp))
+                else StudioText("PlayFeed.Text.6", "Dialogs and overlays", true, item.name, color = SoftWhite, fontSize = 7.sp, maxLines = 4, modifier = Modifier.padding(2.dp))
             }
         }
     }
     AnimatedVisibility(visible = banner != null, enter = fadeIn(tween(120)), exit = fadeOut(tween(300)), modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp).testTag("ability-banner")) {
         val shown = banner ?: return@AnimatedVisibility
-        Text("${shown.name}: ${shown.detail}", color = SoftWhite, fontSize = 12.sp,
+        StudioText("PlayFeed.Text.7", "Dialogs and overlays", true, "${shown.name}: ${shown.detail}", color = SoftWhite, fontSize = 12.sp,
             modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())
                 .clip(RoundedCornerShape(10.dp)).background(Color(0xEE101615)).border(1.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(10.dp))
-                .combinedClickable(onClick = onDismissBanner).padding(horizontal = 12.dp, vertical = 6.dp))
+                .studioCombinedClickable("PlayFeed.combinedClickable.4", "Dialogs and overlays", onClick = onDismissBanner).padding(horizontal = 12.dp, vertical = 6.dp))
     }
     AnimatedVisibility(visible = recap != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(400)), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp).testTag("turn-recap")) {
-        Text(recap.orEmpty(), color = SoftWhite, fontSize = 13.sp,
+        StudioText("PlayFeed.Text.8", "Dialogs and overlays", true, recap.orEmpty(), color = SoftWhite, fontSize = 13.sp,
             modifier = Modifier.widthIn(max = 380.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xF0101615))
                 .border(1.dp, TurnColors.forSeat(false), RoundedCornerShape(12.dp))
-                .combinedClickable(onClick = onDismissRecap).padding(horizontal = 14.dp, vertical = 8.dp))
+                .studioCombinedClickable("PlayFeed.combinedClickable.5", "Dialogs and overlays", onClick = onDismissRecap).padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }

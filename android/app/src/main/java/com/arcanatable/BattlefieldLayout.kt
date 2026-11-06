@@ -184,7 +184,7 @@ private fun StackedCard(stack: CardStack, cardWidth: Dp, card: @Composable (Card
         Box(Modifier.offset(depth, depth).width(width).height(height).clip(RoundedCornerShape(8.dp)).background(Color(0xFF26332F)).border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(8.dp)))
         Box(Modifier.offset(depth / 2, depth / 2).width(width).height(height).clip(RoundedCornerShape(8.dp)).background(Color(0xFF2E3D38)).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp)))
         card(stack, cardWidth)
-        Text(
+        StudioText("BattlefieldLayout.Text.1", "Dialogs and overlays", true,
             "×${stack.count}", color = Color(0xFF101615), fontSize = 13.sp, fontWeight = FontWeight.Black,
             modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(7.dp))
                 .background(Color(0xFFFFD166)).padding(horizontal = 6.dp, vertical = 1.dp).testTag("stack-count")
@@ -213,10 +213,10 @@ fun AttachedPile(
             Modifier.clip(RoundedCornerShape(10.dp)).border(1.dp, Color(0xFFFFD166).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                 .background(Color(0x22FFD166)).padding(4.dp).testTag("attached-pile-open")
         ) {
-            Text(
+            StudioText("BattlefieldLayout.Text.2", "Dialogs and overlays", true,
                 "COLLAPSE  ·  ${attachments.size + 1}", color = Color(0xFFFFD166), fontSize = 10.sp, fontWeight = FontWeight.Black,
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
-                    .clickable(onClickLabel = "Collapse ${host.name}") { onToggle() }
+                    .studioClickable("BattlefieldLayout.clickable.1", "Dialogs and overlays", onClickLabel = "Collapse ${host.name}") { onToggle() }
                     .padding(horizontal = 6.dp, vertical = 4.dp).testTag("attached-pile-collapse")
             )
             androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -240,8 +240,8 @@ fun AttachedPile(
         }
         Box(Modifier.offset(y = peek * shown.size)) { card(host, cardWidth, glow) }
         // Taps on a collapsed pile only spread it, so nothing underneath is acted on by accident.
-        Box(Modifier.matchParentSize().clickable(onClickLabel = "Spread ${host.name}") { onToggle() })
-        Text(
+        Box(Modifier.matchParentSize().studioClickable("BattlefieldLayout.clickable.2", "Dialogs and overlays", onClickLabel = "Spread ${host.name}") { onToggle() })
+        StudioText("BattlefieldLayout.Text.3", "Dialogs and overlays", true,
             "+${attachments.size}", color = Color(0xFF101615), fontSize = 12.sp, fontWeight = FontWeight.Black,
             modifier = Modifier.align(Alignment.TopEnd).padding(3.dp).clip(RoundedCornerShape(7.dp))
                 .background(Color(0xFFFFD166)).padding(horizontal = 6.dp, vertical = 1.dp).testTag("attached-count")

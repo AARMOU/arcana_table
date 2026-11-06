@@ -40,7 +40,7 @@ class StudioLayoutTest {
         assertTrue(ref.copy(elements=ref.elements.map{it.copy(x=Float.NaN)}).problems().isNotEmpty())
     }
     @Test fun unsupportedVersionsAndEmptyProjectsFailClosed() {
-        assertTrue(runCatching{StudioLayout.parse(JSONObject(ref.json()).put("version",2).toString())}.isFailure)
+        assertTrue(runCatching{StudioLayout.parse(JSONObject(ref.json()).put("version",999).toString())}.isFailure)
         assertTrue(runCatching{StudioLayout.parse("{}")}.isFailure)
         assertTrue(runCatching{StudioLayout.parse("x".repeat(250001))}.isFailure)
     }
@@ -87,5 +87,54 @@ class StudioLayoutTest {
         assertEquals("DECLARE BLOCKERS",studioLiveLabel(ref.elements.first(),labels))
         assertEquals("LIBRARY\n83",studioLiveLabel(ref.elements.first{it.id=="metric1"}.copy(label="LIBRARY|92"),labels))
         assertEquals("Choices · 2",studioLiveLabel(ref.elements.first{it.id=="actions"}.copy(label="Choices · 4"),labels))
+    }
+    @Test fun versionOneImportsMigrateWithoutChangingOwnerCoordinates() {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val original=JSONObject(context.assets.open("studio/owner-hand.json").bufferedReader().use {it.readText()})
+        val migrated=StudioLayout.parse(original.toString())
+        assertEquals(2,JSONObject(migrated.json()).getInt("version"))
+        assertEquals(412f,migrated.canvasWidth);assertEquals(928f,migrated.canvasHeight);assertEquals(344f,migrated.originY)
+        assertEquals(original.getJSONObject("layouts").getJSONArray("hand").getJSONObject(0).getDouble("x").toFloat(),migrated.elements[0].x)
+    }
+    @Test fun allDensityProfilesFitCoverUnfoldedAndLandscapeGeometry() {
+        for((w,h) in listOf(344f to 882f,412f to 928f,673f to 841f,892f to 412f)) {
+            for(density in listOf("Minimal","Balanced","Detailed")) {
+                val layout=StudioLayout.responsive(w,h,density)
+                assertEquals("$w/$h/$density: ${layout.problems()}",emptyList<String>(),layout.problems())
+                assertTrue(layout.viewportProblems(w,1f,h).isEmpty())
+                assertEquals(layout,StudioLayout.parse(layout.json()))
+            }
+        }
+    }
+    @Test fun namedCopyDraftDoesNotChangeActiveProfileUntilApply() {
+        val p=prefs();val profiles=StudioProfiles(p,"portrait")
+        StudioStore(p,"portrait").apply(ref)
+        val copy=profiles.create("My Hand",ref.copy(snap=4))
+        assertEquals("Default",profiles.activeName());assertNull(copy.load());assertEquals(4,copy.draft()!!.snap)
+        copy.apply(copy.draft()!!)
+        assertEquals("My Hand",profiles.activeName());assertEquals(4,profiles.activeStore().load()!!.snap)
+        assertEquals(ref,StudioStore(p,"portrait").load())
+        assertEquals("Default",StudioProfiles(p,"landscape").activeName())
+    }
+    @Test fun resettingAllProfilesPreservesUnrelatedGameAndThemePreferences() {
+        val p=prefs();p.edit().putString("saved_game","keep").putBoolean("dark_mode",true).commit()
+        val profiles=StudioProfiles(p,"portrait");profiles.create("Custom",ref).apply(ref)
+        StudioStore(p,"landscape").apply(StudioLayout.responsive(892f,412f))
+        profiles.resetAll()
+        assertNull(StudioStore(p,"portrait","Custom").load());assertNull(StudioStore(p,"landscape").load())
+        assertEquals("keep",p.getString("saved_game",null));assertTrue(p.getBoolean("dark_mode",false))
+    }
+    @Test fun iconsAndTextColorsRoundTripAndUnknownIconsFailClosed() {
+        val layout=ref.copy(elements=ref.elements.map{if(it.id=="cast")it.copy(icon="Play",textColor="#FFFFFF")else it})
+        assertEquals(layout,StudioLayout.parse(layout.json()))
+        reject(layout.copy(elements=layout.elements.map{it.copy(icon="unbound")}))
+    }
+    @Test fun duplicateAndRemoveCardSlotsKeepEveryLiveIndexReachable() {
+        val duplicate=ref.duplicateElement("card2")
+        assertTrue(duplicate.problems().isEmpty())
+        assertEquals("card7",duplicate.elements.last().binding)
+        val removed=duplicate.removeElement("card2")
+        assertTrue(removed.problems().isEmpty())
+        assertEquals((0..6).toList(),removed.elements.filter{it.kind=="card"}.map{it.binding.removePrefix("card").toInt()}.sorted())
     }
 }

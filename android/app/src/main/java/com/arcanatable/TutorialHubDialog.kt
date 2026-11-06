@@ -127,24 +127,24 @@ internal fun TutorialHubDialog(
     var showGlossary by rememberSaveable { mutableStateOf(false) }
     val current = chapters.firstOrNull { it.id == chapterId }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Tutorial Hub Dialog 1", onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f),
             shape = RoundedCornerShape(18.dp), color = TutorialFelt
         ) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("ARCANA  /  LEARN", color = TutorialGold, fontSize = 12.sp, fontWeight = FontWeight.Black,
+                    StudioText("TutorialHubDialog.Text.1", "Dialogs and overlays", false, "ARCANA  /  LEARN", color = TutorialGold, fontSize = 12.sp, fontWeight = FontWeight.Black,
                         modifier = Modifier.weight(1f))
-                    TextButton(onClick = {
+                    StudioTextButton("TutorialHubDialog.TextButton.1", "Dialogs and overlays", onClick = {
                         if (reading) reading = false
                         else if (current != null || showGlossary) { chapterId = null; showGlossary = false }
                         else onDismiss()
-                    }) { Text(if (current != null || showGlossary) "BACK" else "CLOSE", color = TutorialText) }
+                    }) { StudioText("TutorialHubDialog.Text.2", "Dialogs and overlays", true, if (current != null || showGlossary) "BACK" else "CLOSE", color = TutorialText) }
                 }
 
                 if (showGlossary) {
-                    Text("Magic glossary", color = TutorialText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    StudioText("TutorialHubDialog.Text.3", "Dialogs and overlays", false, "Magic glossary", color = TutorialText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     val entries = remember(context) {
                         runCatching {
                             val raw = context.assets.open("tutorials/glossary.json").bufferedReader().use { it.readText() }
@@ -155,14 +155,14 @@ internal fun TutorialHubDialog(
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(entries) { entry ->
                             Column(Modifier.fillMaxWidth().background(TutorialPanel, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                                Text(entry.first, color = TutorialGold, fontWeight = FontWeight.Bold)
-                                Text(entry.second, color = TutorialText, fontSize = 14.sp)
+                                StudioText("TutorialHubDialog.Text.4", "Dialogs and overlays", true, entry.first, color = TutorialGold, fontWeight = FontWeight.Bold)
+                                StudioText("TutorialHubDialog.Text.5", "Dialogs and overlays", true, entry.second, color = TutorialText, fontSize = 14.sp)
                             }
                         }
                     }
                 } else if (current == null) {
-                    Text("Learn to play", color = TutorialText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text("20 short chapters, real-control walkthroughs, and engine-backed practice games. Your saved game is never overwritten.",
+                    StudioText("TutorialHubDialog.Text.6", "Dialogs and overlays", false, "Learn to play", color = TutorialText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    StudioText("TutorialHubDialog.Text.7", "Dialogs and overlays", false, "20 short chapters, real-control walkthroughs, and engine-backed practice games. Your saved game is never overwritten.",
                         color = TutorialMuted, fontSize = 13.sp)
 
                     val intro = chapters.firstOrNull { it.id == "first-turn" }
@@ -171,37 +171,37 @@ internal fun TutorialHubDialog(
                             Modifier.fillMaxWidth().background(TutorialPanel, RoundedCornerShape(14.dp)).padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Text("START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text(if (gameRunning) "A game is in progress, so this follows along on it. Leave the game to play the practice turn instead."
+                            StudioText("TutorialHubDialog.Text.8", "Dialogs and overlays", false, "START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            StudioText("TutorialHubDialog.Text.9", "Dialogs and overlays", false, "Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            StudioText("TutorialHubDialog.Text.10", "Dialogs and overlays", true, if (gameRunning) "A game is in progress, so this follows along on it. Leave the game to play the practice turn instead."
                                 else "Play a real practice turn against a passive opponent. Your saved game is never touched.",
                                 color = TutorialMuted, fontSize = 12.sp)
-                            Button(
+                            StudioButton("TutorialHubDialog.Button.1", "Dialogs and overlays",
                                 onClick = { onStart(intro.id, 0) },
                                 modifier = Modifier.heightIn(min = 48.dp).testTag("tutorial-start-first-turn")
-                            ) { Text(if (gameRunning) "FOLLOW ON MY GAME" else "PLAY THE FIRST TURN") }
+                            ) { StudioText("TutorialHubDialog.Text.11", "Dialogs and overlays", true, if (gameRunning) "FOLLOW ON MY GAME" else "PLAY THE FIRST TURN") }
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(readIds.size.toString() + " / " + chapters.size.toString() + " read",
+                        StudioText("TutorialHubDialog.Text.12", "Dialogs and overlays", true, readIds.size.toString() + " / " + chapters.size.toString() + " read",
                             color = TutorialMuted, modifier = Modifier.weight(1f), fontSize = 12.sp)
-                        TextButton(onClick = { showGlossary = true }) { Text("GLOSSARY", color = TutorialGold) }
+                        StudioTextButton("TutorialHubDialog.TextButton.2", "Dialogs and overlays", onClick = { showGlossary = true }) { StudioText("TutorialHubDialog.Text.13", "Dialogs and overlays", false, "GLOSSARY", color = TutorialGold) }
                     }
-                    OutlinedTextField(
+                    StudioOutlinedTextField("TutorialHubDialog.OutlinedTextField.1", "Dialogs and overlays",
                         value = query, onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(), label = { Text("Find a topic") },
+                        modifier = Modifier.fillMaxWidth(), label = { StudioText("TutorialHubDialog.Text.14", "Dialogs and overlays", false, "Find a topic") },
                         singleLine = true
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         listOf("All", "Learn Magic", "App Controls").forEach { candidate ->
-                            TextButton(
+                            StudioTextButton("TutorialHubDialog.TextButton.3", "Dialogs and overlays",
                                 onClick = { filter = candidate },
                                 modifier = Modifier.background(
                                     if (filter == candidate) TutorialPanel else Color.Transparent,
                                     RoundedCornerShape(10.dp)
                                 )
                             ) {
-                                Text(candidate, color = if (filter == candidate) TutorialGold else TutorialMuted, fontSize = 12.sp)
+                                StudioText("TutorialHubDialog.Text.15", "Dialogs and overlays", true, candidate, color = if (filter == candidate) TutorialGold else TutorialMuted, fontSize = 12.sp)
                             }
                         }
                     }
@@ -220,12 +220,12 @@ internal fun TutorialHubDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(lesson.title, color = TutorialText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Text(lesson.description, color = TutorialMuted, fontSize = 12.sp)
-                                    Text(lesson.section + " · " + lesson.minutes + " min",
+                                    StudioText("TutorialHubDialog.Text.16", "Dialogs and overlays", true, lesson.title, color = TutorialText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    StudioText("TutorialHubDialog.Text.17", "Dialogs and overlays", true, lesson.description, color = TutorialMuted, fontSize = 12.sp)
+                                    StudioText("TutorialHubDialog.Text.18", "Dialogs and overlays", true, lesson.section + " · " + lesson.minutes + " min",
                                         color = TutorialGold, fontSize = 11.sp)
                                 }
-                                Text(if (lesson.id in readIds) "READ" else "›",
+                                StudioText("TutorialHubDialog.Text.19", "Dialogs and overlays", true, if (lesson.id in readIds) "READ" else "›",
                                     color = TutorialGold, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
                             }
                         }
@@ -234,11 +234,11 @@ internal fun TutorialHubDialog(
                     // Chapter overview: one clear way in, plus a text-only option.
                     val drill = current.id in TutorialPracticeScenarios.supported
                     val table = current.steps.any { it.screen in setOf("board", "stack", "menu", "mulligan") }
-                    Text(current.section.uppercase() + "  /  " + current.minutes + " MIN  /  " + current.steps.size + " STEPS",
+                    StudioText("TutorialHubDialog.Text.20", "Dialogs and overlays", true, current.section.uppercase() + "  /  " + current.minutes + " MIN  /  " + current.steps.size + " STEPS",
                         color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(current.title, color = TutorialText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text(current.description, color = TutorialText, fontSize = 15.sp, lineHeight = 21.sp)
-                    Text(when {
+                    StudioText("TutorialHubDialog.Text.21", "Dialogs and overlays", true, current.title, color = TutorialText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    StudioText("TutorialHubDialog.Text.22", "Dialogs and overlays", true, current.description, color = TutorialText, fontSize = 15.sp, lineHeight = 21.sp)
+                    StudioText("TutorialHubDialog.Text.23", "Dialogs and overlays", true, when {
                         drill && !gameRunning -> "You'll play it in a practice game. Each step waits for you to do it on the real table. Your saved game is never touched."
                         table && !gameRunning -> "Opens a practice Commander board so every control is there to see. Your saved game is never touched."
                         table -> "Runs on your current game. Nothing is played for you."
@@ -246,25 +246,25 @@ internal fun TutorialHubDialog(
                     }, color = TutorialMuted, fontSize = 12.sp, lineHeight = 17.sp)
                     LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         items(current.steps.size) { n ->
-                            Text("${n + 1}.  " + current.steps[n].title, color = TutorialMuted, fontSize = 13.sp,
+                            StudioText("TutorialHubDialog.Text.24", "Dialogs and overlays", true, "${n + 1}.  " + current.steps[n].title, color = TutorialMuted, fontSize = 13.sp,
                                 modifier = Modifier.fillMaxWidth().clickable { stepIndex = n; reading = true }.padding(vertical = 5.dp))
                         }
                     }
-                    Button(onClick = { onStart(current.id, 0) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("tutorial-start")) {
-                        Text("START LESSON", fontWeight = FontWeight.Black)
+                    StudioButton("TutorialHubDialog.Button.2", "Dialogs and overlays", onClick = { onStart(current.id, 0) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("tutorial-start")) {
+                        StudioText("TutorialHubDialog.Text.25", "Dialogs and overlays", false, "START LESSON", fontWeight = FontWeight.Black)
                     }
-                    OutlinedButton(onClick = { stepIndex = 0; reading = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text("READ IT HERE INSTEAD")
+                    StudioOutlinedButton("TutorialHubDialog.OutlinedButton.1", "Dialogs and overlays", onClick = { stepIndex = 0; reading = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        StudioText("TutorialHubDialog.Text.26", "Dialogs and overlays", false, "READ IT HERE INSTEAD")
                     }
                 } else {
-                    Text(current.section.uppercase() + "  /  " + current.minutes + " MIN",
+                    StudioText("TutorialHubDialog.Text.27", "Dialogs and overlays", true, current.section.uppercase() + "  /  " + current.minutes + " MIN",
                         color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(current.title, color = TutorialText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    StudioText("TutorialHubDialog.Text.28", "Dialogs and overlays", true, current.title, color = TutorialText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
+                        StudioText("TutorialHubDialog.Text.29", "Dialogs and overlays", false, "STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
                             color = TutorialMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onStart(current.id, if (current.id in TutorialPracticeScenarios.supported) 0 else stepIndex) }) {
-                            Text("SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
+                        StudioTextButton("TutorialHubDialog.TextButton.4", "Dialogs and overlays", onClick = { onStart(current.id, if (current.id in TutorialPracticeScenarios.supported) 0 else stepIndex) }) {
+                            StudioText("TutorialHubDialog.Text.30", "Dialogs and overlays", false, "SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
                         }
                     }
                     val step = current.steps.getOrNull(stepIndex)
@@ -276,23 +276,23 @@ internal fun TutorialHubDialog(
                                 .padding(17.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(step.title, color = TutorialText, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                            Text(step.body, color = TutorialText, fontSize = 16.sp, lineHeight = 23.sp)
+                            StudioText("TutorialHubDialog.Text.31", "Dialogs and overlays", true, step.title, color = TutorialText, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                            StudioText("TutorialHubDialog.Text.32", "Dialogs and overlays", true, step.body, color = TutorialText, fontSize = 16.sp, lineHeight = 23.sp)
                             if (step.hint.isNotBlank()) {
-                                Text("TRY: " + step.hint, color = TutorialGold, fontSize = 12.sp)
+                                StudioText("TutorialHubDialog.Text.33", "Dialogs and overlays", false, "TRY: " + step.hint, color = TutorialGold, fontSize = 12.sp)
                             }
                             if (step.actionKind != "next") {
-                                Text("SHOW ON SCREEN runs this step in the app so you can do it yourself.",
+                                StudioText("TutorialHubDialog.Text.34", "Dialogs and overlays", false, "SHOW ON SCREEN runs this step in the app so you can do it yourself.",
                                     color = TutorialMuted, fontSize = 12.sp)
                             }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
+                        StudioOutlinedButton("TutorialHubDialog.OutlinedButton.2", "Dialogs and overlays",
                             onClick = { stepIndex = (stepIndex - 1).coerceAtLeast(0) },
                             enabled = stepIndex > 0, modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                        ) { Text("PREVIOUS") }
-                        Button(
+                        ) { StudioText("TutorialHubDialog.Text.35", "Dialogs and overlays", false, "PREVIOUS") }
+                        StudioButton("TutorialHubDialog.Button.3", "Dialogs and overlays",
                             onClick = {
                                 if (stepIndex < current.steps.lastIndex) stepIndex++
                                 else {
@@ -304,7 +304,7 @@ internal fun TutorialHubDialog(
                                 }
                             },
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                        ) { Text(if (stepIndex == current.steps.lastIndex) "FINISH READING" else "NEXT") }
+                        ) { StudioText("TutorialHubDialog.Text.36", "Dialogs and overlays", true, if (stepIndex == current.steps.lastIndex) "FINISH READING" else "NEXT") }
                     }
                 }
             }

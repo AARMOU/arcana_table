@@ -2,6 +2,8 @@
 
 package com.arcanatable
 
+import androidx.compose.runtime.CompositionLocalProvider
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -125,7 +127,7 @@ private fun CombatZoomControl(zoom: MutableFloatState, onSave: (Float) -> Unit) 
     }
     Row(Modifier.clip(shape).background(Panel).border(1.dp, PanelLight, shape).padding(2.dp).testTag("combat-zoom"), verticalAlignment = Alignment.CenterVertically) {
         RoundStep("−", "Smaller cards", zoom.floatValue > MIN_COMBAT_ZOOM + 0.001f, size = 40.dp) { step(-0.2f) }
-        Text("${(zoom.floatValue * 100).roundToInt()}%", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+        StudioText("CombatStackBoard.Text.1", "Combat and targets", true, "${(zoom.floatValue * 100).roundToInt()}%", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 44.dp))
         RoundStep("+", "Larger cards", zoom.floatValue < MAX_COMBAT_ZOOM - 0.001f, size = 40.dp) { step(0.2f) }
     }
@@ -141,7 +143,7 @@ private fun CombatStepBar(active: Int) {
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp))
                     .background(when { i == active -> accent; i < active -> Color(0xFF4D5F5B); else -> PanelLight }))
-                Text(step, color = if (i == active) accent else Muted, fontSize = 10.sp,
+                StudioText("CombatStackBoard.Text.2", "Combat and targets", true, step, color = if (i == active) accent else Muted, fontSize = 10.sp,
                     fontWeight = if (i == active) FontWeight.Black else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
             }
         }
@@ -161,7 +163,7 @@ private fun CombatScreen(
     val save: (Float) -> Unit = { prefs.edit().putFloat(COMBAT_ZOOM_KEY, it).apply() }
     // Short landscape screens put the two sides next to each other so neither is scrolled away.
     val sideBySide = config.screenHeightDp < 520 && config.screenWidthDp > config.screenHeightDp
-    Dialog(
+    StudioDialog("Combat Stack Board 1",
         onDismissRequest = { if (dismissable) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = dismissable, dismissOnClickOutside = false),
     ) {
@@ -171,8 +173,8 @@ private fun CombatScreen(
                     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(title, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
-                                Text(subtitle, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+                                StudioText("CombatStackBoard.Text.3", "Combat and targets", true, title, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
+                                StudioText("CombatStackBoard.Text.4", "Combat and targets", true, subtitle, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
                             }
                             CombatZoomControl(zoom, save)
                         }
@@ -216,7 +218,7 @@ private fun CenteredScroll(modifier: Modifier, content: @Composable ColumnScope.
 
 @Composable
 private fun SectionLabel(text: String, color: Color = Muted) =
-    Text(text, color = color, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, textAlign = TextAlign.Center)
+    StudioText("CombatStackBoard.Text.5", "Combat and targets", true, text, color = color, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, textAlign = TextAlign.Center)
 
 @Composable
 private fun CenteredGrid(tag: String, content: @Composable () -> Unit) {
@@ -231,9 +233,9 @@ private fun CenteredGrid(tag: String, content: @Composable () -> Unit) {
 private fun RoundStep(label: String, description: String, enabled: Boolean, size: Dp = 40.dp, onClick: () -> Unit) {
     Box(
         Modifier.size(size).clip(CircleShape).background(if (enabled) PanelLight else Panel)
-            .clickable(enabled = enabled, onClick = onClick).semantics { contentDescription = description },
+            .studioClickable("CombatStackBoard.clickable.1", "Table and player", enabled = enabled, onClick = onClick).semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
-    ) { Text(label, color = if (enabled) SoftWhite else Muted, fontSize = (size.value * 0.45f).sp, fontWeight = FontWeight.Bold) }
+    ) { StudioText("CombatStackBoard.Text.6", "Combat and targets", true, label, color = if (enabled) SoftWhite else Muted, fontSize = (size.value * 0.45f).sp, fontWeight = FontWeight.Bold) }
 }
 
 /** Tiles narrower than this get the compact "3 of 12 ▾" count instead of − / +. */
@@ -242,8 +244,8 @@ private val StepperTileWidth = 150.dp
 /** "3 of 12 ▾": opens the exact-count picker; used when the tile is too narrow for − / +. */
 @Composable
 private fun CompactCount(count: Int, total: Int, verb: String, onOpen: () -> Unit) {
-    Text("$count of $total ▾", color = if (count > 0) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1,
-        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp)).background(Ink).clickable(onClick = onOpen)
+    StudioText("CombatStackBoard.Text.7", "Combat and targets", true, "$count of $total ▾", color = if (count > 0) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1,
+        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp)).background(Ink).studioClickable("CombatStackBoard.clickable.2", "Table and player", onClick = onOpen)
             .semantics { contentDescription = "$count of $total $verb. Change how many" }.padding(horizontal = 12.dp, vertical = 12.dp))
 }
 
@@ -252,7 +254,7 @@ private fun CompactCount(count: Int, total: Int, verb: String, onOpen: () -> Uni
 private fun StackStepper(count: Int, total: Int, canMinus: Boolean, canPlus: Boolean, onMinus: () -> Unit, onPlus: () -> Unit) {
     Row(Modifier.clip(RoundedCornerShape(22.dp)).background(Ink).padding(2.dp), verticalAlignment = Alignment.CenterVertically) {
         RoundStep("−", "One fewer", canMinus, onClick = onMinus)
-        Text("$count / $total", color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 48.dp))
+        StudioText("CombatStackBoard.Text.8", "Combat and targets", true, "$count / $total", color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 48.dp))
         RoundStep("+", "One more", canPlus, onClick = onPlus)
     }
 }
@@ -270,13 +272,13 @@ private fun StackPile(piece: CombatPiece, count: Int, cardWidth: Dp, chosen: Int
         Box(Modifier.offset(y = if (chosen > 0) 6.dp else 10.dp).width(cardWidth).clip(shape).border(if (ring != Color.Transparent) 3.dp else 0.dp, ring, shape)) {
             val card = piece.card
             if (card != null) CardFace(card.copy(combatRole = null), Modifier.fillMaxWidth(), onClick = onTap, onLongClick = onHold, showCounters = true)
-            else Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(PanelLight).clickable(onClick = onTap), contentAlignment = Alignment.Center) {
-                Text(piece.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 3, textAlign = TextAlign.Center, modifier = Modifier.padding(4.dp))
+            else Box(Modifier.fillMaxWidth().aspectRatio(0.72f).background(PanelLight).studioClickable("CombatStackBoard.clickable.3", "Table and player", onClick = onTap), contentAlignment = Alignment.Center) {
+                StudioText("CombatStackBoard.Text.9", "Combat and targets", true, piece.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 3, textAlign = TextAlign.Center, modifier = Modifier.padding(4.dp))
             }
         }
-        if (count > 1) Text("×$count", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Black,
+        if (count > 1) StudioText("CombatStackBoard.Text.10", "Combat and targets", true, "×$count", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Black,
             modifier = Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(11.dp)).background(CounterGold).padding(horizontal = 7.dp, vertical = 2.dp))
-        if (chosen > 0) Text("✓ $chosen", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Black,
+        if (chosen > 0) StudioText("CombatStackBoard.Text.11", "Combat and targets", true, "✓ $chosen", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Black,
             modifier = Modifier.align(Alignment.TopStart).clip(RoundedCornerShape(11.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
     }
 }
@@ -288,7 +290,7 @@ private fun KeywordBadges(card: GameCard?) {
     if (keywords.isEmpty()) return
     FlowRow(horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         keywords.forEach { keyword ->
-            Text(keyword, color = if (keyword in setOf("flying", "trample", "deathtouch", "first strike", "double strike", "menace")) Danger else CounterGold,
+            StudioText("CombatStackBoard.Text.12", "Combat and targets", true, keyword, color = if (keyword in setOf("flying", "trample", "deathtouch", "first strike", "double strike", "menace")) Danger else CounterGold,
                 fontSize = 8.sp, fontWeight = FontWeight.Black, maxLines = 1,
                 modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Ink).padding(horizontal = 4.dp, vertical = 1.dp))
         }
@@ -312,16 +314,16 @@ private fun StackTile(
         Modifier.width(sizing.tile).alpha(if (enabled) 1f else 0.45f).clip(shape)
             .background(if (selected) Color(0x26FFD166) else if (chosen > 0) Color(0x1F89E3B0) else Panel)
             .border(1.dp, if (selected) CounterGold else if (chosen > 0) Mint else PanelLight, shape)
-            .combinedClickable(enabled = enabled, onClick = onTap, onLongClick = hold)
+            .studioCombinedClickable("CombatStackBoard.combinedClickable.1", "Table and player", enabled = enabled, onClick = onTap, onLongClick = hold)
             .padding(horizontal = 6.dp, vertical = 8.dp)
             .testTag("combat-${stack.rep}"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         StackPile(piece, stack.size, sizing.card, chosen, ring, onTap = { if (enabled) onTap() }, onHold = hold)
-        Text(piece.name, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        StudioText("CombatStackBoard.Text.13", "Combat and targets", true, piece.name, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         KeywordBadges(piece.card)
-        note?.let { Text(it, color = noteColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = TextAlign.Center) }
+        note?.let { StudioText("CombatStackBoard.Text.14", "Combat and targets", true, it, color = noteColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = TextAlign.Center) }
         stepper?.invoke()
         footer?.invoke()
     }
@@ -350,7 +352,7 @@ private fun StackPickerDialog(
         counts = counts + (key to value.coerceIn(0, minOf(row.max, limit - others)))
     }
     val primary = rows.first().key
-    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Combat Stack Board 2", onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier.padding(16.dp).widthIn(max = 420.dp).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Panel)
                 .border(1.dp, Color(0xFF33433E), RoundedCornerShape(22.dp)).verticalScroll(rememberScrollState()).padding(16.dp)
@@ -359,7 +361,7 @@ private fun StackPickerDialog(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionLabel(listOf(piece.name.uppercase(), combatStats(piece.card), "$stackSize READY").filter(String::isNotBlank).joinToString(" · "))
-            Text(question, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+            StudioText("CombatStackBoard.Text.15", "Combat and targets", true, question, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
             // The fan: first [total] cards lift and get a ring.
             val shortScreen = LocalConfiguration.current.screenHeightDp < 520
             val shown = if (shortScreen) 0 else minOf(stackSize, 10)
@@ -379,8 +381,8 @@ private fun StackPickerDialog(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     RoundStep("−", "One fewer", total > 0, size = 56.dp) { set(primary, (counts[primary] ?: 0) - 1) }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(min = 84.dp)) {
-                        Text("$total", color = Mint, fontSize = 44.sp, fontWeight = FontWeight.Black)
-                        Text("of ${rows.first().max}", color = Muted, fontSize = 11.sp)
+                        StudioText("CombatStackBoard.Text.16", "Combat and targets", true, "$total", color = Mint, fontSize = 44.sp, fontWeight = FontWeight.Black)
+                        StudioText("CombatStackBoard.Text.17", "Combat and targets", true, "of ${rows.first().max}", color = Muted, fontSize = 11.sp)
                     }
                     RoundStep("+", "One more", total < minOf(limit, rows.first().max), size = 56.dp) { set(primary, (counts[primary] ?: 0) + 1) }
                 }
@@ -388,29 +390,29 @@ private fun StackPickerDialog(
                 val value = counts[row.key] ?: 0
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ink).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("→ ${row.label}", color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        row.detail?.let { Text(it, color = Muted, fontSize = 10.sp, maxLines = 1) }
+                        StudioText("CombatStackBoard.Text.18", "Combat and targets", true, "→ ${row.label}", color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        row.detail?.let { StudioText("CombatStackBoard.Text.19", "Combat and targets", true, it, color = Muted, fontSize = 10.sp, maxLines = 1) }
                     }
                     RoundStep("−", "One fewer at ${row.label}", value > 0) { set(row.key, value - 1) }
-                    Text("$value", color = if (value > 0) Mint else SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 34.dp))
+                    StudioText("CombatStackBoard.Text.20", "Combat and targets", true, "$value", color = if (value > 0) Mint else SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 34.dp))
                     RoundStep("+", "One more at ${row.label}", value < row.max && total < limit) { set(row.key, value + 1) }
                 }
             }
             val primaryMax = minOf(limit, rows.first().max)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("None" to 0, "Half" to (primaryMax + 1) / 2, "All $primaryMax" to primaryMax).forEach { (label, n) ->
-                    TextButton(onClick = { counts = rows.associate { it.key to 0 } + (primary to n) },
+                    StudioTextButton("CombatStackBoard.TextButton.1", "Combat and targets", onClick = { counts = rows.associate { it.key to 0 } + (primary to n) },
                         modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).border(1.dp, Color(0xFF33433E), RoundedCornerShape(12.dp))) {
-                        Text(label, color = SoftWhite, fontSize = 13.sp)
+                        StudioText("CombatStackBoard.Text.21", "Combat and targets", true, label, color = SoftWhite, fontSize = 13.sp)
                     }
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(onClick = onCancel, modifier = Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Color(0xFF33433E), RoundedCornerShape(12.dp))) {
-                    Text("Cancel", color = SoftWhite, fontWeight = FontWeight.Bold)
+                StudioTextButton("CombatStackBoard.TextButton.2", "Combat and targets", onClick = onCancel, modifier = Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Color(0xFF33433E), RoundedCornerShape(12.dp))) {
+                    StudioText("CombatStackBoard.Text.22", "Combat and targets", false, "Cancel", color = SoftWhite, fontWeight = FontWeight.Bold)
                 }
-                TextButton(onClick = { onDone(counts) }, modifier = Modifier.weight(2f).height(48.dp).clip(RoundedCornerShape(12.dp)).background(Mint)) {
-                    Text(if (total == 0) "NONE" else "$confirmVerb $total", color = Ink, fontWeight = FontWeight.Black)
+                StudioTextButton("CombatStackBoard.TextButton.3", "Combat and targets", onClick = { onDone(counts) }, modifier = Modifier.weight(2f).height(48.dp).clip(RoundedCornerShape(12.dp)).background(Mint)) {
+                    StudioText("CombatStackBoard.Text.23", "Combat and targets", true, if (total == 0) "NONE" else "$confirmVerb $total", color = Ink, fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -419,26 +421,41 @@ private fun StackPickerDialog(
 
 @Composable
 private fun ConfirmButton(label: String, enabled: Boolean, onClick: () -> Unit) {
-    TextButton(enabled = enabled, onClick = onClick,
-        modifier = Modifier.tutorialTarget("combat-confirm").heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).background(if (enabled) Mint else PanelLight)) {
-        Text(label, color = if (enabled) Ink else Muted, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
+    val studio=studioWidget("CombatStackBoard.ConfirmButton", "Table and player", "action", label, enabled, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    val studioEnabled=studio?.let{it.runtime.editing || it.enabled} ?: enabled
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
+    StudioTextButton("CombatStackBoard.TextButton.4", "Combat and targets", enabled = studioEnabled, onClick = studioClick,
+        modifier = Modifier.studioWidget(studio).tutorialTarget("combat-confirm").heightIn(min = 48.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(12.dp))).background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (studioEnabled) Mint else PanelLight))) {
+        StudioText("CombatStackBoard.Text.24", "Combat and targets", true, label, color = if (studioEnabled) Ink else Muted, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
     }
+
+    }
+    StudioNativeCopies(studio)
 }
 
 @Composable
 private fun TrayButton(label: String, color: Color = SoftWhite, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.heightIn(min = 44.dp)) { Text(label, color = color, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+    val studio=studioWidget("CombatStackBoard.TrayButton", "Table and player", "action", label, true, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
+    StudioTextButton("CombatStackBoard.TextButton.5", "Combat and targets", onClick = studioClick, modifier = Modifier.studioWidget(studio).heightIn(min = 44.dp)) { StudioText("CombatStackBoard.Text.25", "Combat and targets", true, label, color = color, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+
+    }
+    StudioNativeCopies(studio)
 }
 
 @Composable
 private fun LossBox(label: String, names: String, count: Int, unclear: Int, color: Color, modifier: Modifier) {
     var open by remember { mutableStateOf(false) }
     Column(modifier.clip(RoundedCornerShape(10.dp)).background(Ink).clickable { open = !open }.padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text(label, color = Muted, fontSize = 10.sp)
+        StudioText("CombatStackBoard.Text.26", "Combat and targets", true, label, color = Muted, fontSize = 10.sp)
         // The count is always shown, so a cut-off list never hides how many; tap to see every name.
-        Text((if (count > 0) "$count: " else "") + names, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+        StudioText("CombatStackBoard.Text.27", "Combat and targets", true, (if (count > 0) "$count: " else "") + names, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             maxLines = if (open) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
-        if (unclear > 0) Text("+ $unclear unclear", color = Muted, fontSize = 10.sp)
+        if (unclear > 0) StudioText("CombatStackBoard.Text.28", "Combat and targets", true, "+ $unclear unclear", color = Muted, fontSize = 10.sp)
     }
 }
 
@@ -490,7 +507,7 @@ fun ArgentumAttackBoard(
     val damage = attackPreview(selection, piece)
     val replay = viewerId?.let { CombatMemory.replay(it, stacks, base, optionFor, piece) }?.takeIf { it != selection }
 
-    CombatScreen(
+    StudioScreen("Combat") { CombatScreen(
         title = "DECLARE ATTACKERS",
         subtitle = if (targets.size > 1) "Tap a target, then tap a creature to attack it. Stacks open a count picker. Hold a card to read it; pinch to resize."
             else "Tap a creature to attack, or use − / + on a stack. Hold a card to read it; pinch to resize.",
@@ -498,15 +515,15 @@ fun ArgentumAttackBoard(
         tray = {
             val attacking = selection.size
             val power = damage.values.sum()
-            Text(if (attacking == 0) "No attackers yet" else "$attacking attacking · about $power damage if unblocked",
+            StudioText("CombatStackBoard.Text.29", "Combat and targets", true, if (attacking == 0) "No attackers yet" else "$attacking attacking · about $power damage if unblocked",
                 color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("combat-summary").tutorialTarget("combat-summary"))
             selection.entries.groupBy { (attacker, target) -> Triple(piece(attacker).name, combatStats(piece(attacker).card), target) }.forEach { (key, list) ->
                 val (name, stats, target) = key
-                Text(listOf(if (list.size > 1) "${list.size} × $name" else name, stats).filter(String::isNotBlank).joinToString(" ") + " → " + piece(target).name,
+                StudioText("CombatStackBoard.Text.30", "Combat and targets", true, listOf(if (list.size > 1) "${list.size} × $name" else name, stats).filter(String::isNotBlank).joinToString(" ") + " → " + piece(target).name,
                     color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (missing.isNotEmpty()) Text("Must attack: ${missing.joinToString { piece(it).name }}", color = CounterGold, fontSize = 11.sp)
-            if (attacking > 0) Text("Previews assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
+            if (missing.isNotEmpty()) StudioText("CombatStackBoard.Text.31", "Combat and targets", true, "Must attack: ${missing.joinToString { piece(it).name }}", color = CounterGold, fontSize = 11.sp)
+            if (attacking > 0) StudioText("CombatStackBoard.Text.32", "Combat and targets", false, "Previews assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
         },
         actions = {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -539,27 +556,27 @@ fun ArgentumAttackBoard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     val ink = if (chosen) Ink else SoftWhite
-                    Text(p.name, color = ink, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    StudioText("CombatStackBoard.Text.33", "Combat and targets", true, p.name, color = ink, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val detail = lifeLine(player, p.life) ?: p.card?.counters?.filterValues { it > 0 }?.entries?.joinToString { "${it.key} ${it.value}" }?.ifBlank { null }
                         ?: p.card?.type?.substringBefore('—')?.trim()
-                    detail?.let { Text(it, color = if (chosen) Ink else Muted, fontSize = 10.sp, maxLines = 1) }
+                    detail?.let { StudioText("CombatStackBoard.Text.34", "Combat and targets", true, it, color = if (chosen) Ink else Muted, fontSize = 10.sp, maxLines = 1) }
                     if (incoming > 0) {
                         // "38 → 33 if unblocked" only when the damage is plain life (or loyalty) loss;
                         // infect, toxic, prevention or unknown cards show "N potential damage" instead.
                         val now = player?.life ?: p.life
                         val after = lifeAfterUnblocked(now, selection.filterValues { it == target }.keys.map { piece(it).card }, incoming)
-                        Text(if (after != null) "$now → $after if unblocked" else "$incoming potential damage if unblocked",
+                        StudioText("CombatStackBoard.Text.35", "Combat and targets", true, if (after != null) "$now → $after if unblocked" else "$incoming potential damage if unblocked",
                             color = if (chosen) Ink else Danger, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("combat-life-preview"))
                     }
                     if (player != null) commanderDamageLines(player, commanderPreview(selection, target, piece)).forEach { (line, lethal) ->
-                        Text(line, color = if (chosen) Ink else if (lethal) Danger else CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        StudioText("CombatStackBoard.Text.36", "Combat and targets", true, line, color = if (chosen) Ink else if (lethal) Danger else CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
             }
         }
         if (opponentBlockers.isNotEmpty()) {
-            TextButton(onClick = { showBlockers = !showBlockers }) {
-                Text(if (showBlockers) "HIDE WHO CAN BLOCK ▴" else "WHO CAN BLOCK ▾", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            StudioTextButton("CombatStackBoard.TextButton.6", "Combat and targets", onClick = { showBlockers = !showBlockers }) {
+                StudioText("CombatStackBoard.Text.37", "Combat and targets", true, if (showBlockers) "HIDE WHO CAN BLOCK ▴" else "WHO CAN BLOCK ▾", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
             if (showBlockers) {
                 val defender = preferred?.let(::defenderOf)
@@ -569,16 +586,16 @@ fun ArgentumAttackBoard(
                 val visible = if (ids == null) opponentBlockers else opponentBlockers.mapNotNull { (name, cards) ->
                     cards.filter { it.id in ids }.takeIf { it.isNotEmpty() }?.let { name to it }
                 }
-                Text(defender?.let { "Showing ${it.name}'s possible blockers" } ?: "Showing all opponents' possible blockers",
+                StudioText("CombatStackBoard.Text.38", "Combat and targets", true, defender?.let { "Showing ${it.name}'s possible blockers" } ?: "Showing all opponents' possible blockers",
                     color = Muted, fontSize = 10.sp)
-                if (visible.isEmpty()) Text("No untapped creatures for this defender", color = Muted, fontSize = 11.sp)
+                if (visible.isEmpty()) StudioText("CombatStackBoard.Text.39", "Combat and targets", false, "No untapped creatures for this defender", color = Muted, fontSize = 11.sp)
                 else OpponentBlockersStrip(visible, cardWidth = (96f * zoom.floatValue).coerceIn(56f, 170f).dp)
             }
         }
         },
     ) {
         SectionLabel("YOUR CREATURES", Mint)
-        if (stacks.isEmpty()) Text("No creatures can attack right now.", color = Muted, fontSize = 12.sp)
+        if (stacks.isEmpty()) StudioText("CombatStackBoard.Text.40", "Combat and targets", false, "No creatures can attack right now.", color = Muted, fontSize = 12.sp)
         CenteredGrid("combat-bottom") {
             stacks.forEach { stack ->
                 val p = piece(stack.rep)
@@ -622,20 +639,20 @@ fun ArgentumAttackBoard(
                             allocation.size == 1 -> "→ ${piece(allocation.keys.first()).name} ▾"
                             else -> "→ ${piece(stackTarget(selection, stack, optionFor, preferred) ?: legal.first()).name} ▾"
                         }
-                        Text(text, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        StudioText("CombatStackBoard.Text.41", "Combat and targets", true, text, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { picking = stack }.padding(horizontal = 6.dp, vertical = 6.dp))
                     }) else null,
                 )
             }
         }
-    }
+    } }
 
     picking?.let { stack ->
         val p = piece(stack.rep)
         val allocation = stackAllocation(selection, stack.ids)
         val legal = optionFor[stack.rep]?.targets.orEmpty()
         val order = (listOfNotNull(preferred?.takeIf { it in legal }) + legal).distinct()
-        StackPickerDialog(
+        StudioScreen("Stack") { StackPickerDialog(
             piece = p, stackSize = stack.size, limit = stack.size,
             question = if (stack.size == 1) "Attack with ${p.name}?" else "How many attack?",
             confirmVerb = "ATTACK WITH",
@@ -645,7 +662,7 @@ fun ArgentumAttackBoard(
             },
             onDone = { counts -> selection = allocateStack(selection, stack.ids, counts, optionFor); picking = null },
             onCancel = { picking = null },
-        )
+        ) }
     }
 }
 
@@ -693,7 +710,7 @@ fun ArgentumBlockBoard(
     val menace = menaceShort(selection, piece)
     val blockersOf = { ids: List<String> -> selection.filterValues { list -> list.any { it in ids } }.keys }
 
-    CombatScreen(
+    StudioScreen("Combat") { CombatScreen(
         title = "DECLARE BLOCKERS",
         // The focused attacker stays named here, with its stats, while the cards scroll.
         subtitle = if (focusStack != null) "Blocking: " + listOf(piece(focusStack.rep).name + if (focusStack.size > 1) " ×${focusStack.size}" else "",
@@ -703,17 +720,17 @@ fun ArgentumBlockBoard(
         tray = {
             val life = defender?.life
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("combat-summary").tutorialTarget("combat-summary")) {
-                Text("Estimated: you take ", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("$damage", color = if (life != null && damage >= life) Danger else CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                StudioText("CombatStackBoard.Text.42", "Combat and targets", false, "Estimated: you take ", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                StudioText("CombatStackBoard.Text.43", "Combat and targets", true, "$damage", color = if (life != null && damage >= life) Danger else CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
                 // Life left only when the damage coming through is plain life loss (not infect, prevention, ...).
                 val through = againstMe.filter { a -> damageThrough(a, selection, piece) > 0 }.map { piece(it).card }
                 val after = lifeAfterUnblocked(life, through, damage)
-                Text(" damage" + (after?.let { " · $it life left" } ?: if (damage > 0 && life != null) " (may not all be life loss)" else ""),
+                StudioText("CombatStackBoard.Text.44", "Combat and targets", false, " damage" + (after?.let { " · $it life left" } ?: if (damage > 0 && life != null) " (may not all be life loss)" else ""),
                     color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
-            defender?.let { d -> commanderDamageLines(d, commanderHits).forEach { (line, lethal) -> Text(line, color = if (lethal) Danger else CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
+            defender?.let { d -> commanderDamageLines(d, commanderHits).forEach { (line, lethal) -> StudioText("CombatStackBoard.Text.45", "Combat and targets", true, line, color = if (lethal) Danger else CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
             blockSummary(plan.attackers.map(piece), plan.blockers.map(piece), selection).forEach {
-                Text(it, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                StudioText("CombatStackBoard.Text.46", "Combat and targets", true, it, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (selection.isNotEmpty()) {
                 // Creatures each side is expected to lose, from the same estimate as the labels on the
@@ -727,13 +744,13 @@ fun ArgentumBlockBoard(
                     LossBox("Your creatures lost (est.)", namesWithCounts(yours), yours.size, yoursUnclear, CounterGold, Modifier.weight(1f))
                     LossBox("Their creatures lost (est.)", namesWithCounts(theirs), theirs.size, theirsUnclear, Mint, Modifier.weight(1f))
                 }
-                Text("Estimates assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
+                StudioText("CombatStackBoard.Text.47", "Combat and targets", false, "Estimates assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
             }
-            warning?.let { Text(it, color = CounterGold, fontSize = 11.sp) }
+            warning?.let { StudioText("CombatStackBoard.Text.48", "Combat and targets", true, it, color = CounterGold, fontSize = 11.sp) }
         },
         actions = {
             // Menace problems stay visible next to the button they disable.
-            if (menace.isNotEmpty()) Text("Menace: ${menace.joinToString { piece(it).name }} needs a second blocker.", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            if (menace.isNotEmpty()) StudioText("CombatStackBoard.Text.49", "Combat and targets", true, "Menace: ${menace.joinToString { piece(it).name }} needs a second blocker.", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     TrayButton("SUGGEST BLOCKS", Mint) {
@@ -784,7 +801,7 @@ fun ArgentumBlockBoard(
         },
     ) {
         SectionLabel("YOUR BLOCKERS", Mint)
-        if (blockerStacks.isEmpty()) Text("None of your creatures can block.", color = Muted, fontSize = 12.sp)
+        if (blockerStacks.isEmpty()) StudioText("CombatStackBoard.Text.50", "Combat and targets", false, "None of your creatures can block.", color = Muted, fontSize = 12.sp)
         CenteredGrid("combat-bottom") {
             blockerStacks.forEach { stack ->
                 val p = piece(stack.rep)
@@ -825,8 +842,8 @@ fun ArgentumBlockBoard(
             }
         }
         if (focusStack != null && blockersOf(focusStack.ids).isEmpty() && againstMe.isNotEmpty())
-            Text("Unblocked attackers deal their damage to you.", color = Muted, fontSize = 10.sp)
-    }
+            StudioText("CombatStackBoard.Text.51", "Combat and targets", false, "Unblocked attackers deal their damage to you.", color = Muted, fontSize = 10.sp)
+    } }
 
     val pickingStack = picking
     val pickingFocus = focusStack
@@ -836,7 +853,7 @@ fun ArgentumBlockBoard(
         val here = stackBlocking(selection, stack, f)
         val elsewhere = stack.ids.count { b -> selection[b].orEmpty().any { it !in f.ids } }
         val max = stack.size - elsewhere
-        StackPickerDialog(
+        StudioScreen("Stack") { StackPickerDialog(
             piece = piece(stack.rep), stackSize = stack.size, limit = max,
             question = "How many block ${piece(f.rep).name}${if (f.size > 1) " (×${f.size})" else ""}?",
             confirmVerb = "BLOCK WITH",
@@ -856,6 +873,6 @@ fun ArgentumBlockBoard(
                 picking = null
             },
             onCancel = { picking = null },
-        )
+        ) }
     }
 }

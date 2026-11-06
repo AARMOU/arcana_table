@@ -68,13 +68,13 @@ internal fun TargetingAlertPanel(alert: IncomingTargetAlert, onInspect: () -> Un
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text("YOU / YOUR CARD IS BEING TARGETED", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
-        Text("${alert.controllerName}: ${alert.sourceName}", color = SoftWhite, fontSize = 13.sp,
+        StudioText("TargetingAlert.Text.1", "Combat and targets", false, "YOU / YOUR CARD IS BEING TARGETED", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+        StudioText("TargetingAlert.Text.2", "Combat and targets", true, "${alert.controllerName}: ${alert.sourceName}", color = SoftWhite, fontSize = 13.sp,
             fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(alert.targets.joinToString(" · "), color = SoftWhite, fontSize = 12.sp, maxLines = 3,
+        StudioText("TargetingAlert.Text.3", "Combat and targets", true, alert.targets.joinToString(" · "), color = SoftWhite, fontSize = 12.sp, maxLines = 3,
             overflow = TextOverflow.Ellipsis)
         Row {
-            TextButton(onClick = onInspect) { Text("INSPECT STACK", color = Mint, fontWeight = FontWeight.Bold) }
+            StudioTextButton("TargetingAlert.TextButton.1", "Combat and targets", onClick = onInspect) { StudioText("TargetingAlert.Text.4", "Combat and targets", false, "INSPECT STACK", color = Mint, fontWeight = FontWeight.Bold) }
         }
     }
 }

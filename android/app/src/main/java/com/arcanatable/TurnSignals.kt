@@ -1,5 +1,7 @@
 package com.arcanatable
 
+import androidx.compose.runtime.CompositionLocalProvider
+
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -72,7 +74,7 @@ fun BoxScope.TurnBanner(state: TurnBannerState?, onDismiss: () -> Unit = {}) {
     ) {
         val shown = state ?: return@AnimatedVisibility
         val color = TurnColors.forSeat(shown.isYou)
-        Text(
+        StudioText("TurnSignals.Text.1", "Table and player", true,
             shown.text,
             color = if (shown.isYou) TurnColors.OnColor else color,
             fontSize = if (shown.isYou) 30.sp else 17.sp,
@@ -82,7 +84,7 @@ fun BoxScope.TurnBanner(state: TurnBannerState?, onDismiss: () -> Unit = {}) {
             modifier = Modifier.clip(RoundedCornerShape(14.dp))
                 .background(if (shown.isYou) color.copy(alpha = 0.96f) else Color(0xE6101615))
                 .border(2.dp, color, RoundedCornerShape(14.dp))
-                .clickable(onClick = onDismiss)
+                .studioClickable("TurnSignals.clickable.1", "Table and player", onClick = onDismiss)
                 .padding(horizontal = if (shown.isYou) 34.dp else 22.dp, vertical = if (shown.isYou) 16.dp else 10.dp)
         )
     }
@@ -95,28 +97,38 @@ fun BoxScope.TurnBanner(state: TurnBannerState?, onDismiss: () -> Unit = {}) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PassButton(label: String, onClick: () -> Unit, enabled: Boolean, canRespond: Boolean, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null) {
-    val pulse = if (canRespond && enabled) {
+    val studio=studioWidget("TurnSignals.PassButton", "Table and player", "action", label, enabled, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    val studioEnabled=studio?.let{it.runtime.editing || it.enabled} ?: enabled
+    val studioModifier=modifier.studioWidget(studio)
+    val studioHold:(()->Unit)?=if(studio?.runtime?.editing==true) null else onLongClick
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
+    val pulse = if (canRespond && studioEnabled) {
         val transition = rememberInfiniteTransition(label = "respond-pulse")
         val alpha by transition.animateFloat(0.72f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "respond-alpha")
         alpha
     } else 1f
-    val lit = canRespond && enabled
+    val lit = canRespond && studioEnabled
     val shape = RoundedCornerShape(8.dp)
     Box(
-        modifier.heightIn(min = 50.dp).clip(shape)
-            .background(if (lit) TurnColors.You.copy(alpha = pulse) else if (enabled) PanelLight else Panel)
+        studioModifier.heightIn(min = 50.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (shape))
+            .background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (lit) TurnColors.You.copy(alpha = pulse) else if (studioEnabled) PanelLight else Panel))
             .border(if (lit) 2.dp else 0.dp, if (lit) TurnColors.You else Color.Transparent, shape)
-            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick)
+            .studioCombinedClickable("TurnSignals.combinedClickable.1", "Table and player", enabled = studioEnabled, onClick = studioClick, onLongClick = studioHold)
             .testTag(if (lit) "pass-button-respond" else "pass-button"),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            label, color = if (lit) TurnColors.OnColor else if (enabled) Mint else Muted,
+        StudioText("TurnSignals.Text.2", "Table and player", true,
+            label, color = if (lit) TurnColors.OnColor else if (studioEnabled) Mint else Muted,
             fontSize = 10.sp, fontWeight = if (lit) FontWeight.Black else FontWeight.Bold,
             maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 10.dp, vertical = 8.dp)
         )
     }
+
+    }
+    StudioNativeCopies(studio)
 }
 
 /** A board outline in the active player's colour; other boards are dimmed a little. */

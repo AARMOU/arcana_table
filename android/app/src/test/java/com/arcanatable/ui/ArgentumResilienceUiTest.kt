@@ -19,6 +19,10 @@ import com.arcanatable.ArgentumEndpoints
 import com.arcanatable.MainActivity
 import com.arcanatable.StudioStore
 import com.arcanatable.StudioLayout
+import com.arcanatable.StudioControlStyle
+import com.arcanatable.StudioProfiles
+import com.arcanatable.StudioSites
+import com.arcanatable.isAction
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -358,6 +362,52 @@ class ArgentumResilienceUiTest {
         UiTestSupport.awaitReal(rule, 5_000, "home") { UiTestSupport.homeShown(rule) }
         assertFalse("no resume offer after a finished game", shown("RESUME GAME"))
         scenario.close()
+    }
+
+    @Test @Config(qualifiers = "w412dp-h928dp-port-xhdpi")
+    fun studioNativeHomeEditRestoresAcrossActualActivityRecreation() {
+        StudioProfiles(context.getSharedPreferences("arcana_options",Context.MODE_PRIVATE),"portrait").resetAll()
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            if(shown("NOT NOW",false)){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
+            var id="";var before=0f
+            scenario.onActivity {activity->
+                val runtime=activity.tableController!!.studioControlsRuntime!!
+                assertFalse(runtime.active);runtime.enableCatalog()
+            }
+            UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                val runtime=activity.tableController!!.studioControlsRuntime!!
+                val title=runtime.controls.values.first{StudioSites.site(it.id)=="HomeScreen.Text.1"}
+                id=title.id;before=title.bounds.left
+                runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=8f,font=20f))
+            }
+            UiTestSupport.settle(rule)
+            scenario.onActivity {it.tableController!!.studioControlsRuntime!!.apply()}
+            UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                assertTrue(activity.tableController!!.studioControlsRuntime!!.controls[id]!!.bounds.left>before)
+                UiTestSupport.screenshot(activity,"studio-home-applied")
+            }
+            scenario.recreate();UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                val runtime=activity.tableController!!.studioControlsRuntime!!
+                assertEquals(8f,runtime.style(id).dx);assertTrue(runtime.controls.containsKey(id))
+                runtime.begin();activity.tableController!!.optionsOpen=true;runtime.inspectNativeScreen()
+            }
+            UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                val c=activity.tableController!!;val runtime=c.studioControlsRuntime!!
+                assertTrue(runtime.editing);assertFalse(c.gameInProgress)
+                assertTrue(runtime.controls.values.any{it.kind=="toggle" || it.kind=="range"})
+                runtime.panelOpen=true
+            }
+            UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                UiTestSupport.screenshot(activity,"studio-all-screens-native-editor")
+            }
+        } finally {scenario.close();StudioProfiles(context.getSharedPreferences("arcana_options",Context.MODE_PRIVATE),"portrait").resetAll()}
     }
 
     @Test @Config(qualifiers = "w412dp-h928dp-port-xhdpi")

@@ -27,10 +27,10 @@ class NativeStudioUiTest {
     private val calls=mutableListOf<String>()
     private val layout=mutableStateOf(StudioLayout.reference())
     private val busy=mutableStateOf(false)
-    private fun render(count:Int=7) {
+    private fun render(count:Int=7,width:Int=412,height:Int=928) {
         rule.setContent { MaterialTheme {
-            Box(Modifier.width(412.dp)) {
-                HandSheet((1..count).map{GameCard(it,"Real card $it","Creature",Color.DarkGray)},false,928.dp,null,false,true,true,false,emptyList(),2,
+            Box(Modifier.width(width.dp)) {
+                HandSheet((1..count).map{GameCard(it,"Real card $it","Creature",Color.DarkGray)},false,height.dp,null,false,true,true,false,emptyList(),2,
                     {},{}, {},{}, {},{calls+="pass"},{calls+="stack"},{},{calls+=it},{calls+="select:${it.id}"},{_,_->},
                     argentumMode=true,argentumPrimaryLabel="PASS → ATTACKERS",legalActionCount=3,
                     onUndo={calls+="undo"},onActions={calls+="actions"},onCast={calls+="cast:${it?.id}"},
@@ -40,6 +40,22 @@ class NativeStudioUiTest {
         } }
         rule.waitForIdle()
     }
+    private fun responsiveControlsFit(width:Int,height:Int) {
+        layout.value=StudioLayout.responsive(width.toFloat(),height.toFloat())
+        render(24,width,height)
+        val density=rule.activity.resources.displayMetrics.density
+        UiTestSupport.screenshot(rule.activity,"studio-responsive-${width}x$height")
+        listOf("pass","undo","actions","cast","metric0","metric1","metric2","metric3").forEach {id->
+            val bounds=rule.onNodeWithTag("studio-element-$id").fetchSemanticsNode().boundsInRoot
+            assertTrue("$id left $bounds density=$density",bounds.left>=0);assertTrue("$id right $bounds width=$width density=$density",bounds.right<=width*density+1)
+            assertTrue("$id target",bounds.width>=44*density-1 && bounds.height>=44*density-1)
+        }
+        rule.onNodeWithTag("studio-element-pass").performClick();assertEquals(listOf("pass"),calls)
+        UiTestSupport.screenshot(rule.activity,"studio-responsive-${width}x$height")
+    }
+    @Test @Config(qualifiers="w344dp-h800dp-port-xhdpi") fun foldCoverControlsFitAndInvokeNativeAction(){responsiveControlsFit(344,800)}
+    @Test @Config(qualifiers="w673dp-h928dp-port-xhdpi") fun openFoldControlsFitAndInvokeNativeAction(){responsiveControlsFit(673,928)}
+    @Test @Config(qualifiers="w892dp-h412dp-land-xhdpi") fun landscapeControlsFitAndInvokeNativeAction(){responsiveControlsFit(892,412)}
     @Test fun actualNativeControlsFollowAppliedCoordinatesAndDistinctActions() {
         render()
         val before=rule.onNodeWithTag("studio-element-pass").fetchSemanticsNode().boundsInRoot

@@ -153,45 +153,59 @@ internal data class ChatMessage(val author: String, val text: String, val timest
 internal fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
-            .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
+            .studioCombinedClickable("TableHelpers.combinedClickable.1", "Table and player", onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        Text("HAND  $cardCount", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
+        StudioText("TableHelpers.Text.1", "Table and player", true, "HAND  $cardCount", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
         Spacer(Modifier.width(6.dp))
-        Icon(Icons.Filled.ExpandLess, contentDescription = "Open hand tray", tint = Mint, modifier = Modifier.size(20.dp))
+        StudioIcon("TableHelpers.Icon.1", "Table and player", Icons.Filled.ExpandLess, contentDescription = "Open hand tray", tint = Mint, modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
 internal fun ViewChip(label: String, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    Text(label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = if (compact) 44.dp else 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (selected) Mint else PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp))
+    val studio=studioWidget("TableHelpers.ViewChip", "Table and player", "action", label, true, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
+    StudioText("TableHelpers.Text.2", "Table and player", true, label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.studioWidget(studio).heightIn(min = if (compact) 44.dp else 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(8.dp))).background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (selected) Mint else PanelLight)).studioCombinedClickable("TableHelpers.combinedClickable.2", "Table and player", onClick = studioClick).padding(horizontal = 15.dp, vertical = 12.dp))
+
+    }
+    StudioNativeCopies(studio)
 }
 
 @Composable
 internal fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean, onClick: () -> Unit) {
+    val studio=studioWidget("TableHelpers.PlayerViewTab", "Table and player", "action", name, true, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
     val shape = RoundedCornerShape(9.dp)
     val artUrl = commander?.artCropUrl ?: commander?.imageUrl
     Box(
-        Modifier.width(96.dp).height(50.dp).clip(shape)
-            .background(PanelLight)
+        Modifier.studioWidget(studio).width(96.dp).height(50.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (shape))
+            .background(studio?.style?.fill?.let(::parseTableColorHex) ?: (PanelLight))
             .border(if (selected) 2.dp else 1.dp, if (selected) Mint else Color(0xFF33423D), shape)
-            .combinedClickable(onClick = onClick)
+            .studioCombinedClickable("TableHelpers.combinedClickable.3", "Table and player", onClick = studioClick)
     ) {
         if (!artUrl.isNullOrBlank()) {
             CardArt(artUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, label = commander?.name)
         } else {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("NO COMMANDER", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                StudioText("TableHelpers.Text.3", "Table and player", false, "NO COMMANDER", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
             }
         }
-        Text(
+        StudioText("TableHelpers.Text.4", "Table and player", true,
             name.uppercase(), color = SoftWhite, fontSize = 8.sp, fontWeight = FontWeight.Black,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Color(0xD9000000)).padding(horizontal = 5.dp, vertical = 4.dp)
         )
     }
+
+    }
+    StudioNativeCopies(studio)
 }
 
 internal fun layoutSectionTitle(id: String): String = when (id) {
@@ -262,12 +276,12 @@ internal fun LayoutOrderRow(title: String, subtitle: String, selected: Boolean, 
             },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("⠿", color = Mint, fontSize = 19.sp, modifier = Modifier.padding(start = 10.dp, end = 9.dp))
+        StudioText("TableHelpers.Text.5", "Table and player", false, "⠿", color = Mint, fontSize = 19.sp, modifier = Modifier.padding(start = 10.dp, end = 9.dp))
         Column(Modifier.weight(1f).padding(vertical = 5.dp)) {
-            Text(title, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Muted, fontSize = 8.sp)
+            StudioText("TableHelpers.Text.6", "Table and player", true, title, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            StudioText("TableHelpers.Text.7", "Table and player", true, subtitle, color = Muted, fontSize = 8.sp)
         }
-        IconButton(onClick = onRemove, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Remove $title", tint = Color(0xFFE9978B)) }
+        StudioIconButton("TableHelpers.IconButton.1", "Table and player", onClick = onRemove, modifier = Modifier.size(44.dp)) { StudioIcon("TableHelpers.Icon.2", "Table and player", Icons.Filled.Close, "Remove $title", tint = Color(0xFFE9978B)) }
     }
 }
 
@@ -281,10 +295,10 @@ internal fun LayoutTuningSlider(
 ) {
     Column(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(valueLabel(value), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            StudioText("TableHelpers.Text.8", "Table and player", true, label, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            StudioText("TableHelpers.Text.9", "Table and player", true, valueLabel(value), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = valueRange)
+        StudioSlider("TableHelpers.Slider.1", "Table and player", value = value, onValueChange = onValueChange, valueRange = valueRange)
     }
 }
 
@@ -292,31 +306,44 @@ internal fun LayoutTuningSlider(
 internal fun SettingsToggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().heightIn(min = 54.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(detail, color = Muted, fontSize = 10.sp)
+            StudioText("TableHelpers.Text.10", "Table and player", true, title, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            StudioText("TableHelpers.Text.11", "Table and player", true, detail, color = Muted, fontSize = 10.sp)
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        StudioSwitch("TableHelpers.Switch.1", "Table and player", checked = checked, onCheckedChange = onChange)
     }
 }
 
 @Composable
 internal fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick: () -> Unit) {
+    val studio=studioWidget("TableHelpers.ZoneChip", "Table and player", "action", "$name $count", enabled, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    val studioEnabled=studio?.let{it.runtime.editing || it.enabled} ?: enabled
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
     val target = when (name.uppercase()) {
         "GRAVEYARD" -> "quick-graveyard"
         "EXILE" -> "quick-exile"
         "LIBRARY" -> "quick-library"
         else -> "quick-${name.lowercase()}"
     }
-    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp,
-        fontWeight = FontWeight.Bold, modifier = Modifier.tutorialTarget(target)
+    StudioText("TableHelpers.Text.12", "Table and player", true, "$name  $count", color = if (studioEnabled) SoftWhite else Muted, fontSize = 8.sp,
+        fontWeight = FontWeight.Bold, modifier = Modifier.studioWidget(studio).tutorialTarget(target)
             .heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically)
-            .clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel)
-            .combinedClickable(enabled = enabled, onClick = { TutorialActions.tap(target); onClick() })
+            .clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(6.dp))).background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (studioEnabled) PanelLight else Panel))
+            .studioCombinedClickable("TableHelpers.combinedClickable.4", "Table and player", enabled = studioEnabled, onClick = { TutorialActions.tap(target); studioClick() })
             .padding(horizontal = 8.dp, vertical = 6.dp))
+
+    }
+    StudioNativeCopies(studio)
 }
 
 @Composable
 internal fun QuickActionChip(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val studio=studioWidget("TableHelpers.QuickActionChip", "Table and player", "action", label, enabled, onClick=onClick)
+    if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
+    val studioClick:()->Unit={studio?.click() ?: onClick()}
+    val studioEnabled=studio?.let{it.runtime.editing || it.enabled} ?: enabled
+    CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
     val target = when {
         label.startsWith("STACK") -> "stack-button"
         label.startsWith("GRAVEYARD") -> "quick-graveyard"
@@ -328,12 +355,15 @@ internal fun QuickActionChip(label: String, enabled: Boolean, onClick: () -> Uni
         label.startsWith("UNDO") -> "quick-undo"
         else -> "quick-action-${label.lowercase().replace(' ', '-')}"
     }
-    Text(label, color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.tutorialTarget(target).heightIn(min = 34.dp)
-            .wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp))
-            .background(if (enabled) PanelLight else Panel)
-            .combinedClickable(enabled = enabled, onClick = { TutorialActions.tap(target); onClick() })
+    StudioText("TableHelpers.Text.13", "Table and player", true, label, color = if (studioEnabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+        modifier = Modifier.studioWidget(studio).tutorialTarget(target).heightIn(min = 34.dp)
+            .wrapContentHeight(Alignment.CenterVertically).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(6.dp)))
+            .background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (studioEnabled) PanelLight else Panel))
+            .studioCombinedClickable("TableHelpers.combinedClickable.5", "Table and player", enabled = studioEnabled, onClick = { TutorialActions.tap(target); studioClick() })
             .padding(horizontal = 8.dp, vertical = 6.dp))
+
+    }
+    StudioNativeCopies(studio)
 }
 
 internal fun manaLetter(color: String): String = when (color.uppercase()) {
@@ -405,7 +435,7 @@ internal val counterCatalog = listOf(
 
 @Composable
 internal fun ActionPill(label: String, onClick: () -> Unit) {
-    Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
+    StudioText("TableHelpers.Text.14", "Table and player", true, label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(PanelLight).studioCombinedClickable("TableHelpers.combinedClickable.6", "Table and player", onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
 }
 
 internal fun formatClock(totalSeconds: Long): String {
@@ -418,7 +448,7 @@ internal fun formatClock(totalSeconds: Long): String {
 @Composable
 internal fun LocalChatPanel(
     players: List<TablePlayer>, activePlayer: Int, messages: List<ChatMessage>, draft: String,
-    modifier: Modifier = Modifier, 
+    modifier: Modifier = Modifier,
     onDraft: (String) -> Unit, onDismiss: () -> Unit, onSend: () -> Unit
 ) {
     val context = LocalContext.current
@@ -426,27 +456,27 @@ internal fun LocalChatPanel(
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("TABLE CHAT", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close chat", tint = Muted) }
+                    StudioText("TableHelpers.Text.15", "Table and player", false, "TABLE CHAT", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    StudioIconButton("TableHelpers.IconButton.2", "Table and player", onClick = onDismiss, modifier = Modifier.size(44.dp)) { StudioIcon("TableHelpers.Icon.3", "Table and player", Icons.Filled.Close, "Close chat", tint = Muted) }
                 }
-                Text("Room messages · sending as ${players.getOrNull(activePlayer)?.name ?: "PLAYER"}", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 8.dp))
+                StudioText("TableHelpers.Text.16", "Table and player", true, "Room messages · sending as ${players.getOrNull(activePlayer)?.name ?: "PLAYER"}", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 8.dp))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(messages.size) { index ->
                         val item = messages[index]
                         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(9.dp)) {
-                            Text("${item.author} · ${item.timestamp}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                            SelectionContainer { Text(item.text, color = SoftWhite, fontSize = 12.sp) }
+                            StudioText("TableHelpers.Text.17", "Table and player", true, "${item.author} · ${item.timestamp}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            SelectionContainer { StudioText("TableHelpers.Text.18", "Table and player", true, item.text, color = SoftWhite, fontSize = 12.sp) }
                         }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.weight(1f), singleLine = true, label = { Text("Message") })
-                    TextButton(onClick = {
+                    StudioOutlinedTextField("TableHelpers.OutlinedTextField.1", "Table and player", value = draft, onValueChange = onDraft, modifier = Modifier.weight(1f), singleLine = true, label = { StudioText("TableHelpers.Text.19", "Table and player", false, "Message") })
+                    StudioTextButton("TableHelpers.TextButton.1", "Table and player", onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                         val pastedText = clipboard?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
                         if (!pastedText.isNullOrEmpty()) onDraft(draft + pastedText)
-                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("PASTE", color = Mint, fontSize = 9.sp) }
-                    TextButton(onClick = onSend, enabled = draft.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text("SEND", color = Mint) }
+                    }, modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableHelpers.Text.20", "Table and player", false, "PASTE", color = Mint, fontSize = 9.sp) }
+                    StudioTextButton("TableHelpers.TextButton.2", "Table and player", onClick = onSend, enabled = draft.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { StudioText("TableHelpers.Text.21", "Table and player", false, "SEND", color = Mint) }
                 }
             }
         }

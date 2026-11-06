@@ -75,8 +75,8 @@ fun matchesSearch(text: String, query: String): Boolean {
 
 @Composable
 fun PickSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
-    OutlinedTextField(value = query, onValueChange = { onQuery(it.take(40)) }, singleLine = true,
-        placeholder = { Text("Search…") }, modifier = modifier.fillMaxWidth().padding(bottom = 6.dp).testTag("pick-search"))
+    StudioOutlinedTextField("ArgentumCardPick.OutlinedTextField.1", "Stack and actions", value = query, onValueChange = { onQuery(it.take(40)) }, singleLine = true,
+        placeholder = { StudioText("ArgentumCardPick.Text.1", "Stack and actions", false, "Search…") }, modifier = modifier.fillMaxWidth().padding(bottom = 6.dp).testTag("pick-search"))
 }
 
 /**
@@ -91,9 +91,9 @@ fun CardPickGrid(items: List<PickCard>, selected: Set<String>, isEnabled: (Strin
     Column(Modifier.fillMaxWidth().testTag("card-pick-grid")) {
         if (items.size > SEARCH_THRESHOLD) PickSearchField(query, { query = it })
         val shown = items.filter { it.id in selected || matchesSearch(it.name + " " + it.typeLine, query) }
-        if (shown.isEmpty()) Text("Nothing matches \"$query\".", color = Muted, fontSize = 12.sp)
+        if (shown.isEmpty()) StudioText("ArgentumCardPick.Text.2", "Stack and actions", true, "Nothing matches \"$query\".", color = Muted, fontSize = 12.sp)
         shown.groupBy { it.groupOrder to it.group }.toSortedMap(compareBy { it.first }).forEach { (key, group) ->
-            Text(key.second.uppercase(), color = if (group.first().isYou) TurnColors.You else Muted, fontSize = 10.sp, fontWeight = FontWeight.Black,
+            StudioText("ArgentumCardPick.Text.3", "Stack and actions", true, key.second.uppercase(), color = if (group.first().isYou) TurnColors.You else Muted, fontSize = 10.sp, fontWeight = FontWeight.Black,
                 letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 group.forEach { item ->
@@ -111,17 +111,17 @@ private fun PickTile(item: PickCard, isSelected: Boolean, enabled: Boolean, widt
     Column(Modifier.width(width).alpha(if (enabled || isSelected) 1f else 0.38f), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(shape).background(Color(0xFF1C2523))
             .border(if (isSelected) 3.dp else 1.dp, if (isSelected) Mint else Color.White.copy(alpha = 0.25f), shape)
-            .combinedClickable(enabled = true, onClick = { if (enabled || isSelected) onTap() }, onLongClick = onHold)
+            .studioCombinedClickable("ArgentumCardPick.combinedClickable.1", "Stack and actions", enabled = true, onClick = { if (enabled || isSelected) onTap() }, onLongClick = onHold)
             .testTag("pick-${item.id}")) {
             PickFace(item, Modifier.fillMaxSize())
-            if (isSelected) Text("✓", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center,
+            if (isSelected) StudioText("ArgentumCardPick.Text.4", "Stack and actions", false, "✓", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).clip(CircleShape).background(Mint))
-            if (item.isToken) Text("TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black,
+            if (item.isToken) StudioText("ArgentumCardPick.Text.5", "Stack and actions", false, "TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black,
                 modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xDD15221D)).padding(horizontal = 4.dp, vertical = 2.dp))
         }
-        Text(item.name, color = if (isSelected) Mint else SoftWhite, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+        StudioText("ArgentumCardPick.Text.6", "Stack and actions", true, item.name, color = if (isSelected) Mint else SoftWhite, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
-        item.detail?.let { Text(it, color = Muted, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) }
+        item.detail?.let { StudioText("ArgentumCardPick.Text.7", "Stack and actions", true, it, color = Muted, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) }
     }
 }
 
@@ -133,8 +133,8 @@ fun PickFace(item: PickCard, modifier: Modifier) {
         else Column(Modifier.fillMaxSize().background(if (item.isPlayer) Color(0xFF263B35) else Color(0xFF2A2F3A)).padding(6.dp),
             verticalArrangement = if (item.isPlayer) Arrangement.Center else Arrangement.SpaceBetween,
             horizontalAlignment = if (item.isPlayer) Alignment.CenterHorizontally else Alignment.Start) {
-            Text(if (item.isPlayer) "PLAYER" else item.name, color = if (item.isPlayer) Muted else SoftWhite, fontSize = if (item.isPlayer) 9.sp else 11.sp, fontWeight = FontWeight.Black, maxLines = 4, overflow = TextOverflow.Ellipsis)
-            Text(if (item.isPlayer) item.name else item.typeLine, color = if (item.isPlayer) SoftWhite else Muted, fontSize = if (item.isPlayer) 13.sp else 9.sp,
+            StudioText("ArgentumCardPick.Text.8", "Stack and actions", true, if (item.isPlayer) "PLAYER" else item.name, color = if (item.isPlayer) Muted else SoftWhite, fontSize = if (item.isPlayer) 9.sp else 11.sp, fontWeight = FontWeight.Black, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            StudioText("ArgentumCardPick.Text.9", "Stack and actions", true, if (item.isPlayer) item.name else item.typeLine, color = if (item.isPlayer) SoftWhite else Muted, fontSize = if (item.isPlayer) 13.sp else 9.sp,
                 fontWeight = if (item.isPlayer) FontWeight.Black else FontWeight.Normal, maxLines = 3, overflow = TextOverflow.Ellipsis, textAlign = if (item.isPlayer) TextAlign.Center else TextAlign.Start)
         }
     }
@@ -145,13 +145,13 @@ fun PickFace(item: PickCard, modifier: Modifier) {
 fun PickZoom(item: PickCard, onDismiss: () -> Unit) {
     val screen = LocalConfiguration.current
     val width = minOf(screen.screenWidthDp * 0.82f, screen.screenHeightDp * 0.6f, 380f).dp
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog("Argentum Card Pick 1", onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val window = LocalView.current.parent as? DialogWindowProvider
         SideEffect { window?.window?.setDimAmount(0.7f); window?.window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT)) }
-        Box(Modifier.fillMaxSize().clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().studioClickable("ArgentumCardPick.clickable.1", "Stack and actions", onClick = onDismiss), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 PickFace(item, Modifier.width(width).aspectRatio(0.716f).clip(RoundedCornerShape(14.dp)).border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp)))
-                Text("Tap anywhere to close", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+                StudioText("ArgentumCardPick.Text.10", "Stack and actions", false, "Tap anywhere to close", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
@@ -172,8 +172,8 @@ fun androidx.compose.foundation.layout.BoxScope.StackPile(stack: List<ArgentumSt
     val peek = 22.dp
     val shown = stack.take(5).reversed() // oldest first, so the top item is drawn last (in front)
     Column(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).width(cardWidth + 8.dp).testTag("stack-pile").tutorialTarget("argentum-stack"), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("STACK · ${stack.size}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
-            modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xE6101615)).clickable(onClick = onOpenStack).padding(horizontal = 6.dp, vertical = 3.dp))
+        StudioText("ArgentumCardPick.Text.11", "Stack and actions", true, "STACK · ${stack.size}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xE6101615)).studioClickable("ArgentumCardPick.clickable.2", "Stack and actions", onClick = onOpenStack).padding(horizontal = 6.dp, vertical = 3.dp))
         Box(Modifier.width(cardWidth).padding(top = 4.dp)) {
             shown.forEachIndexed { i, item ->
                 val shape = RoundedCornerShape(6.dp)
@@ -185,7 +185,7 @@ fun androidx.compose.foundation.layout.BoxScope.StackPile(stack: List<ArgentumSt
         }
         stack.first().let { top ->
             val line = listOfNotNull(top.controllerName.takeIf { it.isNotBlank() }, top.targetNames.takeIf { it.isNotEmpty() }?.joinToString(", ", prefix = "→ ")).joinToString(" ")
-            if (line.isNotBlank()) Text(line, color = SoftWhite, fontSize = 9.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+            if (line.isNotBlank()) StudioText("ArgentumCardPick.Text.12", "Stack and actions", true, line, color = SoftWhite, fontSize = 9.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 3.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xE6101615)).padding(horizontal = 4.dp, vertical = 2.dp))
         }
     }
@@ -204,10 +204,10 @@ fun StackCardList(stack: List<ArgentumStackItem>) {
                     PickFace(item.toPick(), Modifier.fillMaxSize())
                 }
                 Column(Modifier.padding(start = 10.dp)) {
-                    Text(if (i == 0) "TOP · resolves next" else "#${i + 1}", color = if (i == 0) CounterGold else Muted, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                    Text(item.name, color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    if (item.controllerName.isNotBlank()) Text(item.controllerName, color = TurnColors.forSeat(item.isYours), fontSize = 11.sp)
-                    if (item.targetNames.isNotEmpty()) Text("→ " + item.targetNames.joinToString(", "), color = Muted, fontSize = 11.sp)
+                    StudioText("ArgentumCardPick.Text.13", "Stack and actions", true, if (i == 0) "TOP · resolves next" else "#${i + 1}", color = if (i == 0) CounterGold else Muted, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                    StudioText("ArgentumCardPick.Text.14", "Stack and actions", true, item.name, color = SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    if (item.controllerName.isNotBlank()) StudioText("ArgentumCardPick.Text.15", "Stack and actions", true, item.controllerName, color = TurnColors.forSeat(item.isYours), fontSize = 11.sp)
+                    if (item.targetNames.isNotEmpty()) StudioText("ArgentumCardPick.Text.16", "Stack and actions", false, "→ " + item.targetNames.joinToString(", "), color = Muted, fontSize = 11.sp)
                 }
             }
         }
