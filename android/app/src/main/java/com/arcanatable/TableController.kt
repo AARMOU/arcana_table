@@ -378,6 +378,8 @@ internal class TableController(
     var timerMenuOpen by run { mutableStateOf(false) }
     var optionsOpen by run { mutableStateOf(false) }
     var layoutLabOpen by run { mutableStateOf(false) }
+    // New Studio is the default editor; classic native controls remain available.
+    var studioEditorOpen by run { mutableStateOf(true) }
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
