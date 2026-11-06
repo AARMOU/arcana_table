@@ -176,6 +176,7 @@ class GhostArkIndependentCertificationTest {
         val retriever = d.putCardInGraveyard(p, "Myr Retriever")
         assertNull(d.submit(CrewVehicle(p, ark, listOf(crew))).error)
         d.resolveAll()
+        d.giveColorlessMana(p, 3)
         assertEquals(1, d.abilityActions(p, retriever).size)
 
         d.passPriorityUntil(Step.UPKEEP, activePlayer = p)
