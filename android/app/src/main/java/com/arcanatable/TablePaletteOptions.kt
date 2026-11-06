@@ -103,6 +103,7 @@ internal data class TablePaletteEditor(
     val customColors: TableColors,
     val onSelect: (String) -> Unit,
     val onCustomColor: (String, Color) -> Unit,
+    val onStudioTheme: (TableColors) -> Unit = {},
 )
 internal val LocalTablePaletteEditor = compositionLocalOf<TablePaletteEditor?> { null }
 
