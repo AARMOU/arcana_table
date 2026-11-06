@@ -1,0 +1,9 @@
+{
+  "key": "eldrazi-displacer",
+  "name": "Eldrazi Displacer",
+  "issue": 960,
+  "source": "certification/EldraziDisplacerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldraziDisplacerIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}

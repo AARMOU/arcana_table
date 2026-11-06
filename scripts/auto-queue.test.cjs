@@ -8,6 +8,7 @@ const SHA = '9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f';
 const CARD = 'Blood for the Blood God!';
 const BODY = [
   '## Cards', '- ' + CARD, '',
+  '## Cardkit starting packet', 'Cardkit classify: SUPPORTED', 'No close tested custom-card match.', '',
   '## Acceptance',
   '- Blood for the Blood God!: reduce generic cost for each creature that died this turn; discard your hand, draw eight and deal eight to each opponent; exile the spell',
   '- Exact current Oracle behavior (cost, types, every ability, targeting and timing), checked against authoritative card records',
@@ -184,6 +185,29 @@ test('B15 holds exhausted card but keeps an unrelated eligible card moving', asy
   assert.equal(result.created, true);
   assert.equal(result.name, other);
   assert.deepEqual(result.held, [{ name: CARD, issue: 901 }]);
+});
+
+test('B15 cap lift cannot bypass B16 Cardkit packet admission', async () => {
+  const withoutPacket = BODY.replace([
+    '## Cardkit starting packet', 'Cardkit classify: SUPPORTED',
+    'No close tested custom-card match.', '',
+  ].join('\n'), '');
+  const p = Q.queuePayload({
+    result: { ok: true, available: 12, alreadyQueued: [] },
+    units: [{ name: CARD, body: withoutPacket }], base: BASE, baseSha: SHA, runId: 555,
+  });
+  assert.equal(p.suggestions[0].ready, false);
+  assert.ok(p.suggestions[0].missing.includes('cardkit-starting-packet'));
+
+  const source = queueIssue(901, CARD, [{ name: Q.RETRY_CAP_LIFT_LABEL }]);
+  const { result, calls } = await run({
+    closed: [source],
+    comments: { 901: paidPair(901, 1) },
+    events: { 901: [{ event: 'labeled', actor: { login: 'AARMOU' }, label: { name: Q.RETRY_CAP_LIFT_LABEL } }] },
+  }, p);
+  assert.notEqual(result.created, true);
+  assert.equal(calls.some(([kind]) => kind === 'create'), false);
+  assert.equal(calls.some(([kind]) => kind === 'removeLabel'), false);
 });
 
 test('B15 consumes one explicit cap-lift and does not authorize another queue next pass', async () => {

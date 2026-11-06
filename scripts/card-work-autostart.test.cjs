@@ -11,8 +11,10 @@ const { claimedAtOf } = require('./units.cjs');
 const SHA = 'a'.repeat(40);
 const ORACLE = JSON.stringify({ name: 'Knuckles the Echidna', type_line: 'Legendary Creature — Echidna', oracle_text: 'Double strike',
   scryfall_uri: 'https://scryfall.com/card/sld/2082/knuckles' });
+const PACKET = '## Cardkit starting packet\\nCardkit classify: `NEEDS_REVIEW`.\\nNo close, tested custom-card match was found by `cardkit similar`; no recipe or example is guessed.';
 const workRequest = (extra = {}) => ({ name: 'Knuckles the Echidna', issue: 350, source: 'owner', requests: 1, outcome: 'engine-work',
-  readiness: 'NEEDS_REVIEW', route: 'claude', cardkitReasons: ['1 line(s) without a close implemented match (best 0.77)'], oracle: ORACLE, ...extra });
+  readiness: 'NEEDS_REVIEW', route: 'claude', cardkitReasons: ['1 line(s) without a close implemented match (best 0.77)'], oracle: ORACLE,
+  referencePacket: PACKET, ...extra });
 const body = r => Q.cardWorkBody(r, { runId: 7, baseSha: SHA, base: 'gpt/arcana-integration-next' });
 const HOUR = 3600e3;
 const review = (n, b, extra = {}) => ({
@@ -26,11 +28,20 @@ test('card-work body carries the trusted Oracle record and priority, and is revi
   assert.equal(A.CARD_WORK_MARKER, Q.CARD_WORK_MARKER);
   assert.equal(A.CARD_WORK_TITLE, Q.CARD_WORK_PREFIX);
   assert.match(b, /^ {4}\{.*"oracle_text"/m);
+  assert.match(b, /## Cardkit starting packet/);
+  assert.ok(b.length <= 7000);
   assert.match(b, /priority:1001/);
   assert.deepEqual(A.reviewActionable(b), { ok: true, missing: [] });
   // No Oracle record (or a mismatched one): never auto-started.
   assert.ok(A.reviewActionable(body(workRequest({ oracle: null }))).missing.includes('oracle-record'));
   assert.ok(A.reviewActionable(body(workRequest({ oracle: ORACLE.replace('Knuckles the Echidna', 'Other Card') }))).missing.includes('oracle-record'));
+});
+
+test('packet-less Card Work bodies fail closed at dispatcher auto-start', () => {
+  const packetless = body(workRequest()).replace('## Cardkit starting packet', '## Missing Cardkit starting packet');
+  const result = A.reviewActionable(packetless);
+  assert.equal(result.ok, false);
+  assert.ok(result.missing.includes('cardkit-starting-packet'));
 });
 
 test('trusted only when the feeder bot wrote it unedited', () => {
@@ -69,7 +80,21 @@ test('claim detection: only trusted people, comment must start with CLAIM', () =
   assert.equal(claimedAtOf([c('CLAIM', 'OWNER', 'Bot')]), null);
 });
 
-test('legacy card-work items without an Oracle record are superseded so they can be reopened', () => {
+test('card-work requests without a Cardkit packet are never published', async () => {
+  const calls = [];
+  const github = { paginate: async () => [], rest: { issues: {
+    create: async args => { calls.push(args); return { data: { number: 99 } }; },
+    createComment: async () => {}, update: async () => {},
+  } } };
+  const missing = workRequest({ referencePacket: null });
+  const out = await Q.syncCardWork({ github, owner: 'AARMOU', repo: 'arcana_table',
+    payload: { ok: true, requestedClassified: true, baseSha: SHA, resolvedRequests: [], workRequests: [missing] },
+    runId: 7, enabled: true });
+  assert.equal(out.created, undefined);
+  assert.equal(calls.length, 0);
+});
+
+test('legacy card-work items without Oracle or Cardkit references are superseded so they can be reopened', () => {
   const legacy = { number: 369, state: 'open', title: '[Card Work] Knuckles the Echidna — needs engine work',
     body: Q.CARD_WORK_MARKER + '\nold body', user: { login: 'github-actions[bot]', type: 'Bot' } };
   const payload = { ok: true, requestedClassified: true, resolvedRequests: [], workRequests: [workRequest()] };
@@ -79,5 +104,5 @@ test('legacy card-work items without an Oracle record are superseded so they can
   const renamed = { ...legacy, state: 'closed', title: Q.SUPERSEDED_PREFIX + 'Knuckles the Echidna' };
   assert.equal(Q.planCardWork(payload, [renamed]).create.name, 'Knuckles the Echidna');
   const current = { ...legacy, body: body(workRequest()) };
-  assert.deepEqual(Q.planCardWork(payload, [current]).supersede, [], 'an item with a record stays');
+  assert.deepEqual(Q.planCardWork(payload, [current]).supersede, [], 'an item with Oracle and Cardkit references stays');
 });

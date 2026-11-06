@@ -1,0 +1,9 @@
+{
+  "key": "goliath-truck",
+  "name": "Goliath Truck",
+  "issue": 989,
+  "source": "certification/GoliathTruckIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GoliathTruckIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}

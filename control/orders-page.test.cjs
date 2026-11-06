@@ -98,3 +98,43 @@ test('render degrades safely without data', () => {
   assert.equal(O.render(doc, box, null, null).ok, false);
   assert.match(box.children[0].textContent, /unavailable/);
 });
+
+
+test('live report is parsed only from a bot-owned, valid status comment', () => {
+  const payload = { checkedAt: '2026-11-05T13:15:00Z', facts: ['Engine checks green'],
+    inbox: [{ issue: 949, entries: [{ at: '2026-11-05T13:12:00Z',
+      url: 'https://github.com/AARMOU/arcana_table/issues/949#x', summary: 'Boneknuckles check-in' }] }] };
+  const comment = { user: { login: 'github-actions[bot]', type: 'Bot' }, body: '<!-- arcana-owner-status-v1 -->\n' +
+    '```json\n' + JSON.stringify(payload) + '\n```' };
+  assert.deepEqual(O.parseLive([comment]), payload);
+  const forged = { ...comment, user: { login: 'untrusted[bot]', type: 'Bot' },
+    body: comment.body.replace('Engine checks green', 'Forged latest status') };
+  assert.deepEqual(O.parseLive([comment, forged]), payload, 'later unrelated bot cannot override trusted status');
+  assert.equal(O.parseLive([forged]), null);
+  assert.equal(O.parseLive([{ ...comment, user: { type: 'Bot' } }]), null);
+  assert.equal(O.parseLive([{ ...comment, user: { login: 'github-actions[bot]', type: 'User' } }]), null);
+  assert.equal(O.parseLive([{ ...comment, user: { type: 'User' } }]), null);
+  assert.equal(O.parseLive([{ ...comment, body: '<!-- arcana-owner-status-v1 -->\nno JSON' }]), null);
+  assert.equal(O.parseLive(null), null);
+});
+
+test('Control displays live heartbeat separate from older manual orders', () => {
+  const doc = fakeDoc(); const box = doc.createElement('div');
+  const live = { checkedAt: '2026-11-05T13:15:00Z',
+    facts: ['Engine latest dry run successful'],
+    inbox: [{ issue: 949, entries: [{ at: '2026-11-05T13:10:00Z',
+      url: 'https://github.com/AARMOU/arcana_table/issues/949#x',
+      summary: 'Boneknuckles: B15 checks green' }] }] };
+  const r = O.render(doc, box, { body: BODY, updated_at: '2026-11-02T03:20:00Z' },
+    [], Date.parse('2026-11-05T13:30:00Z'), live);
+  assert.equal(r.stale, true, 'manual issue is still old');
+  assert.equal(r.liveStale, false, 'live report is independently fresh');
+  const nodes = flat(box);
+  assert.ok(nodes.some(n => n.textContent === 'Live activity'));
+  assert.ok(nodes.some(n => n.textContent === 'Engine latest dry run successful'));
+  assert.ok(nodes.some(n => String(n.textContent).includes('B15 checks green')));
+  assert.ok(nodes.some(n => n.textContent === 'Assigned work (owner board snapshot)'));
+  const delayed = O.render(doc, box, { body: BODY, updated_at: '2026-11-02T03:20:00Z' },
+    [], Date.parse('2026-11-05T15:15:00Z'), live);
+  assert.equal(delayed.liveStale, true);
+});

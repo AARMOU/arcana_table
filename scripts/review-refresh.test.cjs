@@ -6,7 +6,7 @@ const A = require('./admission.cjs');
 
 const BASE = 'b'.repeat(40);
 const ORACLE = '    {"name": "Armory Automaton", "oracle_text": "Whenever this enters or attacks, attach Equipment."}';
-const itemBody = (priority = 0) => [A.CARD_WORK_MARKER, '', '## Card', '', '- Armory Automaton', '', '## Offline Oracle record', '', ORACLE, '',
+const itemBody = (priority = 0) => [A.CARD_WORK_MARKER, '', '## Card', '', '- Armory Automaton', '', '## Cardkit starting packet', '', 'Cardkit classify: NEEDS_REVIEW', '', '## Offline Oracle record', '', ORACLE, '',
   `<!-- source: trusted-main-queue-feeder; base-sha:${BASE}; priority:${priority} -->`].join('\n');
 const DATA = 'tools/cardkit/data/';
 function rec(n, over = {}) {

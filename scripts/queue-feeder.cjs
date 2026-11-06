@@ -1,5 +1,6 @@
 'use strict';
 const { oracleSnapshot } = require('./oracle-handoff.cjs');
+const { MAX_REQUEST_CHARS } = require('./card-reference-handoff.cjs');
 // Cardkit-backed Copilot queue feeder (issue #81).
 // Produces suggestions; in owner's existing normal auto mode it may create ONE unedited
 // Actions-bot issue. Paid assignment is still exclusively the separate guarded dispatcher.
@@ -232,7 +233,8 @@ function newIssueUrl(title, body) {
 function queuePayload({ result, units = [], base, baseSha, now = new Date(), runId }) {
   const suggestions = units.map(u => {
     const body = typeof u.body === 'string' ? u.body.trim() + '\n' : null;
-    const act = body ? A.unitActionable(body, base) : { ok: false, missing: ['no-body'] };
+    const act = !body ? { ok: false, missing: ['no-body'] } : body.length > MAX_REQUEST_CHARS
+      ? { ok: false, missing: ['request-too-large'] } : A.queueUnitActionable(body, base);
     const title = `[Arcana Queue] ${u.name} — Cardkit SUPPORTED, unclaimed`;
     const request = (result?.requested || []).find(r => F.normName(r.name) === F.normName(u.name));
     return { name: u.name, ready: !!body && act.ok, requestedIssue: Number.isSafeInteger(request?.issue) ? request.issue : null,
@@ -305,7 +307,7 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   const notReady = new Set((payload.notReady || []).map(F.normName));
   // An outsider cannot park a fake "ready" issue and indefinitely block the feed.
   const waiting = safeIssues.filter(i => String(i.title || '').startsWith('[Arcana Queue]') && !isCopilotAssigned(i) &&
-    A.unitActionable(i.body || '', payload.base).ok);
+    A.queueUnitActionable(i.body || '', payload.base).ok);
   // A waiting issue whose card Cardkit says Copilot cannot take is skipped by the dispatcher forever;
   // it must not freeze the automatic queue. Reported, never closed or edited here.
   const stuck = waiting.map(i => ({ issue: i.number, cards: F.unitCards(i.body).filter(n => notReady.has(F.normName(n))) }))
@@ -338,7 +340,7 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   let capLiftIssue = null;
   let s = null;
   for (const x of payload.suggestions || []) {
-    if (!(x.ready && x.body && A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
+    if (!(x.ready && x.body && A.queueUnitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
       !safeIssues.some(i => String(i.title || '') === x.title))) continue;
     const key = F.normName(x.name), prior = attempted.get(key) || [];
     const paidCount = payload.attemptCounts instanceof Map ? payload.attemptCounts.get(key) : undefined;
@@ -488,7 +490,9 @@ function cardWorkTitle(r) {
 
 function cardWorkBody(r, { runId, baseSha, base }) {
   const oracleMissing = (r.cardkitReasons || []).some(x => /no cached oracle record/i.test(x));
-  return [CARD_WORK_MARKER,
+  if (typeof r.referencePacket !== 'string' || !r.referencePacket.includes('## Cardkit starting packet'))
+    throw Error('cardkit-reference-packet-required');
+  const body = [CARD_WORK_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + baseSha + '; ' + (r.source === 'precon' ? 'precon-gap:six-precons' : (r.source === 'app' ? 'app-request:#' : 'owner-request:#') + r.issue) +
       '; priority:' + priorityScore(r) + ' -->',
     '## Card', '- ' + r.name, '',
@@ -502,6 +506,7 @@ function cardWorkBody(r, { runId, baseSha, base }) {
       ? ['## App request', 'Requested in the app: **' + r.votes + '** opt-in vote(s) on #' + DEMAND_ISSUE + '. Priority after every owner request.', '']
       : ['## Owner request', 'Selected by the owner in #' + r.issue + '. That request stays open; do not close or edit it.', '']),
     ...oracleSection(r),
+    r.referencePacket,
     '## Priority', '`' + priorityLabel(r) + '`, score ' + priorityScore(r) + ' (owner requests first, then app votes). Any engineer takes the highest-scored open item: ' +
       'comment `CLAIM` here first. Unclaimed items are started automatically (see `' + LANE_LABEL(r) + '`).', '',
     '## Task (any engineer)',
@@ -516,6 +521,8 @@ function cardWorkBody(r, { runId, baseSha, base }) {
     '## Hand-back to Copilot',
     'Done when Cardkit classifies this card `SUPPORTED` with route `copilot` on the integration base (or the card is implemented). The queue feeder then closes this issue and queues the card for Copilot automatically. Implementing the card itself here is optional, not required.', '',
     '## Rules', 'No Copilot assignment, no paid agents, no merges, releases, signing or deployment from this issue. Coordinate on #81.', ''].join('\n');
+  if (body.length > MAX_REQUEST_CHARS) throw Error('card-request-exceeds-size-limit');
+  return body;
 }
 
 // Priority: every owner request outranks every app request; within owner, more separate request issues;
@@ -537,6 +544,7 @@ function oracleSection(r) {
   return jsonl ? ['## Offline Oracle record (trusted feeder snapshot)', '', '    ' + jsonl, ''] : [];
 }
 const hasOracle = i => /^ {4}\{.*"oracle_text"/m.test(String(i.body || ''));
+const hasReferencePacket = i => String(i.body || '').includes('## Cardkit starting packet');
 const SUPERSEDED_PREFIX = '[Card Work superseded] ';
 const MAX_SUPERSEDE_PER_PASS = 2;
 
@@ -550,8 +558,8 @@ function planCardWork(payload, botIssues = []) {
     .map(i => ({ issue: i.number, name: cardWorkName(i) }));
   // Legacy items opened without an Oracle record or priority cannot be auto-started: retire them (renamed, so
   // they no longer count as card work) and the next pass reopens the card with record, priority and labels.
-  const withOracle = new Map((payload.workRequests || []).filter(r => r.oracle).map(r => [F.normName(r.name), r]));
-  const supersede = openWork.filter(i => !hasOracle(i) && withOracle.has(F.normName(cardWorkName(i))) &&
+  const withOracle = new Map((payload.workRequests || []).filter(r => r.oracle && r.referencePacket).map(r => [F.normName(r.name), r]));
+  const supersede = openWork.filter(i => (!hasOracle(i) || !hasReferencePacket(i)) && withOracle.has(F.normName(cardWorkName(i))) &&
     !close.some(c => c.issue === i.number)).slice(0, MAX_SUPERSEDE_PER_PASS).map(i => ({ issue: i.number, name: cardWorkName(i) }));
   // One issue per card, ever: an existing open OR closed card-work issue means an engineer already had it.
   const seen = new Set(existing.map(i => F.normName(cardWorkName(i))));
@@ -567,7 +575,10 @@ async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || ''))) return { reason: 'cardkit-suggestions-unavailable' };
   const botIssues = await github.paginate(github.rest.issues.listForRepo,
     { owner, repo, state: 'all', creator: 'github-actions[bot]', per_page: 100 });
-  const plan = planCardWork(payload, botIssues);
+  // Missing Oracle or reference context is never auto-started. Existing legacy items can be retired only
+  // when a complete replacement packet is available for the same card.
+  const completePayload = { ...payload, workRequests: (payload.workRequests || []).filter(r => r.oracle && r.referencePacket) };
+  const plan = planCardWork(completePayload, botIssues);
   const out = { reason: plan.reason, closed: [] };
   for (const c of plan.close) {
     await github.rest.issues.createComment({ owner, repo, issue_number: c.issue, body: [CARD_WORK_MARKER,
