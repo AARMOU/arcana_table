@@ -1,0 +1,9 @@
+{
+  "key": "forge-of-heroes",
+  "name": "Forge of Heroes",
+  "issue": 981,
+  "source": "certification/ForgeOfHeroesIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ForgeOfHeroesIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
