@@ -56,6 +56,8 @@ internal fun NativeStudioPage(store: StudioStore, cards: List<GameCard>, onAppli
                 ?: error("Could not write project.")
         }.onSuccess {message="Project exported."}.onFailure {message=it.message}
     }
+    val previewBaseColors=LocalTableColors.current
+    CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=Mint,secondary=Mint,surface=Panel,background=Ink,onSurface=SoftWhite,onBackground=SoftWhite)) {
     Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize(),color=Panel) {
@@ -113,10 +115,12 @@ internal fun NativeStudioPage(store: StudioStore, cards: List<GameCard>, onAppli
                 message?.let {Text(it,color=CounterGold)}
                 val errors=layout.problems()
                 if(errors.isNotEmpty()) Text(errors.distinct().take(6).joinToString("\n"),color=MaterialTheme.colorScheme.error)
+                CompositionLocalProvider(LocalTableColors provides previewBaseColors) {
                 StudioHandCanvas(layout,StudioHandState(emptyMap(),emptySet(),cards),{},{},{},
                     editing=true,selectedElement=selected,onSelectElement={selected=it},
                     onMove={id,dx,dy->change(layout.copy(elements=layout.elements.map {if(it.id==id)it.copy(x=snap(it.x+dx),y=snap(it.y+dy)) else it}))},
                     onResize={id,dw,dh->change(layout.copy(elements=layout.elements.map {if(it.id==id)it.copy(w=snap(it.w+dw),h=snap(it.h+dh)) else it}))})
+                }
                 Text("Layers",color=SoftWhite)
                 layout.elements.chunked(4).forEach { group -> Row {group.forEach { e->TextButton(onClick={selected=e.id}) {Text(e.id)} } } }
                 element?.let { e ->
@@ -176,5 +180,6 @@ internal fun NativeStudioPage(store: StudioStore, cards: List<GameCard>, onAppli
     if(jsonOpen) AlertDialog(onDismissRequest={jsonOpen=false},title={Text("Hand project JSON")},text={
         Column {OutlinedTextField(jsonText,{jsonText=it},modifier=Modifier.fillMaxWidth().heightIn(max=300.dp));message?.let {Text(it)};TextButton(onClick={clipboard.setText(AnnotatedString(jsonText));message="JSON copied."}){Text("Copy JSON")}}
     },confirmButton={TextButton(onClick={runCatching{StudioLayout.parse(jsonText)}.onSuccess{change(it);jsonOpen=false;message="Imported into draft; Apply to use."}.onFailure{message=it.message}}){Text("Import draft")}},dismissButton={TextButton(onClick={jsonOpen=false}){Text("Close")}})
+    }
     }
 }

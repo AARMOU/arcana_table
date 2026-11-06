@@ -48,7 +48,8 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
 @Composable
 private fun StudioWindowEscape(runtime:StudioControlsRuntime,modifier:Modifier=Modifier) {
     androidx.compose.material3.TextButton(onClick={if(runtime.editing)runtime.panelOpen=true else runtime.begin()},
+        colors=androidx.compose.material3.ButtonDefaults.textButtonColors(containerColor=darkTableColors.panel,contentColor=darkTableColors.text),
         modifier=modifier.height(48.dp).testTag("studio-window-escape")) {
-        androidx.compose.material3.Text("Arcana Studio",color=Mint)
+        androidx.compose.material3.Text("Arcana Studio",color=darkTableColors.text)
     }
 }

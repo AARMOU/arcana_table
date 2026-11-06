@@ -29,6 +29,7 @@ internal fun StudioControlsPage(runtime:StudioControlsRuntime,onApplied:()->Unit
     fun change(update:(StudioControlStyle)->StudioControlStyle) {
         selected?.let {runtime.edit(it.id,update(runtime.style(it.id)))}
     }
+    CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=Mint,surface=Panel,onSurface=SoftWhite,background=Ink)) {
     Dialog(onDismissRequest={runtime.cancel()},properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize(),color=Panel) {
@@ -135,5 +136,6 @@ internal fun StudioControlsPage(runtime:StudioControlsRuntime,onApplied:()->Unit
         TextButton(onClick={clipboard.setText(AnnotatedString(project))}){Text("Copy JSON")}
         message?.let {Text(it)}
     }},confirmButton={TextButton(onClick={runCatching{runtime.importProject(project)}.onSuccess{json=null}.onFailure{message=it.message}}){Text("Import draft")}},dismissButton={TextButton(onClick={json=null}){Text("Close")}})}
+    }
     }
 }

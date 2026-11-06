@@ -44,7 +44,9 @@ exists. Customized app screens retain an uneditable Arcana Studio recovery entry
 customized native dialogs reserve a 48dp recovery footer, including dialogs that
 disable Back. It opens the editor without dismissing or making a game choice.
 This footer is present during both inspection and applied rendering, outside the
-editable native content. The owner hand canvas is unchanged.
+editable native content. Recovery buttons and editor chrome use fixed readable
+colors even with an all-black project palette; the hand preview still consumes
+the actual game palette plus its saved design colors. The owner hand canvas is unchanged.
 Duplicate buttons execute the genuine source callback in its real window.
 Live information modules duplicate or rebind a current native text source in the
 same screen/window. Full current text is held only in runtime memory, updates

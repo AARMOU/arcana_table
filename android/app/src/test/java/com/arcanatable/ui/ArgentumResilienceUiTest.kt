@@ -384,6 +384,7 @@ class ArgentumResilienceUiTest {
                 val title=runtime.controls.values.first{StudioSites.site(it.id)=="HomeScreen.Text.1"}
                 id=title.id;before=title.bounds.left
                 runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=8f,font=20f))
+                runtime.change(runtime.draft.copy(theme=StudioLayout.themeRoles.associateWith{"#000000"}))
             }
             UiTestSupport.settle(rule)
             scenario.onActivity {it.tableController!!.studioControlsRuntime!!.apply()}
