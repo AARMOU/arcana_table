@@ -1816,7 +1816,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2976,7 +2976,7 @@
    ]
   },
   "Keyword.FLASH": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Sister of Silence",
@@ -4350,7 +4350,7 @@
    ]
   },
   "keywords()": {
-   "count": 79,
+   "count": 80,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4442,7 +4442,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5642,6 +5642,17 @@
     }
    ]
   },
+  "ReplaceDrawWith": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Alms Collector",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AlmsCollector.kt",
+     "lines": 47,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AlmsCollectorScenarioTest.kt"
+    }
+   ]
+  },
   "ReplaceLifeGainWith": {
    "count": 1,
    "examples": [
@@ -5971,7 +5982,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -6081,7 +6092,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -6711,8 +6722,14 @@
    ]
   },
   "Player.ControllerOfSource": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Alms Collector",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AlmsCollector.kt",
+     "lines": 47,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AlmsCollectorScenarioTest.kt"
+    },
     {
      "card": "Great Unclean One",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GreatUncleanOne.kt",
@@ -6803,7 +6820,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Silence",

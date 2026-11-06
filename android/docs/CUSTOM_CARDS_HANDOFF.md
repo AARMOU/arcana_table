@@ -16,7 +16,7 @@ Added 30 more cards from the larger collection: Constricting Sliver, Kodama of t
 
 The following submitted cards are still left out. These are concrete gaps in the pinned engine or behaviors that still need checking against its card language; they are not being represented as if supported:
 
-- Alms Collector needs to replace an opponent drawing a second or later card in a turn with one card for that player and one for Alms Collector's controller. The SDK lacks a way to redistribute only the extra cards from a multi-card draw.
+- Alms Collector: implemented 2026-11-06. The old note misread the card: it replaces one *instruction* to draw two or more (CR 121.2a), not later draws in a turn. `ReplaceDrawWith` on `DrawCardsEvent(EachOpponent, 2)`, plus engine patch 0042 so a paused replacement can't leak the original draw.
 - Bruvac the Grandiloquent needs to multiply milling; the engine's current mill modifier adds a fixed amount instead.
 - Greymond, Avacyn's Stalwart needs a lasting choice of keyword abilities as creatures enter; that behavior has not been verified.
 - Grimlock, Dinobot Leader, Megatron, Tyrant, Optimus Prime, Hero, Starscream, Power Hungry, and Slicer, Hired Muscle need their transforming or converting behavior.

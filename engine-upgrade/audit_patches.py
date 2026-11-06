@@ -54,6 +54,7 @@ MANDATORY = [
     "0038-chosen-color-land-mana-bonus.patch",
     "0039-graveyard-lookback-granted-types.patch",
     "0041-more-than-meets-the-eye-living-metal.patch",
+    "0042-announced-draw-replaced-whole.patch",
 ]
 # Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
 # numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.

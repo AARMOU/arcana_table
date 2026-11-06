@@ -6,11 +6,6 @@
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
     },
-    "Alms Collector": {
-      "reason": "replace only the extra cards of a multi-card draw and redistribute them",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Bruvac the Grandiloquent": {
       "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
