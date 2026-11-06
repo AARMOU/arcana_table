@@ -73,6 +73,19 @@ class CardArtTest {
             assertEquals(1, attempts)
         }
     }
+    @Test fun permanentLoadFailureStopsImmediately() = runBlocking {
+        var attempts = 0
+        val result = loadCardArtWithRetry<String>(
+            "https://cards.scryfall.io/normal/not-found.jpg",
+            pause = { fail("permanent failure must not wait") }
+        ) {
+            attempts++
+            CardArtLoadResult.PermanentFailure
+        }
+        assertNull(result)
+        assertEquals(1, attempts)
+    }
+
     @Test fun permanentHttpFailuresDoNotTriggerOuterRetryButTransientStatusesDo() {
         assertEquals(false, isRetryableCardArtStatusCode(404))
         assertEquals(false, isRetryableCardArtStatusCode(429))
