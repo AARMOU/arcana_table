@@ -17,6 +17,8 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.arcanatable.ArgentumEndpoints
 import com.arcanatable.MainActivity
+import com.arcanatable.StudioStore
+import com.arcanatable.StudioLayout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -356,6 +358,33 @@ class ArgentumResilienceUiTest {
         UiTestSupport.awaitReal(rule, 5_000, "home") { UiTestSupport.homeShown(rule) }
         assertFalse("no resume offer after a finished game", shown("RESUME GAME"))
         scenario.close()
+    }
+
+    @Test @Config(qualifiers = "w412dp-h928dp-port-xhdpi")
+    fun studioSavedLayoutDrivesActualAppStackAndOwnZones() {
+        useServer(fake.origin)
+        val store = StudioStore(context.getSharedPreferences("arcana_options",Context.MODE_PRIVATE),"portrait")
+        store.apply(StudioLayout.reference())
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            UiTestSupport.playWithArgentum(rule,scenario)
+            UiTestSupport.awaitReal(rule,30_000,"table") {tableShown()}
+            scenario.onActivity {it.tableController!!.showHand=true}
+            UiTestSupport.settle(rule)
+            scenario.onActivity {UiTestSupport.screenshot(it,"studio-real-app-portrait")}
+            rule.onNode(hasTestTag("studio-element-metric0")).performClick()
+            UiTestSupport.settle(rule)
+            rule.onNodeWithText("Argentum stack and priority").assertExists()
+            scenario.onActivity {assertTrue(it.tableController!!.stackOpen);assertTrue(it.tableController!!.argentumActionChoices.isEmpty())}
+            rule.onNodeWithText("CLOSE").performClick()
+            UiTestSupport.settle(rule)
+            rule.onNode(hasTestTag("studio-element-metric2")).performClick()
+            UiTestSupport.settle(rule)
+            scenario.onActivity {val c=it.tableController!!;assertEquals(c.localSeat to "Graveyard",c.zoneDialog);c.zoneDialog=null;c.argentumAwaitingUpdate=true}
+            UiTestSupport.settle(rule)
+            listOf("pass","undo","actions","cast").forEach {rule.onNode(hasTestTag("studio-element-$it")).assertIsNotEnabled()}
+        } finally {scenario.close();store.reset()}
     }
 
     @Test fun handDrawerStackAndZonesUseRealDestinationsAndNetworkWaitDisablesWrites() {

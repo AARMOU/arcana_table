@@ -224,6 +224,7 @@ internal fun TableController.TableMainLayout() {
                         DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier.tutorialTarget("menu-game-tools"), onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier.tutorialTarget("menu-room-game"), onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        if (BuildConfig.DEBUG) DropdownMenuItem(text = { Text("Arcana Studio") }, onClick = { topMenuExpanded = false; topMenuSection = null; nativeStudioOpen = true })
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Options") }, modifier = Modifier.tutorialTarget("menu-options"), onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {

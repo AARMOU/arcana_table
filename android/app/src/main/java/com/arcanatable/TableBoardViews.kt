@@ -818,7 +818,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     turnContext: String? = null, onActions: () -> Unit = onStack, onCast: (GameCard?) -> Unit = {},
     castableIds: Set<Int> = emptySet(), actionsBusy: Boolean = false,
     libraryCount: Int = 0, graveyardCount: Int = 0, exileCount: Int = 0,
-    onPreview: (GameCard) -> Unit = onSelect) {
+    onPreview: (GameCard) -> Unit = onSelect, studioLayout: StudioLayout? = null) {
     val handScrollState = rememberScrollState()
     var selectedId by remember { mutableStateOf<Int?>(null) }
     val selectedCard = cards.firstOrNull { it.id == selectedId }
@@ -829,7 +829,44 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         title = { Text("Your library") },
         text = { Text("$libraryCount cards. Library cards stay hidden. Searches and reveals are available only when the game permits them.") },
         confirmButton = { TextButton(onClick = { libraryInfo = false }) { Text("CLOSE") } })
+    val studioGeometryProblems = studioLayout?.viewportProblems(LocalConfiguration.current.screenWidthDp.toFloat(),
+        LocalDensity.current.fontScale, LocalConfiguration.current.screenHeightDp.toFloat()).orEmpty()
+    if (studioLayout != null && argentumMode && studioGeometryProblems.isEmpty()) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
+            }
+            StudioHandCanvas(studioLayout, StudioHandState(
+                labels = mapOf("pass" to (if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel ?: "WAITING"),
+                    "undo" to "UNDO", "actions" to "ACTIONS · ${if (actionsBusy) 0 else legalActionCount}", "cast" to "CAST",
+                    "metric0" to "STACK\n$stackCount", "metric1" to "LIBRARY\n$libraryCount",
+                    "metric2" to "GRAVEYARD\n$graveyardCount", "metric3" to "EXILE\n$exileCount"),
+                enabled = buildSet {
+                    addAll(listOf("metric0","metric1","metric2","metric3"))
+                    if (autoPassing || !actionsBusy && argentumPrimaryLabel != null) add("pass")
+                    if (!actionsBusy) {
+                        if (onUndo != null) add("undo")
+                        if (legalActionCount > 0) add("actions")
+                        if (if (selectedCard == null) cards.any { it.id in castableIds } else selectedCard.id in castableIds) add("cast")
+                    }
+                }, cards = cards, playable = playableIds, selected = selectedId),
+                onAction = { binding -> when (binding) {
+                    "pass" -> if (autoPassing) onAutoPass() else if (!actionsBusy) onPassTurn()
+                    "undo" -> if (!actionsBusy) onUndo?.invoke()
+                    "actions" -> if (!actionsBusy) onActions()
+                    "cast" -> if (!actionsBusy) onCast(selectedCard)
+                    "metric0" -> onStack()
+                    "metric1" -> libraryInfo = true
+                    "metric2" -> onMoreAction("GRAVEYARD")
+                    "metric3" -> onMoreAction("EXILE")
+                } },
+                onCard = { selectedId = it.id; onSelect(it) },
+                onPreview = { selectedId = it.id; onPreview(it) })
+        }
+        return
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+        if (studioGeometryProblems.isNotEmpty()) Text(studioGeometryProblems.joinToString("\n"), color = CounterGold)
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -844,7 +881,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 primaryLabel = when { autoPassing -> "AUTO-PASSING · STOP"; actionsBusy -> null; else -> argentumPrimaryLabel },
                 undoAvailable = onUndo != null && !actionsBusy,
                 actionCount = if (actionsBusy) 0 else legalActionCount,
-                castAvailable = !actionsBusy && (if (selectedCard == null) castableIds.isNotEmpty() else selectedCard.id in castableIds),
+                castAvailable = !actionsBusy && (if (selectedCard == null) cards.any { it.id in castableIds } else selectedCard.id in castableIds),
                 stackCount = stackCount, libraryCount = libraryCount, graveyardCount = graveyardCount, exileCount = exileCount,
                 onPass = { if (autoPassing) onAutoPass() else if (!actionsBusy) onPassTurn() },
                 onUndo = { onUndo?.invoke() }, onActions = onActions, onCast = { onCast(selectedCard) },

@@ -1011,6 +1011,12 @@ internal fun TableController.TableOverlaysB() {
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } },
     )
+    if (nativeStudioOpen && BuildConfig.DEBUG) NativeStudioPage(
+        store = remember(layoutOrientationSuffix) { StudioStore(optionPrefs, layoutOrientationSuffix) },
+        cards = players.getOrNull(localSeat)?.hand.orEmpty(),
+        onApplied = { nativeStudioRevision++ },
+        onDismiss = { nativeStudioOpen = false },
+    )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
         cardSize = cardSizeScale, onCardSize = { value -> cardSizeScale = value.coerceIn(.75f, 1.4f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },

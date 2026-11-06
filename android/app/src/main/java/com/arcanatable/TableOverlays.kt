@@ -960,6 +960,17 @@ internal fun TableController.TableOverlays() {
     val handCastableIds = handCards.filter { card -> ArgentumActions.forCardServerId(handCastActions,
         argentumSnapshot?.serverCardIds?.get(card.id)).isNotEmpty() }.map { it.id }.toSet()
 
+    val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioStore(optionPrefs, layoutOrientationSuffix) }
+    val studioLayout = remember(studioStore, nativeStudioRevision) {
+        if (BuildConfig.DEBUG && studioStore.enabled()) studioStore.load() else null
+    }
+    val studioFrame = studioLayout != null && argentumEnabled && studioLayout.viewportProblems(
+        configuration.screenWidthDp.toFloat(), LocalDensity.current.fontScale, configuration.screenHeightDp.toFloat()).isEmpty()
+    var studioHandFraction by remember(studioLayout, configuration.screenWidthDp, configuration.screenHeightDp) {
+        // Reserve 36dp resize grip and 48dp close row above owner's y=344 origin.
+        mutableFloatStateOf(((configuration.screenHeightDp - 344f * configuration.screenWidthDp / 412f + 84f) /
+            configuration.screenHeightDp.coerceAtLeast(1)).coerceIn(.38f,.95f))
+    }
     AnimatedVisibility(
         visible = handTrayVisible,
         modifier = Modifier.fillMaxSize(),
@@ -977,7 +988,7 @@ internal fun TableController.TableOverlays() {
             ) {
                 // Never shorter than the tray chrome (~172dp) plus one readable card row (~110dp),
                 // which matters on short landscape screens.
-                val effectiveHandFraction = handSheetHeightFraction.coerceAtLeast((282f / configuration.screenHeightDp.coerceAtLeast(1)).coerceIn(0.38f, 0.95f))
+                val effectiveHandFraction = if (studioFrame) studioHandFraction else handSheetHeightFraction.coerceAtLeast((282f / configuration.screenHeightDp.coerceAtLeast(1)).coerceIn(0.38f, 0.95f))
                 Column(
                     Modifier.fillMaxWidth()
                         .fillMaxHeight(effectiveHandFraction)
@@ -998,11 +1009,12 @@ internal fun TableController.TableOverlays() {
                                     onVerticalDrag = { change, amount ->
                                         change.consume()
                                         dragDistance += amount
-                                        handSheetHeightFraction = (handSheetHeightFraction - amount / screenHeightPx).coerceIn(0.38f, 0.95f)
+                                        if (studioFrame) studioHandFraction = (studioHandFraction - amount / screenHeightPx).coerceIn(.38f,.95f)
+                                        else handSheetHeightFraction = (handSheetHeightFraction - amount / screenHeightPx).coerceIn(0.38f, 0.95f)
                                     },
                                     onDragEnd = {
-                                        optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply()
-                                        if (dragDistance > dismissDistancePx && handSheetHeightFraction <= 0.40f) showHand = false
+                                        if (!studioFrame) optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply()
+                                        if (dragDistance > dismissDistancePx && effectiveHandFraction <= 0.40f) showHand = false
                                         dragDistance = 0f
                                     }
                                 )
@@ -1011,8 +1023,9 @@ internal fun TableController.TableOverlays() {
                     ) {
                         BottomSheetDefaults.DragHandle(color = Muted)
                     }
-                    Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
+                    if (!studioFrame) Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
+                        studioLayout = studioLayout,
                         turnContext = argentumSnapshot?.let { snap ->
                             "Turn ${snap.turnNumber} · ${snap.stepName.lowercase().replaceFirstChar(Char::uppercase)} · " +
                                 (if (snap.activePlayer == localSeat) "your turn" else "${players.getOrNull(snap.activePlayer)?.name ?: "Opponent"}'s turn")

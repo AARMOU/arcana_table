@@ -381,6 +381,8 @@ internal class TableController(
     var timerMenuOpen by run { mutableStateOf(false) }
     var optionsOpen by run { mutableStateOf(false) }
     var layoutLabOpen by run { mutableStateOf(false) }
+    var nativeStudioOpen by run { mutableStateOf(false) }
+    var nativeStudioRevision by run { mutableIntStateOf(0) }
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
