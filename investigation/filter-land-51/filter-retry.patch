@@ -1,0 +1,126 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+index 84b647a003..980f586e70 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+@@ -489,15 +489,26 @@ class ManaSolver private constructor(
+             return solveWithSnow(state, playerId, cost, xValue, excludeSources, spellContext, precomputedSources, xManaRestriction)
+         }
+         val attempt = SolveAttempt()
+-        return solveOnce(state, playerId, cost, xValue, excludeSources, spellContext, precomputedSources, xManaRestriction, attempt)
+-            // Mana that can't pay generic (Jegantha) is only useful on colored pips; the default
+-            // pass may give those pips to lands the generic part then needed. Retry with it first.
+-            ?: if (attempt.sawGenericBarredSource) solveOnce(state, playerId, cost, xValue, excludeSources,
+-                spellContext, precomputedSources, xManaRestriction, attempt, preferGenericBarred = true) else null
++        solveOnce(state, playerId, cost, xValue, excludeSources, spellContext, precomputedSources, xManaRestriction, attempt)
++            ?.let { return it }
++        // Mana that can't pay generic (Jegantha) is only useful on colored pips; the default
++        // pass may give those pips to lands the generic part then needed. Retry with it first.
++        if (attempt.sawGenericBarredSource) {
++            solveOnce(state, playerId, cost, xValue, excludeSources, spellContext, precomputedSources,
++                xManaRestriction, attempt, preferGenericBarred = true)?.let { return it }
++        }
++        // A basic land may be needed to seed a composite filter activation. Only retry
++        // after the normal plan fails; keep the same activation-cost settlement and output.
++        return if (attempt.sawCostedCompositeSource) solveOnce(state, playerId, cost, xValue, excludeSources,
++            spellContext, precomputedSources, xManaRestriction, attempt,
++            preferGenericBarred = attempt.sawGenericBarredSource, preferCostedComposite = true) else null
+     }
+
+     /** What one [solveOnce] pass saw, for [solve]'s retry decision. */
+-    private class SolveAttempt(var sawGenericBarredSource: Boolean = false)
++    private class SolveAttempt(
++        var sawGenericBarredSource: Boolean = false,
++        var sawCostedCompositeSource: Boolean = false,
++    )
+
+     private fun solveOnce(
+         state: GameState,
+@@ -511,6 +522,7 @@ class ManaSolver private constructor(
+         attempt: SolveAttempt,
+         /** Tap sources whose mana can't pay generic for colored pips before any other source. */
+         preferGenericBarred: Boolean = false,
++        preferCostedComposite: Boolean = false,
+     ): ManaSolution? {
+         // Get all untapped mana sources controlled by the player.
+         //
+@@ -560,6 +572,9 @@ class ManaSolver private constructor(
+             return null
+         }
+         attempt.sawGenericBarredSource = availableSources.any { it.barsGeneric }
++        attempt.sawCostedCompositeSource = availableSources.any { source ->
++            source.compositeBonusMana.isNotEmpty() && source.colorActivationManaCost.values.any { it > 0 }
++        }
+
+         // Analyze hand to inform smart tapping decisions
+         val handRequirements = analyzeHandRequirements(state, playerId)
+@@ -818,7 +833,7 @@ class ManaSolver private constructor(
+             if (colorlessPays(required) && spendColorlessBonusMana()) return true
+             val best = colors.mapNotNull { color ->
+                 findBestSourceForColor(remainingSources, color, handRequirements, availableSourcesByColor, spellContext,
+-                    preferGenericBarred)
++                    preferGenericBarred, preferCostedComposite)
+                     ?.let { it to color }
+             }.minWithOrNull(compareBy<Pair<ManaSource, Color>>(
+                 // Prefer native colors before spending substitutes that another pip may need.
+@@ -981,7 +996,7 @@ class ManaSolver private constructor(
+                     // Try bonus mana first
+                     if (spendBonusMana(symbol.color)) continue
+
+-                    val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred)
++                    val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
+                     if (source == null) {
+                         // No printed source makes this color. Fall back to an aura tap-bonus
+                         // (e.g. only a Fertile Ground forest can supply the {R}).
+@@ -1005,8 +1020,8 @@ class ManaSolver private constructor(
+                     if (spendBonusMana(symbol.color2)) continue
+
+                     // Try first color, then second - use priority to pick the best
+-                    val source1 = findBestSourceForColor(remainingSources, symbol.color1, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred)
+-                    val source2 = findBestSourceForColor(remainingSources, symbol.color2, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred)
++                    val source1 = findBestSourceForColor(remainingSources, symbol.color1, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
++                    val source2 = findBestSourceForColor(remainingSources, symbol.color2, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
+
+                     val source = when {
+                         source1 == null && source2 == null -> {
+@@ -1044,7 +1059,7 @@ class ManaSolver private constructor(
+                     if (spendBonusMana(symbol.color)) continue
+
+                     // For now, always pay with mana (not life)
+-                    val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred)
++                    val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
+                     if (source == null) {
+                         if (payColoredPipFromAuraBonus(symbol.color)) continue
+                         return null
+@@ -1079,7 +1094,7 @@ class ManaSolver private constructor(
+                     if (allowedColors.any { spendBonusMana(it) } || spendColorlessBonusMana()) continue
+                     val candidates = mutableListOf<Pair<ManaSource, Color?>>()
+                     for (color in allowedColors) {
+-                        findBestSourceForColor(remainingSources, color, handRequirements, availableSourcesByColor, spellContext)
++                        findBestSourceForColor(remainingSources, color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
+                             ?.let { candidates.add(it to color) }
+                     }
+                     remainingSources.filter { it.producesColorless }.forEach { candidates.add(it to null) }
+@@ -1120,7 +1135,7 @@ class ManaSolver private constructor(
+                 continue
+             }
+             if (spendBonusMana(symbol.color)) continue
+-            val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred)
++            val source = findBestSourceForColor(remainingSources, symbol.color, handRequirements, availableSourcesByColor, spellContext, preferGenericBarred, preferCostedComposite)
+             if (source != null) {
+                 manaProduced[source.entityId] = ManaProduction(color = symbol.color, amount = source.amountFor(symbol.color))
+                 useSource(source, symbol.color)
+@@ -2984,10 +2999,14 @@ class ManaSolver private constructor(
+         availableSourcesByColor: Map<Color, Int>,
+         spellContext: SpellPaymentContext? = null,
+         preferGenericBarred: Boolean = false,
++        preferCostedComposite: Boolean = false,
+     ): ManaSource? {
+         return sources
+             .filter { it.availableColorsFor(spellContext).contains(color) }
+             .minWithOrNull(compareBy<ManaSource> { if (preferGenericBarred && !it.paysGenericWith(color)) 0 else 1 }.thenBy {
++                if (preferCostedComposite && it.compositeBonusMana.isNotEmpty() &&
++                    (it.colorActivationManaCost[color] ?: 0) > 0) 0 else 1
++            }.thenBy {
+                 calculateTapPriority(it, handRequirements, availableSourcesByColor) +
+                     painPenalty(it, it.colorPainCost[color] ?: 0) +
+                     forgoneManaPenalty(it, color)
