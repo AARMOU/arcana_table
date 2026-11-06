@@ -25,7 +25,7 @@ class GargoyleFlockIndependentCertificationTest {
         assertTrue(d.projected.hasSubtype(token, "GARGOYLE"))
         val colors = d.projected.getColors(token)
         assertEquals(1, colors.size)
-        assertTrue(colors.contains(Color.BLUE))
+        assertTrue(d.projected.hasColor(token, Color.BLUE))
         assertEquals(1, d.projected.getPower(token))
         assertEquals(1, d.projected.getToughness(token))
         assertTrue(d.projected.hasKeyword(token, Keyword.FLYING))
