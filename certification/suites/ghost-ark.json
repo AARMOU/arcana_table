@@ -1,0 +1,9 @@
+{
+  "key": "ghost-ark",
+  "name": "Ghost Ark",
+  "issue": 987,
+  "source": "certification/GhostArkIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GhostArkIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
