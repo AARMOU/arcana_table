@@ -299,13 +299,9 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                 if(!studio.editing && (studio.active || studio.recoveryReasons().isNotEmpty()))androidx.compose.material3.TextButton(
                     onClick={studio.begin()},colors=androidx.compose.material3.ButtonDefaults.textButtonColors(containerColor=darkTableColors.panel,contentColor=darkTableColors.text),modifier=Modifier.align(Alignment.BottomStart).navigationBarsPadding().testTag("studio-root-escape")
                 ){androidx.compose.material3.Text(if(studio.recoveryReasons().isEmpty())"Arcana Studio" else "Studio restored a control · Review",color=darkTableColors.text)}
-                if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
-                    onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
-                ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}
-                if(studio.panelOpen) StudioControlsPage(studio,
-                    onApplied={nativeStudioRevision++},
-                    onHand={studio.cancel();nativeStudioOpen=true},
-                    destinations=mapOf(
+                var studioClassic by remember(studio) {mutableStateOf(false)}
+                LaunchedEffect(studio.editing) {if(!studio.editing)studioClassic=false}
+                val studioDestinations=mapOf(
                         "Home" to (true to {optionsOpen=false;showHand=false;homeOpen=true}),
                         "Setup" to (!gameInProgress to {homeOpen=true;playSheetOpen=true}),
                         "Table" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=true}),
@@ -316,7 +312,20 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                         "Stack" to (gameInProgress to {stackOpen=true}),
                         "Zones" to (gameInProgress to {zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
                         "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {homeOpen=false;showHand=false}),
-                    ))
+                    )
+                if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
+                    onApplied={nativeStudioRevision++},
+                    onClassic={studioClassic=true;studio.panelOpen=true},
+                    onHand={studio.cancel();nativeStudioOpen=true})
+                else {
+                if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
+                    onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
+                ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}
+                if(studio.panelOpen) StudioControlsPage(studio,
+                    onApplied={nativeStudioRevision++},
+                    onHand={studio.cancel();nativeStudioOpen=true},
+                    destinations=studioDestinations)
+                }
             }
             SnackbarHost(
                 hostState = automaticActionSnackbar,

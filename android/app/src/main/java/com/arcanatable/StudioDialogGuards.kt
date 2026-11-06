@@ -18,7 +18,7 @@ import androidx.compose.ui.window.DialogProperties
 @Composable
 internal fun StudioDialog(screen:String="Dialog",onDismissRequest:()->Unit,properties:DialogProperties=DialogProperties(),content:@Composable ()->Unit) {
     val runtime=LocalStudioControls.current
-    Dialog(onDismissRequest={if(runtime?.editing==true)runtime.panelOpen=true else onDismissRequest()},properties=properties) {StudioScreen(screen) {
+    Dialog(onDismissRequest={if(runtime?.editing==true){runtime.panelOpen=true;StudioEditorRequests.dismiss(onDismissRequest)} else onDismissRequest()},properties=properties) {StudioScreen(screen) {
         if(runtime?.active==true)Box {
             Box(Modifier.padding(bottom=48.dp)){content()}
             StudioWindowEscape(runtime,Modifier.align(Alignment.BottomEnd))
@@ -35,7 +35,7 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
     properties:DialogProperties=DialogProperties()) {
     val runtime=LocalStudioControls.current
     StudioScreen(screen) {
-        AlertDialog(onDismissRequest={if(runtime?.editing==true)runtime.panelOpen=true else onDismissRequest()},confirmButton={
+        AlertDialog(onDismissRequest={if(runtime?.editing==true){runtime.panelOpen=true;StudioEditorRequests.dismiss(onDismissRequest)} else onDismissRequest()},confirmButton={
             if(runtime?.active==true)Column(horizontalAlignment=Alignment.End){confirmButton();StudioWindowEscape(runtime)}
             else confirmButton()
         },
@@ -47,7 +47,7 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
 /** This recovery control is outside the editable project and cannot be hidden or rebound. */
 @Composable
 private fun StudioWindowEscape(runtime:StudioControlsRuntime,modifier:Modifier=Modifier) {
-    androidx.compose.material3.TextButton(onClick={if(runtime.editing)runtime.panelOpen=true else runtime.begin()},
+    androidx.compose.material3.TextButton(onClick={if(runtime.editing){runtime.panelOpen=true;StudioEditorRequests.openMenu()} else runtime.begin()},
         colors=androidx.compose.material3.ButtonDefaults.textButtonColors(containerColor=darkTableColors.panel,contentColor=darkTableColors.text),
         modifier=modifier.height(48.dp).testTag("studio-window-escape")) {
         androidx.compose.material3.Text("Arcana Studio",color=darkTableColors.text)
