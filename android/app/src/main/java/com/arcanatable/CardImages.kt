@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -11,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
@@ -28,6 +30,16 @@ import java.security.MessageDigest
  *   The resolved link is remembered, so each card is looked up once.
  * - If a picture link fails (bad or unverified URL), the card's exact name is looked up instead.
  */
+internal sealed interface CardArtLoadResult<out T> {
+    data class Loaded<T>(val value: T) : CardArtLoadResult<T>
+    object RetryableFailure : CardArtLoadResult<Nothing>
+    object PermanentFailure : CardArtLoadResult<Nothing>
+}
+
+/** 429 is handled once inside the serialized Scryfall API gate; it is never retried by the outer image loop. */
+internal fun isRetryableCardArtStatusCode(statusCode: Int): Boolean =
+    statusCode == 408 || statusCode in 500..599
+
 object CardImages {
     private const val USER_AGENT = "ArcanaTable/0.33 (Android)"
     private var dir: File? = null
@@ -112,69 +124,151 @@ object CardImages {
         return File(d, "$hash.img")
     }
 
-    /** Loads a card picture: memory, then the phone's cache, then the network (with fallbacks). */
-    suspend fun load(url: String, fallbackName: String? = null): Bitmap? = withContext(Dispatchers.IO) {
-        CardBitmapCache.get(url)?.let { return@withContext it }
-        cacheFile(url)?.takeIf { it.exists() && it.length() > 0 }?.let { file ->
-            BitmapFactory.decodeFile(file.path)?.let { CardBitmapCache.put(url, it); return@withContext it }
+    /** Loads a card picture, preserving the existing nullable API for other callers. */
+    suspend fun load(url: String, fallbackName: String? = null): Bitmap? =
+        when (val result = loadForCardArt(url, fallbackName)) {
+            is CardArtLoadResult.Loaded -> result.value
+            CardArtLoadResult.RetryableFailure, CardArtLoadResult.PermanentFailure -> null
         }
-        val version = versionOf(url)
-        val candidates = buildList {
-            if (isScryfallApi(url)) resolve(jsonLookupFor(url)!!, version)?.let(::add) else add(url)
+
+    /**
+     * One bounded retry attempt with an explicit failure class for the visible CardArt caller.
+     * Permanent HTTP outcomes (including 404 and 429) do not trigger outer retries.
+     */
+    internal suspend fun loadForCardArt(url: String, fallbackName: String? = null): CardArtLoadResult<Bitmap> =
+        withContext(Dispatchers.IO) {
+            CardBitmapCache.get(url)?.let { return@withContext CardArtLoadResult.Loaded(it) }
+            cacheFile(url)?.takeIf { it.exists() && it.length() > 0 }?.let { file ->
+                BitmapFactory.decodeFile(file.path)?.let {
+                    CardBitmapCache.put(url, it)
+                    return@withContext CardArtLoadResult.Loaded(it)
+                }
+            }
+            val version = versionOf(url)
+            var transientFailure = false
+            val candidates = mutableListOf<String>()
+            if (isScryfallApi(url)) {
+                when (val result = resolve(jsonLookupFor(url)!!, version)) {
+                    is CardArtLoadResult.Loaded -> candidates.add(result.value)
+                    CardArtLoadResult.RetryableFailure -> transientFailure = true
+                    CardArtLoadResult.PermanentFailure -> Unit
+                }
+            } else {
+                candidates.add(url)
+            }
             val name = fallbackName?.takeIf { it.isNotBlank() && it != "Hidden card" } ?: nameIn(url)
-            if (name != null) resolve(nameLookupFor(name), version)?.let { if (it !in this) add(it) }
+            if (name != null) {
+                when (val result = resolve(nameLookupFor(name), version)) {
+                    is CardArtLoadResult.Loaded -> if (result.value !in candidates) candidates.add(result.value)
+                    CardArtLoadResult.RetryableFailure -> transientFailure = true
+                    CardArtLoadResult.PermanentFailure -> Unit
+                }
+            }
+            for (candidate in candidates) {
+                when (val response = fetchBytes(candidate)) {
+                    is CardArtLoadResult.Loaded -> {
+                        val bytes = response.value
+                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+                        runCatching { cacheFile(url)?.writeBytes(bytes) }
+                        CardBitmapCache.put(url, bitmap)
+                        return@withContext CardArtLoadResult.Loaded(bitmap)
+                    }
+                    CardArtLoadResult.RetryableFailure -> transientFailure = true
+                    CardArtLoadResult.PermanentFailure -> Unit
+                }
+            }
+            if (transientFailure) CardArtLoadResult.RetryableFailure else CardArtLoadResult.PermanentFailure
         }
-        for (candidate in candidates) {
-            val bytes = fetchBytes(candidate) ?: continue
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
-            runCatching { cacheFile(url)?.writeBytes(bytes) }
-            CardBitmapCache.put(url, bitmap)
-            return@withContext bitmap
-        }
-        null
-    }
 
     /** A Scryfall JSON lookup → real picture link, remembered on the phone. Misses are not remembered. */
-    private suspend fun resolve(lookup: String, version: String): String? {
+    private suspend fun resolve(lookup: String, version: String): CardArtLoadResult<String> {
         val key = "$version|$lookup"
-        prefs?.getString(key, null)?.let { return it }
-        val json = apiGet(lookup) ?: return null
-        val image = runCatching { imageFromJson(JSONObject(json), version) }.getOrNull() ?: return null
+        prefs?.getString(key, null)?.let { return CardArtLoadResult.Loaded(it) }
+        val json = when (val response = apiGet(lookup)) {
+            is CardArtLoadResult.Loaded -> response.value
+            CardArtLoadResult.RetryableFailure -> return CardArtLoadResult.RetryableFailure
+            CardArtLoadResult.PermanentFailure -> return CardArtLoadResult.PermanentFailure
+        }
+        val image = runCatching { imageFromJson(JSONObject(json), version) }.getOrNull()
+            ?: return CardArtLoadResult.PermanentFailure
         prefs?.edit()?.putString(key, image)?.apply()
-        return image
+        return CardArtLoadResult.Loaded(image)
     }
 
-    /** One Scryfall API call at a time, ~120 ms apart; one retry after a "slow down" (429). */
-    private suspend fun apiGet(url: String): String? = apiGate.withLock {
-        repeat(2) { attempt ->
+    /** One Scryfall API call at a time, ~120 ms apart; one retry after a 429 slow-down. */
+    private suspend fun apiGet(url: String): CardArtLoadResult<String> = apiGate.withLock {
+        for (attempt in 0..1) {
             val wait = 120 - (System.currentTimeMillis() - lastApiCall)
             if (wait > 0) delay(wait)
             lastApiCall = System.currentTimeMillis()
-            val connection = runCatching { URL(url).openConnection() as HttpURLConnection }.getOrNull() ?: return@withLock null
+            val connection = try {
+                URL(url).openConnection() as HttpURLConnection
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IOException) {
+                return@withLock CardArtLoadResult.RetryableFailure
+            } catch (_: Exception) {
+                return@withLock CardArtLoadResult.PermanentFailure
+            }
             try {
                 connection.connectTimeout = 15_000; connection.readTimeout = 20_000
                 connection.setRequestProperty("User-Agent", USER_AGENT)
                 connection.setRequestProperty("Accept", "application/json")
-                val code = runCatching { connection.responseCode }.getOrNull() ?: return@withLock null
-                if (code == 429 && attempt == 0) { delay(1_000); return@repeat }
-                if (code !in 200..299) return@withLock null
-                return@withLock connection.inputStream.bufferedReader().use { it.readText() }
+                val code = connection.responseCode
+                if (code == 429 && attempt == 0) {
+                    delay(1_000)
+                    continue
+                }
+                if (code !in 200..299) {
+                    return@withLock if (isRetryableCardArtStatusCode(code)) {
+                        CardArtLoadResult.RetryableFailure
+                    } else CardArtLoadResult.PermanentFailure
+                }
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                return@withLock CardArtLoadResult.Loaded(body)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IOException) {
+                return@withLock CardArtLoadResult.RetryableFailure
             } catch (_: Exception) {
-                return@withLock null
-            } finally { connection.disconnect() }
+                return@withLock CardArtLoadResult.PermanentFailure
+            } finally {
+                connection.disconnect()
+            }
         }
-        null
+        // A second 429 is terminal for this visible attempt: do not multiply rate-limited requests.
+        CardArtLoadResult.PermanentFailure
     }
 
-    private fun fetchBytes(url: String): ByteArray? {
-        val connection = runCatching { URL(url).openConnection() as HttpURLConnection }.getOrNull() ?: return null
+    private fun fetchBytes(url: String): CardArtLoadResult<ByteArray> {
+        val connection = try {
+            URL(url).openConnection() as HttpURLConnection
+        } catch (_: IOException) {
+            return CardArtLoadResult.RetryableFailure
+        } catch (_: Exception) {
+            return CardArtLoadResult.PermanentFailure
+        }
         return try {
             connection.connectTimeout = 15_000; connection.readTimeout = 20_000
             connection.instanceFollowRedirects = true
             connection.setRequestProperty("User-Agent", USER_AGENT)
             connection.setRequestProperty("Accept", "image/*")
-            if (connection.responseCode !in 200..299) null else connection.inputStream.use { it.readBytes() }
-        } catch (_: Exception) { null } finally { connection.disconnect() }
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                if (isRetryableCardArtStatusCode(code)) CardArtLoadResult.RetryableFailure
+                else CardArtLoadResult.PermanentFailure
+            } else {
+                CardArtLoadResult.Loaded(connection.inputStream.use { it.readBytes() })
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: IOException) {
+            CardArtLoadResult.RetryableFailure
+        } catch (_: Exception) {
+            CardArtLoadResult.PermanentFailure
+        } finally {
+            connection.disconnect()
+        }
     }
 }
 
