@@ -1,0 +1,9 @@
+{
+  "key": "genestealer-locus",
+  "name": "Genestealer Locus",
+  "issue": 985,
+  "source": "certification/GenestealerLocusIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GenestealerLocusIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
