@@ -53,9 +53,21 @@ consumer, not a full rebuilt-engine, packaging, Android/device or AI certificati
 The init script is opt-in and the normal Gradle configuration is unchanged.
 
 Generated source, XML, logs and jar SHA-256 manifests live under ignored `build/`.
+Each invocation writes a unique timestamp/UUID directory containing its log,
+manifest and (only after exit zero) current XML. Old `baseline-xml`/`candidate-xml`
+directories and top-level manifests are historical artifacts, never current-run
+evidence. The runner clears Gradle's test-result directory before launching and
+rejects a successful command with no fresh XML. Failed commands publish no XML.
 An exclusive runner lock prevents duplicate validation invocations. The runner
 never writes `android/app/libs` and checks its hashes again on exit. It fails
 closed if those jars change or no longer match the recorded baseline.
+On interruption or output failure, Windows tree termination must succeed and the
+root must be reaped before unlocking. If termination cannot be confirmed (including
+an already-exited root or non-Windows descendant uncertainty), the lock stays for
+manual process inspection; do not delete it just to retry.
+
+Lightweight runner failure-path checks (including a real Windows child/grandchild):
+`python -m unittest discover -s investigation/filter-land-51 -p test_validate.py -v`.
 
 ## Regression coverage
 

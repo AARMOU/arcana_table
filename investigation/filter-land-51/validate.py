@@ -16,6 +16,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import signal
+import uuid
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +37,65 @@ def hashes() -> dict[str, str]:
             for p in sorted((ROOT / "android/app/libs").glob("argentum-*.jar"))}
 
 
+class UnconfirmedProcessTree(RuntimeError):
+    """Keep the exclusive lock for manual inspection when cleanup is uncertain."""
+
+
+def stop_tree(process: subprocess.Popen) -> None:
+    try:
+        if os.name == "nt":
+            # A dead root cannot be used to discover its remaining descendants.
+            if process.poll() is not None:
+                raise RuntimeError("Root exited before tree termination could be confirmed")
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                           check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           timeout=30)
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=30)
+            # Reaping the root alone does not establish that every descendant exited.
+            raise RuntimeError("Process-group termination needs manual descendant inspection")
+        process.wait(timeout=30)
+    except BaseException as error:
+        raise UnconfirmedProcessTree("Process tree cleanup uncertain; retain validation.lock") from error
+
+
+def run_logged(command: list[str], log) -> int:
+    options = {} if os.name == "nt" else {"start_new_session": True}
+    process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                               errors="replace", **options)
+    try:
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            log.write(line)
+        return process.wait()
+    except BaseException:
+        stop_tree(process)
+        raise
+    finally:
+        if process.stdout is not None:
+            try:
+                process.stdout.close()
+            except BaseException:
+                # Do not mask an uncertain-tree error and accidentally release its lock.
+                pass
+
+
+def collect_reports(reports: Path, run: Path, result: int) -> None:
+    # Reports were cleared before invocation; failed commands never publish XML.
+    if result != 0:
+        return
+    files = sorted(reports.glob("TEST-*.xml"))
+    if not files:
+        raise RuntimeError("Successful command produced no current JUnit XML")
+    destination = run / "xml"
+    destination.mkdir()
+    for xml in files:
+        shutil.copyfile(xml, destination / xml.name)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", action="store_true")
@@ -47,6 +108,9 @@ def main() -> int:
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     os.write(fd, str(os.getpid()).encode())
     os.close(fd)
+    run = BUILD / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex)
+    run.mkdir()
+    retain_lock = False
     before = hashes()
     mode = "baseline" if args.baseline else "candidate"
     report = {"mode": mode, "started": datetime.now(timezone.utc).isoformat(),
@@ -97,27 +161,26 @@ def main() -> int:
         command += [":custom-cards:test", "--rerun-tasks"]
         if not args.all:
             command += ["--tests", "com.arcanatable.customcards.FilterLandAffordabilityTest"]
-        with (BUILD / f"{mode}.log").open("w", encoding="utf-8") as log:
-            process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-            assert process.stdout is not None
-            for line in process.stdout:
-                print(line, end="", flush=True)
-                log.write(line)
-            result = process.wait()
-        report["exit_code"] = result
         reports = ROOT / "android/custom-cards/build/test-results/test"
         if reports.exists():
-            destination = BUILD / (mode + "-xml")
-            destination.mkdir(exist_ok=True)
-            for xml in reports.glob("TEST-*.xml"):
-                shutil.copyfile(xml, destination / xml.name)
+            if reports.is_symlink() or reports.resolve() != reports.absolute():
+                raise RuntimeError("Unsafe test report path")
+            shutil.rmtree(reports)
+        with (run / f"{mode}.log").open("w", encoding="utf-8") as log:
+            result = run_logged(command, log)
+        report["exit_code"] = result
+        collect_reports(reports, run, result)
         return result
+    except UnconfirmedProcessTree:
+        retain_lock = True
+        report["cleanup"] = "UNKNOWN; lock retained for manual process inspection"
+        raise
     finally:
         report["jars_after"] = hashes()
         report["finished"] = datetime.now(timezone.utc).isoformat()
-        (BUILD / f"{mode}-manifest.json").write_text(json.dumps(report, indent=2) + "\n")
-        lock.unlink()
+        (run / "manifest.json").write_text(json.dumps(report, indent=2) + "\n")
+        if not retain_lock:
+            lock.unlink()
         if report["jars_after"] != before:
             raise RuntimeError("Runtime jars changed during validation")
 
