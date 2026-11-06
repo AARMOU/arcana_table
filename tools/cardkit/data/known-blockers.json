@@ -72,11 +72,6 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Goblin Welder": {
-      "reason": "needs (1) a second target whose legality depends on the first target's controller ('artifact card in that player's graveyard'): with OwnedByReferencedPlayer(PlayerRef(ControllerOf(target))) the engine offers zero legal activations; (2) an all-or-nothing 'if both targets are still legal' gate; (3) a simultaneous sacrifice-and-return exchange",
-      "source": "#883 Clyde rules-expansion probe 2026-11-06 (no activation offered on the shipped engine)",
-      "verified": true
-    },
     "Devil Dinosaur": {
       "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",

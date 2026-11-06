@@ -503,3 +503,29 @@ ability or a counter doesn't give it back. Without `cantHave` it's the ordinary 
 Proof: `ArcaneLighthouseScenarioTest` (7 cases, one per ruling: later Heroic Intervention doesn't restore
 hexproof, which fails with `cantHave = false`; a creature arriving later isn't affected; printed hexproof
 returns next turn; your own creatures keep it; four-player).
+
+### "Target X a player controls and target Y in that player's graveyard" + "if both targets are still legal"
+
+Needs engine patch 0044. Write the second slot's owner as the first target's controller,
+`ControllerPredicate.OwnedByReferencedPlayer(EffectTarget.TargetController)`. The engine then treats
+it as a dependent target: the second slot's choices are listed per first choice
+(`validTargetsByPrefix`), the ability is only offered when a legal pair exists, and a mismatched pair
+is rejected. "If both targets are still legal" is an `Effects.If` over `Conditions.EntityMatches` on
+**both** target handles: a target made illegal in response (CR 608.2b) leaves its handle empty, so
+nothing happens.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GoblinWelder.kt -->
+```kotlin
+        val onField = target(TargetFilter(GameObjectFilter.Artifact))
+        val inYard = target(
+            TargetFilter(
+                GameObjectFilter.Artifact.copy(
+                    controllerPredicate = ControllerPredicate.OwnedByReferencedPlayer(EffectTarget.TargetController)
+                ),
+                zone = Zone.GRAVEYARD,
+            )
+        )
+```
+
+Proof: `GoblinWelderScenarioTest` (9 cases). Without 0044 the ability is never offered (8 fail). Without
+the both-legal gate the two "gone in response" cases fail.
