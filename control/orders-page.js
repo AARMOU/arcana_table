@@ -1,5 +1,5 @@
 /* Arcana Control: owner briefing (Work tab). Read-only.
- * Source: the pinned "Current orders & owner decisions" issue that Claude PM keeps current.
+ * Source: the pinned "Current orders & owner decisions" issue governed by owner decisions on #883 and maintained by Goose coordination.
  * Parses its markdown into plain sections and renders them with DOM nodes only (never innerHTML). */
 (function (root) {
   'use strict';
@@ -119,7 +119,7 @@
     const label = (title, hint) => { const d = el('div', 'section-label'); d.append(el('h2', '', title)); if (hint) d.append(el('span', 'hint', hint)); return d; };
     container.replaceChildren();
     if (!issue || typeof issue.body !== 'string') {
-      container.append(el('div', 'empty', 'Owner briefing unavailable right now. Pull to refresh, or ask Claude or GPT for the current orders.'));
+      container.append(el('div', 'empty', 'Owner briefing unavailable right now. Pull to refresh, or ask Goose for the current orders.'));
       return { ok: false };
     }
     const { meta, sections } = parse(issue.body);
@@ -133,7 +133,7 @@
     wbox.append(el('h3', '', 'Waiting on you'));
     wbox.append(el('div', 'big', waiting.length ? waiting.length + (waiting.length === 1 ? ' thing' : ' things') : 'Nothing right now'));
     if (waiting.length) { const ul = el('ul', 'ob-list'); waiting.forEach(w => ul.append(rich(w, 'li'))); wbox.append(ul); }
-    wbox.append(el('p', 'fine', 'Answer in Claude or GPT, whichever you have open. Either one will act on it.'));
+    wbox.append(el('p', 'fine', 'Send your answer to Goose in ChatGPT; Goose will route it to the responsible worker.'));
     container.append(wbox);
 
     // Verified live facts and inbox reports precede hand-maintained order statuses.
@@ -174,7 +174,7 @@
     rq.forEach(i => {
       const row = el('div', 'list-row'); row.append(el('span', 'row-icon running', '?'));
       const main = el('div', 'row-main'); main.append(el('div', 'row-title', rulesCard(i.title)));
-      main.append(el('div', 'row-sub', 'Asked ' + ago(i.created_at, now) + ' · answer in Claude or GPT'));
+      main.append(el('div', 'row-sub', 'Asked ' + ago(i.created_at, now) + ' · answer to Goose in ChatGPT'));
       row.append(main); row.append(el('span', 'tag amber', 'Needs you')); rqRows.append(row);
     });
     rqPanel.append(rqRows); container.append(rqPanel);
@@ -201,7 +201,7 @@
       container.append(grid);
     }
 
-    // 4. Any other sections the PM adds (deck progress, latest test build, ...)
+    // 4. Any other sections the coordinator adds (deck progress, latest test build, ...)
     for (const s of sections.filter(x => kind(x.title) === 'other')) {
       container.append(label(plain(s.title)));
       const p = el('section', 'panel ob-generic');
