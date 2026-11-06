@@ -58,3 +58,4 @@ The app's exported custom-card data does not add these cards to Argentum's onlin
 ## Export and checks
 
 There are 103 registered custom-card definitions. The custom-card test suite completed 111 tests with 0 failures in this work session. `:custom-cards:exportCards` wrote 103 card records to `app/src/main/assets/argentum/custom-cards.jsonl` and 103 names to `custom-cards.index.tsv`; a second export produced byte-identical files.
+- **Reveal lands (2026-11-06):** Port Town and Furycalm Snarl play from Argentum's library; Fortified Village is a custom card with the same `OnEnterRun` + `MayRevealCardFromHand` shape. All three share `RevealLandChecks` (7 cases each, incl. four-player).
