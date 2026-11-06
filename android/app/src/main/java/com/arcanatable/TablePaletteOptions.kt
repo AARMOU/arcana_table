@@ -1,7 +1,6 @@
 package com.arcanatable
 
 import android.content.SharedPreferences
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -79,7 +78,7 @@ internal fun tableColorHex(color: Color): String =
 
 internal fun parseTableColorHex(hex: String): Color? {
     if (!Regex("^#[0-9A-Fa-f]{6}$").matches(hex)) return null
-    return Color(android.graphics.Color.parseColor(hex))
+    return Color(0xFF000000.toInt() or hex.substring(1).toInt(16))
 }
 
 internal fun readCustomTablePalette(prefs: SharedPreferences): TableColors {
