@@ -37,6 +37,28 @@ internal sealed interface CardArtLoadResult<out T> {
     object PermanentFailure : CardArtLoadResult<Nothing>
 }
 
+internal class CardArtRetryContext {
+    internal val terminalEndpoints = mutableSetOf<String>()
+}
+
+/** Try each endpoint once; remember terminal outcomes so a transient peer cannot replay them. */
+internal suspend fun <T : Any> loadCardArtEndpoints(
+    endpoints: List<String>,
+    retryContext: CardArtRetryContext,
+    request: suspend (String) -> CardArtLoadResult<T>
+): CardArtLoadResult<T> {
+    var hasTransientFailure = false
+    for (endpoint in endpoints) {
+        if (endpoint in retryContext.terminalEndpoints) continue
+        when (val result = request(endpoint)) {
+            is CardArtLoadResult.Loaded -> return result
+            CardArtLoadResult.RetryableFailure -> hasTransientFailure = true
+            CardArtLoadResult.PermanentFailure -> retryContext.terminalEndpoints.add(endpoint)
+        }
+    }
+    return if (hasTransientFailure) CardArtLoadResult.RetryableFailure else CardArtLoadResult.PermanentFailure
+}
+
 /** 429 is handled once inside the serialized Scryfall API gate; it is never retried by the outer image loop. */
 internal fun isRetryableCardArtStatusCode(statusCode: Int): Boolean =
     statusCode == 408 || statusCode in 500..599
@@ -136,7 +158,11 @@ object CardImages {
      * One bounded retry attempt with an explicit failure class for the visible CardArt caller.
      * Permanent HTTP outcomes (including 404 and 429) do not trigger outer retries.
      */
-    internal suspend fun loadForCardArt(url: String, fallbackName: String? = null): CardArtLoadResult<Bitmap> =
+    internal suspend fun loadForCardArt(
+        url: String,
+        fallbackName: String? = null,
+        retryContext: CardArtRetryContext = CardArtRetryContext()
+    ): CardArtLoadResult<Bitmap> =
         withContext(Dispatchers.IO) {
             CardBitmapCache.get(url)?.let { return@withContext CardArtLoadResult.Loaded(it) }
             cacheFile(url)?.takeIf { it.exists() && it.length() > 0 }?.let { file ->
@@ -149,7 +175,7 @@ object CardImages {
             var transientFailure = false
             val candidates = mutableListOf<String>()
             if (isScryfallApi(url)) {
-                when (val result = resolve(jsonLookupFor(url)!!, version)) {
+                when (val result = resolve(jsonLookupFor(url)!!, version, retryContext)) {
                     is CardArtLoadResult.Loaded -> candidates.add(result.value)
                     CardArtLoadResult.RetryableFailure -> transientFailure = true
                     CardArtLoadResult.PermanentFailure -> Unit
@@ -159,41 +185,53 @@ object CardImages {
             }
             val name = fallbackName?.takeIf { it.isNotBlank() && it != "Hidden card" } ?: nameIn(url)
             if (name != null) {
-                when (val result = resolve(nameLookupFor(name), version)) {
+                when (val result = resolve(nameLookupFor(name), version, retryContext)) {
                     is CardArtLoadResult.Loaded -> if (result.value !in candidates) candidates.add(result.value)
                     CardArtLoadResult.RetryableFailure -> transientFailure = true
                     CardArtLoadResult.PermanentFailure -> Unit
                 }
             }
-            for (candidate in candidates) {
+            val imageResult = loadCardArtEndpoints(candidates.map { "image:$it" }, retryContext) { endpoint ->
+                val candidate = endpoint.removePrefix("image:")
                 when (val response = fetchBytes(candidate)) {
                     is CardArtLoadResult.Loaded -> {
                         val bytes = response.value
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            ?: return@loadCardArtEndpoints CardArtLoadResult.PermanentFailure
                         runCatching { cacheFile(url)?.writeBytes(bytes) }
                         CardBitmapCache.put(url, bitmap)
-                        return@withContext CardArtLoadResult.Loaded(bitmap)
+                        CardArtLoadResult.Loaded(bitmap)
                     }
-                    CardArtLoadResult.RetryableFailure -> transientFailure = true
-                    CardArtLoadResult.PermanentFailure -> Unit
+                    CardArtLoadResult.RetryableFailure -> CardArtLoadResult.RetryableFailure
+                    CardArtLoadResult.PermanentFailure -> CardArtLoadResult.PermanentFailure
                 }
             }
+            if (imageResult is CardArtLoadResult.Loaded) return@withContext imageResult
+            if (imageResult == CardArtLoadResult.RetryableFailure) transientFailure = true
             if (transientFailure) CardArtLoadResult.RetryableFailure else CardArtLoadResult.PermanentFailure
         }
 
     /** A Scryfall JSON lookup → real picture link, remembered on the phone. Misses are not remembered. */
-    private suspend fun resolve(lookup: String, version: String): CardArtLoadResult<String> {
+    private suspend fun resolve(
+        lookup: String,
+        version: String,
+        retryContext: CardArtRetryContext
+    ): CardArtLoadResult<String> {
         val key = "$version|$lookup"
         prefs?.getString(key, null)?.let { return CardArtLoadResult.Loaded(it) }
-        val json = when (val response = apiGet(lookup)) {
-            is CardArtLoadResult.Loaded -> response.value
-            CardArtLoadResult.RetryableFailure -> return CardArtLoadResult.RetryableFailure
-            CardArtLoadResult.PermanentFailure -> return CardArtLoadResult.PermanentFailure
+        return loadCardArtEndpoints(listOf("lookup:$lookup"), retryContext) { _ ->
+            when (val response = apiGet(lookup)) {
+                is CardArtLoadResult.Loaded -> {
+                    val image = runCatching { imageFromJson(JSONObject(response.value), version) }.getOrNull()
+                    if (image == null) CardArtLoadResult.PermanentFailure else {
+                        prefs?.edit()?.putString(key, image)?.apply()
+                        CardArtLoadResult.Loaded(image)
+                    }
+                }
+                CardArtLoadResult.RetryableFailure -> CardArtLoadResult.RetryableFailure
+                CardArtLoadResult.PermanentFailure -> CardArtLoadResult.PermanentFailure
+            }
         }
-        val image = runCatching { imageFromJson(JSONObject(json), version) }.getOrNull()
-            ?: return CardArtLoadResult.PermanentFailure
-        prefs?.edit()?.putString(key, image)?.apply()
-        return CardArtLoadResult.Loaded(image)
     }
 
     /** One Scryfall API call at a time, ~120 ms apart; one retry after a 429 slow-down. */
