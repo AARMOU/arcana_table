@@ -459,3 +459,27 @@ permanent already converted (CR 701.28f) does nothing. A noncreature filter on
 Proof: `RatchetFieldMedicScenarioTest` (12 cases: the converted cast offer and its cost, the back face on
 the stack, Living metal on your turn and not on an opponent's, the reflexive return capped by life gained
 this turn, declining it, stacked triggers, once each turn, and token or opponent artifacts not counting).
+
+### "If a player would draw two or more cards, instead …" (whole-instruction draw replacement)
+
+Match the draw *announcement* with `EventPattern.DrawCardsEvent(player, amount)` (one instruction to
+draw that many, CR 121.2a; two separate "draw a card" instructions never match) and replace it with
+`ReplaceDrawWith`. Engine patch 0042 makes this replace the whole instruction even if the replacement
+pauses. Inside a replacement, `EffectTarget.Controller` is the **affected player** (here, the drawer),
+so the card's own controller is `EffectTarget.PlayerRef(Player.ControllerOfSource)`.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AlmsCollector.kt -->
+```kotlin
+    replacementEffect(
+        ReplaceDrawWith(
+            replacementEffect = Effects.DrawCards(1, EffectTarget.PlayerRef(Player.ControllerOfSource)) then
+                Effects.DrawCards(1, EffectTarget.Controller),
+            appliesTo = EventPattern.DrawCardsEvent(player = Player.EachOpponent, amount = 2),
+        )
+    )
+```
+
+Proof: `AlmsCollectorScenarioTest` (9 cases: opponent draws two; your own draws, two single draws and the
+draw step are untouched; two Collectors with "each player draws two" give both players two; four-player
+distribution; two Collectors vs a third player's draw apply once; a dredge prompt pausing the replacement
+doesn't leak the original card. That last case fails without 0042).
