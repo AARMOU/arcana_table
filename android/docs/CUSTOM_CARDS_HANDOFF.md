@@ -50,7 +50,7 @@ The following 39 cards remain unimplemented: Pantlaza, Sun-Favored; Atla Palani,
 - Food Chain is not a true mana ability.
 - Urza's Saga keeps its own lore counters.
 - Sakashima of a Thousand Faces makes its copies nonlegendary.
-- Goblin Welder is left out (re-checked 2026-11-06): besides the simultaneous swap, the engine can't express a second target that must be in the graveyard of the first target's controller (no legal activation is offered), nor the all-or-nothing "if both targets are still legal".
+- Goblin Welder: implemented 2026-11-06 on engine patch 0044 (dependent "that player's graveyard" target). `GoblinWelderScenarioTest` covers the ruling, both control cases and four-player.
 - Ratchet, Field Medic is now included (engine patch 0041); `RatchetFieldMedicScenarioTest` covers both faces.
 
 The app's exported custom-card data does not add these cards to Argentum's online server. They are for offline games. The custom card definitions now carry Scryfall image links. Some older set and collector-number metadata remains inaccurate and was left unchanged; the image links were matched to the card name instead.

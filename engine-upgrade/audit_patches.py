@@ -56,6 +56,7 @@ MANDATORY = [
     "0041-more-than-meets-the-eye-living-metal.patch",
     "0042-announced-draw-replaced-whole.patch",
     "0043-keyword-cant-have.patch",
+    "0044-dependent-target-owned-by-target-controller.patch",
 ]
 # Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
 # numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.
