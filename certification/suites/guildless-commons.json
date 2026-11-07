@@ -1,0 +1,9 @@
+{
+  "key": "guildless-commons",
+  "name": "Guildless Commons",
+  "issue": 1020,
+  "source": "certification/GuildlessCommonsIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GuildlessCommonsIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
