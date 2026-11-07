@@ -165,11 +165,51 @@ internal fun TableScreen(onControllerReady: (TableController) -> Unit) {
     val context = LocalContext.current
     val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
     var darkMode by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("dark_mode", true)) }
-    val colors = if (darkMode) darkTableColors else lightTableColors
+    var paletteName by rememberSaveable {
+        mutableStateOf(optionPrefs.getString(TABLE_PALETTE_PREF, "Arcana Original") ?: "Arcana Original")
+    }
+    var customPalette by remember { mutableStateOf(readCustomTablePalette(optionPrefs)) }
+    var customPaletteInitialized by remember {
+        mutableStateOf(optionPrefs.getBoolean(TABLE_CUSTOM_READY_PREF, false))
+    }
+    val selectedPalette = if (paletteName == CUSTOM_TABLE_PALETTE) customPalette else tablePaletteByName(paletteName)
+    // Keep the existing Light/Dark switch: a palette selection switches to that dark palette,
+    // but the Light option can still temporarily override it without erasing the selection.
+    val colors = if (darkMode) selectedPalette else lightTableColors
     val scheme = if (darkMode) darkColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
         else lightColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
     val cardZoom = remember { CardZoomController() }
-    CompositionLocalProvider(LocalTableColors provides colors, LocalCardZoom provides cardZoom) {
+    val paletteEditor = TablePaletteEditor(
+        selectedName = paletteName,
+        selectedColors = selectedPalette,
+        customColors = customPalette,
+        onSelect = { name ->
+            if (name == CUSTOM_TABLE_PALETTE && !customPaletteInitialized) {
+                // First use starts with the currently selected colors, not a random default.
+                customPalette = selectedPalette
+                customPaletteInitialized = true
+                optionPrefs.edit().writeCustomTablePalette(customPalette).apply()
+            }
+            if (name == CUSTOM_TABLE_PALETTE || tablePalettePresets.any { it.name == name }) {
+                paletteName = name
+                darkMode = true
+                optionPrefs.edit().putString(TABLE_PALETTE_PREF, name).putBoolean("dark_mode", true).apply()
+            }
+        },
+        onCustomColor = { role, color ->
+            val next = customPalette.withColorRole(role, color)
+            customPalette = next
+            customPaletteInitialized = true
+            paletteName = CUSTOM_TABLE_PALETTE
+            darkMode = true
+            optionPrefs.edit().writeCustomTablePalette(next)
+                .putString(TABLE_PALETTE_PREF, CUSTOM_TABLE_PALETTE)
+                .putBoolean("dark_mode", true).apply()
+        },
+    )
+    CompositionLocalProvider(
+        LocalTableColors provides colors, LocalTablePaletteEditor provides paletteEditor, LocalCardZoom provides cardZoom
+    ) {
         MaterialTheme(colorScheme = scheme) {
             TableScreenContent(darkMode, onToggleTheme = {
                 darkMode = !darkMode

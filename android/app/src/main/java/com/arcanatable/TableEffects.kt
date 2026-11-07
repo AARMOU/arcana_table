@@ -394,10 +394,11 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             stackCycleActive = false
         }
     }
+    // Match Android system bars to the currently selected palette's canvas.
+    val systemBarColor = Ink.toArgb()
     SideEffect {
-        val systemBar = if (darkMode) android.graphics.Color.rgb(16, 22, 21) else android.graphics.Color.rgb(242, 245, 241)
-        activity?.window?.statusBarColor = systemBar
-        activity?.window?.navigationBarColor = systemBar
+        activity?.window?.statusBarColor = systemBarColor
+        activity?.window?.navigationBarColor = systemBarColor
     }
 
     LaunchedEffect(stackActions, priorityPlayer, priorityPassed, players, gameGeneration, onlineMode, argentumEnabled) {
