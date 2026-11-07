@@ -61,7 +61,9 @@ class StudioControlsTest {
     }
     @Test fun nonfiniteOrUnsafeDimensionsAndUnknownIconsFailValidation() {
         assertTrue(StudioControlStyle(dx=Float.NaN).problems().isNotEmpty())
-        assertTrue(StudioControlStyle(width=20f).problems().isNotEmpty())
+        assertTrue(StudioControlStyle(width=0f).problems().isNotEmpty())
+        // Owner note 14: a 20dp-wide control is allowed (advice, marked red), not refused.
+        assertTrue(StudioControlStyle(width=20f).problems().isEmpty());assertNotNull(StudioControlStyle(width=20f).advice())
         assertTrue(StudioControlStyle(icon="network-fetch").problems().isNotEmpty())
         assertTrue(StudioControlStyle(fill="javascript:run()").problems().isNotEmpty())
     }
@@ -99,6 +101,18 @@ class StudioControlsTest {
         runtime.begin();runtime.chooseProfile("Minimal");runtime.cancel();assertEquals("Default",runtime.profile)
         assertEquals(20f,runtime.style(a).dx)
         assertTrue(StudioControlStore(p,"landscape","Default").load().controls.isEmpty())
+    }
+    /** Owner feedback bugs 18/20/21: leaving keeps the whole draft (buttons and hand); only Discard throws it away. */
+    @Test fun leavingKeepsTheWholeDraftAndOnlyDiscardDropsIt() {
+        val p=prefs();val runtime=StudioControlsRuntime(p,"portrait")
+        val hand=StudioLayout.reference().let{l->l.copy(elements=l.elements.map{if(it.id=="undo")it.copy(h=31f) else it})}
+        runtime.begin();runtime.edit(a,StudioControlStyle(dx=12f));runtime.changeHand(hand);runtime.cancel()
+        runtime.begin()
+        assertEquals(12f,runtime.draft.controls[a]!!.dx);assertTrue(runtime.hasPendingHand());assertEquals(hand,runtime.handDraft())
+        runtime.apply()
+        assertEquals(hand,StudioStore(p,"portrait","Default").load());assertEquals(12f,StudioControlStore(p,"portrait","Default").load().controls[a]!!.dx)
+        runtime.begin();runtime.edit(a,StudioControlStyle(dx=50f));runtime.changeHand(StudioLayout.reference());runtime.discard()
+        runtime.begin();assertEquals(12f,runtime.draft.controls[a]!!.dx);assertFalse(runtime.hasPendingHand());assertEquals(hand,runtime.handDraft())
     }
     @Test fun corruptCurrentProjectUsesBackupAndResetLeavesOtherData() {
         val p=prefs();p.edit().putString("saved_game","preserved").commit()

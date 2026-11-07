@@ -25,19 +25,33 @@ class StudioLayoutTest {
         assertEquals(600f,parsed.elements.last().y)
         assertEquals(parsed,StudioLayout.parse(parsed.json()))
     }
+    /**
+     * Owner feedback note 14 (Nov 6) changed this contract: only lock-outs block Apply. Pass must stay visible; Cast,
+     * Undo and the counters may now be removed or hidden. Duplicate ids are still malformed.
+     */
     @Test fun duplicateIdsAndMissingCriticalBindingCannotApply() {
         reject(ref.copy(elements=ref.elements+ref.elements.first()))
-        reject(ref.copy(elements=ref.elements.filterNot{it.id=="cast"}))
-        reject(ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(visible=false) else it}))
+        reject(ref.copy(elements=ref.elements.filterNot{it.id=="pass"}))
+        reject(ref.copy(elements=ref.elements.map{if(it.id=="pass")it.copy(visible=false) else it}))
+        val noCast=ref.copy(elements=ref.elements.filterNot{it.id=="cast"})
+        assertEquals(emptyList<String>(),noCast.problems());assertEquals(noCast,StudioLayout.parse(noCast.json()))
+        assertTrue(ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(visible=false) else it}).problems().isEmpty())
     }
     @Test fun unknownOrCrossScreenBindingsCannotGainGameAuthority() {
         reject(ref.copy(elements=ref.elements.map{if(it.id=="pass")it.copy(binding="concede") else it}))
         reject(ref.copy(elements=ref.elements.map{if(it.id=="card0")it.copy(binding="opponent.hand.0") else it}))
     }
+    /** Owner note 14: overlaps, small sizes and items past the edge are red advice, never a refusal; NaN is still malformed. */
     @Test fun overlapOffCanvasAndNonfiniteGeometryRejected() {
-        reject(ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(x=8f) else it}))
-        reject(ref.copy(elements=ref.elements.map{if(it.id=="cast")it.copy(w=100f) else it}))
-        assertTrue(ref.copy(elements=ref.elements.map{it.copy(x=Float.NaN)}).problems().isNotEmpty())
+        val overlap=ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(x=8f) else it})
+        assertTrue(overlap.problems().isEmpty());assertTrue("undo" in overlap.advice() && "pass" in overlap.advice())
+        val past=ref.copy(elements=ref.elements.map{if(it.id=="cast")it.copy(w=100f) else it})
+        assertTrue(past.problems().isEmpty());assertEquals("Partly outside the hand.",past.advice()["cast"])
+        val tiny=ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(h=31f) else it})
+        assertTrue(tiny.problems().isEmpty());assertEquals("Hard to tap: smaller than 44.",tiny.advice()["undo"])
+        assertEquals(tiny,StudioLayout.parse(tiny.json()))
+        assertTrue(ref.advice().isEmpty())
+        reject(ref.copy(elements=ref.elements.map{it.copy(x=Float.NaN)}))
     }
     @Test fun unsupportedVersionsAndEmptyProjectsFailClosed() {
         assertTrue(runCatching{StudioLayout.parse(JSONObject(ref.json()).put("version",999).toString())}.isFailure)
@@ -71,12 +85,24 @@ class StudioLayoutTest {
         history.undo();assertEquals(ref,history.current);history.redo();assertEquals(4,history.current.snap)
         history.undo();history.change(ref.copy(snap=2));assertFalse(history.canRedo)
     }
+    /**
+     * Owner feedback note 8 changed this contract: the owner's design is never thrown out for the Fold cover, large
+     * text or landscape (small buttons grow to 44dp when drawn). Only an undrawable viewport is reported.
+     */
     @Test fun unsupportedViewportAndLargeTextAreFlaggedWithoutMovingSavedElements() {
         assertTrue(ref.viewportProblems(412f).isEmpty())
-        assertTrue(ref.viewportProblems(344f).isNotEmpty())
-        assertTrue(ref.viewportProblems(412f,4f).isNotEmpty())
-        assertTrue(ref.viewportProblems(892f,1f,412f).isNotEmpty())
+        assertTrue(ref.viewportProblems(344f).isEmpty())
+        assertTrue(ref.viewportProblems(412f,4f).isEmpty())
+        assertTrue(ref.viewportProblems(892f,1f,412f).isEmpty())
+        assertTrue(ref.viewportProblems(Float.NaN).isNotEmpty())
         assertEquals(8f,ref.elements.first().x)
+    }
+    /** Owner feedback bug 19: a hand draft with red advice still saves and reloads. */
+    @Test fun draftWithAdviceStillSaves() {
+        val store=StudioStore(prefs(),"portrait");store.apply(ref)
+        val tiny=ref.copy(elements=ref.elements.map{if(it.id=="undo")it.copy(h=31f) else it})
+        store.saveDraft(tiny);assertEquals(tiny,store.draft());assertEquals(ref,store.load())
+        store.clearDraft();assertNull(store.draft())
     }
     @Test fun handSlotGapsCannotHideActualCards() {
         reject(ref.copy(elements=ref.elements.filterNot{it.id=="card2"}))

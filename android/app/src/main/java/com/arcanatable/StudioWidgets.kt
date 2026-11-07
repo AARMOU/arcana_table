@@ -77,10 +77,14 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         layout(0,0){} // Compose captions and guards, but never place, draw or hit-test hidden controls.
     }
     // Native anchors and parent-data (weights) remain intact. Draft and applied use this same modifier.
-    var result=this.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
+    // Owner feedback #11/#12 (bug 22): Studio's size goes OUTSIDE the call site's own modifiers. Placed after them,
+    // the native width()/height()/heightIn() fixed the slot and the saved size never showed. Outermost, the native
+    // size modifiers are coerced into Studio's exact constraints, so the visible control is the size in the panel.
+    var sized:Modifier=Modifier
+    s.width?.takeIf{it.isFinite()}?.let{sized=sized.requiredWidth(it.coerceIn(1f,2000f).dp)}
+    s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
+    var result=sized.then(this).offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
         s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
-    s.width?.takeIf{it.isFinite()}?.let{result=result.requiredWidth(it.coerceIn(1f,2000f).dp)}
-    s.height?.takeIf{it.isFinite()}?.let{result=result.requiredHeight(it.coerceIn(1f,4000f).dp)}
     s.radius?.takeIf{it.isFinite()}?.let{result=result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
     s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
@@ -94,8 +98,8 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
                 val style=current.runtime.style(current.id)
                 val bounds=current.runtime.controls[current.id]?.bounds
                 current.runtime.edit(current.id,if(resizing)style.copy(
-                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(44f),
-                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(44f)
+                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(StudioEditorGeometry.FLOOR_DP),
+                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(StudioEditorGeometry.FLOOR_DP)
                 ) else style.copy(dx=style.dx+dx,dy=style.dy+dy));drag=Offset.Zero
             })
         }.drawWithContent {
@@ -107,12 +111,10 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         }
     return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f).onGloballyPositioned {coordinates->
         val rect=coordinates.boundsInRoot()
+        // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
+        // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
+        // through style(); everything else is shown exactly as designed (owner note 36).
         widget.runtime.bounds(widget.id,rect,System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
-        if(s!=StudioControlStyle() && !widget.runtime.editing && widget.runtime.controls[widget.id]?.isAction==true) {
-            val minimum=with(density){44.dp.toPx()}
-            if(s.width!=null && rect.width<minimum-1 || s.height!=null && rect.height<minimum-1 || rect.left< -1 || rect.top< -1 ||
-                rect.right>root.width+1 || rect.bottom>root.height+1)widget.runtime.recover(widget.id,"A control did not fit this viewport; its native layout was restored.")
-        }
     }
 }
 

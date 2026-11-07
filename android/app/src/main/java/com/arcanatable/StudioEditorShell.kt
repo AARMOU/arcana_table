@@ -88,8 +88,7 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     val screen=if(handMode)"Hand" else popupScreens?.let{p->selected?.screen?.takeIf{it in p} ?: popups.last().screen} ?: selected?.screen ?: tab
     val foreign=!handMode && runtime.controls.values.any{it.window!=0 && it.window!=window && it.bounds.width>0f}
     val apply:()->Unit={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message ?: "Fix the listed problems before applying."}}
-    val close:()->Unit={if(runtime.canUndo)confirmClose=true else runtime.cancel()}
-    val problems=runtime.problems().distinct()
+    val close:()->Unit={if(runtime.canUndo || runtime.hasDraft())confirmClose=true else runtime.cancel()}
     val pick:(String)->Unit={name->
         if(name=="Hand"){onLeaveScreen();tab="Hand";runtime.selected=null;handSelected=null}
         else destinations[name]?.let{(available,open)->
@@ -101,12 +100,17 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     androidx.activity.compose.BackHandler(enabled=true) {if(popups.isNotEmpty())popups.last().dismiss() else close()}
 
     val bar=@Composable {
-        StudioTopBar(runtime,screen,close,{},{layersOpen=!layersOpen},layersOpen,{moreOpen=true},apply)
+        // Owner note 5: the Select/Scroll switch lives in the toolbar, never floating over cards or buttons.
+        StudioTopBar(runtime,screen,close,{},{layersOpen=!layersOpen},layersOpen,{moreOpen=true},apply,
+            scrollMode=if(noGame)null else tool==StudioEditorTool.Scroll,
+            onToggleScroll={tool=if(tool==StudioEditorTool.Scroll)StudioEditorTool.Select else StudioEditorTool.Scroll})
         StudioScreenBar(tabs,tab,destinations,pick,popups.lastOrNull()?.let{p->({p.dismiss()})},if(handMode)null else tab)
-        val notice=message ?: problems.firstOrNull()
+        // Owner note 14: no standing warning bar. Problems are red marking on the items themselves; this only shows a
+        // message the owner just triggered (e.g. why Apply couldn't save a lock-out), and a tap dismisses it.
+        val notice=message
         if(notice!=null)Surface(color=darkTableColors.raised,shape=RoundedCornerShape(12.dp),modifier=Modifier.padding(6.dp).fillMaxWidth()
             .clickable{message=null}.testTag("studio-notice")) {
-            Text(notice+(if(message==null && problems.size>1)"  (+${problems.size-1} more)" else ""),color=darkTableColors.counter,fontSize=12.sp,modifier=Modifier.padding(10.dp))
+            Text(notice,color=darkTableColors.counter,fontSize=12.sp,modifier=Modifier.padding(10.dp))
         }
     }
     val inspector:@Composable (Modifier)->Unit={mod->
@@ -146,9 +150,7 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
             val dockTop=!handMode && selected!=null && selected.window==window && (selected.bounds.center.y-origin.y)>height*0.55f
             Column(Modifier.align(if(dockTop)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth()
                 .then(if(dockTop)Modifier.statusBarsPadding().padding(top=112.dp) else Modifier.navigationBarsPadding()).padding(horizontal=6.dp,vertical=4.dp)) {
-                if(!dockTop && !noGame)StudioToolSwitch(tool){tool=it}
                 if(!foreign || selected?.window==window)inspector(Modifier.widthIn(max=640.dp).align(Alignment.CenterHorizontally))
-                if(dockTop)StudioToolSwitch(tool){tool=it}
             }
             if(!foreign)sheets()
         }
@@ -160,7 +162,11 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
             if(layersOpen || moreOpen)StudioOverlayWindow {sheets()}
         }
         if(confirmClose)AlertDialog(onDismissRequest={confirmClose=false},title={Text("Leave Studio?")},
-            text={Text("Your draft is kept and reopens next time. Nothing changes in the game until you Apply.")},
+            text={Column {
+                Text("Your draft is kept and reopens next time. Nothing changes in the game until you Apply.")
+                TextButton(onClick={confirmClose=false;runtime.discard()},modifier=Modifier.testTag("studio-close-discard")){
+                    Text("Discard draft",color=darkTableColors.muted)}
+            }},
             confirmButton={TextButton(onClick={confirmClose=false;runtime.cancel()},modifier=Modifier.testTag("studio-close-confirm")){Text("Leave")}},
             dismissButton={TextButton(onClick={confirmClose=false;apply()},modifier=Modifier.testTag("studio-close-apply")){Text("Apply and leave")}})
     }
@@ -292,11 +298,25 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                     style=Stroke(1.dp.toPx(),pathEffect=PathEffect.dashPathEffect(floatArrayOf(6f,6f))))
             }
         }
+        // Owner notes 14 + 31: anything with advice is outlined red with a small warning flag (not colour alone), and
+        // turns red live while a drag would put it in a problem spot. Nothing blocks; tapping it shows why.
+        val advice=runtime.advice()
+        val red=Color(0xFFE5534B)
+        runtime.controls.values.filter{it.id in advice && it.window==window && it.bounds.width>0f && pickable(it)}.forEach {c->
+            val r=c.bounds.translate(-origin)
+            drawRect(red,r.topLeft,r.size,style=Stroke(2.dp.toPx(),pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f,5f))))
+            val f=8.dp.toPx();val p=androidx.compose.ui.graphics.Path().apply{moveTo(r.right-f,r.top);lineTo(r.right,r.top);lineTo(r.right,r.top+f);close()}
+            drawPath(p,red)
+        }
         selection?.let {s->
             val base=s.bounds.translate(-origin)
-            val frame=handle?.let{StudioEditorGeometry.preview(base,it,drag,minPx)} ?: base
-            if(handle!=null)drawRect(accent.copy(alpha=0.12f),frame.topLeft,frame.size)
-            drawRect(accent,frame.topLeft,frame.size,style=Stroke(2.dp.toPx()))
+            val frame=handle?.let{StudioEditorGeometry.preview(base,it,drag,StudioEditorGeometry.FLOOR_DP*density)} ?: base
+            val trouble=handle!=null && StudioEditorGeometry.dragTrouble(frame,s,runtime.controls.values.filter{
+                it.id!=s.id && it.window==window && it.isAction && it.bounds.width>0f && it.screen==s.screen && runtime.style(it.id).visible}.map{it.bounds.translate(-origin)},
+                Size(size.width,size.height),minPx)
+            val edge=if(trouble || (handle==null && s.id in advice))red else accent
+            if(handle!=null)drawRect(edge.copy(alpha=0.12f),frame.topLeft,frame.size)
+            drawRect(edge,frame.topLeft,frame.size,style=Stroke(2.dp.toPx()))
             StudioEditorGeometry.handlePoints(frame,StudioEditorGeometry.compact(frame,reach)).values.forEach {p->
                 drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
             }

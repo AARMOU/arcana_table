@@ -284,9 +284,10 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-tab-Action").performClick();rule.waitForIdle()
         rule.onNodeWithTag("studio-hand-binding-metric0").performScrollTo().performClick();rule.waitForIdle()
         assertEquals("metric0",hand().elements.single{it.id=="undo"}.binding)
-        rule.onNodeWithTag("studio-notice").assertIsDisplayed() // undo is now unreachable, so Apply must refuse
+        // Owner note 14 (Nov 6) changed this contract: Undo may be left unreachable. No warning bar, and Apply saves.
+        rule.onNodeWithTag("studio-notice").assertDoesNotExist()
         rule.onNodeWithTag("studio-apply").performClick();rule.waitForIdle()
-        assertTrue(runtime.editing);assertEquals(0,applied)
+        assertFalse(runtime.editing);assertEquals(1,applied)
     }
 
     @Test fun ownerHandJsonLoadsAndAppliesExactly() {

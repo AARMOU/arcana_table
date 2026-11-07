@@ -15,7 +15,7 @@ internal data class StudioControlStyle(
     fun problems()=buildList {
         if(listOfNotNull(dx,dy,width,height,font,radius,layer).any {!it.isFinite()})add("Use finite dimensions.")
         if(kotlin.math.abs(dx)>2000 || kotlin.math.abs(dy)>4000)add("Offset exceeds the canvas.")
-        if(width!=null && width !in 44f..2000f || height!=null && height !in 44f..4000f)add("Controls need dimensions of at least 44dp.")
+        if(width!=null && width !in 1f..2000f || height!=null && height !in 1f..4000f)add("Width and height must be positive.")
         if(font!=null && font !in 8f..64f || radius!=null && radius !in 0f..100f)add("Invalid font or corner radius.")
         if(fill!=null && parseTableColorHex(fill)==null || ink!=null && parseTableColorHex(ink)==null)add("Use #RRGGBB colors.")
         if(label!=null && label.length>120)add("Label is too long.")
@@ -23,6 +23,8 @@ internal data class StudioControlStyle(
         if(icon !in StudioLayout.icons)add("Unknown icon.")
         if(layer !in -100f..100f)add("Layer must be between -100 and 100.")
     }
+    /** Owner note 14: soft advice only. It marks the control red in the editor and never blocks Apply. */
+    fun advice():String?=if(width!=null && width<44f || height!=null && height<44f)"Hard to tap: smaller than 44." else null
     fun json()=JSONObject().put("dx",dx).put("dy",dy).put("visible",visible).put("icon",icon).put("layer",layer).apply {
         width?.let{put("width",it)};height?.let{put("height",it)};font?.let{put("font",it)};radius?.let{put("radius",it)}
         fill?.let{put("fill",it)};ink?.let{put("ink",it)};label?.let{put("label",it)};binding?.let{put("binding",it)}
@@ -231,7 +233,16 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun changeHand(hand:StudioLayout)=change(draft,hand)
     fun undo(){if(undo.isNotEmpty()){redo.addLast(Revision(draft,pendingHand));val previous=undo.removeLast();draft=previous.controls;pendingHand=previous.hand;saveDraft();revision++}}
     fun redo(){if(redo.isNotEmpty()){undo.addLast(Revision(draft,pendingHand));val next=redo.removeLast();draft=next.controls;pendingHand=next.hand;saveDraft();revision++}}
-    fun cancel(){prefs.edit().remove(pendingHandKey).apply();pendingHand=null;profile=StudioProfiles(prefs,orientation).activeName();applied=store().load();draft=applied;editing=false;capturing=false;panelOpen=false;revision++}
+    /**
+     * Leave the editor and KEEP the draft (owner feedback bugs 18, 20, 21). Leaving used to drop the pending-hand flag
+     * while the stored hand draft still showed on reopen, so Apply silently skipped it; button edits were kept but hand
+     * edits were not. Now both stay as a draft until Apply or [discard].
+     */
+    fun cancel(){pendingHand=null;profile=StudioProfiles(prefs,orientation).activeName();applied=store().load();draft=applied;editing=false;capturing=false;panelOpen=false;revision++}
+    /** Throw the draft away (buttons and hand) and go back to the applied layout. */
+    fun discard(){store().saveDraft(applied);StudioStore(prefs,orientation,profile).clearDraft()
+        prefs.edit().remove(pendingHandKey).apply();cancel()}
+    fun hasDraft()=store().draft()?.let{it!=applied}==true || prefs.getBoolean(pendingHandKey,false)
     fun apply() {
         val errors=problems();require(errors.isEmpty()){errors.joinToString("\n")}
         val edit=store().stage(prefs.edit(),draft)
@@ -291,27 +302,38 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             val control=controls[id]
             if(control?.requiredNativeAction==true && (!style.visible || style.binding!=null && style.binding!=id) && !hasReplacement(draft,id))
                 add("Keep required action ${control.title} reachable.")
+            // A rebinding to an action on another screen/window, or one that isn't available, can never run: refused.
             if(style.binding!=null && control!=null && !(if(control.isAction)canInvoke(id,style.binding) else canDisplay(id,style.binding)))
                 add("${control.title}: choose an available ${if(control.isAction)"action" else "information source"} on the same screen.")
             if(control?.protectedLabel==true && style.label!=null)add("Dynamic game data cannot be replaced by a fixed label.")
             if(control?.kind=="container-action" && !control.captionEditable && style.label!=null)add("Edit this control's text layer to rename it.")
             if(control?.kind=="container-action" && !control.captionEditable && style.binding!=null)add("Duplicate this compound control as a button to change its action.")
-            if(control?.isAction==true && style.visible && control.bounds.width>0 && control.viewportWidth>0) {
+        }
+    }
+    /**
+     * Owner note 14: everything that isn't a lock-out is advice. Each entry is control id → one plain-language line;
+     * the editor marks those controls red. Apply never looks at this.
+     */
+    fun advice():Map<String,String> = buildMap {
+        (draft.controls+draft.copies.associate{it.id to it.style}).forEach {(id,style)->
+            style.advice()?.let{put(id,it)}
+            val control=controls[id] ?: return@forEach
+            if(control.isAction && style.visible && control.bounds.width>0 && control.viewportWidth>0) {
                 val r=control.bounds
                 if(r.left< -1 || r.top< -1 || r.right>control.viewportWidth+1 || r.bottom>control.viewportHeight+1)
-                    add("${control.title} is outside its native window.")
-                // Only real collisions: same screen, and never a container against something drawn inside it
-                // (e.g. the hand tray and its cards, which may be partly scrolled out of the tray).
+                    put(id,"Partly off the screen.")
+                // Only real collisions: same screen, and never a container against something drawn inside it.
                 controls.values.filter{it.id!=id && it.isAction && it.window==control.window && it.screen==control.screen &&
                     this@StudioControlsRuntime.style(it.id).visible}.forEach {other->
                     val b=other.bounds
                     val contains=r.left<=b.left && r.top<=b.top && r.right>=b.right && r.bottom>=b.bottom
                     val contained=b.left<=r.left && b.top<=r.top && b.right>=r.right && b.bottom>=r.bottom
                     val nested=(control.kind=="container-action" && r.contains(b.center)) || (other.kind=="container-action" && b.contains(r.center))
-                    if(b.width>0 && r.overlaps(b) && !contains && !contained && !nested)add("${control.title} overlaps ${other.title}.")
+                    if(b.width>0 && r.overlaps(b) && !contains && !contained && !nested)put(id,"Overlaps ${other.title}.")
                 }
             }
         }
+        pendingHand?.advice()?.forEach{(id,why)->put("hand:$id",why)}
     }
 }
 

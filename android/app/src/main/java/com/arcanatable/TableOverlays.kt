@@ -961,7 +961,7 @@ internal fun TableController.TableOverlays() {
     val handCastableIds = handCards.filter { card -> ArgentumActions.forCardServerId(handCastActions,
         argentumSnapshot?.serverCardIds?.get(card.id)).isNotEmpty() }.map { it.id }.toSet()
 
-    val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioProfiles(optionPrefs, layoutOrientationSuffix).activeStore() }
+    val studioStore = remember(nativeStudioRevision) { StudioProfiles(optionPrefs, STUDIO_LAYOUT_KEY).activeStore() }
     val studioLayout = remember(studioStore, nativeStudioRevision) {
         if (BuildConfig.STUDIO_ENABLED && studioStore.enabled()) studioStore.load() else null
     }

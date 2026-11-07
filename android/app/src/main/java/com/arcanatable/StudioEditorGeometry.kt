@@ -17,8 +17,19 @@ internal enum class StudioHandle(val left:Boolean=false,val top:Boolean=false,va
  * [StudioControlsRuntime] records, so the editor never draws a mock of a screen: it frames the real control.
  */
 internal object StudioEditorGeometry {
-    /** Matches [StudioControlStyle.problems]: every sized control keeps a 44dp touch target. */
+    /** Comfortable touch target. Below it a control is marked red (owner note 14); it is no longer a hard stop. */
     const val MIN_DP=44f
+    /** The smallest a resize can go, so a control can never vanish under a fingertip. */
+    const val FLOOR_DP=16f
+
+    /** True while a drag would leave the selection too small, overlapping a sibling, or off the screen (red live). */
+    fun dragTrouble(frame:Rect,selected:StudioLiveControl,siblings:List<Rect>,screen:androidx.compose.ui.geometry.Size,minPx:Float):Boolean {
+        if(!selected.isAction)return false
+        if(frame.width<minPx-1 || frame.height<minPx-1)return true
+        if(frame.left< -1 || frame.top< -1 || frame.right>screen.width+1 || frame.bottom>screen.height+1)return true
+        return siblings.any{b->frame.overlaps(b) && !(frame.contains(b.topLeft) && frame.contains(b.bottomRight)) &&
+            !(b.contains(frame.topLeft) && b.contains(frame.bottomRight))}
+    }
     const val GRID_DP=4f
 
     /** The always-mounted table screen; every other screen in the main window is drawn over it. */
@@ -91,11 +102,11 @@ internal object StudioEditorGeometry {
         val w=style.width ?: widthDp;val h=style.height ?: heightDp
         var next=style
         if(handle.left || handle.right) {
-            val nw=snap((if(handle.left)w-dragDp.x else w+dragDp.x),grid).coerceIn(MIN_DP,2000f)
+            val nw=snap((if(handle.left)w-dragDp.x else w+dragDp.x),grid).coerceIn(FLOOR_DP,2000f)
             next=next.copy(width=nw,dx=if(handle.left)snap(style.dx+(w-nw),false).coerceIn(-2000f,2000f) else next.dx)
         }
         if(handle.top || handle.bottom) {
-            val nh=snap((if(handle.top)h-dragDp.y else h+dragDp.y),grid).coerceIn(MIN_DP,4000f)
+            val nh=snap((if(handle.top)h-dragDp.y else h+dragDp.y),grid).coerceIn(FLOOR_DP,4000f)
             next=next.copy(height=nh,dy=if(handle.top)snap(style.dy+(h-nh),false).coerceIn(-4000f,4000f) else next.dy)
         }
         return next
@@ -124,8 +135,8 @@ internal object StudioEditorGeometry {
         style.copy(dx=(style.dx+dxDp).coerceIn(-2000f,2000f),dy=(style.dy+dyDp).coerceIn(-4000f,4000f))
 
     fun resize(style:StudioControlStyle,widthDp:Float,heightDp:Float,dw:Float,dh:Float)=style.copy(
-        width=if(dw==0f)style.width else ((style.width ?: widthDp)+dw).coerceIn(MIN_DP,2000f),
-        height=if(dh==0f)style.height else ((style.height ?: heightDp)+dh).coerceIn(MIN_DP,4000f))
+        width=if(dw==0f)style.width else ((style.width ?: widthDp)+dw).coerceIn(FLOOR_DP,2000f),
+        height=if(dh==0f)style.height else ((style.height ?: heightDp)+dh).coerceIn(FLOOR_DP,4000f))
 
     fun isMeaningfulDrag(drag:Offset,slop:Float)=drag.getDistance()>slop
 }

@@ -17,15 +17,14 @@ internal data class StudioElement(
 internal data class StudioLayout(val elements: List<StudioElement>, val snap: Int = 8,
     val theme: Map<String,String> = emptyMap(),
     val canvasWidth: Float = 412f, val canvasHeight: Float = 928f, val originY: Float = 344f) {
+    /**
+     * Owner feedback note 8: a saved hand design is never thrown out in a game. Small buttons grow to a tappable size
+     * when drawn ([StudioHandCanvas]) instead of the whole design falling back to the native hand with a warning.
+     * Only a viewport that can't be drawn at all is reported.
+     */
     fun viewportProblems(widthDp: Float, fontScale: Float = 1f, heightDp: Float = 928f): List<String> = buildList {
         val scale=widthDp/canvasWidth
-        if(!scale.isFinite() || scale<=0) add("Invalid viewport.")
-        if(elements.any {it.visible && it.kind!="card" && (it.w*scale<44f || it.h*scale<44f)})
-            add("This design needs larger touch targets at this width; native hand retained.")
-        if(elements.any {it.visible && it.kind!="card" && it.fs*fontScale*1.2f>it.h})
-            add("Text size exceeds this design; native hand retained.")
-        if(originY*scale+44f*scale>heightDp-24f)
-            add("The reference hand origin does not fit this orientation; native hand retained.")
+        if(!scale.isFinite() || scale<=0 || !fontScale.isFinite() || !heightDp.isFinite()) add("Invalid viewport.")
     }
     fun colors(base: TableColors): TableColors = theme.entries.fold(base) { colors,(key,value) ->
         parseTableColorHex(value)?.let {colors.withColorRole(if(key=="gold")"counter" else key,it)} ?: colors
@@ -54,8 +53,12 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
                 }) }
         })).toString()
 
+    /**
+     * Hard problems only: a design that is malformed, or that would lock the player out (no Pass, no hand). Owner note 14:
+     * sizes, overlaps, hidden counters/buttons and items past the edge are [advice], never a reason to refuse Apply.
+     */
     fun problems(): List<String> = buildList {
-        if (elements.size !in 8..64) add("Use 8–64 elements.")
+        if (elements.size !in 1..64) add("Use at most 64 elements.")
         if (elements.map { it.id }.distinct().size != elements.size) add("Element IDs must be unique.")
         if (snap !in 1..32) add("Snap must be 1–32.")
         if(!canvasWidth.isFinite() || !canvasHeight.isFinite() || !originY.isFinite() ||
@@ -65,9 +68,9 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
         elements.forEach { e ->
             if (e.id.isBlank() || e.id.length > 64 || e.label.length > 80) add("Invalid element identity or label.")
             if (e.kind !in setOf("button", "metric", "card")) add("Unsupported element kind: ${e.kind}")
-            if (listOf(e.x,e.y,e.w,e.h,e.fs,e.r).any { !it.isFinite() } || e.x < 0 || e.y < originY ||
-                e.w < 24 || e.h < 24 || e.x + e.w > canvasWidth || e.y + e.h > 4000 || e.fs !in 8f..32f || e.r !in 0f..64f)
-                add("${e.id}: geometry is outside the supported hand canvas.")
+            if (listOf(e.x,e.y,e.w,e.h,e.fs,e.r).any { !it.isFinite() } || e.w <= 0 || e.h <= 0 || e.w > 4000 || e.h > 4000 ||
+                kotlin.math.abs(e.x) > 4000 || kotlin.math.abs(e.y) > 8000 || e.fs !in 8f..32f || e.r !in 0f..64f)
+                add("${e.id}: invalid geometry.")
             if (e.kind == "card") {
                 if (e.binding.removePrefix("card").toIntOrNull() !in 0..31 || !e.binding.startsWith("card")) add("${e.id}: invalid hand card slot.")
             } else if (e.binding !in bindings) add("${e.id}: unknown action binding.")
@@ -75,13 +78,22 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
             if (e.textColor != null && parseTableColorHex(e.textColor) == null) add("${e.id}: invalid text color.")
             if(e.icon !in icons) add("${e.id}: unknown icon.")
         }
-        bindings.forEach { b -> if (elements.none { it.kind != "card" && it.binding == b && it.visible }) add("Keep $b reachable.") }
+        // Lock-outs (owner: Pass and the way back can't be hidden). Without a visible card slot the hand can't be played.
+        if (elements.none { it.kind != "card" && it.binding == "pass" && it.visible }) add("Keep Pass visible.")
         if (elements.none { it.kind == "card" && it.binding == "card0" && it.visible }) add("Keep the first hand card slot visible.")
         val slots=elements.filter {it.kind=="card" && it.visible}.mapNotNull {it.binding.removePrefix("card").toIntOrNull()}.sorted()
         if(slots != (0 until slots.size).toList()) add("Hand card slots must be unique and consecutive from card0.")
+    }
+
+    /** Soft advice per element id (owner note 14): shown as red marking in the editor, never blocks Apply. */
+    fun advice(): Map<String,String> = buildMap {
         val visible = elements.filter { it.visible }
+        visible.forEach { e ->
+            if (e.kind != "card" && (e.w < 44 || e.h < 44)) put(e.id, "Hard to tap: smaller than 44.")
+            if (e.x < 0 || e.y < originY || e.x + e.w > canvasWidth) put(e.id, "Partly outside the hand.")
+        }
         visible.forEachIndexed { i, a -> visible.drop(i+1).forEach { b ->
-            if (a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y) add("${a.id} overlaps ${b.id}.")
+            if (a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y) { putIfAbsent(a.id, "Overlaps ${b.label}."); putIfAbsent(b.id, "Overlaps ${a.label}.") }
         } }
     }
 
@@ -151,6 +163,9 @@ internal class StudioHistory(initial: StudioLayout) {
     fun redo() { if (canRedo) { back.addLast(current); current=forward.removeLast() } }
 }
 
+/** One saved Studio layout for every orientation and fold state (owner: "one layout that adapts automatically"). */
+internal const val STUDIO_LAYOUT_KEY = "portrait"
+
 internal class StudioStore(internal val prefs: SharedPreferences, internal val orientation: String,
     internal val profile: String = "Default") {
     init {require(orientation in listOf("portrait","landscape"));require(profile.length in 1..40 && profile.all {it.isLetterOrDigit() || it in " _-"})}
@@ -160,7 +175,9 @@ internal class StudioStore(internal val prefs: SharedPreferences, internal val o
         prefs.getString(k,null)?.let { runCatching { StudioLayout.parse(it) }.getOrNull() }
     }
     fun draft(): StudioLayout? = prefs.getString("${key}_draft",null)?.let { runCatching { StudioLayout.parse(it) }.getOrNull() }
+    /** Owner feedback bug 19: drafts always save (only malformed data, which can't be reloaded, is skipped). */
     fun saveDraft(layout: StudioLayout) { if (layout.problems().isEmpty()) prefs.edit().putString("${key}_draft",layout.json()).apply() }
+    fun clearDraft() { prefs.edit().remove("${key}_draft").apply() }
     fun apply(layout: StudioLayout) {
         check(stage(prefs.edit(),layout).putString("studio_active_v1_$orientation",profile).commit()) { "Could not save layout." }
     }

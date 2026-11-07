@@ -47,8 +47,8 @@ class StudioEditorGeometryTest {
         assertEquals(12f,moved.dx,0f);assertEquals(-8f,moved.dy,0f)
         val left=StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.Left,100f,50f,Offset(-20f,0f))
         assertEquals(120f,left.width!!,0f);assertEquals(-20f,left.dx,0f);assertNull(left.height)
-        val top=StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.TopRight,100f,50f,Offset(10f,30f))
-        assertEquals("never below the 44dp minimum",44f,top.height!!,0f);assertEquals(6f,top.dy,0f);assertEquals(112f,top.width!!,0f)
+        val top=StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.TopRight,100f,50f,Offset(10f,40f))
+        assertEquals("owner note 14: below 44 is allowed (marked red), never below the 16dp floor",StudioEditorGeometry.FLOOR_DP,top.height!!,0f);assertEquals(34f,top.dy,0f);assertEquals(112f,top.width!!,0f)
         assertTrue(StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.BottomRight,100f,50f,Offset(-500f,-500f)).problems().isEmpty())
     }
 

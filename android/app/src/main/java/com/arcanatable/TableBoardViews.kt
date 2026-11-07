@@ -886,7 +886,6 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         return
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-        if (studioGeometryProblems.isNotEmpty()) StudioText("TableBoardViews.Text.77", "Table and player", true, studioGeometryProblems.joinToString("\n"), color = CounterGold)
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 StudioText("TableBoardViews.Text.78", "Table and player", true, "YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)

@@ -278,8 +278,10 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
         DisposableEffect(t) {
             onDispose { TutorialActions.onGesture = null }
         }
-        val studioRuntime = remember(layoutOrientationSuffix, nativeStudioRevision) {
-            if (BuildConfig.STUDIO_ENABLED) StudioControlsRuntime(optionPrefs,layoutOrientationSuffix) else null
+        // Owner feedback bug 24: one Studio layout that adapts, not one per orientation (folding/rotating the Fold
+        // used to swap in a different or default layout). The runtime survives rotation instead of being rebuilt.
+        val studioRuntime = remember(nativeStudioRevision) {
+            if (BuildConfig.STUDIO_ENABLED) StudioControlsRuntime(optionPrefs,STUDIO_LAYOUT_KEY) else null
         }
         SideEffect {studioControlsRuntime=studioRuntime}
         CompositionLocalProvider(LocalStudioControls provides studioRuntime,

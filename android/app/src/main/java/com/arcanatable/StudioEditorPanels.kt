@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.sp
 /** Compact single-row toolbar: fits 344dp (Fold cover) with 44dp+ targets. */
 @Composable
 internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()->Unit,onScreens:()->Unit,onLayers:()->Unit,
-    layersOpen:Boolean,onMore:()->Unit,onApply:()->Unit) {
+    layersOpen:Boolean,onMore:()->Unit,onApply:()->Unit,scrollMode:Boolean?=null,onToggleScroll:()->Unit={}) {
     // Fold cover (~344dp): Apply becomes a 44dp check so the screen name keeps room to be read.
     val narrow=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<380
     Surface(color=darkTableColors.panel,shape=RoundedCornerShape(bottomStart=16.dp,bottomEnd=16.dp),shadowElevation=6.dp,modifier=Modifier.fillMaxWidth().testTag("studio-top-bar")) {
@@ -43,6 +43,8 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
             }
             StudioBarIcon(Icons.AutoMirrored.Filled.Undo,"Undo","studio-undo",enabled=runtime.canUndo){runtime.undo()}
             StudioBarIcon(Icons.AutoMirrored.Filled.Redo,"Redo","studio-redo",enabled=runtime.canRedo){runtime.redo()}
+            if(scrollMode!=null)StudioBarIcon(Icons.Default.PanTool,if(scrollMode)"Scroll mode: tap to edit" else "Scroll the screen",
+                if(scrollMode)"studio-tool-Select" else "studio-tool-Scroll",active=scrollMode,onClick=onToggleScroll)
             StudioBarIcon(Icons.Default.Layers,"Layers","studio-layers",active=layersOpen,onClick=onLayers)
             StudioBarIcon(Icons.Default.MoreVert,"More options","studio-more",onClick=onMore)
             if(narrow)FilledIconButton(onClick=onApply,modifier=Modifier.size(44.dp).testTag("studio-apply"),
