@@ -175,8 +175,31 @@ class GameplayPerfJ12BaselineTest {
 
     private fun f(v: Double) = String.format(java.util.Locale.ROOT, "%.2f", v)
 
+    @Volatile private var lastProgress = System.nanoTime()
+    private fun progress(what: String) { lastProgress = System.nanoTime(); println("J12 progress ${java.time.Instant.now()}: $what") }
+
+    /** Prints the main thread's stack whenever the test makes no progress for 3 minutes, so a CI stall is diagnosable. */
+    private fun startWatchdog(main: Thread): Thread = Thread({
+        try {
+            while (true) {
+                Thread.sleep(30_000)
+                if (System.nanoTime() - lastProgress > 180_000_000_000L) {
+                    println("J12 STALL: no progress for 3 min; main thread state ${main.state}:")
+                    main.stackTrace.take(80).forEach { println("J12 STALL    at $it") }
+                    lastProgress = System.nanoTime()
+                }
+            }
+        } catch (_: InterruptedException) {}
+    }, "j12-watchdog").apply { isDaemon = true; start() }
+
     @Test @Config(sdk = [34], qualifiers = "w344dp-h800dp-port-xhdpi")
     fun studioCostOnBusyFourPlayerTable() {
+        val watchdog = startWatchdog(Thread.currentThread())
+        progress("launching app")
+        try { runMeasurement() } finally { watchdog.interrupt() }
+    }
+
+    private fun runMeasurement() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             UiTestSupport.settle(rule)
             UiTestSupport.playWithArgentum(rule, scenario)
@@ -187,6 +210,7 @@ class GameplayPerfJ12BaselineTest {
                     }
             }
             UiTestSupport.settle(rule, 800)
+            progress("four-seat table ready")
 
             lateinit var runtime: StudioControlsRuntime
             var density = 2f
@@ -199,6 +223,7 @@ class GameplayPerfJ12BaselineTest {
 
             /** One resize edit on a non-required Table action, applied through the real Apply path. */
             fun applyOneEdit() {
+                progress("applying one Studio edit")
                 if (editedId == null) {
                     scenario.onActivity { runtime.begin() }
                     UiTestSupport.settle(rule, 600)
@@ -214,7 +239,7 @@ class GameplayPerfJ12BaselineTest {
                     }
                     if (runtime.editing) scenario.onActivity { runtime.cancel() }
                 } else {
-                    scenario.onActivity { runtime.begin(editedId); runtime.edit(editedId!!, editStyle!!); runtime.apply() }
+                    scenario.onActivity { val id = editedId!!; runtime.begin(id); runtime.edit(id, editStyle!!); runtime.apply() }
                 }
                 UiTestSupport.settle(rule, 800)
                 assertNotNull("found a Table action Studio could apply a resize to", editedId)
@@ -224,8 +249,10 @@ class GameplayPerfJ12BaselineTest {
             var n = 0
             val phases = mutableListOf<Phase>()
             fun measure(name: String) {
+                progress("phase $name: warm-up")
                 repeat(WARMUP) { val m = update(n++); scenario.onActivity { it.tableController!!.handleArgentumMessage(m) }; frames(2) }
                 val updateMs = ArrayList<Double>(); val handleMs = ArrayList<Double>(); val frameMs = ArrayList<Double>()
+                progress("phase $name: measuring")
                 sampler.reset()
                 val changesBefore = recomposerChanges()
                 repeat(MEASURED) {
@@ -237,6 +264,7 @@ class GameplayPerfJ12BaselineTest {
                     frames(2)
                     val t2 = System.nanoTime()
                     sampler.enabled.set(false)
+                    if (it % 40 == 39) progress("phase $name: ${it + 1}/$MEASURED")
                     handleMs += (t1 - t0) / 1e6; frameMs += (t2 - t1) / 1e6; updateMs += (t2 - t0) / 1e6
                 }
                 val changes = recomposerChanges().let { if (it < 0 || changesBefore < 0) -1L else it - changesBefore }
@@ -268,6 +296,7 @@ class GameplayPerfJ12BaselineTest {
                 measure("5 applied again")
             } finally { sampler.close() }
 
+            progress("all phases done")
             report(phases, editedId)
         }
     }

@@ -64,6 +64,15 @@ android {
                 providers.gradleProperty("arcana.robolectricJarDir").orNull?.takeIf { it.isNotBlank() }
                     ?.let { test.systemProperty("robolectric.dependency.dir", it) }
                 test.systemProperty("arcana.screenshots", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
+                // MEASUREMENT BRANCH ONLY (claude-b J12, PR #1034, do not merge): run just the J12 baseline so CI
+                // finishes and its numbers reach the CI log (artifacts can't be read from the measuring sandbox).
+                test.filter {
+                    includeTestsMatching("com.arcanatable.ui.GameplayPerfJ12BaselineTest")
+                    isFailOnNoMatchingTests = false
+                }
+                test.addTestOutputListener { descriptor, event ->
+                    if (descriptor.className?.contains("GameplayPerfJ12") == true) test.logger.lifecycle(event.message.trimEnd())
+                }
             }
         }
     }
