@@ -58,6 +58,7 @@ class HeraldOfSlaaneshIndependentCertificationTest {
         val d = customScenario(HeraldOfSlaanesh)
         val opponent = d.player2
         d.putCreatureOnBattlefield(d.player1, "Herald of Slaanesh")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         val spell = d.putCardInHand(opponent, "Herald of Slaanesh")
         d.giveMana(opponent, Color.RED)
 
