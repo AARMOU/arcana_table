@@ -63,6 +63,18 @@ internal object StudioHandEditing {
         runtime.changeHand(current.copy(elements=current.elements.map{if(it.id==id)update(it) else it}))
     }
 
+    /**
+     * Width stepper. Owner's Studio log (Nov 7): "+ Width" tapped 9 times on a button against the right edge did
+     * nothing, because the width was capped at the space left to its right. Now + always grows: when the right edge
+     * is reached, the button grows to the left instead. − never goes below 24.
+     */
+    fun widen(e:StudioElement,by:Float,canvasWidth:Float):StudioElement {
+        if(by<0)return e.copy(w=(e.w+by).coerceAtLeast(24f))
+        val w=(e.w+by).coerceAtMost(canvasWidth.coerceAtLeast(24f))
+        val x=if(e.x+w>canvasWidth)(canvasWidth-w).coerceAtLeast(0f) else e.x
+        return e.copy(x=minOf(x,e.x),w=w)
+    }
+
     /** Frame of an element in px inside the canvas, given px-per-design-unit. */
     fun frame(e:StudioElement,layout:StudioLayout,unit:Float)=Rect(e.x*unit,(e.y-layout.originY)*unit,(e.x+e.w)*unit,(e.y-layout.originY+e.h)*unit)
 
@@ -166,7 +178,10 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
     val card=e.kind=="card"
     val tabs=StudioInspectorTab.entries
     var tab by remember(e.id){mutableStateOf(StudioInspectorTab.Layout)}
-    fun change(update:(StudioElement)->StudioElement)=StudioHandEditing.edit(runtime,layout,e.id,update)
+    // Owner's Studio log, Nov 7 (lines 324-349): with UNDO picked, "−" still shrank PASS. A function reference (::change)
+    // to this local function counted as equal to the old one, so Compose kept the one holding PASS. A lambda is renewed
+    // whenever the picked item changes.
+    val change:((StudioElement)->StudioElement)->Unit={update->StudioHandEditing.edit(runtime,layout,e.id,update)}
     val palette=layout.colors(runtime.project().colors(darkTableColors)).let {c->listOf("Surface" to c.panel,"Raised" to c.raised,"Accent" to c.accent,
         "Text" to c.text,"Muted" to c.muted,"Gold" to c.counter,"Canvas" to c.background)}
     Surface(modifier.fillMaxWidth().testTag("studio-inspector"),color=darkTableColors.panel,shape=RoundedCornerShape(16.dp),shadowElevation=8.dp) {
@@ -191,10 +206,10 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
-                    StudioInspectorTab.Layout->HandLayoutTab(layout,e,::change)
-                    StudioInspectorTab.Style->HandStyleTab(e,palette,::change)
-                    StudioInspectorTab.Action->HandActionTab(e,::change)
-                    StudioInspectorTab.Arrange->HandArrangeTab(runtime,layout,e,onSelect,::change)
+                    StudioInspectorTab.Layout->HandLayoutTab(layout,e,change)
+                    StudioInspectorTab.Style->HandStyleTab(e,palette,change)
+                    StudioInspectorTab.Action->HandActionTab(e,change)
+                    StudioInspectorTab.Arrange->HandArrangeTab(runtime,layout,e,onSelect,change)
                 }
             }
         }
@@ -219,7 +234,7 @@ private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioEle
         }
     }
     val sizes=@Composable {
-        StudioStepper("Width","${e.w.toInt()}","studio-width",{change{it.copy(w=(it.w-step).coerceAtLeast(24f))}},{change{it.copy(w=(it.w+step).coerceAtMost(layout.canvasWidth-it.x))}})
+        StudioStepper("Width","${e.w.toInt()}","studio-width",{change{StudioHandEditing.widen(it,-step,layout.canvasWidth)}},{change{StudioHandEditing.widen(it,step,layout.canvasWidth)}})
         StudioStepper("Height","${e.h.toInt()}","studio-height",{change{it.copy(h=(it.h-step).coerceAtLeast(24f))}},{change{it.copy(h=it.h+step)}})
     }
     val position=@Composable {Text("X ${e.x.toInt()} · Y ${e.y.toInt()}",color=darkTableColors.muted,fontSize=11.sp)}

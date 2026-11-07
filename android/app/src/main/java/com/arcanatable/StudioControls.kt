@@ -236,7 +236,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun store()=StudioControlStore(prefs,orientation,profile)
     fun record(info:StudioLiveControl,callback:(()->Unit)?) {
         val previous=controls[info.id]
-        val next=info.copy(title=StudioNames.of(info.id) ?: if(info.kind=="container-action" && info.title=="Control")previous?.title ?: info.title else info.title,
+        val next=info.copy(title=StudioNames.of(info.id) ?: StudioNames.orFallback(info.id,if(info.kind=="container-action" && info.title=="Control")previous?.title ?: info.title else info.title),
             bounds=previous?.bounds ?: info.bounds,window=info.window.takeIf{it!=0} ?: previous?.window ?: 0,
             viewportWidth=previous?.viewportWidth ?: info.viewportWidth,viewportHeight=previous?.viewportHeight ?: info.viewportHeight)
         if(previous!=next)controls[info.id]=next
@@ -245,9 +245,13 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     }
     fun remove(id:String){controls.remove(id);callbacks.remove(id);captions.remove(id);liveText.remove(id)}
     fun bounds(id:String,rect:Rect,window:Int,width:Float=0f,height:Float=0f){controls[id]?.let {
-        val child=if(it.kind=="container-action" && !it.captionEditable) controls.values.filter {c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}.minByOrNull{c->c.bounds.top} else null
+        // Owner's Studio log, Nov 7: "Open hand tray" grew to 648 tall and its edits were then logged as "40", because the
+        // caption was re-picked from whatever now sat inside the grown panel. A panel keeps the first caption it found
+        // while that caption is still on screen; only a panel without one looks again.
+        val kept=captions[id]?.let{c->controls[c]}?.takeIf{c->c.window==window && c.bounds.width>0}
+        val child=if(it.kind=="container-action" && !it.captionEditable) kept ?: controls.values.filter {c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}.minByOrNull{c->c.bounds.top} else null
         child?.let{c->captions[id]=c.id}
-        val next=it.copy(title=StudioNames.of(id) ?: child?.title ?: it.title,bounds=rect,window=window,viewportWidth=width,viewportHeight=height)
+        val next=it.copy(title=StudioNames.of(id) ?: child?.title ?: StudioNames.orFallback(id,it.title),bounds=rect,window=window,viewportWidth=width,viewportHeight=height)
         if(next!=it)controls[id]=next
     }}
     fun project()=if(editing)draft else applied
@@ -258,7 +262,8 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         val onScreen=screen ?: controls[id]?.screen
         // Owner, Nov 7: game log entries are all the same kind of item, so resizing one resizes them all. An entry with
         // no edit of its own follows an edited entry built from the same piece of code.
-        val shared=if(project.controls[id]==null && onScreen?.contains("log",ignoreCase=true)==true) {
+        // Only the game log: "Dialogs" also contains "log", so every dialog's items used to copy each other's edits.
+        val shared=if(project.controls[id]==null && StudioNames.isGameLog(onScreen)) {
             val site=id.substringAfter("native:").substringBefore("/")
             project.controls.entries.firstOrNull{(k,_)->k!=id && k.substringAfter("native:").substringBefore("/")==site}?.value
         } else null
@@ -362,7 +367,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     private fun logChange(before:StudioControlProject,after:StudioControlProject,handBefore:StudioLayout?,handAfter:StudioLayout?) {
         (before.controls.keys+after.controls.keys).forEach {id->
             val a=before.controls[id] ?: StudioControlStyle();val b=after.controls[id] ?: StudioControlStyle()
-            if(a!=b)StudioLog.add("Edit ${title(id)} [${controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?"}]: ${StudioLog.diff(a,b)}")
+            if(a!=b)StudioLog.add("Edit ${title(id)} [${StudioNames.screen(controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?")}]: ${StudioLog.diff(a,b)}")
         }
         if(before.hiddenPieces!=after.hiddenPieces)StudioLog.add("Show on screen: hidden ${after.hiddenPieces.sorted().ifEmpty{listOf("nothing")}.joinToString()}")
         if(before.backdrop!=after.backdrop || before.backdropFit!=after.backdropFit || before.backdropDim!=after.backdropDim)
@@ -381,7 +386,19 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         pendingHand?.let{StudioStore(prefs,orientation,profile).saveDraft(it)}
         prefs.edit().putBoolean(pendingHandKey,pendingHand!=null).apply()
     }
-    fun change(project:StudioControlProject,hand:StudioLayout?=pendingHand){if(project!=draft || hand!=pendingHand){
+    /**
+     * Owner rule: Pass and the way back (App menu, Back, Close…) can't be hidden, and Studio never blocks with a refused
+     * Apply (owner's Studio log, Nov 7: "Apply refused: Keep required action App menu reachable"). So hiding one simply
+     * doesn't happen: it stays visible, its Visible switch is off-limits, and the inspector says why in red.
+     */
+    fun mustStayVisible(id:String,project:StudioControlProject=draft)=controls[id]?.requiredNativeAction==true && !hasReplacement(project,id)
+    private fun keepRequiredVisible(project:StudioControlProject):StudioControlProject {
+        val forced=project.controls.filter{(id,style)->!style.visible && mustStayVisible(id,project)}
+        if(forced.isEmpty())return project
+        forced.keys.forEach{StudioLog.add("Kept ${title(it)} visible: it can't be hidden")}
+        return project.copy(controls=project.controls+forced.mapValues{(_,style)->style.copy(visible=true)})
+    }
+    fun change(proposed:StudioControlProject,hand:StudioLayout?=pendingHand){val project=keepRequiredVisible(proposed);if(project!=draft || hand!=pendingHand){
         logChange(draft,project,pendingHand,hand)
         undo.addLast(Revision(draft,pendingHand));if(undo.size>100)undo.removeFirst();redo.clear();draft=project;pendingHand=hand;saveDraft();revision++
     }}
@@ -532,4 +549,51 @@ internal object StudioNames {
         "TableMainLayout.combinedClickable.1" to "Turn label",
     )
     fun of(id:String):String?=names[StudioEditorGeometry.siteOf(id)]
+
+    /**
+     * Owner's Studio log, Nov 7: dozens of items were just "Control" (tappable areas with no words of their own, such as
+     * cards, seat tabs and stack tiles). These names are used only when an item would otherwise be called "Control";
+     * an item with its own words keeps them.
+     */
+    private val fallbacks=mapOf(
+        "TableBoardViews.combinedClickable.6" to "Trackers",
+        "TableBoardViews.combinedClickable.9" to "Card",
+        "TableBoardViews.combinedClickable.10" to "Card preview backdrop",
+        "TableBoardViews.combinedClickable.11" to "Card preview",
+        "ArgentumUi.clickable.1" to "Seat tab",
+        "ArgentumUi.clickable.2" to "Game feed",
+        "ArgentumUi.clickable.3" to "Needs your answer",
+        "ArgentumUi.clickable.5" to "Action options",
+        "ArgentumUi.clickable.6" to "Action options",
+        "ArgentumCombatBoard.combinedClickable.1" to "Blocker",
+        "CombatStackBoard.clickable.1" to "Combat step",
+        "CombatStackBoard.clickable.2" to "Count",
+        "CombatStackBoard.clickable.3" to "Stack pile",
+        "CombatStackBoard.combinedClickable.1" to "Stack item",
+        "ArgentumCardPick.combinedClickable.1" to "Card choice",
+        "ArgentumCardPick.clickable.1" to "Card zoom",
+        "TableHelpers.combinedClickable.1" to "Hand bar",
+        "TableHelpers.combinedClickable.3" to "Player view tab",
+        "BattlefieldLayout.clickable.1" to "Attached cards",
+        "BattlefieldLayout.clickable.2" to "Attached cards",
+        "PlayFeed.combinedClickable.1" to "Played cards tab",
+        "PlayFeed.combinedClickable.2" to "Hide played cards",
+        "PlayFeed.combinedClickable.3" to "Played card",
+        "PlayFeed.combinedClickable.4" to "Ability banner",
+        "PlayFeed.combinedClickable.5" to "Turn recap",
+        "TableOverlaysB.clickable.1" to "Chat panel",
+        "TurnSignals.clickable.1" to "Turn banner",
+        "TableDialogs.combinedClickable.1" to "Card choice",
+        "TableDialogs.clickable.2" to "Game log entry",
+    )
+    /**
+     * Plain names for screens whose code name means nothing to the owner (log: "Table Dialogs 22"). Display only: the
+     * code name stays inside item IDs, so saved edits keep working.
+     */
+    const val GAME_LOG_SCREEN="Table Dialogs 22"
+    private val screens=mapOf(GAME_LOG_SCREEN to "Game log")
+    fun screen(name:String):String=screens[name] ?: name
+    fun isGameLog(screen:String?)=screen==GAME_LOG_SCREEN
+    /** [title] unless it is the bare "Control" placeholder and this site has a plain name. */
+    fun orFallback(id:String,title:String):String=if(title=="Control")fallbacks[StudioEditorGeometry.siteOf(id)] ?: title else title
 }

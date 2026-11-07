@@ -99,6 +99,68 @@ class StudioEditorShellUiTest {
         assertEquals("three taps, three changes: $heights",3,heights.distinct().size)
     }
 
+    /**
+     * Owner's Studio log, Nov 7 (lines 324-349): Pass shrunk to 24 wide, then nine "+ Width" taps made no edit. Pass sat
+     * against the right edge, where + was capped at the space left. Each tap must change the size and the shown value.
+     */
+    @Test fun handWidthStepperWorksAt24AgainstTheRightEdge() {
+        render()
+        openHandScreen()
+        val start=hand()
+        rule.runOnIdle{runtime.changeHand(start.copy(elements=start.elements.map{
+            if(it.id=="pass")it.copy(x=start.canvasWidth-24f,w=24f) else it}))}
+        rule.waitForIdle()
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint("pass"))};rule.waitForIdle()
+        rule.onNodeWithTag("studio-width-value").performScrollTo().assertTextEquals("24")
+        rule.onNodeWithTag("studio-width-minus").performScrollTo().performClick();rule.waitForIdle()
+        assertEquals("− at 24 stays 24",24f,hand().elements.single{it.id=="pass"}.w,0f)
+        val widths=mutableListOf<Float>()
+        repeat(4) {
+            rule.onNodeWithTag("studio-width-plus").performScrollTo().performClick();rule.waitForIdle()
+            val w=hand().elements.single{it.id=="pass"}.w;widths+=w
+            rule.onNodeWithTag("studio-width-value").assertTextEquals("${w.toInt()}")
+        }
+        assertEquals("four taps, four changes: $widths",4,widths.distinct().size)
+        assertTrue("grows by moving left, staying on screen",hand().elements.single{it.id=="pass"}.let{it.x+it.w<=start.canvasWidth+0.01f})
+    }
+
+    /**
+     * Owner's Studio log, Nov 7 (lines 324-349): after picking UNDO, "−" kept shrinking PASS while "+" grew UNDO. Each
+     * stepper must edit the item the panel shows, whichever item was picked before.
+     */
+    @Test fun handSteppersEditTheNewlyPickedItemNotThePreviousOne() {
+        render()
+        openHandScreen()
+        fun w(id:String)=hand().elements.single{it.id==id}.w
+        fun pick(id:String){rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint(id))};rule.waitForIdle()}
+        pick("pass")
+        rule.onNodeWithTag("studio-width-minus").performScrollTo().performClick();rule.waitForIdle()
+        val pass=w("pass");val undo=w("undo")
+        pick("undo")
+        rule.onNodeWithTag("studio-width-value").performScrollTo().assertTextEquals("${undo.toInt()}")
+        rule.onNodeWithTag("studio-width-minus").performScrollTo().performClick();rule.waitForIdle()
+        assertEquals("− left PASS alone",pass,w("pass"),0f)
+        assertTrue("− shrank UNDO",w("undo")<undo)
+        rule.onNodeWithTag("studio-width-value").assertTextEquals("${w("undo").toInt()}")
+        val afterMinus=w("undo")
+        rule.onNodeWithTag("studio-width-plus").performScrollTo().performClick();rule.waitForIdle()
+        assertTrue("+ grew UNDO",w("undo")>afterMinus);assertEquals(pass,w("pass"),0f)
+    }
+
+    /** The same for buttons on the live screen: after picking another control, the steppers edit that control. */
+    @Test fun sizeSteppersEditTheNewlyPickedControl() {
+        render()
+        val play=control("Play").id;val decks=control("Decks").id
+        tapCanvas(bounds("play").center);rule.waitForIdle()
+        rule.onNodeWithTag("studio-width-plus").performClick();rule.waitForIdle()
+        val playWidth=runtime.style(play).width
+        tapCanvas(bounds("decks").center);rule.waitForIdle()
+        assertEquals(decks,runtime.selected)
+        rule.onNodeWithTag("studio-width-plus").performClick();rule.waitForIdle()
+        assertEquals("Play untouched",playWidth,runtime.style(play).width)
+        assertNotNull("Decks resized",runtime.style(decks).width)
+    }
+
     @Test fun directDragMovesTheRealControlAndIsOneUndoStep() {
         render()
         val before=bounds("play")

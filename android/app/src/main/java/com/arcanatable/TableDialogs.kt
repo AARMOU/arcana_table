@@ -2217,7 +2217,7 @@ internal fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = n
     }
     // Paginate expanded events to keep thousand-trigger turns responsive.
     var expandedCounts by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    StudioDialog("Table Dialogs 22", onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    StudioDialog(StudioNames.GAME_LOG_SCREEN, onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.82f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

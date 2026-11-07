@@ -36,8 +36,14 @@ class StudioControlsTest {
         val menu="native:TableMainLayout.IconButton.2/10"
         runtime.record(StudioLiveControl(menu,"Table","icon-action","App menu",true),{})
         runtime.begin(menu);runtime.edit(menu,StudioControlStyle(visible=false))
-        assertTrue(runtime.problems().any{it.contains("required action")})
-        runtime.duplicate(menu,1f);assertTrue(runtime.problems().isEmpty())
+        // Owner's Studio log, Nov 7: no refused Apply. The hide simply doesn't happen, so there is nothing to refuse.
+        assertTrue("the way back stays visible",runtime.style(menu).visible)
+        assertTrue(runtime.mustStayVisible(menu))
+        assertTrue(runtime.problems().isEmpty())
+        runtime.duplicate(menu,1f)
+        assertFalse("a visible stand-in lets the original hide",runtime.mustStayVisible(menu))
+        runtime.edit(menu,StudioControlStyle(visible=false))
+        assertFalse(runtime.style(menu).visible);assertTrue(runtime.problems().isEmpty())
     }
     @Test fun informationBindingsRejectActionsAndOtherWindows() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")

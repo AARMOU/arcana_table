@@ -38,7 +38,7 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
             StudioBarIcon(Icons.Default.Close,"Close Studio","studio-close",onClick=onClose)
             // A plain label: screens are chosen from the always-visible screen bar below.
             Column(Modifier.weight(1f).heightIn(min=44.dp).padding(horizontal=if(narrow)2.dp else 6.dp).testTag("studio-screen-title"),verticalArrangement=Arrangement.Center) {
-                Text(screen,color=darkTableColors.text,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
+                Text(StudioNames.screen(screen),color=darkTableColors.text,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
                 Text(runtime.profile,color=darkTableColors.muted,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
             }
             StudioBarIcon(Icons.AutoMirrored.Filled.Undo,"Undo","studio-undo",enabled=runtime.canUndo){runtime.undo()}
@@ -104,7 +104,7 @@ internal fun StudioLayersPanel(runtime:StudioControlsRuntime,window:Int,onDismis
                 items(rows,key={it.id}) {c->
                     val style=runtime.style(c.id)
                     StudioListRow((if(c.isAction)"▣ " else "▤ ")+c.title.ifBlank{"Untitled"},runtime.selected==c.id,"studio-layer-row",trailing={
-                        IconButton(onClick={runtime.edit(c.id,style.copy(visible=!style.visible))},modifier=Modifier.size(44.dp).testTag("studio-layer-eye")) {
+                        IconButton(onClick={runtime.edit(c.id,style.copy(visible=!style.visible))},enabled=!style.visible || !runtime.mustStayVisible(c.id),modifier=Modifier.size(44.dp).testTag("studio-layer-eye")) {
                             Icon(if(style.visible)Icons.Default.Visibility else Icons.Default.VisibilityOff,if(style.visible)"Hide ${c.title}" else "Show ${c.title}",
                                 tint=if(style.visible)darkTableColors.text else darkTableColors.muted)
                         }

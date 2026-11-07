@@ -51,7 +51,10 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
     if(tab !in tabs)tab=StudioInspectorTab.Layout
     val widthDp=control.bounds.width/density;val heightDp=control.bounds.height/density
     // Several selected: every change made here goes to all of them (sizes and moves by the same amount).
-    fun change(update:(StudioControlStyle)->StudioControlStyle) {
+    // Owner's Studio log, Nov 7: after picking another item, "−" still edited the item picked before. This was a
+    // function reference (::change); two references to the same local function count as equal, so Compose kept the old
+    // one, still holding the old item. A lambda is renewed whenever the item it edits changes.
+    val change:((StudioControlStyle)->StudioControlStyle)->Unit={update->
         val next=update(runtime.style(control.id))
         if(runtime.group.isEmpty() || control.id!=runtime.selected)runtime.edit(control.id,next) else runtime.editGroup(next,density)
     }
@@ -63,7 +66,7 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start=4.dp)) {
                     Text(if(runtime.group.isEmpty())control.title.ifBlank{"Untitled"} else "$many selected",color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
-                    Text("${control.screen} · ${kindName(control.kind)} · ${kotlin.math.round(widthDp).toInt()}×${kotlin.math.round(heightDp).toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
+                    Text("${StudioNames.screen(control.screen)} · ${kindName(control.kind)} · ${kotlin.math.round(widthDp).toInt()}×${kotlin.math.round(heightDp).toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
                     // Owner, Nov 7: multi-select needs to be findable. Shown only when there are others like this one.
                     val like=remember(control.id,runtime.controls.size){runtime.controls.values.count{it.id!=control.id && it.screen==control.screen &&
                         StudioEditorGeometry.siteOf(it.id)==StudioEditorGeometry.siteOf(control.id)}}
@@ -94,10 +97,10 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
-                    StudioInspectorTab.Layout->LayoutTab(style,widthDp,heightDp,::change)
-                    StudioInspectorTab.Style->StyleTab(style,caps,palette,::change)
-                    StudioInspectorTab.Action->ActionTab(runtime,control,style,caps,::change)
-                    StudioInspectorTab.Arrange->ArrangeTab(runtime,control,style,caps,density,::change,onMessage)
+                    StudioInspectorTab.Layout->LayoutTab(style,widthDp,heightDp,change)
+                    StudioInspectorTab.Style->StyleTab(style,caps,palette,change)
+                    StudioInspectorTab.Action->ActionTab(runtime,control,style,caps,change)
+                    StudioInspectorTab.Arrange->ArrangeTab(runtime,control,style,caps,density,change,onMessage)
                 }
             }
         }
@@ -206,7 +209,7 @@ private fun ArrangeTab(runtime:StudioControlsRuntime,control:StudioLiveControl,s
     change:((StudioControlStyle)->StudioControlStyle)->Unit,onMessage:(String)->Unit) {
     Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)) {
         Text("Visible",color=darkTableColors.text,modifier=Modifier.weight(1f))
-        Switch(style.visible,{v->change{it.copy(visible=v)}},modifier=Modifier.testTag("studio-visible"))
+        Switch(style.visible,{v->change{it.copy(visible=v)}},enabled=!style.visible || !runtime.mustStayVisible(control.id),modifier=Modifier.testTag("studio-visible"))
     }
     StudioStepper("Layer",style.layer.toInt().toString(),"studio-layer",{change{it.copy(layer=(it.layer-1f).coerceIn(-100f,100f))}},
         {change{it.copy(layer=(it.layer+1f).coerceIn(-100f,100f))}})
@@ -219,7 +222,8 @@ private fun ArrangeTab(runtime:StudioControlsRuntime,control:StudioLiveControl,s
             runtime.change(runtime.draft.copy(controls=runtime.draft.controls-control.id))
         }
     }
-    if(control.requiredNativeAction)Text("Required game action: hiding or rebinding it needs a visible replacement.",color=darkTableColors.counter,fontSize=11.sp)
+    if(control.requiredNativeAction)Text("Can't be hidden: the game needs it (or it's your way back). A visible duplicate can stand in for it.",
+        color=Color(0xFFE5534B),fontSize=11.sp,modifier=Modifier.testTag("studio-required-note"))
 }
 
 @Composable
