@@ -129,10 +129,10 @@ index 0000000000..d9d2b59cdf
 +    }
 +})
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 9b82720e6b..7f6e6cb2e4 100644
+index 43fc9f1b75..c60097ec41 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11886,6 +11886,14 @@ in the declare-blockers step, even before the turn-based block action has comple
+@@ -11905,6 +11905,14 @@ in the declare-blockers step, even before the turn-based block action has comple
    `mechanics/combat`) is the shared reader — `AttackPhaseManager` validates with it and the AI
    repairs its planned attack with it. Honors face-down, lost abilities, Room faces and
    `ConditionalStaticAbility` wrappers. `staticAbility { ability = OpponentsMustAttackYou }`.
@@ -148,7 +148,7 @@ index 9b82720e6b..7f6e6cb2e4 100644
    "change the target of target spell or ability with a single target" (Willbender). The two knobs
    are Reflecting Mirror's printed restrictions: fire only when the spell's single target is *you*,
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 9442f1bebb..abf4eee468 100644
+index 11bb093a5d..dddb9f8ce3 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1997,6 +1997,7 @@ Families:
@@ -187,10 +187,10 @@ index d4daf46776..8fde11961f 100644
   * Sentence-subject rendering of an attacker filter: "creature with flying" → "Creatures with
   * flying". This string is user-visible — it is the attack-rejection message and the label of a
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 4c8ab5c995..45afd44bb6 100644
+index 1dfe7d3548..7db1c80eaa 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1527,6 +1527,7 @@ MustBlock — StaticAbility
+@@ -1526,6 +1526,7 @@ MustBlock — StaticAbility
  MustBlockEachAttacker — StaticAbility
  NoMaximumHandSize — StaticAbility
  NoncombatDamageBonus — StaticAbility

@@ -23,10 +23,10 @@ index d4e2a55b80..b6f3370fc7 100644
              is DynamicAmount.LastKnownSourceCounters, is DynamicAmount.LastKnownDamageDealtToSource,
              is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-index 674fbce85f..ff13aea7df 100644
+index fed6870369..fea45868d8 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-@@ -259,6 +259,7 @@ object CardIntentAnalyzer {
+@@ -270,6 +270,7 @@ object CardIntentAnalyzer {
          var expiringPump = false
          var pumpToughness = 0
          var expiringGroupPump = false
@@ -34,7 +34,7 @@ index 674fbce85f..ff13aea7df 100644
          // Hand selection reads gated interiors too — see [handSelectionLeaves] for why only here.
          val handLeaves = scripts.flatMap { script ->
              EffectWalker.slots(script).map { it.effect } +
-@@ -289,6 +290,13 @@ object CardIntentAnalyzer {
+@@ -301,6 +302,13 @@ object CardIntentAnalyzer {
              if (isExpiringCopy(effect)) expiringPump = true
          }
  
@@ -48,7 +48,7 @@ index 674fbce85f..ff13aea7df 100644
          var anthemBonus = 0
          for (static in scripts.flatMap { it.staticAbilities }) {
              tags += tagsOf(static)
-@@ -316,7 +324,7 @@ object CardIntentAnalyzer {
+@@ -328,7 +336,7 @@ object CardIntentAnalyzer {
          // A protective keyword that wears off at cleanup (Withstand Death's indestructible) is the
          // same trick without the stats: spent on a fight or on removal on the stack, or wasted.
          val speed = speedOf(card, scripts, tags)
@@ -57,7 +57,7 @@ index 674fbce85f..ff13aea7df 100644
  
          val repeatable = repeatableOf(card, scripts)
          val arrivalTags = arrivalTagsOf(card, scripts, tags)
-@@ -1656,6 +1664,29 @@ object CardIntentAnalyzer {
+@@ -1967,6 +1975,29 @@ object CardIntentAnalyzer {
                  isExpiringPump(it) && (it as ModifyStatsEffect).target == EffectTarget.IterationEntity
              }
  

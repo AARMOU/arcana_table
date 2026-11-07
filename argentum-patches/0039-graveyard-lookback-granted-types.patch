@@ -15,10 +15,10 @@ Subject: [PATCH] arcana: 0039-graveyard-lookback-granted-types
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/layers/GraveyardLookBackCardTypeTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 5aadedab0c..c1bdf75f31 100644
+index e04da8ae5a..294f48063d 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -9272,7 +9272,11 @@ in the repo today):
+@@ -9291,7 +9291,11 @@ in the repo today):
    etc.), regardless of how many or where they went. For the common "leave your graveyard
    **during your turn**" wording, add `triggerRestriction = Conditions.IsYourTurn`; for "this
    ability triggers only once each turn", add `oncePerTurn = true`. (Attuned Hunter, Kishla
@@ -31,7 +31,7 @@ index 5aadedab0c..c1bdf75f31 100644
  - `Triggers.oneOrMore(filter).putIntoExile(from, includeTokens)` — batching trigger; fires once per event
    batch when one or more matching **cards** are put into exile from any of `fromZones` (default:
    graveyard and battlefield). Left unfiltered it is **not** scoped to one player's zones —
-@@ -11190,7 +11194,8 @@ staticAbility {
+@@ -11209,7 +11213,8 @@ staticAbility {
    battlefield only `filter`'s **card predicates** qualify an object (read against printed characteristics); its
    controller half is replaced by "spells the source's controller controls" / "cards that player owns". Honored by the
    `ProjectedState.crossZoneGrantedCardTypes` overlay, which `PredicateEvaluator`'s type predicates, cast triggers,
@@ -54,10 +54,10 @@ index 2c31c35e2b..f959588830 100644
          subclass(EmblemSourceComponent::class)
          subclass(EmblemActivatedAbilityComponent::class)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-index 8386b423a1..70ce88ebf7 100644
+index 91c16e1f31..84d1a1c6b8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-@@ -3033,7 +3033,12 @@ class TriggerDetector(
+@@ -3036,7 +3036,12 @@ class TriggerDetector(
  
                  // Which of the moved cards match the filter
                  val matchingIds = ownerEvents
@@ -71,7 +71,7 @@ index 8386b423a1..70ce88ebf7 100644
                      .map { it.entityId }
                  val hasMatch = matchingIds.isNotEmpty()
                  if (hasMatch && trigger.firstTimeEachTurn &&
-@@ -3090,8 +3095,13 @@ class TriggerDetector(
+@@ -3093,8 +3098,13 @@ class TriggerDetector(
                  val ownerEvents = fromGravByOwner[controllerId] ?: continue
  
                  // Check if any of the departed cards match the filter
@@ -86,7 +86,7 @@ index 8386b423a1..70ce88ebf7 100644
                  }
  
                  if (hasMatch) {
-@@ -3148,7 +3158,12 @@ class TriggerDetector(
+@@ -3151,7 +3161,12 @@ class TriggerDetector(
                              state = state,
                              entityId = event.entityId,
                              filter = trigger.filter,
@@ -100,7 +100,7 @@ index 8386b423a1..70ce88ebf7 100644
                          )
                  }.map { it.entityId }
                  if (matchingIds.isEmpty()) continue
-@@ -3199,6 +3214,12 @@ class TriggerDetector(
+@@ -3202,6 +3217,12 @@ class TriggerDetector(
       * matches [filter] for graveyard batching triggers. Card-characteristic predicates are
       * evaluated against the card's base [CardComponent]; [GameObjectFilter.Any] always matches.
       */
@@ -113,7 +113,7 @@ index 8386b423a1..70ce88ebf7 100644
      /**
       * "For the first time each turn": did a card matching [filter] reach [ownerId]'s graveyard this
       * turn *before* the current batch? The owner's [CardsPutIntoGraveyardThisTurnComponent] already
-@@ -3218,14 +3239,19 @@ class TriggerDetector(
+@@ -3221,14 +3242,19 @@ class TriggerDetector(
              val at = earlier.lastIndexOf(event.entityId)
              if (at >= 0) earlier.removeAt(at)
          }
@@ -135,7 +135,7 @@ index 8386b423a1..70ce88ebf7 100644
      ): Boolean {
          // Tokens aren't cards (CR 111.6), so a token put into a graveyard never satisfies a
          // "one or more [permanent] cards are put into your graveyard" trigger — even though it
-@@ -3236,7 +3262,12 @@ class TriggerDetector(
+@@ -3239,7 +3265,12 @@ class TriggerDetector(
          val entity = state.getEntity(entityId) ?: return false
          if (!includeTokens && entity.has<TokenComponent>()) return false
          if (filter == GameObjectFilter.Any) return true

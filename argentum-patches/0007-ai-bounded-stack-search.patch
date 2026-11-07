@@ -17,7 +17,7 @@ Subject: [PATCH] arcana: 0007-ai-bounded-stack-search
  create mode 100644 ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index 66d6743d11..a54e46588d 100644
+index 4c555c0673..d3e868209b 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 @@ -57,6 +57,8 @@ class AIPlayer(
@@ -63,7 +63,7 @@ index 66d6743d11..a54e46588d 100644
      }
  
      /**
-@@ -434,6 +444,7 @@ class AIPlayer(
+@@ -437,6 +447,7 @@ class AIPlayer(
                  responder = responder,
                  useMeaningfulFilter = profile.useMeaningfulFilter,
                  opponentKnowledge = opponentKnowledge,
@@ -72,7 +72,7 @@ index 66d6743d11..a54e46588d 100644
          }
  
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
-index 2be816fce4..cb366f3d3d 100644
+index 57327c6510..c4b40cc3c8 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
 @@ -49,6 +49,7 @@ class GameSimulator(
@@ -122,7 +122,7 @@ index 2be816fce4..cb366f3d3d 100644
          val pending = state.pendingDecision
              ?: return SimulationResult.Illegal(state, emptyList(), "No pending decision")
          val action = SubmitDecision(pending.playerId, response)
-@@ -198,6 +217,10 @@ class GameSimulator(
+@@ -210,6 +229,10 @@ class GameSimulator(
                  return SimulationResult.Terminal(current.state, allEvents)
              }
  
@@ -133,7 +133,7 @@ index 2be816fce4..cb366f3d3d 100644
              // Auto-resolve trivial decisions; use decisionResolver for non-trivial ones
              if (current.outcome is Outcome.Paused) {
                  val decision = current.pendingDecision!!
-@@ -236,6 +259,7 @@ class GameSimulator(
+@@ -248,6 +271,7 @@ class GameSimulator(
                              isResolving = false
                          }
                      }
@@ -189,10 +189,10 @@ index 1e879c8d4f..8dbfd3c754 100644
       *
       * Two consumers, two answers, and the difference is whether the caller is producing a *move* or
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index 5d2caa89b6..3fc0195514 100644
+index e039398b7d..713a28af0b 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-@@ -362,7 +362,7 @@ class Strategist(
+@@ -382,7 +382,7 @@ class Strategist(
          // returns a single DeclareAttackers/DeclareBlockers with an empty default map).
          val combatAction = legalActions.find { it.actionType == "DeclareAttackers" || it.actionType == "DeclareBlockers" }
          if (combatAction != null) {
@@ -201,7 +201,7 @@ index 5d2caa89b6..3fc0195514 100644
                  if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
              }
              return handleCombatDeclaration(evaluationState, combatAction, playerId, budget, startNanos)
-@@ -381,7 +381,7 @@ class Strategist(
+@@ -401,7 +401,7 @@ class Strategist(
              } else {
                  single
              }
@@ -210,7 +210,7 @@ index 5d2caa89b6..3fc0195514 100644
                  if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
              }
              return only.copy(action = chooseCommittedTargets(state, only, playerId, budget))
-@@ -390,7 +390,9 @@ class Strategist(
+@@ -410,7 +410,9 @@ class Strategist(
          val pass = legalActions.find { it.actionType == "PassPriority" }
          val candidates = if (forcedPlay) {
              legalActions.filter { it.affordable && !it.hasUnfillableTargetRequirement }
@@ -221,7 +221,7 @@ index 5d2caa89b6..3fc0195514 100644
          // A forced play has to play *something*, so nothing is vetoed there.
          val aimed = if (targetPolarityFromEffect && !forcedPlay) {
              candidates.filterNot { TargetSelection.aimsOnlyAtTheWrongSide(state, it, playerId, intents) }
-@@ -401,7 +403,7 @@ class Strategist(
+@@ -421,7 +423,7 @@ class Strategist(
  
          if (affordable.isEmpty()) return pass ?: legalActions.first()
  

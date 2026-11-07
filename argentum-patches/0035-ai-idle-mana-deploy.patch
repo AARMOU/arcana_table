@@ -14,7 +14,7 @@ Subject: [PATCH] arcana: 0035-ai-idle-mana-deploy
  create mode 100644 ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index a54e46588d..54b816ed33 100644
+index d3e868209b..cbb5a2e2e7 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 @@ -401,6 +401,7 @@ class AIPlayer(
@@ -26,7 +26,7 @@ index a54e46588d..54b816ed33 100644
                      defendPlaneswalkers = profile.defendPlaneswalkers,
                      spendFuelWalkers = profile.spendFuelWalkers,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
-index 74b224affa..670ccd3c62 100644
+index 451d3d0e9b..299b87bfa9 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 @@ -566,6 +566,32 @@ data class AiProfile(
@@ -62,7 +62,7 @@ index 74b224affa..670ccd3c62 100644
      /**
       * Score `ThreatAssessment`'s evasion term the way it reads after an attack, so attacking with a
       * flier the opponent cannot block stops reading as a loss.
-@@ -1579,11 +1605,21 @@ data class AiProfile(
+@@ -1618,11 +1644,21 @@ data class AiProfile(
          val LEGACY_V0 = AiProfile(id = "v0")
  
          /**
@@ -89,10 +89,10 @@ index 74b224affa..670ccd3c62 100644
          /**
           * What a player faced in a real game **up to 2026-08-07**, when
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index 3fc0195514..efc75f396f 100644
+index 713a28af0b..7f2875c0f3 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-@@ -189,6 +189,11 @@ class Strategist(
+@@ -192,6 +192,11 @@ class Strategist(
       * permanent cast. See [deploymentCredit].
       */
      private val permanentCastIsNotCardLoss: Boolean = false,
@@ -104,7 +104,7 @@ index 3fc0195514..efc75f396f 100644
      /**
       * [AiProfile.fuelLoyaltyIsNotBoardValue] — refund the board price of loyalty a minus-only
       * planeswalker spends on a loyalty ability. See [fuelLoyaltyCredit].
-@@ -842,8 +847,17 @@ class Strategist(
+@@ -879,8 +884,17 @@ class Strategist(
      private fun sacrificesItself(state: GameState, action: GameAction): Boolean {
          val activation = action as? ActivateAbility ?: return false
          val card = state.getEntity(activation.sourceId)?.get<CardComponent>() ?: return false
@@ -123,21 +123,21 @@ index 3fc0195514..efc75f396f 100644
          return when (val cost = ability.cost) {
              is AbilityCost.SacrificeSelf -> true
              is AbilityCost.Composite -> cost.costs.any { it is AbilityCost.SacrificeSelf }
-@@ -1042,10 +1056,12 @@ class Strategist(
-         val deployed = deploymentCredit(state, action, leafState, playerId)
+@@ -1080,10 +1094,12 @@ class Strategist(
          val fuel = fuelLoyaltyCredit(state, action, leafState, playerId)
-         val ban = castBanCredit(state, action, playerId)
--        val credit = deployed + fuel + ban
+         val ban = turnDenialCredit(state, action, playerId)
+         val freeTap = freeTapCredit(state, action, leafState, playerId)
+-        val credit = deployed + fuel + ban + freeTap
 +        val idleMana = idleManaCredit(state, action, leafState, playerId)
-+        val credit = deployed + fuel + ban + idleMana
++        val credit = deployed + fuel + ban + freeTap + idleMana
          val leafScore = rawLeafScore + credit
          val creditNote = listOfNotNull(
              if (deployed > 0.0) "deployed, not spent %+.2f".format(deployed) else null,
 +            if (idleMana > 0.0) "mana held for no instant %+.2f".format(idleMana) else null,
              if (fuel > 0.0) "loyalty is only fuel %+.2f".format(fuel) else null,
-             if (ban > 0.0) "ban denies their turn %+.2f".format(ban) else null,
-         ).joinToString("; ").ifEmpty { null }
-@@ -1750,6 +1766,58 @@ class Strategist(
+             if (ban > 0.0) "denies their turn %+.2f".format(ban) else null,
+             if (freeTap > 0.0) "tap is free: it untaps before it is needed %+.2f".format(freeTap) else null,
+@@ -1847,6 +1863,58 @@ class Strategist(
          return charge.coerceAtLeast(0.0)
      }
  
@@ -194,8 +194,8 @@ index 3fc0195514..efc75f396f 100644
 +    }
 +
      /**
-      * What the evaluator charged for the loyalty a loyalty ability spent, refunded when the walker
-      * can only ever spend it — [AiProfile.fuelLoyaltyIsNotBoardValue].
+      * The tap a creature's self-tapping ability pays, refunded where the tap costs nothing —
+      * [AiProfile.tapToPingAtTheirEndStep]. In an opponent's turn after blockers, with our turn
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 new file mode 100644
 index 0000000000..bc9d0fec20

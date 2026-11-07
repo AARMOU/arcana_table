@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0016-granted-keyword-mana-value-cap
  6 files changed, 74 insertions(+), 15 deletions(-)
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index c0bc043d08..1b8120d2f1 100644
+index 5b96eee5f5..5a415fa173 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -13577,7 +13577,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13596,7 +13596,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    has left. The legal action carries `maxAdditionalManaForCounters` (a picker bound; the client shows an
    amount selector before mana payment). Only creature *spells* as cast — never a permanent put onto the
    battlefield by an effect.
@@ -26,7 +26,7 @@ index c0bc043d08..1b8120d2f1 100644
    permanent is on the battlefield, spells its controller casts matching `spellFilter` effectively have `keyword`
    ("you cast" semantics). `fromZone` narrows it to spells cast **from** that zone — "Spells you cast from exile have
    convoke" (**Hoarding Broodlord**: `GrantKeywordToOwnSpells(CONVOKE, GameObjectFilter.Any, fromZone = Zone.EXILE)`).
-@@ -13593,6 +13593,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13612,6 +13612,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    - **Cost-modifying keywords** (CONVOKE, DELVE, IMPROVISE) surface in the cast enumerator / alternative-payment handler —
      e.g. **Eirdu, Carrier of Dawn** (`GrantKeywordToOwnSpells(CONVOKE, Creature)`), **Teval, Arbiter of Virtue**
      (`DELVE`), **Ironheart, Clever Champion** (`IMPROVISE`, `GameObjectFilter.Noncreature`).
@@ -43,7 +43,7 @@ index c0bc043d08..1b8120d2f1 100644
      `GrantedKeywordResolver.countGrants` when `CastSpellHandler` builds the spell's storm triggers — one storm
      instance per matching grant (CR 702.40b), added to the printed-keyword count. **Prismari, the Inspiration** =
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 87c9774500..b87eb70e14 100644
+index 10ceadbbad..aa04539025 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1934,7 +1934,7 @@ Families:

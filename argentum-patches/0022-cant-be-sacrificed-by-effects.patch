@@ -13,10 +13,10 @@ Subject: [PATCH] arcana: 0022-cant-be-sacrificed-by-effects
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 1b8120d2f1..483fc579b0 100644
+index 5a415fa173..87500c28ba 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11353,7 +11353,8 @@ staticAbility {
+@@ -11372,7 +11372,8 @@ staticAbility {
    abilities including mana abilities (Ashnod's Altar, auto-pay included). It is per permanent, as the
    ruling reads it: an artifact creature can't pay "Sacrifice an artifact", a noncreature artifact
    still can. Sacrifices a resolving spell or ability performs (edicts, exploit, "unless you

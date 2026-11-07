@@ -14,7 +14,7 @@ Subject: [PATCH] arcana: 0012-colorless-hybrid-sdk
  create mode 100644 mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/core/ColorlessHybridManaSdkTest.kt
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 0cd9d04f16..87c9774500 100644
+index d0c486f1cb..10ceadbbad 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1454,6 +1454,7 @@ Families:
@@ -168,10 +168,10 @@ index 0000000000..6a8cc50932
 +    }
 +})
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 5d80be75ea..40e85b0f32 100644
+index 632caaff7f..5c5485742a 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1130,6 +1130,7 @@ ManaSpellRider.MakesSpellUncounterable — ManaSpellRider
+@@ -1129,6 +1129,7 @@ ManaSpellRider.MakesSpellUncounterable — ManaSpellRider
  ManaSpellRider.ScryOnSharedTypeWithCommander — ManaSpellRider
  ManaSymbol.Colored — ManaSymbol
  ManaSymbol.Colorless — ManaSymbol

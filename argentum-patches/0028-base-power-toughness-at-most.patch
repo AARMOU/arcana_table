@@ -20,10 +20,10 @@ Subject: [PATCH] arcana: 0028-base-power-toughness-at-most
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BasePowerOrToughnessAtMostTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 7f6e6cb2e4..75c683f9a6 100644
+index c60097ec41..f8233618cd 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -7401,6 +7401,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
+@@ -7420,6 +7420,12 @@ This is the player-arm prerequisite for the planned composable mixed `TargetUnio
    P/T (as `.powerGreaterThanBase()` does); elsewhere it reads the printed value. Rapid Augmenter ("another creature you
    control with base power 1 enters"), Sword of the Squeak ("for each creature you control with base power or
    toughness 1"). `.powerGreaterThanBase()` above compares current power against this same base.
@@ -37,7 +37,7 @@ index 7f6e6cb2e4..75c683f9a6 100644
    entity. Reads the live `SpellOnStackComponent` buckets while the entity is still a spell, or the
    `CastRecordComponent` snapshot once it has resolved onto the battlefield (0 if it was never cast).
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index abf4eee468..d779ed6e6c 100644
+index dddb9f8ce3..fc3580e42c 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -178,7 +178,9 @@ Families:
@@ -106,7 +106,7 @@ index 6518c8509e..1703ed5ab1 100644
      @Serializable
      data class PowerAtMost(val max: Int) : CardPredicate {
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 45afd44bb6..4bba517601 100644
+index 7db1c80eaa..11ac0b8855 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -81,7 +81,9 @@ CardMeasure.DistinctCardTypes — CardMeasure

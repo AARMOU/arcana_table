@@ -17,10 +17,10 @@ Subject: [PATCH] arcana: 0032-per-player-target-binding
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 75c683f9a6..ca3df71e0e 100644
+index f8233618cd..b126188574 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -6791,6 +6791,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
+@@ -6810,6 +6810,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
    "**For each other player, exile up to one target creature that player controls**" (Kaya, Spirits'
    Justice) is `TargetObject(filter = TargetFilter.CreatureOpponentControls, optional = true, dynamicMaxCount = DynamicAmount.PlayerCount(Player.EachOpponent), differentControllers = true, id = "one target creature each other player controls")`. Give it an `id` — the generated description
    reads "controlled by different players", which is the constraint, not the printed sentence.

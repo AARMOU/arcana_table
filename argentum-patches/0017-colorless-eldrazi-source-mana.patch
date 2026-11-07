@@ -13,7 +13,7 @@ Subject: [PATCH] arcana: 0017-colorless-eldrazi-source-mana
  5 files changed, 35 insertions(+)
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index b87eb70e14..b632bbb425 100644
+index aa04539025..d86a2ee1f5 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1423,6 +1423,7 @@ Families:
@@ -52,7 +52,7 @@ index bff352a196..06055b8c38 100644
       * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
       * cost contains {X}, and by activating an ability whose mana cost contains {X} — both are
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 40e85b0f32..e4c2a56c51 100644
+index 5c5485742a..2fff4e6179 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -1737,6 +1737,7 @@ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, Prev

@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0030-bloodthirst-keyword
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/BloodthirstKeywordTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index ca3df71e0e..190f238163 100644
+index b126188574..d8c4fcbaad 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -15210,6 +15210,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
+@@ -15229,6 +15229,23 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
    permanent reanimated or blinked gets none; the counters go through `placeEntryCounters` (Hardened
    Scales / Solemnity apply). Don't hand-write an `EntersWithDynamicCounters` for it — it would stack.
    Converge (an ability word) is the hand-authored neighbour: `convergeEntersWithCounters()`.

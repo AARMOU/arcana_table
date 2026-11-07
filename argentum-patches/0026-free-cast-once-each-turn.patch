@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0026-free-cast-once-each-turn
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FreeCastOnceEachTurnTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 483fc579b0..9b82720e6b 100644
+index 87500c28ba..43fc9f1b75 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -13721,7 +13721,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13740,7 +13740,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `GrantAlternativeCastingCost("{0}", listOf(Costs.additional.PayPlayerCounters(CounterType.ENERGY, 1)),
    spellFilter = GameObjectFilter.Creature.manaValueAtMost(3), asThoughFlash = true)`. Like every
    granted alternative cost it is offered for casts from hand only.
@@ -26,7 +26,7 @@ index 483fc579b0..9b82720e6b 100644
    battlefield permission to cast a spell without paying its mana cost (CR 118.9). Like every
    "without paying its mana cost" cast (cascade, discover, `PlayWithoutPayingCostComponent`
    permissions), it is priced as a {0} base through the full cost-modifier pipeline
-@@ -13733,7 +13733,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13752,7 +13752,13 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    zero spells this turn; `oncePerTurn = true` allows one free cast during each of the caster's own
    turns (active player only) regardless of how many spells were cast first — unlike
    `firstSpellOfTurnOnly`, the caster may cast other spells before using it; each source tracks its
@@ -42,7 +42,7 @@ index 483fc579b0..9b82720e6b 100644
    `GameObjectFilter.Any` = every spell). `fromZones` restricts the permission to spells cast **from** the listed zones (the zone the
    spell left, CR 601.2a; `null` = any zone): the free cast is offered on each listed zone's cast path
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 909950ab1f..9442f1bebb 100644
+index 97f7ee598e..11bb093a5d 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
 @@ -1979,7 +1979,7 @@ Families:

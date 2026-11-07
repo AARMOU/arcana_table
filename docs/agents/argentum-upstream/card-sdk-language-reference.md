@@ -1716,7 +1716,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   If either fighter is no longer a creature on the battlefield when the fight happens, neither deals
   damage (CR 701.14b) and the excess variable is 0 — this covers a `Self` fighter ("it fights"), which
   no target re-check removes.
-- `Effects.DividedDamage(total, minTargets, maxTargets, dynamicTotal?, among?)` — "N damage divided as you
+- `Effects.DividedDamage(total, minTargets, maxTargets, dynamicTotal?, among?, storeDamagedAs?)` — "N damage divided as you
   choose among target ..." The targets come from the ability's target requirement; pair with
   `TargetObject(filter = TargetFilter.Creature, count = count, minCount = minCount)` (Forked Lightning, Skirk Volcanist) or, for "any number of target",
   a `TargetObject(unlimited = true, dynamicMaxCount = ..., filter = ...)`. Set `dynamicTotal` (a
@@ -1748,6 +1748,22 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   division against it, and binds it onto the stack object as the ability's X — so the executor deals
   that number even if the creature that set it is gone. Cap the targets with the *board* amount
   (`dynamicMaxCount = <amount>`, not `XValue`, which enumeration treats as a player-chosen X).
+
+  **An activation's own X** (Huatli, Warrior Poet's −X: "Huatli deals X damage divided as you choose
+  among any number of target creatures") is `loyaltyAbilityX` (or an `{X}` mana cost) with
+  `dynamicTotal = DynamicAmounts.xValue()` and the targets capped by it (`targets(…, minCount = 0,
+  unlimited = true, dynamicMaxCount = DynamicAmounts.xValue())`). X is announced before the division
+  (CR 601.2b, 601.2d), so the legal action carries `totalDamageByX` — the total for every X from `minX`
+  to `maxAffordableX` — the client divides the entry for the X it chose, and the validator checks the
+  division against the announced X. With X = 0 no target can be chosen.
+
+  **"… dealt damage this way"** (Huatli: "Creatures dealt damage this way can't block this turn") is
+  `storeDamagedAs`: the permanents and players the division actually dealt at least 1 damage to, after
+  prevention and replacement, stored as a pipeline collection — a target that became illegal or whose
+  share was wholly prevented isn't in it. Read it in the same pipeline:
+  `val damaged = runStoringCollection { Effects.DividedDamage(total = 0, dynamicTotal = DynamicAmounts.xValue(),
+  storeDamagedAs = it) }; run(Effects.ForEachInCollection(damaged, Effects.CantBlock(EffectTarget.IterationEntity)))`.
+  It is stored on every path: an announced division, a lone target, and a division asked for at resolution.
 
   **A spell's X pinned by its additional cost** (Nahiri's Sacrifice: "As an additional cost to cast
   this spell, sacrifice an artifact or creature with mana value X. … deals X damage divided as you
@@ -2290,6 +2306,9 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   (the opposite face — front→back), `FRONT` ("return it front face up" — the eikon Saga's final chapter flips
   back to the legend), or `BACK`. The front face's activated ability is sorcery-speed
   (`timing = TimingRule.SorcerySpeed`); Jecht uses it from a "may" combat-damage trigger instead.
+  `underYourControl = true` (`controllerOverride = EffectTarget.Controller`) is "…transformed **under your
+  control**" — it re-enters under the ability's controller, not its owner (Conqueror's Galleon, delayed to end of
+  combat via `CreateDelayedTrigger(step = Step.END_COMBAT, …)`).
 - `Meld(partner, into, tappedAndAttacking = false)` — CR 701.42 meld: "If you both own and control [this] and a
   [partner], exile them, then meld them into [into]." Put it on the one meld card that prints the ability (CR 712.4a);
   its source is always that card. `partner` names the other card with its type — `Filters.Creature.named("Bruna, the
@@ -5096,7 +5115,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   use it in a "when ~ enters" trigger when the chosen type only feeds a continuous tax (Arachne,
   Psionic Weaver — "choose a card type … Spells of the chosen type cost {1} more").
 - `GrantHexproofFromChosenColorEffect(target)` — hexproof from chosen color.
-- `Effects.GrantProtectionsSharedByGroup(group, target = Self, duration = EndOfTurn)` (`GrantProtectionsSharedByGroupEffect`) — the target gains **every** protection ability (every projected `PROTECTION_FROM_…` keyword: colour, card type, subtype, supertype, each opponent) that some permanent in `group` has, read once at resolution. Fan over the group with `ForEachInGroup(group, GrantProtectionsSharedByGroup(group))` — Concerted Effort's "the same is true for … protection".
+- `Effects.GrantKeywordVariantsSharedByGroup(keyword, group, target, duration = EndOfTurn)` (`GrantKeywordVariantsSharedByGroupEffect`) — the target gains **every variant** of a parameterised keyword that some permanent in `group` has, read once at resolution. `keyword` is `Keyword.PROTECTION` (every projected `PROTECTION_FROM_…`: colour, card type, subtype, supertype, each opponent — Concerted Effort's "the same is true for … protection") or `Keyword.HEXPROOF` (every projected `HEXPROOF_FROM_…` — the "hexproof from white" ruling on Majestic Myriarch and Odric, Lunarch Marshal; plain hexproof stays a `GrantKeyword(HEXPROOF)` behind `Conditions.ControlCreatureWithKeyword`). Fan over the group with `ForEachInGroup(group, GrantKeywordVariantsSharedByGroup(keyword, group, IterationEntity))`, or target `Self` for a creature that only gains them itself.
 - `GrantProtectionFromChosenColorEffect(target)` — protection from chosen color. Must run inside `ChooseColorThen`; wrap in `ForEachInGroup` for the group case (Akroma's Blessing: "Creatures you control gain protection from the chosen color").
 - `Effects.GrantProtectionFromChosenCardType(target, duration)` — "gains protection from the card type of your choice" (Pippin, Guard of the Citadel). The card-type analogue of `GrantProtectionFromChosenColor`, but **self-contained**: its executor owns the choice — it presents a `ChooseOptionDecision` over the fixed protectable card-type set (Artifact, Creature, Enchantment, Instant, Land, Planeswalker, Sorcery, Battle) and, on response, grants a floating `PROTECTION_FROM_CARDTYPE_<TYPE>` keyword for `duration`. The targeting validator, `StackResolver` spell-targeting, `DamageUtils`, the combat-damage pipeline/manager, and a `ProtectionFromCardTypeRule` block-evasion rule all match the protected keyword against the source's projected card types. (The "can't be enchanted/equipped by that type" clause is reminder text and unenforced at attach time, mirroring color/subtype protection.)
 - `Effects.GrantProtectionFromColorlessOrChosenColor(target, duration = EndOfTurn)` (`GrantProtectionFromColorlessOrChosenColorEffect`) — "gains protection from colorless or from the color of your choice" (Angelic Intervention). Self-contained like `GrantProtectionFromChosenCardType`: colorless is not a color (CR 105.4), so `ChooseColorThen` can't offer it; the executor presents a `ChooseOptionDecision` over Colorless plus the five colors and grants a floating `PROTECTION_FROM_COLORLESS` or `PROTECTION_FROM_<COLOR>` keyword. **Protection from colorless** matches any source with no colors — artifacts, Eldrazi, colorless spells, abilities of colorless sources — and every color-protection read site (targeting and resolution re-check, `DamageUtils`, the combat-damage pipeline/manager, the `ProtectionFromColorRule` block-evasion rule, and the Aura/Equipment attach and SBA checks) asks the engine's shared `ColorProtection` helper, so the colorless case is enforced for all of DEBT. A source whose card is unknown is never treated as colorless.
@@ -15944,7 +15963,10 @@ Blighted Agent, Ichor Rats, Plague Stinger, Skithiryx.
   `CreateTokenCopyOfTarget(Self, overridePower = 4, overrideToughness = 4, overrideColors = {BLACK},
   addedSubtypes = {Zombie}, exceptions = CopyExceptions(noManaCost = true))`. Declares `Keyword.ETERNALIZE` for display
   and marks the ability `keyword = Keyword.ETERNALIZE` (Vizier of the Anointed's draw trigger). Used by Timeless
-  Witness, Fanatic of Rhonas.
+  Witness, Fanatic of Rhonas. An eternalize cost with a non-mana part takes it as `eternalize(cost, additionalCost)`:
+  Sunscourge Champion's "Eternalize—{2}{W}{W}, Discard a card" is `eternalize("{2}{W}{W}", Costs.DiscardCard)` — the
+  extra `AbilityCost` joins the mana and the self-exile in the ability's composite cost, and the ability stays marked
+  `Keyword.ETERNALIZE`.
 - `Unearth(cost)` — `card { unearth(cost) }` builder helper (CR 702.84, Shards of Alara). "[Cost]: Return this card
   from your graveyard to the battlefield. It gains haste. Exile it at the beginning of the next end step. If it would
   leave the battlefield, exile it instead of putting it anywhere else. Activate only as a sorcery." Composed entirely
