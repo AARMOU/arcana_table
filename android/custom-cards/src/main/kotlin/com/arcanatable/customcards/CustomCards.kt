@@ -98,6 +98,7 @@ object CustomCards {
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
         Entry(BlightsteelColossus, "MBS", POOL),
+        Entry(FortifiedVillage, "SOI", POOL),
         Entry(NekusarTheMindrazer, "CMM", POOL),
         Entry(MichelangeloTheHeart, "TMC", POOL),
         Entry(VenomEddieBrock, "SPE", POOL),

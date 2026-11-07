@@ -425,3 +425,28 @@ What a reviewer rejects:
 - History of omissions and the few legacy approximations (do **not** add new ones):
   [`android/docs/CUSTOM_CARDS_HANDOFF.md`](../../android/docs/CUSTOM_CARDS_HANDOFF.md).
 - Engine primitive work is Claude's lane and tracked in issue #141.
+
+### "As this land enters, you may reveal …; if you don't, it enters tapped"
+
+The reveal-land cycle (Port Town, Fortified Village, Furycalm Snarl, Game Trail, Choked Estuary, …) is
+an `OnEnterRun` replacement wrapping `Effects.MayRevealCardFromHand`. It runs inline as the land
+enters (no stack, no priority), the reveal is public to every player, and "otherwise" makes it enter
+tapped. An effect that puts the land onto the battlefield tapped still wins. Port Town and Furycalm
+Snarl are Argentum library cards. Fortified Village is Arcana's, with the same shape:
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FortifiedVillage.kt -->
+```kotlin
+    replacementEffect(
+        OnEnterRun(
+            Effects.MayRevealCardFromHand(
+                filter = GameObjectFilter.Land.withAnySubtype("Forest", "Plains"),
+                otherwise = Effects.EnterTapped(),
+            )
+        )
+    )
+```
+
+Test a new member with the shared checks in `support/RevealLandChecks.kt` (reveal either type → untapped
+and shown to all; decline → tapped; wrong type or another copy not offered; empty hand → tapped without
+a question; put-onto-battlefield-tapped wins; four-player). See `FortifiedVillageScenarioTest`,
+`PortTownScenarioTest` and `FurycalmSnarlScenarioTest`.
