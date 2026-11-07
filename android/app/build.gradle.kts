@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -61,7 +63,7 @@ android {
                     events("started", "failed", "skipped")
                     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
                 }
-                test.timeout.set(java.time.Duration.ofMinutes(25))
+                test.timeout.set(Duration.ofMinutes(25))
                 // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
