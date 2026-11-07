@@ -16,10 +16,10 @@ Subject: [PATCH] arcana: 0024-commander-cast-history-amount
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index ccac4d776f..97f7ee598e 100644
+index 2c4e99f57ca..a64066484c9 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -648,6 +648,7 @@ Families:
+@@ -649,6 +649,7 @@ Families:
  - `DynamicAmount.CastChoice(slot: ChoiceSlot)` — A *numeric* value locked in for a com.wingedsheep.sdk.scripting.ChoiceSlot as this object was cast, read off the *current object* regardless of zone — the sibling of CastX for the other cast-choice…
  - `DynamicAmount.CastX` — The value of `{X}` this object was cast with, read off the *current object* regardless of what zone it is in.
  - `DynamicAmount.CombatDamageSourcesThisTurn(player: Player, sourceFilter: GameObjectFilter)` — How many distinct sources matching sourceFilter dealt *combat* damage to player this turn, each judged as it stood **when it dealt the damage** — "a player who was dealt combat damage by three or m…
@@ -28,10 +28,10 @@ index ccac4d776f..97f7ee598e 100644
  - `DynamicAmount.Conditional(condition: Condition, ifTrue: DynamicAmount, ifFalse: DynamicAmount)` — Conditional amount: evaluates to one of two amounts based on a condition.
  - `DynamicAmount.ContextProperty(key: ContextPropertyKey)` — A value pulled from the current resolution context — trigger payload, additional-cost accumulator, target list, or a linked-exile pile attached to the source permanent.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
-index 5a333adb18..f717325fae 100644
+index d8e542a0def..8cf3067c38b 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
-@@ -1127,6 +1127,10 @@ object DynamicAmounts {
+@@ -1128,6 +1128,10 @@ object DynamicAmounts {
      fun extraTurnsBegunThisGame(player: Player = Player.You): DynamicAmount =
          DynamicAmount.ExtraTurnsBegunThisGame(player)
  
@@ -43,10 +43,10 @@ index 5a333adb18..f717325fae 100644
      fun spellsCastDuringTheirLastTurn(player: Player): DynamicAmount =
          DynamicAmount.TurnTracking(player, TurnTracker.SPELLS_CAST_DURING_THEIR_LAST_TURN)
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
-index 14430ca9b9..194d46439b 100644
+index 19d93986cae..2634f291b5c 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
-@@ -2184,6 +2184,19 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
+@@ -2189,6 +2189,19 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
              else "the number of extra turns ${player.description} has begun this game"
      }
  
@@ -67,10 +67,10 @@ index 14430ca9b9..194d46439b 100644
       * Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
       *
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 8809117358..1dfe7d3548 100644
+index 6a81b854547..c50cc0dba7f 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1662,6 +1662,7 @@ Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duratio
+@@ -1663,6 +1663,7 @@ Duration.WhileSourceAttached — Duration — Metamorphic Alteration — Duratio
  Duration.WhileSourceEncodedOnAffected — Duration — Whispering Madness — Duration.WhileSourceOnBattlefield, Duration.WhileSourceAttachedToAffected — cipher's source is a card in exile, not a permanent, so the battlefield gate is always closed for it; the attachment gate reads AttachedToComponent between two permanents, while 'encoded' (CR 702.99b) is a link from an exiled card to a creature that must also be the same exiled object (CR 702.99c)
  DynamicAmount.CapturedAtCast — DynamicAmount — Lethal Exploit — DynamicAmount.CastChoice, DynamicAmount.VariableReference — CastChoice reads a number the player chose into a fixed ChoiceSlot enum (a closed set of player decisions), not a card-named game-state snapshot; VariableReference reads a pipeline variable that dies with the resolving effect, while a capture is frozen at cast and outlives the cast. Subsumes and deletes the CastTimeFlagSet condition (now Compare(CapturedAtCast, GT, 0))
  DynamicAmount.CombatDamageSourcesThisTurn — DynamicAmount — Admiral Beckett Brass — DynamicAmount.TurnTracking, StatePredicate.WasDealtDamageThisTurnBy — TurnTracking reads fixed per-player counters with no source-filter axis (a filter field would mean something for one tracker only); WasDealtDamageThisTurnBy reads the same frozen source record but on a damaged permanent, as a yes/no. Subsumes TurnTracker.DEALT_COMBAT_DAMAGE_BY_LEGENDARY_CREATURE (Blitzball migrated, tracker and its marker component deleted)
@@ -79,7 +79,7 @@ index 8809117358..1dfe7d3548 100644
  DynamicAmount.DungeonsCompleted — DynamicAmount — Nadaar, Selfless Paladin — DynamicAmount.Speed, DynamicAmount.PlayerCounterCount — both read a per-player number the engine keeps, but speed is a 0–4 designation and player counters are counters (CR 122.1); completed dungeons are a game-long record of which dungeon cards left the game (CR 309.7), with a by-name axis neither has
  DynamicAmount.ExtraTurnsBegunThisGame — DynamicAmount — H.M.S. Bounty, Unlikely Timeship — DynamicAmount.SpellsCastThisGame, DynamicAmount.TurnTracking — game-long per-player counts are sibling variants (SpellsCastThisGame, CardsCycledThisGame) over different actions, and no game-scope tracker enum exists to take a value; TurnTracking's trackers are all per-turn and cleared at every turn boundary
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
-index ca88f761de..f57bb3b52d 100644
+index 35e1d587b4d..46cd0af9d08 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 @@ -26,6 +26,7 @@ import com.wingedsheep.engine.state.components.identity.FaceDownComponent
@@ -112,7 +112,7 @@ index ca88f761de..f57bb3b52d 100644
              // state off each Room's RoomComponent — a single Room entity can contribute two
              // doors, so this can't go through the entity-level AggregateBattlefield. Controller
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-index 4dbc88c171..8f7750e907 100644
+index 4dbc88c171a..8f7750e9079 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 @@ -449,6 +449,7 @@ class CreateDelayedTriggerExecutor(
@@ -125,7 +125,7 @@ index 4dbc88c171..8f7750e907 100644
          DynamicAmount.SpellsCastLastTurn,
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 new file mode 100644
-index 0000000000..6baffc0e2f
+index 00000000000..6baffc0e2f9
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
 @@ -0,0 +1,70 @@

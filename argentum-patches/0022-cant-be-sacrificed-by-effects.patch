@@ -13,10 +13,10 @@ Subject: [PATCH] arcana: 0022-cant-be-sacrificed-by-effects
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 5a415fa173..87500c28ba 100644
+index 00b1f1f9ff7..efc782e5e61 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -11372,7 +11372,8 @@ staticAbility {
+@@ -11435,7 +11435,8 @@ staticAbility {
    abilities including mana abilities (Ashnod's Altar, auto-pay included). It is per permanent, as the
    ruling reads it: an artifact creature can't pay "Sacrifice an artifact", a noncreature artifact
    still can. Sacrifices a resolving spell or ability performs (edicts, exploit, "unless you
@@ -27,7 +27,7 @@ index 5a415fa173..87500c28ba 100644
    control can't cause you to sacrifice permanents" (Sigarda, Host of Herons:
    `setOf(CompelledAction.SACRIFICE)`) / "… to discard cards or sacrifice permanents" (Tamiyo,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
-index d098b28963..2df7adc6ac 100644
+index d098b289636..2df7adc6ac1 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/ForceSacrificeExecutor.kt
 @@ -156,6 +156,8 @@ class ForceSacrificeExecutor(
@@ -40,7 +40,7 @@ index d098b28963..2df7adc6ac 100644
              state, filter.youControl(), PredicateContext(controllerId = playerId, sourceId = sourceId),
              predicateEvaluator = zones.predicateEvaluator
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
-index 13a97b7038..ef1e5fd305 100644
+index 13a97b70381..ef1e5fd3054 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/SacrificeExecutor.kt
 @@ -97,6 +97,7 @@ class SacrificeExecutor(
@@ -53,7 +53,7 @@ index 13a97b7038..ef1e5fd305 100644
              predicateEvaluator = zones.predicateEvaluator
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 new file mode 100644
-index 0000000000..ab2d4e306b
+index 00000000000..ab2d4e306bb
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CantBeSacrificedByEffectsTest.kt
 @@ -0,0 +1,116 @@

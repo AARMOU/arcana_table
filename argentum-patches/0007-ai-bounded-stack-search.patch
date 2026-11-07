@@ -17,7 +17,7 @@ Subject: [PATCH] arcana: 0007-ai-bounded-stack-search
  create mode 100644 ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index 4c555c0673..d3e868209b 100644
+index 4c555c06730..d3e868209b4 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 @@ -57,6 +57,8 @@ class AIPlayer(
@@ -72,7 +72,7 @@ index 4c555c0673..d3e868209b 100644
          }
  
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
-index 57327c6510..c4b40cc3c8 100644
+index 57327c65108..c4b40cc3c8f 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
 @@ -49,6 +49,7 @@ class GameSimulator(
@@ -143,7 +143,7 @@ index 57327c6510..c4b40cc3c8 100644
                      allEvents = allEvents + current.events
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
 new file mode 100644
-index 0000000000..582d3b1a15
+index 00000000000..582d3b1a15e
 --- /dev/null
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
 @@ -0,0 +1,28 @@
@@ -176,7 +176,7 @@ index 0000000000..582d3b1a15
 +    }
 +}
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
-index 1e879c8d4f..8dbfd3c754 100644
+index 1e879c8d4f3..8dbfd3c7549 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
 @@ -35,7 +35,7 @@ sealed interface SimulationResult {
@@ -189,7 +189,7 @@ index 1e879c8d4f..8dbfd3c754 100644
       *
       * Two consumers, two answers, and the difference is whether the caller is producing a *move* or
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index e039398b7d..713a28af0b 100644
+index e039398b7dd..713a28af0b8 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 @@ -382,7 +382,7 @@ class Strategist(
@@ -231,7 +231,7 @@ index e039398b7d..713a28af0b 100644
          }
          if (budget.expired() && pass != null) return pass
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
-index 1e5deef9a3..7c717dc8d5 100644
+index 1e5deef9a3e..7c717dc8d5a 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
 @@ -176,6 +176,15 @@ class DecisionBudget(
@@ -251,7 +251,7 @@ index 1e5deef9a3..7c717dc8d5 100644
          if (deadlineNanos == Long.MAX_VALUE) Long.MAX_VALUE
          else max(0L, (deadlineNanos - System.nanoTime()) / NANOS_PER_MILLI)
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
-index 4e1d3d8118..95d991a2ed 100644
+index 4e1d3d81189..95d991a2ed3 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
 @@ -75,6 +75,45 @@ private fun boltFixture(opponentLife: Int = 20): BoltFixture {
@@ -301,7 +301,7 @@ index 4e1d3d8118..95d991a2ed 100644
          val fixture = boltFixture()
          val result = GameSimulator(fixture.registry, maxAutomaticTransitions = 1)
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
-index b900a5b3b3..88afe46deb 100644
+index b900a5b3b37..88afe46debb 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
 @@ -12,6 +12,23 @@ import io.kotest.matchers.shouldBe

@@ -17,10 +17,10 @@ Subject: [PATCH] arcana: 0032-per-player-target-binding
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index f8233618cd..b126188574 100644
+index 547cb12ffc7..65875203d8f 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -6810,6 +6810,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
+@@ -6841,6 +6841,11 @@ Every `TargetRequirement` carries count semantics (defaults shown):
    "**For each other player, exile up to one target creature that player controls**" (Kaya, Spirits'
    Justice) is `TargetObject(filter = TargetFilter.CreatureOpponentControls, optional = true, dynamicMaxCount = DynamicAmount.PlayerCount(Player.EachOpponent), differentControllers = true, id = "one target creature each other player controls")`. Give it an `id` — the generated description
    reads "controlled by different players", which is the constraint, not the printed sentence.
@@ -33,7 +33,7 @@ index f8233618cd..b126188574 100644
    wording (Run Away Together: `targets(TargetFilter.Creature, count = 2, differentControllers = true)`)
    — any two controllers, so in multiplayer two different opponents' creatures qualify. That shape is also
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
-index 67d0072b38..940d585cad 100644
+index 67d0072b38c..940d585cad7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
 @@ -274,7 +274,8 @@ class CopyTargetSpellOrAbilityExecutor(
@@ -47,7 +47,7 @@ index 67d0072b38..940d585cad 100644
          }
  
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
-index a759d9008d..339e9345b0 100644
+index a759d9008d3..339e9345b09 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/AbilityResolver.kt
 @@ -87,6 +87,7 @@ internal class AbilityResolver(
@@ -67,7 +67,7 @@ index a759d9008d..339e9345b0 100644
                  objectReferences = abilityComponent.objectReferences,
                  lastKnownSourceSnapshot = abilityComponent.lastKnownSourceSnapshot,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
-index 84a0537cb3..5a908785f0 100644
+index 84a0537cb37..5a908785f04 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/ResolutionTargetValidator.kt
 @@ -63,6 +63,11 @@ internal class ResolutionTargetValidator(
@@ -134,7 +134,7 @@ index 84a0537cb3..5a908785f0 100644
      private fun anyTargetStillMatches(
          state: GameState,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
-index 01471b0a13..6a429cba4c 100644
+index 01471b0a131..6a429cba4c2 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/SpellResolver.kt
 @@ -73,7 +73,8 @@ internal class SpellResolver(
@@ -148,7 +148,7 @@ index 01471b0a13..6a429cba4c 100644
              if (validTargets.isEmpty()) {
                  if (container.has<com.wingedsheep.engine.mechanics.BestowedComponent>()) {
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
-index 25f65c4ee1..37afbfa2a3 100644
+index 25f65c4ee11..37afbfa2a3d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
 @@ -232,7 +232,8 @@ internal object StackPlacement {
@@ -162,7 +162,7 @@ index 25f65c4ee1..37afbfa2a3 100644
          }
          container = container.with(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
-index 9f45cade4f..264cc48348 100644
+index 9f45cade4f6..264cc483489 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/state/components/stack/StackComponents.kt
 @@ -593,6 +593,16 @@ data class TargetsComponent(
@@ -227,7 +227,7 @@ index 9f45cade4f..264cc48348 100644
           * and returned between targeting and now (CR 400.7). Ids with no captured stamp (targets
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 new file mode 100644
-index 0000000000..960f62c2b0
+index 00000000000..960f62c2b0e
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/PerPlayerTargetBindingTest.kt
 @@ -0,0 +1,121 @@

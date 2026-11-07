@@ -21,10 +21,10 @@ Subject: [PATCH] arcana: 0033-property-sum-of-collection
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
-index b6f3370fc7..65c9529573 100644
+index 38fcd76aafd..dce1b03d64e 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
-@@ -74,7 +74,7 @@ internal enum class AmountSign {
+@@ -79,7 +79,7 @@ internal enum class AmountSign {
              // "X minus its power" stays unknown through [sum].
              // The same floor holds for an aggregate: a total power, a greatest toughness.
              is DynamicAmount.EntityProperty, is DynamicAmount.AggregateBattlefield,
@@ -34,10 +34,10 @@ index b6f3370fc7..65c9529573 100644
              // before state-based actions.
              is DynamicAmount.YourLifeTotal, is DynamicAmount.LifeTotal -> UNKNOWN
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index d8c4fcbaad..e9ef621c5c 100644
+index b25c1935d61..c276a6b0698 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -17925,7 +17925,7 @@ read is available to other snapshot-backed entity references once their captured
+@@ -18016,7 +18016,7 @@ read is available to other snapshot-backed entity references once their captured
    **Pipeline-scoped counts get the same treatment, board-state counts deliberately do not.** A
    `CreateTokenEffect` scheduled into a delayed trigger has its `count` frozen at scheduling time *only
    if* the amount reads the pipeline that produced it — `DistinctEntitiesInCollections`,
@@ -46,7 +46,7 @@ index d8c4fcbaad..e9ef621c5c 100644
    `VariableReference`, or any arithmetic tree containing one. Those live in the resolving
    `EffectContext` and would silently read 0 an upkeep later. A *board-state* count
    (`AggregateBattlefield`, …) is left lazy, because "at the beginning of your end step, create a token
-@@ -18384,6 +18384,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
+@@ -18475,6 +18475,18 @@ Army just amassed by a sibling/action effect, or any cost-chosen entity. The plu
    graveyard). For "you mill X cards … that player loses life equal to the total mana value of those
    cards" — Palantír of Orthanc mills into the default `"milled"` collection
    (`Patterns.Library.mill(X)`), then `Effects.LoseLife(DynamicAmounts.manaValueSumOf("milled"), opponent)`.
@@ -66,10 +66,10 @@ index d8c4fcbaad..e9ef621c5c 100644
  ### `ManaColorSet`<a id="manacolorset"></a>
  
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index fc3580e42c..f172726db7 100644
+index c4a1db85ffb..eb1dd8213f3 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -691,6 +691,7 @@ Families:
+@@ -692,6 +692,7 @@ Families:
  - `DynamicAmount.PlayerCount(scope: Player)` — How many players are in scope — "for each opponent", "for each other player", "the number of players in the game".
  - `DynamicAmount.PlayerCounterCount(counterType: CounterType?, player: Player)` — How many counters of counterType a player currently has — the player-scoped sibling of EntityProperty's com.wingedsheep.sdk.scripting.values.EntityNumericProperty.CounterCount (which reads one obje…
  - `DynamicAmount.Power(base: Int, exponent: DynamicAmount)` — Raise a fixed base to the power of a dynamic exponent (`base^exponent`).
@@ -78,7 +78,7 @@ index fc3580e42c..f172726db7 100644
  - `DynamicAmount.Speed(player: Player)` — A player's **speed** (Aetherdrift, CR 702.179) — the 0–4 designation that "Start your engines!" begins and the inherent speed trigger raises.
  - `DynamicAmount.SpellsCastLastTurn` — The total number of spells cast during the immediately preceding turn.
 diff --git a/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt b/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
-index f3218058d9..f2bf06d854 100644
+index f3218058d93..f2bf06d8548 100644
 --- a/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
 +++ b/mtg-sdk-tooling/src/main/kotlin/com/wingedsheep/sdk/tooling/CardLinter.kt
 @@ -780,6 +780,7 @@ object CardLinter {
@@ -90,7 +90,7 @@ index f3218058d9..f2bf06d854 100644
          put("TapUntapCollection" to "collectionName", read(Space.COLLECTION))
          put("AddCountersToCollection" to "collectionName", read(Space.COLLECTION))
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
-index f717325fae..ef14c66ec4 100644
+index 8cf3067c38b..daa1fc31630 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
 @@ -691,6 +691,13 @@ object DynamicAmounts {
@@ -108,10 +108,10 @@ index f717325fae..ef14c66ec4 100644
      // Graveyard counting
      // =========================================================================
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
-index 441e545f0c..018ea90c42 100644
+index 381ececfd14..bba4421ef03 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/PipelineBuilder.kt
-@@ -79,6 +79,14 @@ value class CollectionSlot(val key: String) {
+@@ -80,6 +80,14 @@ value class CollectionSlot(val key: String) {
       */
      val count: DynamicAmount get() = DynamicAmount.VariableReference("${key}_count")
  
@@ -127,7 +127,7 @@ index 441e545f0c..018ea90c42 100644
      val asTarget: EffectTarget.PipelineTarget get() = EffectTarget.PipelineTarget(key)
  
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
-index 194d46439b..7dddf51b6c 100644
+index 2634f291b5c..f7affedb802 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
 @@ -1301,6 +1301,26 @@ sealed interface DynamicAmount : TextReplaceable<DynamicAmount> {
@@ -158,7 +158,7 @@ index 194d46439b..7dddf51b6c 100644
      // Math Operations - Composable arithmetic on DynamicAmounts
      // =========================================================================
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
-index 0b549b465d..cbe4fb4dd1 100644
+index 0b549b465da..cbe4fb4dd14 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/ProjectionScopedAmounts.kt
 @@ -38,7 +38,7 @@ import kotlinx.serialization.json.encodeToJsonElement
@@ -171,7 +171,7 @@ index 0b549b465d..cbe4fb4dd1 100644
      "TotalPowerSacrificedThisWay", "CountersRemovedAsCost", "StationCharge",
      "LastKnownSourceCounters", "LastKnownDamageDealtToSource",
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-index 11ac0b8855..8ecf32ae63 100644
+index 2e313b62f83..b998748f5e7 100644
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 @@ -494,6 +494,7 @@ DynamicAmount.PermanentsSacrificedThisWay — DynamicAmount
@@ -183,7 +183,7 @@ index 11ac0b8855..8ecf32ae63 100644
  DynamicAmount.Speed — DynamicAmount
  DynamicAmount.SpellsCastLastTurn — DynamicAmount
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
-index f57bb3b52d..2c61fad1ce 100644
+index 46cd0af9d08..99920dfafdf 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
 @@ -229,6 +229,7 @@ class DynamicAmountEvaluator(
@@ -217,7 +217,7 @@ index f57bb3b52d..2c61fad1ce 100644
              // intermediate snapshot survives nested aggregates. Arithmetic is saturating
              // (GameLimits.*Clamped): a "twice the number of X" / doubling chain must clamp at
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
-index 8f7750e907..038ae690bd 100644
+index 8f7750e9079..038ae690bd8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
 @@ -395,6 +395,7 @@ class CreateDelayedTriggerExecutor(
@@ -230,7 +230,7 @@ index 8f7750e907..038ae690bd 100644
              !amount.variableName.endsWith("_count") || amount.variableName.removeSuffix("_count") in stored
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt
 new file mode 100644
-index 0000000000..33595c305d
+index 00000000000..33595c305d9
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/PropertySumOfCollectionTest.kt
 @@ -0,0 +1,180 @@

@@ -7,14 +7,15 @@ Subject: [PATCH] arcana: 0025-akromas-will-modal-combat-trick
 ---
  .../ai/engine/knowledge/AmountSign.kt         |  1 +
  .../ai/engine/knowledge/CardIntentAnalyzer.kt | 33 ++++++++++++++++-
+ .../ai/audit/AiReadingAuditSnapshotTest.kt    |  8 ++---
  .../knowledge/CardIntentAnalyzerTest.kt       | 35 +++++++++++++++++++
- 3 files changed, 68 insertions(+), 1 deletion(-)
+ 4 files changed, 72 insertions(+), 5 deletions(-)
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
-index d4e2a55b80..b6f3370fc7 100644
+index 94fcdf5a95e..38fcd76aafd 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
-@@ -86,6 +86,7 @@ internal enum class AmountSign {
+@@ -91,6 +91,7 @@ internal enum class AmountSign {
              // Counts, mana values, mana spent, X: none of them can go below zero.
              is DynamicAmount.Speed, is DynamicAmount.DungeonsCompleted, is DynamicAmount.PlayerCounterCount, is DynamicAmount.CardsCycledThisGame,
              is DynamicAmount.SpellsCastThisGame, is DynamicAmount.ExtraTurnsBegunThisGame,
@@ -23,18 +24,18 @@ index d4e2a55b80..b6f3370fc7 100644
              is DynamicAmount.LastKnownSourceCounters, is DynamicAmount.LastKnownDamageDealtToSource,
              is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-index fed6870369..fea45868d8 100644
+index 3822912f070..16c20210d72 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzer.kt
-@@ -270,6 +270,7 @@ object CardIntentAnalyzer {
+@@ -317,6 +317,7 @@ object CardIntentAnalyzer {
          var expiringPump = false
          var pumpToughness = 0
          var expiringGroupPump = false
 +        var expiringGroupTrick = false
-         // Hand selection reads gated interiors too — see [handSelectionLeaves] for why only here.
+         // Hand selection reads gated interiors too — see [gateInteriorLeaves] for why only here.
          val handLeaves = scripts.flatMap { script ->
              EffectWalker.slots(script).map { it.effect } +
-@@ -301,6 +302,13 @@ object CardIntentAnalyzer {
+@@ -354,6 +355,13 @@ object CardIntentAnalyzer {
              if (isExpiringCopy(effect)) expiringPump = true
          }
  
@@ -48,7 +49,7 @@ index fed6870369..fea45868d8 100644
          var anthemBonus = 0
          for (static in scripts.flatMap { it.staticAbilities }) {
              tags += tagsOf(static)
-@@ -328,7 +336,7 @@ object CardIntentAnalyzer {
+@@ -395,7 +403,7 @@ object CardIntentAnalyzer {
          // A protective keyword that wears off at cleanup (Withstand Death's indestructible) is the
          // same trick without the stats: spent on a fight or on removal on the stack, or wasted.
          val speed = speedOf(card, scripts, tags)
@@ -57,9 +58,9 @@ index fed6870369..fea45868d8 100644
  
          val repeatable = repeatableOf(card, scripts)
          val arrivalTags = arrivalTagsOf(card, scripts, tags)
-@@ -1967,6 +1975,29 @@ object CardIntentAnalyzer {
-                 isExpiringPump(it) && (it as ModifyStatsEffect).target == EffectTarget.IterationEntity
-             }
+@@ -2638,6 +2646,29 @@ object CardIntentAnalyzer {
+     private fun asRummage(tags: Set<IntentTag>): Set<IntentTag> =
+         if (IntentTag.DRAW in tags) tags - IntentTag.DRAW + IntentTag.CARD_SELECTION else tags
  
 +    /** A modal mode that grants temporary combat abilities to each member of a group. */
 +    private fun hasExpiringGroupCombatGrant(effect: Effect): Boolean {
@@ -87,8 +88,28 @@ index fed6870369..fea45868d8 100644
      private fun drawsOf(effect: Effect): Int? = when (effect) {
          is DrawCardsEffect -> fixed(effect.count)
          is DrawUpToEffect -> effect.maxCards
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/audit/AiReadingAuditSnapshotTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/audit/AiReadingAuditSnapshotTest.kt
+index b017266eea1..06be95eb607 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/audit/AiReadingAuditSnapshotTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/audit/AiReadingAuditSnapshotTest.kt
+@@ -55,11 +55,11 @@ class AiReadingAuditSnapshotTest : FunSpec({
+         // An expiring hexproof beside a lasting +1/+1 counter: castable whenever, no trick to hold.
+         "Snakeskin Veil" to emptyList(),
+         // The team form: hexproof for our permanents beside a lasting Amass. The evasion grant to the
+-        // player is a separate, still-unread leaf.
+-        "Lazotep Plating" to listOf("timing: GrantEvasionKeywordEffect"),
++        // player is timed with the whole spell by the group combat-trick reader.
++        "Lazotep Plating" to emptyList(),
+         // Unread — the effect types the audit names as the work to do.
+-        // Team hexproof beside a damage shield, every part gone at cleanup: a trick nothing holds yet.
+-        "Blinding Fog" to listOf("timing: ForEach>GrantKeywordEffect"),
++        // Team hexproof beside a damage shield: the group combat-trick reader holds the whole spell.
++        "Blinding Fog" to emptyList(),
+         // A draw beside the trample outlasts the turn, so the keyword floor does not read the spell.
+         "Charge Through" to listOf("timing: GrantKeywordEffect"),
+         "Act on Impulse" to listOf("intent: GrantMayPlayFromExileEffect", "intent: Pipeline(TopOfLibrary→exile)"),
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
-index 79c9e945d9..eb4a3bb19d 100644
+index 6962bbd5c42..37769e9b10a 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/knowledge/CardIntentAnalyzerTest.kt
 @@ -5,6 +5,14 @@ import com.wingedsheep.engine.state.components.identity.RoomComponent
@@ -106,7 +127,7 @@ index 79c9e945d9..eb4a3bb19d 100644
  import com.wingedsheep.mtg.sets.definitions.dsk.cards.UnholyAnnexRitualChamber
  import com.wingedsheep.mtg.sets.definitions.war.cards.GodEternalKefnet
  import com.wingedsheep.mtg.sets.definitions.woe.cards.VirtueOfLoyalty
-@@ -121,6 +129,33 @@ class CardIntentAnalyzerTest : ScenarioTestBase() {
+@@ -127,6 +135,33 @@ class CardIntentAnalyzerTest : ScenarioTestBase() {
              }
          }
  

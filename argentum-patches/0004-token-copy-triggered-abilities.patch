@@ -5,15 +5,15 @@ Date: Sat, 1 Jan 2000 00:00:00 +0000
 Subject: [PATCH] arcana: 0004-token-copy-triggered-abilities
 
 ---
- .../token/CreateTokenCopyOfTargetExecutor.kt  | 19 +++++-----------
+ .../token/CreateTokenCopyOfTargetExecutor.kt  | 21 +++++-------------
  .../effects/token/CreateTokenExecutor.kt      | 22 ++++---------------
- 2 files changed, 10 insertions(+), 31 deletions(-)
+ 2 files changed, 10 insertions(+), 33 deletions(-)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
-index 08459a048b..ad9b8f7879 100644
+index 70670b313c6..c9dd510c7e8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt
-@@ -18,7 +18,6 @@ import com.wingedsheep.engine.registry.CardRegistry
+@@ -19,7 +19,6 @@ import com.wingedsheep.engine.registry.CardRegistry
  import com.wingedsheep.engine.event.DelayedTriggeredAbility
  import com.wingedsheep.engine.event.GrantedActivatedAbility
  import com.wingedsheep.engine.event.GrantedStaticAbility
@@ -21,7 +21,7 @@ index 08459a048b..ad9b8f7879 100644
  import com.wingedsheep.engine.state.Component
  import com.wingedsheep.engine.state.ComponentContainer
  import com.wingedsheep.engine.state.GameState
-@@ -362,7 +361,12 @@ class CreateTokenCopyOfTargetExecutor(
+@@ -366,7 +365,12 @@ class CreateTokenCopyOfTargetExecutor(
              flipSide = card.flipSide?.let(::withAddedStatics),
          )
          val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))
@@ -34,12 +34,14 @@ index 08459a048b..ad9b8f7879 100644
 +            ) }
  
          val cappedCount = com.wingedsheep.engine.core.GameLimits.cappedTokenCount(count, "target-copy tokens")
-         // CR 508.4: "its controller chooses ... as it enters" — every copy's defender is settled
-@@ -521,17 +525,6 @@ class CreateTokenCopyOfTargetExecutor(
+         // A token that's a copy of a Clone *card* (Vizier of Many Faces, embalmed) has the Clone's
+@@ -571,19 +575,6 @@ class CreateTokenCopyOfTargetExecutor(
                  initialCounters = initialCounters, predicateEvaluator = amountEvaluator.predicates
              )
  
--            for (ability in effect.triggeredAbilities) {
+-            // "Except it has …" grants are part of the token-copy effect, which an as-enters copy
+-            // overwrites (CR 707.9) — like the exceptions and added statics above.
+-            if (!enteredAsCopy) for (ability in effect.triggeredAbilities) {
 -                val grant = GrantedTriggeredAbility(
 -                    entityId = tokenId,
 -                    ability = ability,
@@ -54,7 +56,7 @@ index 08459a048b..ad9b8f7879 100644
              // have no CardDefinition, so granted abilities live in GameState.grantedActivatedAbilities,
              // which the legal-action enumerator and ActivateAbilityHandler consult for any entity.
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
-index 9bca3ef4bf..a863172d85 100644
+index 9bca3ef4bf6..a863172d854 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
 @@ -322,7 +322,9 @@ class CreateTokenExecutor(

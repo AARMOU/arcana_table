@@ -14,7 +14,7 @@ Subject: [PATCH] arcana: 0035-ai-idle-mana-deploy
  create mode 100644 ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
-index d3e868209b..cbb5a2e2e7 100644
+index d3e868209b4..cbb5a2e2e75 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 @@ -401,6 +401,7 @@ class AIPlayer(
@@ -26,7 +26,7 @@ index d3e868209b..cbb5a2e2e7 100644
                      defendPlaneswalkers = profile.defendPlaneswalkers,
                      spendFuelWalkers = profile.spendFuelWalkers,
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
-index 451d3d0e9b..299b87bfa9 100644
+index 451d3d0e9bc..299b87bfa92 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AiProfile.kt
 @@ -566,6 +566,32 @@ data class AiProfile(
@@ -89,7 +89,7 @@ index 451d3d0e9b..299b87bfa9 100644
          /**
           * What a player faced in a real game **up to 2026-08-07**, when
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
-index 713a28af0b..7f2875c0f3 100644
+index 713a28af0b8..7f2875c0f30 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
 @@ -192,6 +192,11 @@ class Strategist(
@@ -198,7 +198,7 @@ index 713a28af0b..7f2875c0f3 100644
       * [AiProfile.tapToPingAtTheirEndStep]. In an opponent's turn after blockers, with our turn
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 new file mode 100644
-index 0000000000..bc9d0fec20
+index 00000000000..bc9d0fec20e
 --- /dev/null
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/ManaHeldOnlyForInstantsTest.kt
 @@ -0,0 +1,174 @@
@@ -377,7 +377,7 @@ index 0000000000..bc9d0fec20
 +    }
 +}
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
-index 9954fe42b3..873a3ca0ce 100644
+index 9954fe42b37..873a3ca0cea 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
 +++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/SacrificeManaPaymentAiTest.kt
 @@ -5,6 +5,7 @@ import com.wingedsheep.engine.core.CastSpell
