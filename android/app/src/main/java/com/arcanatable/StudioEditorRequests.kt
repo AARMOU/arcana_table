@@ -21,4 +21,13 @@ internal object StudioEditorRequests {
     fun openMenu(){menuRequests++}
     fun consumeDismiss():(()->Unit)?=pendingDismiss.also{pendingDismiss=null}
     fun clear(){pendingDismiss=null}
+    // Editor settings shared with game dialog windows, which draw their own selection canvas.
+    var shellActive by mutableStateOf(false)
+    var tool by mutableStateOf(StudioEditorTool.Select)
+    var snap by mutableStateOf(true)
+    var outlines by mutableStateOf(true)
+    /** The window the shell itself draws on; every other window (dialog, sheet) hosts its own canvas. */
+    var mainWindow by mutableStateOf(0)
+    /** One selection canvas per secondary window, owned by whichever Studio control in it claimed it first. */
+    val canvasOwners=androidx.compose.runtime.mutableStateMapOf<Int,Any>()
 }

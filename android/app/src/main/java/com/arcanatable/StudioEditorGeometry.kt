@@ -46,10 +46,15 @@ internal object StudioEditorGeometry {
             .minByOrNull {it.bounds.width*it.bounds.height}
 
     /** Handle positions (centers) for a frame, in the same coordinate space as [frame]. */
-    fun handlePoints(frame:Rect):Map<StudioHandle,Offset> = mapOf(
+    fun handlePoints(frame:Rect,compact:Boolean=false):Map<StudioHandle,Offset> = if(compact) mapOf(
+        StudioHandle.TopLeft to frame.topLeft,StudioHandle.TopRight to frame.topRight,StudioHandle.BottomRight to frame.bottomRight,StudioHandle.BottomLeft to frame.bottomLeft)
+        else mapOf(
         StudioHandle.TopLeft to frame.topLeft,StudioHandle.Top to Offset(frame.center.x,frame.top),StudioHandle.TopRight to frame.topRight,
         StudioHandle.Right to Offset(frame.right,frame.center.y),StudioHandle.BottomRight to frame.bottomRight,
         StudioHandle.Bottom to Offset(frame.center.x,frame.bottom),StudioHandle.BottomLeft to frame.bottomLeft,StudioHandle.Left to Offset(frame.left,frame.center.y))
+
+    /** Small frames show only corner handles, so the handles never bury the control being edited. */
+    fun compact(frame:Rect,reach:Float)=frame.width<reach*2.5f || frame.height<reach*2.5f
 
     /**
      * Which handle a touch at [point] grabs. The interior (inset so small 44dp controls still move) moves the control;
@@ -58,7 +63,7 @@ internal object StudioEditorGeometry {
     fun handleAt(frame:Rect,point:Offset,reach:Float):StudioHandle? {
         val inset=minOf(reach*0.5f,frame.width/4f,frame.height/4f)
         if(frame.deflate(inset).contains(point))return StudioHandle.Move
-        val nearest=handlePoints(frame).minByOrNull {(_,p)->(p-point).getDistance()}
+        val nearest=handlePoints(frame,compact(frame,reach)).minByOrNull {(_,p)->(p-point).getDistance()}
         if(nearest!=null && (nearest.value-point).getDistance()<=reach)return nearest.key
         return if(frame.contains(point))StudioHandle.Move else null
     }

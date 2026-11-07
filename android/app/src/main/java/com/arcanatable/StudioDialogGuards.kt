@@ -21,7 +21,8 @@ internal fun StudioDialog(screen:String="Dialog",onDismissRequest:()->Unit,prope
     Dialog(onDismissRequest={if(runtime?.editing==true){runtime.panelOpen=true;StudioEditorRequests.dismiss(onDismissRequest)} else onDismissRequest()},properties=properties) {StudioScreen(screen) {
         if(runtime?.active==true)Box {
             Box(Modifier.padding(bottom=48.dp)){content()}
-            StudioWindowEscape(runtime,Modifier.align(Alignment.BottomEnd))
+            // With the editor shell open, its floating toolbar replaces this button (and the canvas would cover it).
+            if(!(runtime.editing && StudioEditorRequests.shellActive))StudioWindowEscape(runtime,Modifier.align(Alignment.BottomEnd))
         } else content()
     }}
 }
@@ -36,7 +37,7 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
     val runtime=LocalStudioControls.current
     StudioScreen(screen) {
         AlertDialog(onDismissRequest={if(runtime?.editing==true){runtime.panelOpen=true;StudioEditorRequests.dismiss(onDismissRequest)} else onDismissRequest()},confirmButton={
-            if(runtime?.active==true)Column(horizontalAlignment=Alignment.End){confirmButton();StudioWindowEscape(runtime)}
+            if(runtime?.active==true)Column(horizontalAlignment=Alignment.End){confirmButton();if(!(runtime.editing && StudioEditorRequests.shellActive))StudioWindowEscape(runtime)}
             else confirmButton()
         },
             modifier=modifier,dismissButton=dismissButton,icon=icon,title=title,text=text,shape=shape,containerColor=containerColor,

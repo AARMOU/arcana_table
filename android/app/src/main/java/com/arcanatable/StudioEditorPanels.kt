@@ -72,7 +72,7 @@ internal fun StudioScreenMenu(destinations:Map<String,Pair<Boolean,()->Unit>>,cu
                 .background(if(name==current)darkTableColors.accent.copy(alpha=0.18f) else Color.Transparent).padding(horizontal=12.dp).testTag("studio-screen-$name"),
                 verticalAlignment=Alignment.CenterVertically) {
                 Text(name,color=if(!entry.first)darkTableColors.muted.copy(alpha=0.5f) else if(name==current)darkTableColors.accent else darkTableColors.text,modifier=Modifier.weight(1f))
-                if(!entry.first)Text(if(name in listOf("Setup","Lobby"))"Outside a game" else "Needs a live game",color=darkTableColors.muted,fontSize=11.sp)
+                if(!entry.first)Text(when(name){"Setup","Lobby"->"Outside a game";"Combat"->"During combat";else->"Needs a live game"},color=darkTableColors.muted,fontSize=11.sp)
             }
         }
         onHand?.let {hand->StudioListRow("Hand",current=="Hand","studio-screen-Hand"){hand()}}

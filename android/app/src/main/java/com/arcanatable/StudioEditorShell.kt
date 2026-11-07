@@ -55,14 +55,14 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList()) {
     val window=System.identityHashCode(LocalView.current.rootView)
     val density=LocalDensity.current.density
-    var tool by remember{mutableStateOf(StudioEditorTool.Select)}
+    var tool by StudioEditorRequests::tool
     var layersOpen by remember{mutableStateOf(false)}
     var moreOpen by remember{mutableStateOf(false)}
     var screensOpen by remember{mutableStateOf(false)}
     var collapsed by remember{mutableStateOf(false)}
     var confirmClose by remember{mutableStateOf(false)}
-    var snap by remember{mutableStateOf(true)}
-    var outlines by remember{mutableStateOf(true)}
+    var snap by StudioEditorRequests::snap
+    var outlines by StudioEditorRequests::outlines
     var message by remember{mutableStateOf<String?>(null)}
     var origin by remember{mutableStateOf(Offset.Zero)}
     var height by remember{mutableFloatStateOf(0f)}
@@ -109,7 +109,9 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     LaunchedEffect(StudioEditorRequests.menuRequests){if(StudioEditorRequests.menuRequests!=firstMenuRequest)screensOpen=true}
     val firstHandRequest=remember{StudioEditorRequests.handRequests-(if(StudioEditorRequests.handPending)1 else 0)}
     LaunchedEffect(StudioEditorRequests.handRequests){if(StudioEditorRequests.handRequests!=firstHandRequest){StudioEditorRequests.handPending=false;openHand()}}
-    DisposableEffect(runtime){StudioEditorRequests.clear();onDispose{StudioEditorRequests.clear()}}
+    SideEffect{StudioEditorRequests.mainWindow=window}
+    DisposableEffect(runtime){StudioEditorRequests.clear();StudioEditorRequests.shellActive=true;StudioEditorRequests.tool=StudioEditorTool.Select
+        onDispose{StudioEditorRequests.clear();StudioEditorRequests.shellActive=false}}
     CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=darkTableColors.accent,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
         Box(Modifier.fillMaxSize().onGloballyPositioned{origin=it.boundsInRoot().topLeft;height=it.size.height.toFloat()}.testTag("studio-editor")) {
@@ -226,7 +228,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
             val frame=handle?.let{StudioEditorGeometry.preview(base,it,drag,minPx)} ?: base
             if(handle!=null)drawRect(accent.copy(alpha=0.12f),frame.topLeft,frame.size)
             drawRect(accent,frame.topLeft,frame.size,style=Stroke(2.dp.toPx()))
-            StudioEditorGeometry.handlePoints(frame).values.forEach {p->
+            StudioEditorGeometry.handlePoints(frame,StudioEditorGeometry.compact(frame,reach)).values.forEach {p->
                 drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
             }
             // Size readout rides on the frame, drawn (not laid out) so it can never feed back into layout.
@@ -236,6 +238,37 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                 (frame.top-text.size.height-2*pad-10.dp.toPx()).coerceAtLeast(0f))
             drawRoundRect(accent,at,Size(text.size.width+2*pad,text.size.height+2*pad),CornerRadius(pad))
             drawText(text,topLeft=at+Offset(pad,pad))
+        }
+    }
+}
+
+/**
+ * Direct manipulation inside a game dialog window: a non-focusable popup pinned to the dialog window's origin carries
+ * the same selection canvas (tap/drag/handles), so dialogs are edited exactly like full screens. Shown only in Select
+ * mode; in Scroll mode the dialog scrolls normally and its Studio controls still only select.
+ */
+@Composable
+internal fun StudioWindowCanvasHost(runtime:StudioControlsRuntime,window:Int) {
+    if(!runtime.editing || !StudioEditorRequests.shellActive || window==StudioEditorRequests.mainWindow)return
+    val token=remember{Any()}
+    DisposableEffect(window,token){onDispose{if(StudioEditorRequests.canvasOwners[window]===token)StudioEditorRequests.canvasOwners.remove(window)}}
+    SideEffect{if(StudioEditorRequests.canvasOwners[window]==null)StudioEditorRequests.canvasOwners[window]=token}
+    if(StudioEditorRequests.canvasOwners[window]===token)StudioWindowCanvas(runtime)
+}
+
+@Composable
+internal fun StudioWindowCanvas(runtime:StudioControlsRuntime) {
+    if(!runtime.editing || !StudioEditorRequests.shellActive || StudioEditorRequests.tool!=StudioEditorTool.Select)return
+    val window=System.identityHashCode(LocalView.current.rootView)
+    val density=LocalDensity.current.density
+    androidx.compose.ui.window.Popup(popupPositionProvider=object:androidx.compose.ui.window.PopupPositionProvider {
+        override fun calculatePosition(anchorBounds:androidx.compose.ui.unit.IntRect,windowSize:androidx.compose.ui.unit.IntSize,
+            layoutDirection:androidx.compose.ui.unit.LayoutDirection,popupContentSize:androidx.compose.ui.unit.IntSize)=androidx.compose.ui.unit.IntOffset.Zero
+    },properties=androidx.compose.ui.window.PopupProperties(focusable=false,clippingEnabled=false)) {
+        CompositionLocalProvider(LocalTableColors provides darkTableColors) {
+            Box(Modifier.fillMaxSize().testTag("studio-window-canvas")) {
+                StudioSelectionCanvas(runtime,window,Offset.Zero,true,StudioEditorRequests.snap,StudioEditorRequests.outlines,density)
+            }
         }
     }
 }

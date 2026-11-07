@@ -90,8 +90,9 @@ class StudioEditorRealAppUiTest {
             UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-floating-inspector").assertIsDisplayed()
             scenario.onActivity {UiTestSupport.screenshot(it,"studio-real-settings-dialog-editor")}
-            // The in-dialog Studio button opens the screen menu above the dialog; Home closes Settings.
-            rule.onNodeWithTag("studio-window-escape").performClick();UiTestSupport.settle(rule)
+            // While the editor is open the dialog's own Studio button is replaced by the floating toolbar above it.
+            rule.onAllNodesWithTag("studio-window-escape").assertCountEquals(0)
+            rule.onNode(hasTestTag("studio-screen-picker") and hasAnyAncestor(hasTestTag("studio-floating-bar"))).performClick();UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-overlay-window").assertIsDisplayed()
             rule.onNodeWithTag("studio-screen-Home").performClick();UiTestSupport.settle(rule)
             scenario.onActivity {activity->assertFalse(activity.tableController!!.optionsOpen)}
@@ -142,5 +143,68 @@ class StudioEditorRealAppUiTest {
                 assertTrue(store.enabled());assertEquals("gameplay hand drawer source is the owner's design, unchanged",owner,store.load())
             }
         } finally {scenario.close();StudioProfiles(prefs(),"portrait").resetAll()}
+    }
+
+    /** A project that hides the main action and paints everything black still leaves the Studio route working. */
+    @Test fun allBlackHiddenProjectStillHasAWayBackAndResets() {
+        StudioProfiles(prefs(),"portrait").resetAll()
+        context.getSharedPreferences("arcana_tutorial",Context.MODE_PRIVATE).edit()
+            .putStringSet("first_visit_guides_v2",setOf("HOME","TABLE","PLAYER","HAND","MENU_MAIN","MENU_TOOLS","MENU_GAME","MENU_DECKS","LOBBY","OPTIONS","DECK_IMPORT","STACK","LOG")).commit()
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            if(rule.onAllNodesWithText("NOT NOW").fetchSemanticsNodes().isNotEmpty()){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
+            scenario.onActivity {it.tableController!!.studioControlsRuntime!!.enableCatalog()}
+            UiTestSupport.settle(rule)
+            var id=""
+            scenario.onActivity {activity->
+                val r=activity.tableController!!.studioControlsRuntime!!
+                val window=System.identityHashCode(activity.window.decorView.rootView)
+                id=r.controls.values.first{it.screen=="Home" && it.isAction && it.window==window && it.title.equals("PLAY",true)}.id
+                r.begin();r.edit(id,r.style(id).copy(visible=false))
+                r.change(r.draft.copy(theme=StudioLayout.themeRoles.associateWith{"#000000"}))
+            }
+            UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-apply").performClick();UiTestSupport.settle(rule)
+            scenario.recreate();UiTestSupport.settle(rule)
+            // The escape lives outside the editable project, so it survives black palettes and hidden controls.
+            rule.onNodeWithTag("studio-root-escape").assertIsDisplayed().performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-editor").assertIsDisplayed()
+            scenario.onActivity {UiTestSupport.screenshot(it,"studio-real-recovery-all-black")}
+            rule.onNodeWithTag("studio-more").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-more-tab-Project").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-reset-profile").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-confirm").performClick();UiTestSupport.settle(rule)
+            scenario.onActivity {activity->
+                val r=activity.tableController!!.studioControlsRuntime!!
+                assertTrue(r.project().controls.isEmpty());assertTrue(r.project().theme.isEmpty())
+            }
+        } finally {scenario.close();StudioProfiles(prefs(),"portrait").resetAll()}
+    }
+
+    /** Landscape uses its own orientation project; the toolbar and hand screen work there too. */
+    @Test @Config(qualifiers="w892dp-h412dp-land-xhdpi") fun landscapeEditorAndHandScreen() {
+        StudioProfiles(prefs(),"landscape").resetAll()
+        context.getSharedPreferences("arcana_tutorial",Context.MODE_PRIVATE).edit()
+            .putStringSet("first_visit_guides_v2",setOf("HOME","TABLE","PLAYER","HAND","MENU_MAIN","MENU_TOOLS","MENU_GAME","MENU_DECKS","LOBBY","OPTIONS","DECK_IMPORT","STACK","LOG")).commit()
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            if(rule.onAllNodesWithText("NOT NOW").fetchSemanticsNodes().isNotEmpty()){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
+            scenario.onActivity {it.tableController!!.nativeStudioOpen=true}
+            UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-hand-workspace").assertIsDisplayed()
+            rule.onNodeWithTag("studio-apply").assertIsDisplayed()
+            scenario.onActivity {activity->
+                assertEquals("landscape",activity.tableController!!.studioControlsRuntime!!.orientation)
+                UiTestSupport.screenshot(activity,"studio-real-landscape-hand")
+            }
+            rule.onNodeWithTag("studio-more").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-hand-Balanced").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-more-panel-close").performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-apply").performClick();UiTestSupport.settle(rule)
+            assertNotNull("landscape hand saved separately",StudioStore(prefs(),"landscape",StudioProfiles(prefs(),"landscape").activeName()).load())
+            assertNull("portrait untouched",StudioStore(prefs(),"portrait","Default").load())
+        } finally {scenario.close();StudioProfiles(prefs(),"landscape").resetAll()}
     }
 }

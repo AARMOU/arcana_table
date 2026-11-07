@@ -57,6 +57,7 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     val actualScreen=LocalStudioScreen.current ?: screen
     SideEffect {runtime.record(StudioLiveControl(id,actualScreen,kind,currentCaption,enabled,window=window,protectedLabel=protectedLabel,captionEditable=captionEditable),
         if(onClick==null)null else ({action?.invoke()}))}
+    StudioWindowCanvasHost(runtime,window)
     val style=runtime.style(id,actualScreen,kind)
     val available=enabled && (style.binding==null || if(kind.endsWith("action"))runtime.canInvoke(id,style.binding) else runtime.canDisplay(id,style.binding))
     return StudioWidget(runtime,id,style,available,caption,source)

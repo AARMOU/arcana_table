@@ -301,17 +301,20 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                 ){androidx.compose.material3.Text(if(studio.recoveryReasons().isEmpty())"Arcana Studio" else "Studio restored a control · Review",color=darkTableColors.text)}
                 var studioClassic by remember(studio) {mutableStateOf(false)}
                 LaunchedEffect(studio.editing) {if(!studio.editing)studioClassic=false}
+                // Switching screens in Studio closes whatever overlay was open first, so each pick shows exactly that screen.
+                val studioCloseAll={optionsOpen=false;stackOpen=false;zoneDialog=null;deckPickerOpen=false;playSheetOpen=false;wifiMultiConfigOpen=false;showHand=false;logOpen=false}
                 val studioDestinations=mapOf(
-                        "Home" to (true to {optionsOpen=false;showHand=false;homeOpen=true}),
-                        "Setup" to (!gameInProgress to {homeOpen=true;playSheetOpen=true}),
-                        "Table" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=true}),
-                        "Player" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
-                        "Lobby" to (!gameInProgress to {wifiMultiConfigOpen=true}),
-                        "Decks" to (true to {homeOpen=true;optionsOpen=false;deckPickerOpen=true}),
-                        "Settings" to (true to {optionsOpen=true}),
-                        "Stack" to (gameInProgress to {stackOpen=true}),
-                        "Zones" to (gameInProgress to {zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
-                        "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {homeOpen=false;showHand=false}),
+                        "Home" to (true to {studioCloseAll();homeOpen=true}),
+                        "Setup" to (!gameInProgress to {studioCloseAll();homeOpen=true;playSheetOpen=true}),
+                        "Lobby" to (!gameInProgress to {studioCloseAll();wifiMultiConfigOpen=true}),
+                        "Decks" to (true to {studioCloseAll();homeOpen=true;deckPickerOpen=true}),
+                        "Settings" to (true to {studioCloseAll();optionsOpen=true}),
+                        "Table" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=true}),
+                        "Player" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
+                        "Stack" to (gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true}),
+                        "Zones" to (gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
+                        "Game log" to (gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true}),
+                        "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {studioCloseAll();homeOpen=false}),
                     )
                 // Every "Arcana Studio" hand entry point (menu, classic panel) now opens the hand screen in this editor.
                 LaunchedEffect(nativeStudioOpen) {if(nativeStudioOpen){nativeStudioOpen=false;studioClassic=false;StudioEditorRequests.openHand();if(!studio.editing)studio.begin()}}

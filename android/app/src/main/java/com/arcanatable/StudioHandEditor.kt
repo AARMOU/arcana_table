@@ -125,7 +125,7 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                         val f=handle?.let{StudioEditorGeometry.preview(base,it,drag,minPx)} ?: base
                         if(handle!=null)drawRect(accent.copy(alpha=0.12f),f.topLeft,f.size)
                         drawRect(accent,f.topLeft,f.size,style=Stroke(2.dp.toPx()))
-                        if(!e.locked)StudioEditorGeometry.handlePoints(f).values.forEach {p->
+                        if(!e.locked)StudioEditorGeometry.handlePoints(f,StudioEditorGeometry.compact(f,reach)).values.forEach {p->
                             drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
                         }
                         val text=measurer.measure("${(f.width/unit).toInt()} × ${(f.height/unit).toInt()}"+if(e.locked)" · locked" else "",
