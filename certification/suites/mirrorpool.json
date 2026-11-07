@@ -4,5 +4,5 @@
   "issue": 587,
   "source": "certification/MirrorpoolIndependentCertificationTest.kt",
   "testClass": "com.arcanatable.customcards.MirrorpoolIndependentCertificationTest",
-  "tests": 9
+  "tests": 13
 }
