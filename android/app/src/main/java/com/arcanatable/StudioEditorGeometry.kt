@@ -41,11 +41,22 @@ internal object StudioEditorGeometry {
      * Picks what the finger is on. Overlay screens beat the table underneath them; a full-screen page hides the table
      * entirely. Within a layer the deepest (smallest) visible control wins, so text inside a container is reachable.
      */
-    fun hitTest(controls:Collection<StudioLiveControl>,point:Offset,window:Int,visible:(String)->Boolean):StudioLiveControl? {
+    fun hitTest(controls:Collection<StudioLiveControl>,point:Offset,window:Int,current:String?=null,visible:(String)->Boolean):StudioLiveControl? {
         val live=controls.filter {it.window==window && it.bounds.width>0f && it.bounds.height>0f && visible(it.id)}
         val covered=live.any{it.screen in FULL_SCREENS}
-        return live.filter {it.bounds.contains(point) && !(covered && it.screen==BASE_SCREEN)}
-            .minWithOrNull(compareBy<StudioLiveControl>{if(it.screen==BASE_SCREEN)1 else 0}.thenBy{it.bounds.width*it.bounds.height}.thenBy{if(it.isAction)0 else 1})
+        val under=live.filter {it.bounds.contains(point) && !(covered && it.screen==BASE_SCREEN)}
+        val deepest=under.minWithOrNull(compareBy<StudioLiveControl>{if(it.screen==BASE_SCREEN)1 else 0}.thenBy{it.bounds.width*it.bounds.height}.thenBy{if(it.isAction)0 else 1})
+            ?: return null
+        // Owner, Nov 7: "It drags the picture off the chip." A picture, name or number inside a grouped item (a player
+        // chip, a log entry) selects the whole group first, so a drag moves the chip in one piece. Tapping the group
+        // again goes inside to the part. Buttons are always picked directly.
+        val group=under.filter{it.kind=="container-action" && it.id!=deepest.id && it.screen==deepest.screen}
+            .minByOrNull{it.bounds.width*it.bounds.height} ?: return deepest
+        // Something inside a big panel (the battlefield, the hand tray) is picked directly; inside a small group such as
+        // a chip (at most ~12× its own area) the group comes first.
+        val area={c:StudioLiveControl->c.bounds.width*c.bounds.height}
+        if(area(group)>12f*area(deepest))return deepest
+        return if(current==group.id)deepest else group
     }
 
     /** The smallest other control that fully encloses [child] in the same window. */

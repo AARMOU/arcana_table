@@ -283,7 +283,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                 runtime.edit(selection.id,StudioEditorGeometry.commit(style,grabbed,selection.bounds.width/density,selection.bounds.height/density,
                     Offset(total.x/density,total.y/density),currentSnap))
             } else if(!StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop)) {
-                runtime.selected=StudioEditorGeometry.hitTest(runtime.controls.values.filter(currentPickable),point,window){runtime.style(it).visible}?.id
+                runtime.selected=StudioEditorGeometry.hitTest(runtime.controls.values.filter(currentPickable),point,window,runtime.selected){runtime.style(it).visible}?.id
             }
             handle=null;drag=Offset.Zero
         }

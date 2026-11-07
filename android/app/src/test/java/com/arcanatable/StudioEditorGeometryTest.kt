@@ -21,6 +21,18 @@ class StudioEditorGeometryTest {
         assertNull(StudioEditorGeometry.parentOf(all,group))
     }
 
+    /** Owner, Nov 7: "It drags the picture off the chip." A small group is picked first; tapping it again goes inside. */
+    @Test fun aChipIsPickedWholeFirstAndItsPictureOnASecondTap() {
+        val chip=c("native:chip",Rect(0f,0f,150f,60f),"container-action")
+        val art=c("native:art",Rect(4f,4f,64f,56f),"action")
+        val board=c("native:board",Rect(0f,100f,400f,500f),"container-action")
+        val pass=c("native:pass",Rect(10f,110f,110f,154f))
+        val all=listOf(chip,art,board,pass)
+        assertEquals("native:chip",StudioEditorGeometry.hitTest(all,Offset(20f,20f),1){true}?.id)
+        assertEquals("native:art",StudioEditorGeometry.hitTest(all,Offset(20f,20f),1,"native:chip"){true}?.id)
+        assertEquals("a button in a big panel is picked directly","native:pass",StudioEditorGeometry.hitTest(all,Offset(20f,120f),1){true}?.id)
+    }
+
     @Test fun overlayScreensBeatTheTableAndFullScreenPagesHideIt() {
         fun s(id:String,screen:String,r:Rect)=StudioLiveControl(id,screen,"action",id,true,r,1)
         val board=s("native:board","Table",Rect(0f,0f,400f,400f))

@@ -190,8 +190,17 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun style(id:String,screen:String?=null,kind:String?=null):StudioControlStyle {
         if(!editing && id in recovered)return StudioControlStyle()
         val project=project()
-        val style=project.controls[id] ?: project.copies.firstOrNull{it.id==id}?.style ?: StudioControlStyle(
-            visible=!((project.screenDensity[screen ?: controls[id]?.screen] ?: project.density)=="Minimal" && (kind ?: controls[id]?.kind)=="data"))
+        // Owner, Nov 7: Minimal hides live info on the table, but never the game log's text (the log is only its text).
+        val onScreen=screen ?: controls[id]?.screen
+        // Owner, Nov 7: game log entries are all the same kind of item, so resizing one resizes them all. An entry with
+        // no edit of its own follows an edited entry built from the same piece of code.
+        val shared=if(project.controls[id]==null && onScreen?.contains("log",ignoreCase=true)==true) {
+            val site=id.substringAfter("native:").substringBefore("/")
+            project.controls.entries.firstOrNull{(k,_)->k!=id && k.substringAfter("native:").substringBefore("/")==site}?.value
+        } else null
+        val style=project.controls[id] ?: shared ?: project.copies.firstOrNull{it.id==id}?.style ?: StudioControlStyle(
+            visible=!((project.screenDensity[onScreen] ?: project.density)=="Minimal" && (kind ?: controls[id]?.kind)=="data" &&
+                onScreen?.contains("log",ignoreCase=true)!=true))
         if(!editing && !style.visible) {
             val replacements=project.copies.filter{it.style.visible && (it.style.binding ?: it.source)==id}
             if(replacements.isNotEmpty() && replacements.all{it.id in recovered})return StudioControlStyle()
