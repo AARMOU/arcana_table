@@ -179,6 +179,48 @@ test('B15 final dispatch gate fails closed when trusted historical ledger data i
   assert.equal(r.state, 'nothing-eligible'); assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
 });
 
+test('B15 concurrent dispatcher wake cannot spend after another run records authorization', async () => {
+  const ledger = {};
+  const f = fake({ ledger });
+  const originalComment = f.github.rest.issues.createComment;
+  f.github.rest.issues.createComment = async args => {
+    await originalComment(args);
+    if (String(args.body || '').startsWith(A.LEDGER))
+      (ledger[args.issue_number] ||= []).push(bot(args.body));
+  };
+  let assignmentStarted, releaseAssignment;
+  const started = new Promise(resolve => { assignmentStarted = resolve; });
+  const blocked = new Promise(resolve => { releaseAssignment = resolve; });
+  const calls = [];
+  const first = run(f, {}, { fetchImpl: async (url, init) => {
+    calls.push([url, JSON.parse(init.body)]);
+    assignmentStarted();
+    await blocked;
+    return { ok: true, json: async () => ({ assignees: [{ login: 'Copilot' }] }) };
+  } });
+  await started;
+
+  let racedCalls = 0;
+  const raced = await run(f, {}, { fetchImpl: async () => { racedCalls++; throw Error('must not assign'); } });
+  assert.equal(raced.state, 'interrupted-attempt');
+  assert.deepEqual(raced.issues, [68]);
+  assert.equal(racedCalls, 0);
+
+  releaseAssignment();
+  const completed = await first;
+  assert.deepEqual(completed, { state: 'attempted', issue: 68, result: 'confirmed' });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(f.writes.map(w => w[0]), ['comment', 'removeLabel', 'comment', 'comment']);
+  assert.match(f.writes[0][2], /op:authorizing/);
+  assert.match(f.writes[3][2], /op:attempt-result/);
+
+  const fs = require('node:fs');
+  const dispatcher = fs.readFileSync('.github/workflows/arcana-card-dispatcher.yml', 'utf8');
+  const router = fs.readFileSync('.github/workflows/arcana-ci-failure-router.yml', 'utf8');
+  assert.match(dispatcher, /^concurrency:\n  group: arcana-copilot-control\n  cancel-in-progress: false/m);
+  assert.match(router, /    concurrency:\n      group: arcana-copilot-control\n      cancel-in-progress: false/);
+});
+
 test('unknown budget denies without writes', async () => {
   const f = fake(); const calls = [];
   const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }), fetchImpl: fetchOk(calls) });
