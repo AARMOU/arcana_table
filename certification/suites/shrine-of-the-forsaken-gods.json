@@ -1,0 +1,9 @@
+{
+  "key": "shrine-of-the-forsaken-gods",
+  "name": "Shrine of the Forsaken Gods",
+  "issue": 766,
+  "source": "certification/ShrineOfTheForsakenGodsIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ShrineOfTheForsakenGodsIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
