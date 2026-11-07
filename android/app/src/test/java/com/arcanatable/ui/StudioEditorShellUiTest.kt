@@ -266,11 +266,10 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-profile-name").performScrollTo().performTextReplacement("Fold cover")
         rule.onNodeWithTag("studio-profile-copy").performClick();rule.waitForIdle()
         assertEquals("Fold cover",runtime.profile)
-        // The Layout page is long now (Show on screen, Turn label): reopen the panel at the top, as a player would.
-        rule.onNodeWithTag("studio-more-panel-close").performScrollTo().performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-more").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-more-tab-Project").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-classic").performScrollTo().performClick();rule.waitForIdle()
+        // The Layout page is long now (Show on screen, Turn label), so the tab and chip may be scrolled out of view;
+        // use their click actions directly rather than touch positions.
+        rule.onNodeWithTag("studio-more-tab-Project").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick);rule.waitForIdle()
+        rule.onNodeWithTag("studio-classic").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick);rule.waitForIdle()
         assertEquals(listOf("classic"),calls)
     }
 
