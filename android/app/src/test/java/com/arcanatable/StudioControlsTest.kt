@@ -93,7 +93,8 @@ class StudioControlsTest {
     @Test fun requiredActionsAndDynamicDataRemainTruthful() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
         runtime.record(StudioLiveControl(a,"Table","action","PASS → BLOCKERS",true)){}
-        runtime.begin(a);runtime.edit(a,StudioControlStyle(visible=false));assertTrue(runtime.problems().isNotEmpty())
+        // Owner's Studio log, Nov 7: Pass can't be hidden, so hiding it doesn't happen (no refused Apply later).
+        runtime.begin(a);runtime.edit(a,StudioControlStyle(visible=false));assertTrue(runtime.style(a).visible);assertTrue(runtime.problems().isEmpty())
         runtime.edit(a,StudioControlStyle());runtime.record(StudioLiveControl(b,"Table","data","Life 40",true,protectedLabel=true),null)
         runtime.edit(b,StudioControlStyle(label="Life 500"));assertTrue(runtime.problems().isNotEmpty())
     }
@@ -149,7 +150,10 @@ class StudioControlsTest {
         runtime.begin(a);runtime.duplicate(a,1f);runtime.edit(a,StudioControlStyle(visible=false))
         assertTrue(runtime.problems().isEmpty())
         val id=runtime.draft.copies.single().id
-        runtime.edit(id,runtime.style(id).copy(visible=false));assertTrue(runtime.problems().isNotEmpty())
+        assertFalse(runtime.style(a).visible)
+        // Hiding the stand-in too would lock the player out, so the original comes back instead (never a refused Apply).
+        runtime.edit(id,runtime.style(id).copy(visible=false))
+        assertTrue(runtime.style(a).visible);assertTrue(runtime.problems().isEmpty())
     }
     @Test fun sameScreenStillCannotRebindAcrossNativeWindows() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
