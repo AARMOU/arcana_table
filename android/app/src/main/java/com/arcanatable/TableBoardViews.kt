@@ -241,7 +241,7 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
         if (player.commanderName != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 player.commanderCard?.let { commander ->
-                    val crop = commander.artCropUrl ?: commander.imageUrl
+                    val crop = commanderArtOnly(commander.artCropUrl ?: commander.imageUrl)
                     if (!crop.isNullOrBlank()) CardArt(
                         crop,
                         Modifier.size(width = if (compact) 60.dp else 92.dp, height = if (compact) 38.dp else 58.dp)
@@ -256,7 +256,8 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
                         contentAlignment = Alignment.Center
                     ) { StudioText("TableBoardViews.Text.11", "Table and player", false, "COMMANDER", color = CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Bold) }
                 }
-                StudioText("TableBoardViews.Text.12", "Table and player", true, "COMMANDER · ${player.commanderName}", color = CounterGold, fontSize = if (compact) 7.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Owner note 12: the name was cut off ("COMMANDER · Mabe…"). It now wraps to a second line and takes the room left.
+                StudioText("TableBoardViews.Text.12", "Table and player", true, "COMMANDER · ${player.commanderName}", color = CounterGold, fontSize = if (compact) 7.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (compact) 9.sp else 11.sp, modifier = Modifier.weight(1f, fill = false))
             }
         }
         val commanderDamageTotal = player.commanderDamageReceived.values.sum()

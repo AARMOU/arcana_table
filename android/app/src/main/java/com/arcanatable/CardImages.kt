@@ -331,3 +331,18 @@ internal fun homeArtUrl(tableArt: String?, bundled: String?, name: String): Stri
     }
     return nameUrl
 }
+
+/**
+ * Owner note 12: commander chips and tabs show the artwork only (Scryfall `art_crop`), not the whole card. Links that
+ * aren't Scryfall's (bundled or offline pictures) are kept as they are, so nothing new is fetched.
+ */
+internal fun commanderArtOnly(url: String?): String? {
+    if (url.isNullOrBlank()) return url
+    val sized = CardImages.atSize(url, "art_crop")
+    if (sized.startsWith("https://api.scryfall.com/") && sized.contains("format=image")) {
+        val base = sized.substringBefore('?')
+        val query = sized.substringAfter('?', "").split('&').filter { it.isNotBlank() && !it.startsWith("version=") }
+        return base + "?" + (query + "version=art_crop").joinToString("&")
+    }
+    return sized
+}

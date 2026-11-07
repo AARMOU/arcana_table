@@ -162,7 +162,7 @@ internal fun TableController.TableMainLayout() {
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
                             turnLabel = if (index == snap.activePlayer) TurnColors.label(index == localSeat, player.name, player.isComputer) else null,
-                            artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
+                            artUrl = player.commanderCard?.let { commanderArtOnly(it.artCropUrl ?: it.imageUrl) }, artLabel = player.commanderCard?.name,
                             selected = !showOverview && selectedPlayer == index,
                             onClick = { run { selectedPlayer = index; showOverview = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         ) else PlayerViewTab(
