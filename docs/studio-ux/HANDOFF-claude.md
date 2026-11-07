@@ -2,6 +2,19 @@
 
 _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan), #883 (owner decisions), #1016 (GPT index)._
 
+## Update: Nov 7, ~14:00 MT (owner hit usage limits; GPT workers stopped)
+- **Second Claude account handoff** (J12, engine/rules queue, reviews; never touches #1013): [#81 comment 6712053976](https://github.com/AARMOU/arcana_table/issues/81#issuecomment-6712053976).
+- **Landed since 37188ed:**
+  - Show on screen covers phase bar, chips, TABLE, FULL TABLE label, mana bar, button row, commander chip, thinking bar and timer (`studioPieceShown`); hidden rows free their space (test `hidingScreenPiecesGivesTheirSpaceToTheBoard`)
+  - Scroll arrows on all sideways bars (J15)
+  - **Permanent IDs** (`d61a18b`): `studioStableId(site, screen, n)`, `withStableIds()` migration from owners, `_v1_original` rollback copy; clashes and missing owners are never guessed
+  - J10 fixture tests copied into this PR (`63f4d46`)
+  - **Neighbours make room** (`2185a22`): `StudioFixedSlotElement` replaces Row/Column weight for resized controls
+  - **"Show me…"** (`af90a09`): `studioPreview` + `StudioPreviews` for Combat, Opening hand and Actions tabs
+- **CI note:** runs from `494595c` took 45–75 min or hung; suspect the optionsExportImport test's close/reopen of the More panel, replaced by semantics clicks in `2ef17d3`. If CI still runs >30 min, bisect the new real-app tests (J10 UI, Show me, Show on screen).
+- **Still open:** multi-select, Align, button types (26), selectable battlefield and background (16/17), plain names from J7, two-finger scroll, chip reflow inside the scrolling seat row (it scrolls; neighbours don't shrink there).
+- **APK:** the owner said to build when the soonest sound point is reached (owner: "Whatever will get this done and into an apk as soon and as soundly as possible"), after CI is green on the head. J10's runtime proof comes from this PR's CI; J12 is with Claude B.
+
 ## Update: Nov 7, ~10:30 MT, batch 2b in progress (owner: no APK until GPT's jobs are verified DONE)
 - **Owner feedback** on #995: [2a notes](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6707718742) and [2b part 1 notes plus the button-text finding](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6709459150). GPT jobs in priority order (J9 → J7 → J8, J13–J15): [#950 comment 6709459381](https://github.com/AARMOU/arcana_table/issues/950#issuecomment-6709459381). **Don't build or send an APK until the owner confirms GPT is done.**
 - **2b done:**
