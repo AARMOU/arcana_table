@@ -245,6 +245,8 @@ jobs:
             const previous=await S.previousStatus({github,...context.repo,kind:'queue'});
             const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
             payload.autoQueue=auto;
+            try{payload.hardCardHandoff=await Q.syncHardCardHandoffs({github,...context.repo,held:auto.held||[]});}
+            catch(e){payload.hardCardHandoff={error:'handoff-sync-failed'};core.warning('Hard-card handoff sync failed: '+e.message);}
             // Blocked owner/app requests -> one prioritized [Card Work] item per pass; resolved ones handed back. Never paid here.
             try{payload.cardWork=await Q.syncCardWork({github,...context.repo,payload,runId:context.runId,enabled});}
             catch(e){payload.cardWork={reason:'card-work-sync-failed'};core.warning('Card work sync failed: '+e.message);}

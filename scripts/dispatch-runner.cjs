@@ -5,6 +5,7 @@
 const A = require('./admission.cjs');
 const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
 const F = require('./feasibility.cjs');
+const Q = require('./queue-feeder.cjs');
 const { calibrateReady } = require('./credit-calibration.cjs');
 
 // A certification-suite request (certification/suite-requests.cjs): test-only work on main.
@@ -47,6 +48,61 @@ const SUITE_FEASIBLE = { ok: true, code: null, reason: null, cards: [] };
 // Reviews exist because Cardkit cannot clear the card yet; the session's output is a review record, not the card.
 const REVIEW_FEASIBLE = SUITE_FEASIBLE;
 const feasOf = (u, feasible) => isSuite(u) || isReview(u) ? SUITE_FEASIBLE : feasible(u);
+
+const trustedQueueIssue = i => !i?.pull_request && String(i?.title || '').startsWith('[Arcana Queue]') &&
+  (A.TRUSTED_ASSOCIATIONS.includes(i.author_association || i.authorAssociation) ||
+    ((i.user?.login || i.authorLogin) === 'github-actions[bot]' && (i.user?.type || i.authorType) === 'Bot' &&
+      String(i.body || '').startsWith(A.AUTO_QUEUE_MARKER + '\n')));
+const capLiftSource = body => Number((String(body || '').match(/<!-- retry-cap-lift-consumed-from: #(\d+) -->/) || [])[1]) || null;
+
+// Final paid-admission guard for B15. Queue creation already checks per-card history, but an older
+// already-open queue can bypass that path. Recount trusted closed ledgers here and fail closed.
+async function historicalAttemptGates({ github, owner, repo, units }) {
+  const queued = units.filter(u => u.derived.state === 'queued' && trustedQueueIssue(u.raw));
+  const names = [...new Set(queued.flatMap(u => F.unitCards(u.raw.body)).map(F.normName).filter(Boolean))];
+  const gates = new Map();
+  if (!names.length) return gates;
+  let closed;
+  try {
+    closed = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'closed', per_page: 100 });
+  } catch {
+    for (const u of queued) gates.set(u.raw.number, { ok: false, reason: 'paid-attempt-history-unavailable' });
+    return gates;
+  }
+  const history = await Q.attemptHistoryForCards({ github, owner, repo, closedIssues: closed, names });
+  const trustedClosed = closed.filter(trustedQueueIssue);
+  const markerUses = new Map();
+  for (const issue of [...queued.map(u => u.raw), ...trustedClosed]) {
+    const source = capLiftSource(issue.body);
+    if (source) markerUses.set(source, [...(markerUses.get(source) || []), issue.number]);
+  }
+  for (const u of queued) {
+    const cards = F.unitCards(u.raw.body);
+    let denied = null;
+    for (const card of cards) {
+      const key = F.normName(card);
+      if (history.unknown.has(key)) { denied = 'paid-attempt-history-unavailable: ' + card; break; }
+      if ((history.counts.get(key) || 0) < Q.MAX_AUTO_ATTEMPTS) continue;
+      const sourceNumber = capLiftSource(u.raw.body);
+      const duplicateUse = sourceNumber && (markerUses.get(sourceNumber) || []).some(n => n !== u.raw.number);
+      const source = sourceNumber && trustedClosed.find(i => i.number === sourceNumber &&
+        F.unitCards(i.body).some(n => F.normName(n) === key));
+      if (!sourceNumber || duplicateUse || !source) { denied = 'per-card-paid-attempt-cap: ' + card; break; }
+      let approved = false;
+      try {
+        const events = await github.paginate(github.rest.issues.listEventsForTimeline,
+          { owner, repo, issue_number: sourceNumber, per_page: 100 });
+        approved = events.some(e => e.event === 'labeled' &&
+          String(e.actor?.login || '').toLowerCase() === String(owner).toLowerCase() &&
+          (typeof e.label === 'string' ? e.label : e.label?.name) === Q.RETRY_CAP_LIFT_LABEL);
+      } catch { approved = false; }
+      if (!approved) { denied = 'per-card-paid-attempt-cap: unaudited owner lift for ' + card; break; }
+    }
+    gates.set(u.raw.number, denied ? { ok: false, reason: denied } : { ok: true, reason: null });
+  }
+  return gates;
+}
+
 
 // Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
 // body that no longer passes the readiness rules stops the assignment, even if it happened after
@@ -355,7 +411,13 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
 
   // Engine feasibility (Cardkit on this exact base SHA). Missing or stale verdicts fail closed.
   const verdicts = F.parseVerdicts(env.ARCANA_FEASIBILITY);
-  const feasible = u => F.assess({ body: u.raw.body, override: u.raw.feasibilityOverride, approvers, verdicts, baseSha });
+  const cardkitFeasible = u => F.assess({ body: u.raw.body, override: u.raw.feasibilityOverride, approvers, verdicts, baseSha });
+  const historicalGates = await historicalAttemptGates({ github, owner, repo, units: data.units });
+  report.historicalAttemptGates = [...historicalGates].map(([issue, gate]) => ({ issue, ...gate }));
+  const feasible = u => {
+    const gate = historicalGates.get(u.raw.number);
+    return gate && !gate.ok ? { ok: false, code: 'historical-cap', reason: gate.reason, cards: [] } : cardkitFeasible(u);
+  };
   report.feasibility = verdicts ? { baseSha: verdicts.baseSha, classified: Object.keys(verdicts.cards).length } : { unavailable: true };
   // Every run publishes the dispatcher's own reason for each queued unit (null = eligible), so
   // Arcana Control never has to re-derive eligibility. Pure: no extra API calls.
@@ -452,4 +514,5 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { ciEquivalent, NON_BUILD, engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { historicalAttemptGates, ciEquivalent, NON_BUILD, engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+

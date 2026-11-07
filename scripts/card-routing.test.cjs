@@ -114,10 +114,104 @@ test('a card whose earlier trusted queue issue closed without landing is retried
   const held = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360 }]);
   assert.equal(held.suggestion, undefined);
   assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 360 }]);
+  const labeledOnly = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360,
+    labels: [{ name: Q.RETRY_CAP_LIFT_LABEL }] }]);
+  assert.equal(labeledOnly.suggestion, undefined, 'label alone is not owner approval');
+  const lifted = Q.chooseAutoQueue({ ...p, authorizedCapLiftIssues: new Set([360]) }, [],
+    [closedBot, { ...closedBot, number: 360, labels: [{ name: Q.RETRY_CAP_LIFT_LABEL }] }]);
+  assert.equal(lifted.suggestion.name, 'Celestine, the Living Saint');
+  assert.equal(lifted.capLiftIssue, 360);
   // An outsider's closed lookalike cannot block a card.
   const outsider = { ...closedBot, user: { login: 'x', type: 'User' }, body: unitBody('Celestine, the Living Saint') };
   const o = Q.chooseAutoQueue(p, [], [outsider, { ...outsider, number: 361 }]);
   assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
+});
+
+test('feeder posts a hard-card handoff comment without editing the owner board body', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT, title: '[Arcana Queue] Celestine',
+    body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name), labels: [] };
+  const board = { number: 883, body: '## Owner decisions\n\n## 2a. ⏰ Worker schedule\n' };
+  const comments = { 883: [] };
+  let nextId = 1;
+  const api = { issues: {
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    getLabel: async () => ({ data: {} }),
+    createLabel: async () => ({ data: {} }),
+    addLabels: async ({ labels }) => { issue.labels.push(...labels.map(label => ({ name: label }))); },
+    listComments: () => {},
+    createComment: async ({ issue_number, body }) => {
+      (comments[issue_number] ||= []).push({ id: nextId++, user: BOT, body });
+    },
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      const found = comments[issue_number].find(x => x.id === comment_id);
+      found.body = body;
+    },
+  } };
+  const github = { rest: api, paginate: async (fn, args) => comments[args.issue_number] || [] };
+  const originalBoard = board.body;
+  const r = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table',
+    held: [{ name, issue: 360 }] });
+  assert.deepEqual(issue.labels.map(l => l.name), [Q.HARD_CARD_LABEL]);
+  assert.match(comments[360][0].body, /Copilot stopped after two failed attempts/);
+  assert.equal(r.boardUpdated, true);
+  assert.equal(board.body, originalBoard, 'the owner-maintained issue body is untouched');
+  assert.match(comments[883][0].body, /## Hard cards waiting for a worker/);
+  assert.ok(comments[883][0].body.includes('#360'));
+});
+
+test('feeder preserves a still-capped prior card in its bot-maintained board comment', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
+    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
+    labels: [{ name: Q.HARD_CARD_LABEL }] };
+  const board = { number: 883, body: 'Owner decisions stay here.' };
+  const comments = { 360: [{ id: 1, user: BOT, body: '<!-- arcana-hard-card-handoff-v1 -->' + '\nWaiting for a worker.' }],
+    883: [{ id: 2, user: BOT, body: '<!-- arcana-hard-card-handoff-comment-v1 -->' + '\n## Hard cards waiting for a worker\n- Old card' }] };
+  const api = { issues: {
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    listForRepo: () => {},
+    listComments: () => {},
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      Object.values(comments).flat().find(x => x.id === comment_id).body = body;
+    },
+  } };
+  const github = { rest: api, paginate: async (fn, args) => {
+    if (fn === api.issues.listComments) return comments[args.issue_number] || [];
+    return args.state === 'closed' ? [issue] : [];
+  } };
+  const result = await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
+  assert.deepEqual(result.cards, [{ name, issue: 360 }]);
+  assert.match(comments[883][0].body, /Celestine, the Living Saint.*queue #360/);
+  assert.equal(board.body, 'Owner decisions stay here.');
+});
+
+test('feeder updates only its bot comment and preserves concurrent owner board edits', async () => {
+  const name = 'Celestine, the Living Saint';
+  const issue = { number: 360, state: 'closed', author_association: 'NONE', user: BOT,
+    title: '[Arcana Queue] Celestine', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody(name),
+    labels: [{ name: Q.HARD_CARD_LABEL }] };
+  const board = { number: 883, body: 'Owner edit added during hand-off sync.' };
+  const comments = { 360: [{ id: 1, user: BOT, body: '<!-- arcana-hard-card-handoff-v1 -->' + '\nWaiting.' }],
+    883: [{ id: 2, user: BOT, body: '<!-- arcana-hard-card-handoff-comment-v1 -->' + '\nOld handoff.' }] };
+  let boardWrites = 0;
+  const api = { issues: {
+    get: async ({ issue_number }) => ({ data: issue_number === 883 ? board : issue }),
+    listForRepo: () => {},
+    listComments: () => {},
+    update: async () => { boardWrites++; },
+    updateComment: async ({ issue_number, comment_id, body }) => {
+      Object.values(comments).flat().find(x => x.id === comment_id).body = body;
+    },
+  } };
+  const github = { rest: api, paginate: async (fn, args) => {
+    if (fn === api.issues.listComments) return comments[args.issue_number] || [];
+    return args.state === 'closed' ? [issue] : [];
+  } };
+  await Q.syncHardCardHandoffs({ github, owner: 'AARMOU', repo: 'arcana_table', held: [] });
+  assert.equal(boardWrites, 0);
+  assert.equal(board.body, 'Owner edit added during hand-off sync.');
+  assert.match(comments[883][0].body, /#360/);
 });
 
 const PACKET = ['## Cardkit starting packet', 'Cardkit classify: NEEDS_REVIEW', 'No close tested custom-card match was found.'].join('\n');

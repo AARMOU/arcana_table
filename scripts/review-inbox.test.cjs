@@ -387,15 +387,15 @@ test('existing holds override a certified ready row without replacing certificat
   }
 });
 
-const exhaustedRepairs = ['2026-10-31T00:00:00Z','2026-10-31T00:20:00Z'];
+const exhaustedRepairs = ['2026-10-31T00:00:00Z'];
 const finishedRepair = [{event:'copilot_work_started',created_at:'2026-10-31T00:21:00Z'},
   {event:'copilot_work_finished',created_at:'2026-10-31T00:50:00Z'}];
-test('trusted two-repair ledger plus finished session and red checks exposes engineering escalation', async () => {
+test('trusted one-repair ledger plus finished session and red checks exposes engineering escalation', async () => {
   const p = await lifecycleFixture({checks:[run('toolkit','failure')],repairs:exhaustedRepairs,events:finishedRepair}).go();
   const row = p.items[0];
   assert.equal(row.state,'repair-exhausted');
-  assert.equal(row.work.repairs,2);
-  assert.equal(row.work.limit,2);
+  assert.equal(row.work.repairs,1);
+  assert.equal(row.work.limit,1);
   assert.equal(row.work.pickup,'finished');
   assert.match(row.recovery.next,/without another paid attempt/);
   assert.equal(row.readyForOwner,false);
@@ -409,7 +409,7 @@ test('exhausted budget does not imply a live repair finished; lost timeline read
   f.github.rest.issues.listEventsForTimeline = async () => {throw Error('unavailable');};
   row = (await f.go()).items[0];
   assert.equal(row.work.pickup,'unknown');
-  assert.equal(row.work.repairs,2);
+  assert.equal(row.work.repairs,1);
   assert.notEqual(row.state,'repair-exhausted');
 });
 
@@ -419,7 +419,7 @@ test('a failing existing suite PR is named as the recovery destination, includin
   assert.equal(row.state,'repair-exhausted');
   assert.equal(row.suite.pr,535);
   assert.equal(row.work.repairs,0,'card repair ledger is not the suite ledger');
-  assert.equal(row.suite.work.repairs,2);
+  assert.equal(row.suite.work.repairs,1);
   assert.match(row.recovery.next,/suite PR #535/);
   f.suiteUnit.user.login = 'someone';
   row = (await f.go()).items[0];
