@@ -55,6 +55,13 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "3g"
+                // Nov 7: a hung test held CI for over an hour with no name in the log. Log each test as it starts and
+                // fails, and stop the task after 25 minutes (a full green run takes about 10), so a hang shows its name.
+                test.testLogging {
+                    events("started", "failed", "skipped")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                }
+                test.timeout.set(java.time.Duration.ofMinutes(25))
                 // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
