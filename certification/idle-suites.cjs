@@ -99,7 +99,7 @@ function idleRequest({ card, oracleLine, target }) {
       '## Acceptance', '',
       '- Every ability, cost, restriction and timing in the Oracle text has a positive scenario, with at least one negative scenario.',
       '- No placeholders, approximations, skipped or weakened assertions.',
-      `- \`Arcana Card Certification Premerge\` runs the suite against \`${target}\`; it merges automatically only when that run is green. If the card itself is wrong, keep the correct assertion and say exactly which one fails and why: that is a regression for the card lane, not a suite fix.`, '',
+      `- \`Arcana Card Certification Premerge\` runs the suite against \`${target}\`; a green result is report-only and still requires explicit owner merge approval. If the card itself is wrong, keep the correct assertion and say exactly which one fails and why: that is a regression for the card lane, not a suite fix.`, '',
       '## Oracle record', '', '    ' + oracleLine, ''].join('\n'),
   };
 }

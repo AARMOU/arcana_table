@@ -285,12 +285,11 @@ Suite authoring is now an ordinary admitted unit:
   the latest GitHub release for 72 h: owner AARMOU, next action the B141 checklist. Publishing the build
   as a release clears it. (Building, signing and releasing stay owner-only.)
 
-**§16 update (2026-10-30):** GitHub refuses `markPullRequestReadyForReview` from the workflow token, so the
-suite auto-merge marks ready and merges with `ARCANA_SUITE_MERGE_TOKEN` if set, else `COPILOT_DISPATCH_TOKEN`.
-If GitHub still refuses, it posts one notice on the suite PR with the owner's two clicks (Ready for review,
-Squash and merge) instead of stalling silently. A red premerge is now routed back to Copilot like card CI
-(`Arcana Card Certification Premerge` is in failure routing's workflow set; repair mode still applies).
-
+**Suite safeguard update (2026-11-07):** Suite certification is report-only. Green exact-head
+premerge returns `owner-merge-required`; it never marks a draft ready, merges, or starts
+post-merge backfill. The workflow uses read permissions and no merge/dispatch writer token.
+The owner must explicitly approve the final merge. Red premerge routing and all existing
+admission, budget and certification guards remain unchanged.
 
 ## 18. Merged suite completion and billing retention (#526 / #529)
 

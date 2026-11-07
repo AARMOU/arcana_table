@@ -41,44 +41,87 @@ test('every unsafe variation blocks the merge', () => {
   assert.ok(mergeBlockers(modified).includes('files-not-exactly-the-new-suite'));
 });
 
-test('mergeSuitePr marks ready and squash-merges the exact head; ignores non-suite PRs', async () => {
-  const g = good(); const calls = [];
-  const github = {
-    paginate: async (fn, a) => fn(a),
-    graphql: async () => { calls.push('ready'); return { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } }; },
+// Every mutation surface is a trap, including the legacy separately-authenticated writer.
+function client(g, calls) {
+  const mutation = async () => { calls.push('mutation'); throw Error('mutation forbidden'); };
+  return {
+    paginate: async (fn, a) => fn(a), graphql: mutation,
     rest: {
-      pulls: { list: () => [g.pr], listFiles: () => g.files, merge: async a => { calls.push(['merge', a.pull_number, a.sha, a.merge_method]); } },
-      issues: { get: async () => ({ data: g.request }) },
-      actions: { listJobsForWorkflowRun: () => g.jobs },
-      repos: { getContent: async () => ({ data: { content: Buffer.from(JSON.stringify(g.suite)).toString('base64') } }) },
+      pulls: { list: () => [g.pr], listFiles: () => g.files, merge: mutation, update: mutation },
+      issues: { get: async () => ({ data: g.request }), createComment: mutation },
+      actions: { listJobsForWorkflowRun: () => g.jobs, reRunWorkflow: mutation },
+      repos: { getContent: async () => ({ data: { content: g.raw ?? Buffer.from(JSON.stringify(g.suite)).toString('base64') } }) },
     },
   };
-  const r = await mergeSuitePr({ github, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
-  assert.equal(r.merged, true);
-  assert.deepEqual(calls, ['ready', ['merge', 610, SHA, 'squash']]);
-  g.request = { ...g.request, title: '[Arcana Queue] something' }; calls.length = 0;
-  const r2 = await mergeSuitePr({ github, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
-  assert.equal(r2.reason, 'not-a-suite-pr'); assert.deepEqual(calls, []);
+}
+
+test('green eligible draft and ready PRs require owner merge with zero mutations', async () => {
+  for (const draft of [true, false]) {
+    const g = good(), calls = []; g.pr.draft = draft;
+    const github = client(g, calls);
+    const result = await mergeSuitePr({ github, writer: github, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
+    assert.deepEqual(result, { merged: false, pr: 610, request: 600, key: 'shield-sphere', reason: 'owner-merge-required' });
+    assert.deepEqual(calls, []);
+  }
 });
 
-test('a refused merge leaves one owner notice with the exact clicks, never a silent stall', async () => {
-  const g = good(); const comments = [];
-  const github = {
-    paginate: async (fn, a) => fn(a),
-    rest: {
-      pulls: { list: () => [g.pr], listFiles: () => g.files },
-      issues: { get: async () => ({ data: g.request }), listComments: () => comments,
-        createComment: async a => comments.push({ user: { login: 'github-actions[bot]' }, body: a.body }) },
-      actions: { listJobsForWorkflowRun: () => g.jobs },
-      repos: { getContent: async () => ({ data: { content: Buffer.from(JSON.stringify(g.suite)).toString('base64') } }) },
-    },
-  };
-  const writer = { graphql: async () => { throw Error('Resource not accessible by integration'); }, rest: { pulls: { merge: async () => {} } } };
-  for (let i = 0; i < 2; i++) {
-    const r = await mergeSuitePr({ github, writer, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
-    assert.equal(r.reason, 'merge-refused');
+test('red, stale, foreign, unexecuted and malformed inputs remain blocked without mutations', async () => {
+  const variations = [
+    g => { g.run.conclusion = 'failure'; },
+    g => { g.pr.head.sha = 'c'.repeat(40); },
+    g => { g.run.head_repository.full_name = 'fork/repo'; },
+    g => { g.jobs[1].conclusion = 'failure'; },
+    g => { g.jobs = []; },
+    g => { g.raw = Buffer.from('{bad json').toString('base64'); },
+    g => { g.suite = null; },
+    g => { g.run.head_sha = ''; },
+    g => { g.run = null; },
+  ];
+  for (const mutate of variations) {
+    const g = good(), calls = []; mutate(g);
+    const github = client(g, calls);
+    const result = await mergeSuitePr({ github, writer: github, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
+    assert.equal(result.merged, false);
+    assert.ok(result.blockers?.length, JSON.stringify(result));
+    assert.deepEqual(calls, []);
   }
-  assert.equal(comments.length, 1);
-  assert.match(comments[0].body, /Ready for review\*\*, then \*\*Squash and merge/);
-  assert.match(comments[0].body, /ARCANA_SUITE_MERGE_TOKEN/);
+});
+
+test('unrelated PRs are left alone', async () => {
+  const g = good(), calls = []; g.request.title = '[Arcana Queue] unrelated';
+  const result = await mergeSuitePr({ github: client(g, calls), owner: 'AARMOU', repo: 'arcana_table', run: g.run });
+  assert.equal(result.reason, 'not-a-suite-pr'); assert.deepEqual(calls, []);
+});
+
+test('workflow grants reads only and has no writer token or post-merge backfill', () => {
+  const workflow = require('node:fs').readFileSync(require('node:path').join(__dirname, '../.github/workflows/arcana-suite-automerge.yml'), 'utf8');
+  assert.doesNotMatch(workflow, /: write|MERGE_TOKEN|COPILOT_DISPATCH_TOKEN|new github.constructor|backfill|setOutput/);
+  assert.match(workflow, /owner merge required/);
+});
+
+test('eligible workflow_run executes the actual report script with a read-only client', async () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-suite-automerge.yml'), 'utf8');
+  const script = workflow.match(/          script: \|\n([\s\S]*?)(?=      - name: Save)/)[1]
+    .split('\n').map(line => line.replace(/^            /, '')).join('\n');
+  const g = good(), calls = [], output = [];
+  const github = client(g, calls);
+  // Expose only the five REST read endpoints needed for an eligibility report.
+  delete github.graphql;
+  delete github.rest.pulls.merge; delete github.rest.pulls.update;
+  delete github.rest.issues.createComment; delete github.rest.actions.reRunWorkflow;
+  const summary = { addHeading() { return this; }, addCodeBlock(value) { output.push(JSON.parse(value)); return this; }, async write() {} };
+  const core = { info() {}, warning() {}, summary };
+  const load = name => {
+    if (name === './scripts/gh-etag-cache.cjs') return { install() {} };
+    assert.equal(name, './certification/suite-automerge.cjs');
+    return { mergeSuitePr };
+  };
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  await new AsyncFunction('github', 'context', 'core', 'require', script)(github,
+    { repo: { owner: 'AARMOU', repo: 'arcana_table' }, payload: { workflow_run: g.run } }, core, load);
+  assert.equal(output.length, 1);
+  assert.equal(output[0].reason, 'owner-merge-required');
+  assert.equal(output[0].merged, false);
+  assert.deepEqual(calls, []);
 });

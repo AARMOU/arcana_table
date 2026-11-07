@@ -87,7 +87,7 @@ const missingBody = list => {
   const needed = list.filter(m => !m.engineGap), blocked = list.filter(m => m.engineGap);
   return [MARKER, '### 🤖 Certification suites needed (automated, hourly)', '',
   needed.length
-    ? 'These Copilot card PRs contain card code but no registered certification suite, so they cannot be certified, verified or integrated yet. Each gets an automatic `[Arcana Suite]` request that the dispatcher assigns to Copilot (admission and budget apply); a green premerge merges the suite and the backfill re-runs certification. **Suite authors (Work GPT / Goose):** only entries marked as not requested or closed need you; add `certification/suites/<key>.json` + test, as in #480.'
+    ? 'These Copilot card PRs contain card code but no registered certification suite, so they cannot be certified, verified or integrated yet. Each gets an automatic `[Arcana Suite]` request that the dispatcher assigns to Copilot (admission and budget apply); a green premerge reports eligibility for owner approval and manual merge, after which the backfill re-runs certification. **Suite authors (Work GPT / Goose):** only entries marked as not requested or closed need you; add `certification/suites/<key>.json` + test, as in #480.'
     : 'Every open Copilot card PR with card code has a registered certification suite.',
   '', ...needed.map(line),
   ...(blocked.length ? ['', `**Blocked on engine work** (queue issue labeled \`${ENGINE_GAP_LABEL}\`; no suite until the engine supports the card):`, ...blocked.map(line)] : []), '',
