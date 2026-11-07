@@ -1,7 +1,6 @@
 package com.arcanatable
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonColors
 import androidx.compose.ui.graphics.Color
@@ -16,12 +15,13 @@ import androidx.compose.ui.unit.dp
 internal object StudioButtonTypes {
     data class Look(val shape:Shape,val fill:(TableColors)->Color,val ink:(TableColors)->Color,val edge:((TableColors)->BorderStroke)?)
 
+    // The five approved on #995 (note 26), each copying a button already in the app.
     val looks:Map<String,Look> = linkedMapOf(
-        "Plaque" to Look(RoundedCornerShape(4.dp),{it.raised},{it.counter},{BorderStroke(1.dp,it.counter.copy(alpha=0.45f))}),
-        "Gold bar" to Look(RoundedCornerShape(3.dp),{it.counter},{it.background},null),
-        "Cut corner" to Look(CutCornerShape(8.dp),{it.panel},{it.counter},{BorderStroke(1.dp,it.counter)}),
-        "Outline" to Look(RoundedCornerShape(4.dp),{Color.Transparent},{it.counter},{BorderStroke(1.5.dp,it.counter)}),
-        "Tab" to Look(CutCornerShape(topStart=0.dp,topEnd=10.dp,bottomEnd=0.dp,bottomStart=10.dp),{it.accent},{it.background},null),
+        "Action" to Look(RoundedCornerShape(6.dp),{it.accent},{it.background},null),                                      // solid teal, like PASS
+        "Panel" to Look(RoundedCornerShape(6.dp),{it.panel},{it.text},{BorderStroke(1.dp,it.accent)}),                     // dark with an outline, like CAST
+        "Counter" to Look(RoundedCornerShape(4.dp),{it.raised},{it.text},{BorderStroke(1.dp,it.muted.copy(alpha=0.5f))}),  // like LIBRARY
+        "Phase tab" to Look(RoundedCornerShape(4.dp),{it.counter.copy(alpha=0.18f)},{it.counter},{BorderStroke(1.dp,it.counter.copy(alpha=0.6f))}), // like MAIN 1
+        "Tray bar" to Look(RoundedCornerShape(topStart=10.dp,topEnd=10.dp,bottomStart=2.dp,bottomEnd=2.dp),{it.panel},{it.counter},{BorderStroke(1.dp,it.counter.copy(alpha=0.3f))}), // like HAND 7
     )
     val names get()=looks.keys
 
