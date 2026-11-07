@@ -160,6 +160,12 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             TextButton(onClick={runCatching{runtime.copyProfile(profileName.trim())}.onSuccess{profileName=""}.onFailure{onMessage(it.message ?: "Cannot copy profile.")}},
                 enabled=profileName.isNotBlank(),modifier=Modifier.heightIn(min=48.dp).testTag("studio-profile-copy")){Text("Save")}
         }
+        StudioSection("Turn label")
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            listOf("both" to "R2 · T3","round" to "Round 2","turn" to "Turn 3","hidden" to "Hidden").forEach {(mode,text)->
+                StudioChip(text,true,"studio-turn-label-$mode",selected=runtime.draft.turnLabel==mode){runtime.change(runtime.draft.copy(turnLabel=mode))}
+            }
+        }
         StudioSection("Information on $screen")
         val current=runtime.draft.screenDensity[screen] ?: runtime.draft.density
         Row {listOf("Minimal","Balanced","Detailed").forEach {v->StudioChip(v,true,"studio-density-$v",selected=v==current){runtime.density(screen,v)}}}

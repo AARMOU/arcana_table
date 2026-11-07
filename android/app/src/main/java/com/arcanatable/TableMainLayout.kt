@@ -198,7 +198,10 @@ internal fun TableController.TableMainLayout() {
             }
             if (!compactArgentumTable) Spacer(Modifier.weight(1f))
             Box(Modifier) {
-                StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) "T${turnNumber}${if (turnTimerVisible) " · " + formatClock(elapsedTurnSeconds) else ""}" else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) listOfNotNull(
+                    // Owner, Nov 7: rounds as well as turns ("R2 · T3"), changeable in Studio ⋮ > Layout.
+                    if (BuildConfig.STUDIO_ENABLED) turnLabelText(studioControlsRuntime?.project()?.turnLabel ?: "both", turnNumber, players.size.coerceAtLeast(1)) else "T$turnNumber",
+                    if (turnTimerVisible) formatClock(elapsedTurnSeconds) else null).joinToString(" · ") else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.heightIn(min = 44.dp).tutorialTarget("turn-timer").wrapContentHeight(Alignment.CenterVertically).studioCombinedClickable("TableMainLayout.combinedClickable.1", "Table and player", enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.1", "Table and player", text = { StudioText("TableMainLayout.Text.6", "Table and player", true, if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })

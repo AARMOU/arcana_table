@@ -32,3 +32,21 @@ class StudioLogTest {
         assertEquals("hand: no change", StudioLog.handDiff(ref, ref))
     }
 }
+
+/** Owner, Nov 7: "A full turn is counted after everyone goes." Rounds as well as turns, and the label is changeable. */
+class TurnLabelTest {
+    @Test fun roundGoesUpAfterEveryoneHasHadATurn() {
+        assertEquals("R1 · T1", turnLabelText("both", 1, 2))
+        assertEquals("R1 · T2", turnLabelText("both", 2, 2))
+        assertEquals("R2 · T3", turnLabelText("both", 3, 2))
+        assertEquals("Round 1", turnLabelText("round", 4, 4))
+        assertEquals("Round 2", turnLabelText("round", 5, 4))
+        assertEquals("Turn 5", turnLabelText("turn", 5, 4))
+        assertEquals(null, turnLabelText("hidden", 5, 4))
+    }
+    @Test fun turnLabelChoiceSavesWithTheProject() {
+        val p = StudioControlProject(turnLabel = "round")
+        assertEquals("round", StudioControlProject.parse(p.json()).turnLabel)
+        assertEquals("both", StudioControlProject.parse(StudioControlProject().json()).turnLabel)
+    }
+}

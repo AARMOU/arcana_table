@@ -40,12 +40,25 @@ internal data class StudioControlStyle(
     }
 }
 
+internal val TURN_LABELS=listOf("both","round","turn","hidden")
+
+/**
+ * Owner, Nov 7: "A full turn is counted after everyone goes." The engine counts every player's turn; a round is one
+ * turn for everyone at the table. [turnNumber] is the engine's 1-based count; [seats] the players at the table.
+ */
+internal fun turnLabelText(mode:String,turnNumber:Int,seats:Int):String? {
+    val turn=turnNumber.coerceAtLeast(1);val round=(turn-1)/seats.coerceAtLeast(1)+1
+    return when(mode){"round"->"Round $round";"turn"->"Turn $turn";"hidden"->null;else->"R$round · T$turn"}
+}
+
 internal data class StudioControlCopy(val id:String,val source:String,val style:StudioControlStyle)
 internal data class StudioControlProject(val controls:Map<String,StudioControlStyle> = emptyMap(),
     val copies:List<StudioControlCopy> = emptyList(),val density:String="Balanced",val theme:Map<String,String> = emptyMap(),
-    val owners:Map<String,String> = emptyMap(),val screenDensity:Map<String,String> = emptyMap()) {
+    val owners:Map<String,String> = emptyMap(),val screenDensity:Map<String,String> = emptyMap(),
+    /** Owner, Nov 7: what the top turn label shows — "both" (R2 · T3), "round", "turn" or "hidden". */
+    val turnLabel:String="both") {
     fun colors(base:TableColors)=StudioLayout(emptyList(),theme=theme).colors(base)
-    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("controls",JSONObject().apply {
+    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("controls",JSONObject().apply {
         controls.forEach {(id,style)->put(id,style.json())}
     }).put("copies",JSONArray().apply {copies.forEach {put(JSONObject().put("id",it.id).put("source",it.source).put("style",it.style.json()))}}).toString()
     companion object {
@@ -78,10 +91,11 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
             require(owners.all{(id,name)->StudioSites.contains(id) && name.length in 1..100}){"Unknown screen owner."}
             val densities=stringMap("screenDensity")
             require(densities.all{(name,value)->name.length in 1..100 && value in listOf("Minimal","Balanced","Detailed")}){"Invalid screen density."}
+            val turnLabel=root.optString("turnLabel","both");require(turnLabel in TURN_LABELS){"Unknown turn label."}
             return StudioControlProject(controls.keys().asSequence().associateWith {id->
                 require(id.startsWith("native:") && id.length<=180 && StudioSites.contains(id)){"Unknown control ID."}
                 StudioControlStyle.parse(controls.getJSONObject(id))
-            },parsedCopies,density,theme,owners,densities)
+            },parsedCopies,density,theme,owners,densities,turnLabel)
         }
     }
 }
@@ -210,6 +224,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             val a=before.controls[id] ?: StudioControlStyle();val b=after.controls[id] ?: StudioControlStyle()
             if(a!=b)StudioLog.add("Edit ${title(id)} [${controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?"}]: ${StudioLog.diff(a,b)}")
         }
+        if(before.turnLabel!=after.turnLabel)StudioLog.add("Turn label ${before.turnLabel}→${after.turnLabel}")
         val oldCopies=before.copies.associateBy{it.id};val newCopies=after.copies.associateBy{it.id}
         (newCopies.keys-oldCopies.keys).forEach{StudioLog.add("Duplicate of ${title(newCopies[it]!!.source)} added")}
         (oldCopies.keys-newCopies.keys).forEach{StudioLog.add("Duplicate of ${title(oldCopies[it]!!.source)} removed")}
