@@ -239,4 +239,26 @@ class StudioControlsTest {
         val runtime=StudioControlsRuntime(prefs(),"portrait");runtime.begin();runtime.importProject(old.json())
         assertEquals(StudioControlStyle(width=120f,ink="#FFD166"),runtime.draft.controls[newLife])
     }
+
+    /** Owner, Nov 7: hold picks every item like it; one change moves them all as one Undo; Line up uses the first picked. */
+    @Test fun holdSelectsAllLikeItAndEditsAndLinesThemUpTogether() {
+        val runtime=StudioControlsRuntime(prefs(),"portrait")
+        val chips=(0..2).map{"native:HomeScreen.OutlinedButton.1/s1:$it"}
+        chips.forEachIndexed{i,id->runtime.record(StudioLiveControl(id,"Home","action","Chip $i",true,androidx.compose.ui.geometry.Rect(10f+100f*i,20f*i,90f+100f*i,60f+20f*i)),{})}
+        runtime.record(StudioLiveControl(b,"Home","action","Other",true,androidx.compose.ui.geometry.Rect(0f,300f,80f,340f)),{})
+        runtime.begin()
+        runtime.holdSelect(chips[0])
+        assertEquals(chips.toSet(),runtime.members().toSet())
+        runtime.editGroup(runtime.style(chips[0]).copy(dx=4f),1f)
+        assertTrue(chips.all{runtime.style(it).dx==4f})
+        assertEquals(0f,runtime.style(b).dx,0f)
+        runtime.undo()
+        assertTrue("one Undo for the group",chips.all{runtime.style(it).dx==0f})
+        runtime.toggleMember(chips[2])
+        assertEquals(setOf(chips[0],chips[1]),runtime.members().toSet())
+        runtime.align(StudioEditorGeometry.Align.Top,1f)
+        assertEquals(-20f,runtime.style(chips[1]).dy,0f)
+        runtime.selected=b
+        assertTrue("a plain selection goes back to one item",runtime.group.isEmpty())
+    }
 }
