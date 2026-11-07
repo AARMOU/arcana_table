@@ -323,16 +323,20 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                     if(studioLiveGame)message="Arcana Studio is available after this game."
                     else {optionsOpen=false;if(gameInProgress)homeOpen=false;if(!studio.editing)studio.begin()}}}
                 // Switching screens in Studio closes whatever overlay was open first, so each pick shows exactly that screen.
-                val studioCloseAll={optionsOpen=false;stackOpen=false;zoneDialog=null;deckPickerOpen=false;playSheetOpen=false;wifiMultiConfigOpen=false;showHand=false;logOpen=false}
+                val studioCloseAll={studioPreview=null;optionsOpen=false;stackOpen=false;zoneDialog=null;deckPickerOpen=false;playSheetOpen=false;wifiMultiConfigOpen=false;showHand=false;logOpen=false}
                 val studioDestinations=mapOf(
                         "Table" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=true}),
                         "Player" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
                         "Stack" to (gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true}),
                         "Zones" to (gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
                         "Log" to (gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true}),
-                        "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {studioCloseAll();homeOpen=false}),
+                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up.
+                        "Combat" to (gameInProgress to {studioCloseAll();homeOpen=false;if(argentumAttackPlan==null && argentumBlockPlan==null)studioPreview="Combat"}),
+                        "Opening hand" to (gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Opening hand"}),
+                        "Actions" to (gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Actions"}),
                     )
                 val studioPractice:(()->Unit)?=if(gameInProgress) null else ({studioCloseAll();startOfflineGame()})
+                LaunchedEffect(studio.editing){if(!studio.editing)studioPreview=null}
                 if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
                     onApplied={nativeStudioRevision++},
                     onClassic={studioClassic=true;studio.panelOpen=true},
