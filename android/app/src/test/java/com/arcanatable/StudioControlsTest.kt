@@ -201,4 +201,42 @@ class StudioControlsTest {
         assertFalse(runtime.active);runtime.begin();assertTrue(runtime.active)
         runtime.cancel();assertFalse(runtime.active)
     }
+
+    /**
+     * Permanent IDs (Nov 6 note 27; Goose STUDIO-J7 migration gate): a project saved with old position-based IDs moves
+     * to stable IDs as it is read, keeps every style, duplicate source and screen owner, never guesses on a clash or a
+     * missing screen, keeps the untouched original for rollback, and still exports/imports in the same format.
+     */
+    @Test fun oldPositionBasedIdsMoveToStableIdsWithoutGuessing() {
+        val life="native:TableBoardViews.Text.27/-1186399513:0"; val pass="native:TableMainLayout.IconButton.1/774411:0"
+        val clashA="native:TableHelpers.Text.4/111:0"; val clashB="native:TableHelpers.Text.4/222:0"
+        val orphan="native:TableHelpers.Text.5/333:0"
+        val old=StudioControlProject(
+            controls=mapOf(life to StudioControlStyle(width=120f,ink="#FFD166"),pass to StudioControlStyle(dx=8f,visible=false),
+                clashA to StudioControlStyle(font=14f),clashB to StudioControlStyle(font=18f),orphan to StudioControlStyle(dy=4f)),
+            copies=listOf(StudioControlCopy("copy:abc",pass,StudioControlStyle(dx=20f))),
+            owners=mapOf(life to "Player",pass to "Table",clashA to "Player",clashB to "Player"),hiddenPieces=setOf("timer"))
+        val m=old.withStableIds()
+        val newLife=studioStableId("TableBoardViews.Text.27","Player",0);val newPass=studioStableId("TableMainLayout.IconButton.1","Table",0)
+        assertEquals(StudioControlStyle(width=120f,ink="#FFD166"),m.controls[newLife])
+        assertEquals(StudioControlStyle(dx=8f,visible=false),m.controls[newPass])
+        assertEquals(newPass,m.copies.single().source)
+        assertEquals("Player",m.owners[newLife])
+        assertTrue("a clash is kept, not guessed",clashA in m.controls && clashB in m.controls)
+        assertTrue("no recorded screen: kept as it was",orphan in m.controls)
+        assertEquals(setOf("timer"),m.hiddenPieces)
+        assertEquals(m,m.withStableIds())
+        assertEquals(m,StudioControlProject.parse(m.json()))
+        // Read through the store: the original is preserved once, untouched, for rollback.
+        val p=prefs();val key="studio_controls_v1_portrait_Default"
+        p.edit().putString(key,old.json()).commit()
+        val store=StudioControlStore(p,"portrait","Default")
+        assertEquals(m,store.load())
+        assertEquals(old,StudioControlProject.parse(p.getString("${key}_v1_original",null)!!))
+        store.apply(store.load());assertEquals(m,store.load())
+        assertEquals(old,StudioControlProject.parse(p.getString("${key}_v1_original",null)!!))
+        // Import of an old export lands on the stable IDs too.
+        val runtime=StudioControlsRuntime(prefs(),"portrait");runtime.begin();runtime.importProject(old.json())
+        assertEquals(StudioControlStyle(width=120f,ink="#FFD166"),runtime.draft.controls[newLife])
+    }
 }

@@ -47,7 +47,11 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     val runtime=LocalStudioControls.current ?: return null
     if(!runtime.active || LocalStudioExcluded.current)return null
     if(kind.endsWith("action") && LocalStudioControlParent.current?.proxy==true)return null
-    val base="native:$site/${currentCompositeKeyHash}"
+    // Owner, Nov 7 / Nov 6 note 27: permanent IDs. The ID is the code site, the screen and the control's order among
+    // same-site controls on that screen. It used to include the compose key hash, which changes whenever the app's code
+    // moves, so saved edits could detach between builds. Old saved IDs are moved by StudioControlProject.withStableIds.
+    val idScreen=LocalStudioScreen.current ?: screen
+    val base=studioStableId(site,idScreen,0).substringBeforeLast(":")
     val token=remember{Any()}
     val id=runtime.claim(base,token)
     val caption=remember(id){mutableStateOf(title)}

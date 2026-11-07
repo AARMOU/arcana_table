@@ -40,6 +40,9 @@ internal data class StudioControlStyle(
     }
 }
 
+/** Stable control ID: the code site, the screen it is on, and its order among same-site controls on that screen. */
+internal fun studioStableId(site:String,screen:String,index:Int)="native:$site/s${Integer.toHexString(screen.hashCode())}:$index"
+
 internal val TURN_LABELS=listOf("both","round","turn","hidden")
 
 /**
@@ -84,6 +87,24 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
     /** Owner, Nov 7: main-screen pieces switched off in Studio ⋮ > Layout > Show on screen (see [SCREEN_PIECES]). */
     val hiddenPieces:Set<String> = emptySet()) {
     fun colors(base:TableColors)=StudioLayout(emptyList(),theme=theme).colors(base)
+    /**
+     * Moves old position-based IDs (`native:<site>/<compose key hash>:<n>`) to stable ones (`native:<site>/s<screen>:<n>`).
+     * The old hash changed whenever the app's code moved, which detached saved edits between builds. The screen comes
+     * from [owners], recorded when the control was edited. IDs without a recorded screen, or two old IDs that would
+     * land on the same new ID, are kept as they are and never guessed (they are logged).
+     */
+    fun withStableIds():StudioControlProject {
+        val old=Regex("^native:(.+)/(-?\\d+):(\\d+)$")
+        val all=controls.keys+copies.map{it.source}+owners.keys
+        val target=all.associateWith {id->old.matchEntire(id)?.let{m->owners[id]?.let{screen->studioStableId(m.groupValues[1],screen,m.groupValues[3].toInt())}}}
+        val clashes=target.values.filterNotNull().groupingBy{it}.eachCount().filterValues{it>1}.keys
+        val map=target.filterValues{it!=null && it !in clashes}.mapValues{it.value!!}
+            .filter{(_,new)->new !in controls.keys && new !in owners.keys}
+        target.filter{(id,new)->new==null && old.matches(id) || new in clashes}.keys.forEach{StudioLog.add("Kept an old ID unmatched (no single stable match): $it")}
+        if(map.isEmpty())return this
+        fun m(id:String)=map[id] ?: id
+        return copy(controls=controls.mapKeys{m(it.key)},copies=copies.map{it.copy(source=m(it.source))},owners=owners.mapKeys{m(it.key)})
+    }
     fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("controls",JSONObject().apply {
         controls.forEach {(id,style)->put(id,style.json())}
     }).put("copies",JSONArray().apply {copies.forEach {put(JSONObject().put("id",it.id).put("source",it.source).put("style",it.style.json()))}}).toString()
@@ -131,8 +152,19 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
 
 internal class StudioControlStore(private val prefs:SharedPreferences,val orientation:String,val profile:String) {
     private val key="studio_controls_v1_${orientation}_$profile"
-    fun load():StudioControlProject=listOf(key,"${key}_backup").firstNotNullOfOrNull {k->prefs.getString(k,null)?.let{runCatching{StudioControlProject.parse(it)}.getOrNull()}} ?: StudioControlProject(density=profile.takeIf{it in listOf("Minimal","Balanced","Detailed")} ?: "Balanced")
-    fun draft()=prefs.getString("${key}_draft",null)?.let{runCatching{StudioControlProject.parse(it)}.getOrNull()}
+    fun load():StudioControlProject=listOf(key,"${key}_backup").firstNotNullOfOrNull {k->prefs.getString(k,null)?.let{raw->
+        runCatching{StudioControlProject.parse(raw)}.getOrNull()?.let{keepOriginal(k,raw,it)}}} ?: StudioControlProject(density=profile.takeIf{it in listOf("Minimal","Balanced","Detailed")} ?: "Balanced")
+    fun draft()=prefs.getString("${key}_draft",null)?.let{raw->runCatching{StudioControlProject.parse(raw)}.getOrNull()?.let{keepOriginal("${key}_draft",raw,it)}}
+    /**
+     * Permanent IDs (Nov 6 note 27, Goose STUDIO-J7 migration gate). A project saved with the old position-based IDs
+     * is moved to stable IDs as it is read; the untouched original JSON is kept once under `_v1_original` for
+     * rollback, so a bad migration can never overwrite the last good copy.
+     */
+    private fun keepOriginal(k:String,raw:String,parsed:StudioControlProject):StudioControlProject {
+        val migrated=parsed.withStableIds()
+        if(migrated!=parsed && !prefs.contains("${k}_v1_original"))prefs.edit().putString("${k}_v1_original",raw).apply()
+        return migrated
+    }
     fun saveDraft(project:StudioControlProject){prefs.edit().putString("${key}_draft",project.json()).apply()}
     fun apply(project:StudioControlProject) {
         check(stage(prefs.edit(),project).commit()){"Could not save controls."}
@@ -352,12 +384,13 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             (pendingHand ?: StudioStore(prefs,orientation,profile).load())?.let{put("hand",JSONObject(it.json()))}
         }.toString()
     fun importProject(text:String) {
+        StudioLog.add("Imported a project")
         require(text.length in 1..5_000_000){"Project is empty or too large."}
         val root=JSONObject(text)
-        if(root.optString("renderer")=="native-flow"){change(StudioControlProject.parse(text));return}
+        if(root.optString("renderer")=="native-flow"){change(StudioControlProject.parse(text).withStableIds());return}
         require(root.getInt("version")==3 && root.getString("renderer")=="arcana-native"){"Unsupported project."}
         require(root.getString("orientation")==orientation){"Select the project's orientation before importing."}
-        val controls=StudioControlProject.parse(root.getJSONObject("controls").toString())
+        val controls=StudioControlProject.parse(root.getJSONObject("controls").toString()).withStableIds()
         val hand=root.optJSONObject("hand")?.let{StudioLayout.parse(it.toString())}
         change(controls,hand)
     }
