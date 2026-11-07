@@ -64,6 +64,11 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
                 Column(Modifier.weight(1f).padding(start=4.dp)) {
                     Text(if(runtime.group.isEmpty())control.title.ifBlank{"Untitled"} else "$many selected",color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
                     Text("${control.screen} · ${kindName(control.kind)} · ${kotlin.math.round(widthDp).toInt()}×${kotlin.math.round(heightDp).toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
+                    // Owner, Nov 7: multi-select needs to be findable. Shown only when there are others like this one.
+                    val like=remember(control.id,runtime.controls.size){runtime.controls.values.count{it.id!=control.id && it.screen==control.screen &&
+                        StudioEditorGeometry.siteOf(it.id)==StudioEditorGeometry.siteOf(control.id)}}
+                    if(runtime.group.isEmpty() && like>0)Text("Hold it to pick all ${like+1} like it",color=darkTableColors.muted,fontSize=10.sp,maxLines=1)
+                    else if(runtime.group.isNotEmpty())Text("Tap items to add or remove · hold to go back to one",color=darkTableColors.muted,fontSize=10.sp,maxLines=1)
                 }
                 StudioParentButton(runtime,control)
                 IconButton(onClick={onCollapse(!collapsed)},modifier=Modifier.testTag("studio-inspector-collapse")) {

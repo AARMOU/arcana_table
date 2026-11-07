@@ -205,8 +205,14 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         StudioSection("Project")
         Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Copy / paste",true,"studio-export"){json=runtime.exportProject()}
-            StudioChip("Save file",true,"studio-save-file"){saveFile.launch("Arcana-Studio-${runtime.orientation}-${runtime.profile}.json")}
-            StudioChip("Open file",true,"studio-open-file"){openFile.launch(arrayOf("application/json","text/plain"))}
+            // Owner note 34: plain names. A backup holds the layout; a background picture stays on this phone.
+            StudioChip("Back up",true,"studio-save-file"){saveFile.launch("Arcana-Studio-${runtime.orientation}-${runtime.profile}.json")}
+            StudioChip("Restore",true,"studio-open-file"){openFile.launch(arrayOf("application/json","text/plain"))}
+            StudioChip("Share layout",true,"studio-share-layout"){
+                runCatching{context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply{
+                    type="text/plain";putExtra(android.content.Intent.EXTRA_SUBJECT,"Arcana Studio layout");putExtra(android.content.Intent.EXTRA_TEXT,runtime.exportProject())},"Share layout"))}
+                    .onFailure{onMessage("Couldn't open sharing on this phone.")}
+            }
             onHand?.let{StudioChip("Edit hand",true,"studio-more-hand"){it()}}
             onClassic?.let{StudioChip("Classic panel",true,"studio-classic",onClick=it)}
         }
