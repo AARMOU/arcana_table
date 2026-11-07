@@ -1,0 +1,9 @@
+{
+  "key": "beacon-of-unrest",
+  "name": "Beacon of Unrest",
+  "issue": 797,
+  "source": "certification/BeaconOfUnrestIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BeaconOfUnrestIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
