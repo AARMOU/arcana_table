@@ -207,9 +207,11 @@ internal fun StudioPadButton(icon:androidx.compose.ui.graphics.vector.ImageVecto
 internal fun StudioStepper(label:String,value:String,tag:String,onMinus:()->Unit,onPlus:()->Unit) {
     Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
         Text(label,color=darkTableColors.muted,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
-        IconButton(onClick=onMinus,modifier=Modifier.size(48.dp).testTag("$tag-minus")){Icon(Icons.Default.Remove,"Decrease $label",tint=darkTableColors.text)}
+        // Studio log: every stepper tap is recorded with the value it started from, so "tap once and it stops" can be
+        // traced on the owner's phone (owner, Nov 7).
+        IconButton(onClick={StudioLog.add("Tap − $label (was $value)");onMinus()},modifier=Modifier.size(48.dp).testTag("$tag-minus")){Icon(Icons.Default.Remove,"Decrease $label",tint=darkTableColors.text)}
         Text(value,color=darkTableColors.text,fontSize=13.sp,modifier=Modifier.widthIn(min=44.dp).testTag("$tag-value"),textAlign=androidx.compose.ui.text.style.TextAlign.Center)
-        IconButton(onClick=onPlus,modifier=Modifier.size(48.dp).testTag("$tag-plus")){Icon(Icons.Default.Add,"Increase $label",tint=darkTableColors.text)}
+        IconButton(onClick={StudioLog.add("Tap + $label (was $value)");onPlus()},modifier=Modifier.size(48.dp).testTag("$tag-plus")){Icon(Icons.Default.Add,"Increase $label",tint=darkTableColors.text)}
     }
 }
 

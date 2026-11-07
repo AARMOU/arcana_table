@@ -92,10 +92,10 @@ class StudioEditorShellUiTest {
         openHandScreen()
         rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint("pass"))};rule.waitForIdle()
         val widths=mutableListOf<Float>()
-        repeat(3){rule.onNodeWithTag("studio-width-plus").performClick();rule.waitForIdle();widths+=hand().elements.single{it.id=="pass"}.w}
+        repeat(3){rule.onNodeWithTag("studio-width-plus").performScrollTo().performClick();rule.waitForIdle();widths+=hand().elements.single{it.id=="pass"}.w}
         assertEquals("three taps, three changes: $widths",3,widths.distinct().size)
         val heights=mutableListOf<Float>()
-        repeat(3){rule.onNodeWithTag("studio-height-plus").performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h}
+        repeat(3){rule.onNodeWithTag("studio-height-plus").performScrollTo().performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h}
         assertEquals("three taps, three changes: $heights",3,heights.distinct().size)
     }
 
