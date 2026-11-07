@@ -133,7 +133,7 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                         if(!e.locked)StudioEditorGeometry.handlePoints(f,StudioEditorGeometry.compact(f,reach)).values.forEach {p->
                             drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
                         }
-                        val text=measurer.measure("${(f.width/unit).toInt()} × ${(f.height/unit).toInt()}"+if(e.locked)" · locked" else "",
+                        val text=measurer.measure("${kotlin.math.round(f.width/unit).toInt()} × ${kotlin.math.round(f.height/unit).toInt()}"+if(e.locked)" · locked" else "",
                             TextStyle(color=darkTableColors.background,fontSize=11.sp))
                         val pad=4.dp.toPx()
                         val at=Offset(f.left.coerceIn(0f,(size.width-text.size.width-2*pad).coerceAtLeast(0f)),(f.top-text.size.height-2*pad-10.dp.toPx()).coerceAtLeast(0f))

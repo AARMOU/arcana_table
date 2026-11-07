@@ -129,7 +129,7 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     }
     SideEffect{StudioEditorRequests.mainWindow=window}
     DisposableEffect(runtime){StudioEditorRequests.clear();StudioEditorRequests.shellActive=true;StudioEditorRequests.tool=StudioEditorTool.Select
-        onDispose{StudioEditorRequests.clear();StudioEditorRequests.shellActive=false}}
+        onDispose{StudioEditorRequests.clear();StudioEditorRequests.shellActive=false;StudioEditorRequests.screenTopInset=0.dp}}
     CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=darkTableColors.accent,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
         Box(Modifier.fillMaxSize().onGloballyPositioned{origin=it.boundsInRoot().topLeft;height=it.size.height.toFloat()}.testTag("studio-editor")) {
@@ -145,7 +145,9 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
                 noGame->StudioPracticeCard(onPractice,{pick("Hand")},Modifier.align(Alignment.Center))
                 else->StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density,popupScreens)
             }
-            Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().onGloballyPositioned{barBottom=it.boundsInRoot().bottom}) {bar()}
+            val px=LocalDensity.current
+            Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().onGloballyPositioned{barBottom=it.boundsInRoot().bottom
+                StudioEditorRequests.screenTopInset=with(px){it.size.height.toDp()}}) {bar()}
             // Dock the inspector away from the selection so the element being edited is never hidden.
             val dockTop=!handMode && selected!=null && selected.window==window && (selected.bounds.center.y-origin.y)>height*0.55f
             Column(Modifier.align(if(dockTop)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth()
@@ -321,7 +323,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                 drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
             }
             // Size readout rides on the frame, drawn (not laid out) so it can never feed back into layout.
-            val text=measurer.measure("${(frame.width/density).toInt()} × ${(frame.height/density).toInt()}",TextStyle(color=ink,fontSize=11.sp))
+            val text=measurer.measure("${kotlin.math.round(frame.width/density).toInt()} × ${kotlin.math.round(frame.height/density).toInt()}",TextStyle(color=ink,fontSize=11.sp))
             val pad=4.dp.toPx()
             val at=Offset(frame.left.coerceIn(0f,(size.width-text.size.width-2*pad).coerceAtLeast(0f)),
                 (frame.top-text.size.height-2*pad-10.dp.toPx()).coerceAtLeast(0f))

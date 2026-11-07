@@ -109,7 +109,10 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),topLeft=Offset(size.width-16.dp.toPx(),size.height-16.dp.toPx()),size=androidx.compose.ui.geometry.Size(16.dp.toPx(),16.dp.toPx()))
             }
         }
-    return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f).onGloballyPositioned {coordinates->
+    result=result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f)
+    // Owner note 32: in play, nothing is measured per frame. Positions are only tracked while Studio is open.
+    if(!widget.runtime.editing)return result
+    return result.onGloballyPositioned {coordinates->
         val rect=coordinates.boundsInRoot()
         // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
         // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable

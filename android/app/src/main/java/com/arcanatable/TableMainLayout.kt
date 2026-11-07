@@ -143,7 +143,8 @@ internal fun TableController.TableMainLayout() {
     Column(
         Modifier.fillMaxSize().background(Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(start = 10.dp, top = 8.dp, end = 10.dp)
+            // While Studio is open the screen starts below its bar instead of sliding underneath (owner notes 4, 10).
+            .padding(start = 10.dp, top = 8.dp + StudioEditorRequests.screenTopInset, end = 10.dp)
     ) {
         // Argentum game: one strip for connection, phase and timer (life is on the player tabs).
         val compactArgentumTable = argentumEnabled && argentumSnapshot != null

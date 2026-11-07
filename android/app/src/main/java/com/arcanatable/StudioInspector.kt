@@ -58,7 +58,7 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start=4.dp)) {
                     Text(control.title.ifBlank{"Untitled"},color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
-                    Text("${control.screen} · ${kindName(control.kind)} · ${widthDp.toInt()}×${heightDp.toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
+                    Text("${control.screen} · ${kindName(control.kind)} · ${kotlin.math.round(widthDp).toInt()}×${kotlin.math.round(heightDp).toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
                 }
                 StudioParentButton(runtime,control)
                 IconButton(onClick={onCollapse(!collapsed)},modifier=Modifier.testTag("studio-inspector-collapse")) {

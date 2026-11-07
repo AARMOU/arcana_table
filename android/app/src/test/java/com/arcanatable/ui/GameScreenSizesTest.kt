@@ -93,7 +93,8 @@ class GameScreenSizesTest {
         rule.onNode(hasTestTag("hand-peek")).performClick()
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-3-hand") }
-        assertTrue(shown("YOUR HAND"))
+        // Owner note 9: Studio builds show one compact line ("Hand 7 · Main 1 · 3 playable") instead of "YOUR HAND".
+        assertTrue(shown("YOUR HAND") || rule.onAllNodes(hasTestTag("hand-context"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         assertTrue("hand tray offers Argentum's actions", shown("ACTIONS ·"))
         assertFalse("no manual draw in Argentum mode", shown("DRAW", substring = false))
         assertFalse("no manual reveal in Argentum mode", shown("REVEAL HAND"))

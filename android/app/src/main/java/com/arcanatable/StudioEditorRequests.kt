@@ -1,5 +1,7 @@
 package com.arcanatable
 
+import androidx.compose.ui.unit.dp
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +25,8 @@ internal object StudioEditorRequests {
     fun clear(){pendingDismiss=null}
     // Editor settings shared with game dialog windows, which draw their own selection canvas.
     var shellActive by mutableStateOf(false)
+    /** Height of Studio's toolbar + screen bar. The live screen starts below it while editing (owner notes 4, 10). */
+    var screenTopInset by mutableStateOf(0.dp)
     var tool by mutableStateOf(StudioEditorTool.Select)
     var snap by mutableStateOf(true)
     var outlines by mutableStateOf(true)

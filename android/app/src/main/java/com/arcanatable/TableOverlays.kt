@@ -1002,7 +1002,7 @@ internal fun TableController.TableOverlays() {
                         .clickable { }
                 ) {
                     Box(
-                        Modifier.fillMaxWidth().height(36.dp).tutorialTarget("hand-drawer-grip")
+                        Modifier.fillMaxWidth().height(if (BuildConfig.STUDIO_ENABLED) 28.dp else 36.dp).tutorialTarget("hand-drawer-grip")
                             .pointerInput(configuration.screenHeightDp) {
                                 var dragDistance = 0f
                                 val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
@@ -1025,7 +1025,8 @@ internal fun TableController.TableOverlays() {
                     ) {
                         BottomSheetDefaults.DragHandle(color = Muted)
                     }
-                    if (!studioFrame) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
+                    // Owner note 9: no drag hint in Studio builds; the grip says it.
+                    if (!studioFrame && !BuildConfig.STUDIO_ENABLED) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     StudioScreen("Hand") { HandSheet(
                         studioLayout = studioLayout,
                         turnContext = argentumSnapshot?.let { snap ->

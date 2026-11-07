@@ -886,7 +886,17 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         return
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Owner note 9 (Studio builds): one compact line instead of three, e.g. "Hand 7 · Main 1 · 3 playable".
+        if (BuildConfig.STUDIO_ENABLED) Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+            val phase = turnContext?.split(" · ")?.getOrNull(1)?.let { when (it.lowercase()) {
+                "precombat main" -> "Main 1"; "postcombat main" -> "Main 2"; else -> it } }
+            val line = listOfNotNull("Hand ${cards.size}", phase,
+                if (argentumMode) "${cards.count { it.id in playableIds }} playable" else null,
+                if (argentumMode && stackCount > 0) "Stack $stackCount" else null).joinToString(" · ")
+            StudioText("TableBoardViews.Text.80", "Table and player", true, line, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("hand-context"))
+            StudioIconButton("TableBoardViews.IconButton.5", "Table and player", onClick = onClose, modifier = Modifier.size(44.dp)) { StudioIcon("TableBoardViews.Icon.6", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
+        } else Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 StudioText("TableBoardViews.Text.78", "Table and player", true, "YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 turnContext?.let { StudioText("TableBoardViews.Text.79", "Table and player", true, it, color = Muted, fontSize = 10.sp, maxLines = 2) }
