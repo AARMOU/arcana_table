@@ -425,3 +425,29 @@ What a reviewer rejects:
 - History of omissions and the few legacy approximations (do **not** add new ones):
   [`android/docs/CUSTOM_CARDS_HANDOFF.md`](../../android/docs/CUSTOM_CARDS_HANDOFF.md).
 - Engine primitive work is Claude's lane and tracked in issue #141.
+
+## 10. Mechanic recipes (rules expansion, issue #883)
+
+Each recipe names the card whose scenario test proves the mechanic on the pinned engine. Copy the
+shape, then copy that test's positive **and** negative cases for your card.
+
+### Infect, poison counters and the ten-poison loss
+
+Infect is a plain keyword. The engine already converts the damage: to a player it becomes poison
+counters and no life loss (CR 120.3b), to a creature it becomes -1/-1 counters instead of marked
+damage (CR 702.90c), trample excess becomes poison, and the 704.5c check ends the game for a player
+at ten poison (fifteen pooled in Two-Headed Giant). Toxic (`Keyword.TOXIC`) shares the poison path.
+
+<!-- excerpt: android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlightsteelColossus.kt -->
+```kotlin
+    keywords(Keyword.TRAMPLE, Keyword.INFECT, Keyword.INDESTRUCTIBLE)
+```
+
+Proof and test shapes: `BlightsteelColossusScenarioTest` (poison instead of life loss, exact
+threshold, -1/-1 counters on a blocker, trample-over poison, non-infect control, four-player game in
+which only the attacked player is poisoned and the game continues). Read poison with
+`state.getEntity(player)?.get<CountersComponent>()?.getCount(CounterType.POISON)`.
+
+A card-intrinsic "if this would be put into a graveyard from anywhere" replacement is
+`RedirectZoneChange(..., selfOnly = true)`; it works from hand, library and stack too (same test:
+discard and mill cases).

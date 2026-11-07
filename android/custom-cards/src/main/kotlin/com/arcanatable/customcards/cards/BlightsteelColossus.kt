@@ -16,9 +16,11 @@ val BlightsteelColossus = card("Blightsteel Colossus") {
     oracleText = "Trample, infect, indestructible\n" +
         "If Blightsteel Colossus would be put into a graveyard from anywhere, reveal Blightsteel Colossus and shuffle it into its owner's library instead."
 
-    // The pinned Argentum SDK has no infect keyword implementation. This custom definition
-    // keeps the supported trample, indestructible, and library-replacement behaviors.
-    keywords(Keyword.TRAMPLE, Keyword.INDESTRUCTIBLE)
+    // Infect (CR 702.90) is native to the pinned engine: damage to players becomes poison
+    // counters (CR 120.3b), damage to creatures becomes -1/-1 counters (CR 120.3d), and the
+    // 704.5c state-based action ends the game at ten poison. The shuffle-back below is a
+    // card-intrinsic replacement (`selfOnly`), so it works from every zone (CR 614.12).
+    keywords(Keyword.TRAMPLE, Keyword.INFECT, Keyword.INDESTRUCTIBLE)
 
     replacementEffect(
         RedirectZoneChange(

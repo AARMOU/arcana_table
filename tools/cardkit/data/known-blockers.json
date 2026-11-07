@@ -134,11 +134,6 @@
     }
   },
   "keywords": {
-    "Infect": {
-      "reason": "infect is not in the pinned Keyword enum; damage would not become poison/-1/-1 counters",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Blightsteel Colossus)",
-      "verified": true
-    },
     "Prowl": {
       "reason": "Prowl's alternative cost is not available",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Hunting Velociraptor)",
