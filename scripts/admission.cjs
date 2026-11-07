@@ -22,7 +22,8 @@ const RESOLVE_LABEL = 'wu:resolve-interrupted';
 // below it with budget headroom (scaledCapacity); demand fills it, because a slot is only taken when an
 // eligible build or repair exists.
 const HARD_MAX_UNITS = 3;
-const CEILING = { assign: 1, repair: 2 };
+// B15: one initial assignment plus at most one paid repair per card.
+const CEILING = { assign: 1, repair: 1 };
 const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
 // A Copilot session that started but never reported finishing for this long is reported as stale.
 // It keeps its slot (it may still be spending) until it finishes or the owner releases it.

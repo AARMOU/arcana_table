@@ -118,15 +118,17 @@ test('legacy assignment without a session holds a slot as an unreviewed pickup t
   assert.deepEqual([u.state, u.reason, u.holdsSlot, u.assignments], ['halted', 'pickup-timeout', true, 1]);
 });
 
-test('per-unit ceilings: one assignment and two repair requests', () => {
+test('B15 two-attempt cap: one assignment then one repair; third paid attempt refused', () => {
   const ready = A.readiness(env());
   assert.match(A.admit({ op: 'assign', unit: review(63), ready, snapshot: snap(), now: NOW }).reason, /state review/);
   const repairs = n => A.parseLedger(Array.from({ length: n }, (_, i) =>
     bot(A.formatLedger({ op: 'repair-request', issue: 67, run: 100 + i, at: iso(NOW - (90 - i) * MIN) }))));
   assert.equal(A.admit({ op: 'repair', unit: review(67), ready, snapshot: snap(), now: NOW }).allowed, true);
-  const two = review(67, { ledger: repairs(2) });
-  assert.equal(two.state, 'review');
-  assert.match(A.admit({ op: 'repair', unit: two, ready, snapshot: snap(), now: NOW }).reason, /repair ceiling/);
+  const afterOnePaidRepair = review(67, { ledger: repairs(1) });
+  assert.equal(afterOnePaidRepair.state, 'review');
+  const thirdPaidAttempt = A.admit({ op: 'repair', unit: afterOnePaidRepair, ready, snapshot: snap(), now: NOW });
+  assert.equal(thirdPaidAttempt.allowed, false);
+  assert.match(thirdPaidAttempt.reason, /repair ceiling/);
 });
 
 test('an outstanding repair request holds a slot until the session finishes', () => {

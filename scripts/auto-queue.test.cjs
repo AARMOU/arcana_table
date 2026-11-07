@@ -16,22 +16,36 @@ const BODY = [
   'Base: ' + BASE, '',
 ].join('\n');
 const title = '[Arcana Queue] ' + CARD + ' — Cardkit SUPPORTED, unclaimed';
+const BOT = { login: 'github-actions[bot]', type: 'Bot' };
 const payload = () => Q.queuePayload({
   result: { ok: true, available: 12, alreadyQueued: [] },
   units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA, runId: 555,
 });
 
-function fakeGitHub({ open = [], closed = [], head = SHA, issuer = { login: 'github-actions[bot]', type: 'Bot' } } = {}) {
+function fakeGitHub({ open = [], closed = [], comments = {}, events = {}, head = SHA, issuer = BOT, createError = null, removeLabelError = null } = {}) {
   const calls = [];
   const github = {
     rest: {
       repos: { getBranch: async args => { calls.push(['branch', args]); return { data: { commit: { sha: head } } }; } },
       issues: {
         listForRepo: () => {},
-        create: async args => { calls.push(['create', args]); return { data: { number: 777, user: issuer, html_url: 'https://github.com/AARMOU/arcana_table/issues/777' } }; },
+        listComments: () => {},
+        listEventsForTimeline: () => {},
+        removeLabel: async ({ issue_number, name }) => {
+          calls.push(['removeLabel', { issue_number, name }]);
+          if (removeLabelError) throw removeLabelError;
+          const issue = closed.find(i => i.number === issue_number);
+          if (issue) issue.labels = (issue.labels || []).filter(l => (typeof l === 'string' ? l : l.name) !== name);
+        },
+        create: async args => { calls.push(['create', args]); if (createError) throw createError; return { data: { number: 777, user: issuer, html_url: 'https://github.com/AARMOU/arcana_table/issues/777' } }; },
       },
     },
-    paginate: async (fn, args) => { calls.push(['list', args]); return args.state === 'closed' ? closed : open; },
+    paginate: async (fn, args) => {
+      calls.push([fn === github.rest.issues.listComments ? 'comments' : 'list', args]);
+      if (fn === github.rest.issues.listComments) return comments[args.issue_number] || [];
+      if (fn === github.rest.issues.listEventsForTimeline) return events[args.issue_number] || [];
+      return args.state === 'closed' ? closed : open;
+    },
   };
   return { github, calls };
 }
@@ -82,6 +96,30 @@ test('one trusted bot issue is created with immutable provenance and exact unit 
   assert.equal(A.provenance({ authorAssociation: 'NONE', authorLogin: 'github-actions[bot]',
     authorType: 'Bot', body, title, autoQueueUnedited: true, commenters: [] }).ok, true);
 });
+test('B15 does not consume the owner cap-lift label when queue creation fails', async () => {
+  const source = queueIssue(901, CARD, ['arcana:lift-copilot-attempt-cap']);
+  const { github, calls } = fakeGitHub({
+    closed: [source],
+    comments: { 901: [...paidPair(901, 1), ...paidPair(901, 2)] },
+    events: { 901: [{ event: 'labeled', actor: { login: 'AARMOU' }, label: { name: 'arcana:lift-copilot-attempt-cap' } }] },
+    createError: new Error('synthetic issue-create failure'),
+  });
+  await assert.rejects(() => Q.createNextAutoQueue({
+    github, owner: 'AARMOU', repo: 'arcana_table', payload: payload(), runId: 123, enabled: true,
+  }), /synthetic issue-create failure/);
+  assert.equal(calls.some(([kind]) => kind === 'removeLabel'), false);
+});
+
+test('B15 consumed cap-lift marker prevents reusing approval if label removal failed', () => {
+  const source = queueIssue(901, CARD, ['arcana:lift-copilot-attempt-cap']);
+  const retry = queueIssue(902, CARD);
+  retry.body += '\n<!-- retry-cap-lift-consumed-from: #901 -->\n';
+  const p = { ...payload(), authorizedCapLiftIssues: new Set([901]) };
+  const pick = Q.chooseAutoQueue(p, [], [source, retry]);
+  assert.equal(pick.suggestion, undefined);
+  assert.deepEqual(pick.held, [{ name: CARD, issue: 902 }]);
+});
+
 test('existing complete unassigned issue is woken without opening another issue', async () => {
   const existing = [{ number: 99, title: '[Arcana Queue] Another Card', body: BODY, assignees: [], author_association: 'OWNER' }];
   const { result, calls } = await run({ open: existing });
@@ -110,6 +148,84 @@ test('bot provenance rejects missing marker, wrong issuer, edits and untrusted c
 });
 test('unexpected token issuer halts, never silently assumes issue provenance', async () => {
   await assert.rejects(() => run({ issuer: { login: 'other-app[bot]', type: 'Bot' } }), /issuer-not-github-actions/);
+});
+
+const queueIssue = (number, name = CARD, labels = []) => ({ number, state: 'closed', labels, user: BOT,
+  author_association: 'NONE', title: '[Arcana Queue] ' + name, body: A.AUTO_QUEUE_MARKER + '\n' + BODY.replaceAll(CARD, name) });
+const ledgerComment = (issue, fields) => ({ user: BOT, body: A.formatLedger({ issue, at: '2026-11-04T10:00:00Z', ...fields }) });
+const paidPair = (issue, n) => [
+  ledgerComment(issue, { op: 'authorizing', run: n }),
+  ledgerComment(issue, { op: 'attempt-result', run: n, result: 'confirmed' }),
+  ledgerComment(issue, { op: 'repair-request', run: n + 1000 }),
+];
+
+test('B15 counts assignment plus repair across re-queues and hands off at the card-level cap', async () => {
+  const firstQueue = queueIssue(901);
+  const { result } = await run({ closed: [firstQueue], comments: { 901: paidPair(901, 1) } });
+  assert.equal(result.created, undefined);
+  assert.deepEqual(result.held, [{ name: CARD, issue: 901 }]);
+});
+
+test('B15 counts first assignments on two queue issues as two paid attempts', async () => {
+  const a = queueIssue(901), b = queueIssue(902);
+  const { result } = await run({ closed: [a, b], comments: {
+    901: [ledgerComment(901, { op: 'authorizing', run: 1 }), ledgerComment(901, { op: 'attempt-result', run: 1, result: 'confirmed' })],
+    902: [ledgerComment(902, { op: 'authorizing', run: 2 }), ledgerComment(902, { op: 'attempt-result', run: 2, result: 'confirmed' })],
+  } });
+  assert.equal(result.created, undefined);
+  assert.deepEqual(result.held, [{ name: CARD, issue: 902 }]);
+});
+
+test('B15 holds exhausted card but keeps an unrelated eligible card moving', async () => {
+  const other = 'Unrelated Test Card';
+  const p = Q.queuePayload({ result: { ok: true, available: 2 }, units: [
+    { name: CARD, body: BODY }, { name: other, body: BODY.replaceAll(CARD, other) },
+  ], base: BASE, baseSha: SHA });
+  const { result } = await run({ closed: [queueIssue(901)], comments: { 901: paidPair(901, 1) } }, p);
+  assert.equal(result.created, true);
+  assert.equal(result.name, other);
+  assert.deepEqual(result.held, [{ name: CARD, issue: 901 }]);
+});
+
+test('B15 cap lift cannot bypass B16 Cardkit packet admission', async () => {
+  const withoutPacket = BODY.replace([
+    '## Cardkit starting packet', 'Cardkit classify: SUPPORTED',
+    'No close tested custom-card match.', '',
+  ].join('\n'), '');
+  const p = Q.queuePayload({
+    result: { ok: true, available: 12, alreadyQueued: [] },
+    units: [{ name: CARD, body: withoutPacket }], base: BASE, baseSha: SHA, runId: 555,
+  });
+  assert.equal(p.suggestions[0].ready, false);
+  assert.ok(p.suggestions[0].missing.includes('cardkit-starting-packet'));
+
+  const source = queueIssue(901, CARD, [{ name: Q.RETRY_CAP_LIFT_LABEL }]);
+  const { result, calls } = await run({
+    closed: [source],
+    comments: { 901: paidPair(901, 1) },
+    events: { 901: [{ event: 'labeled', actor: { login: 'AARMOU' }, label: { name: Q.RETRY_CAP_LIFT_LABEL } }] },
+  }, p);
+  assert.notEqual(result.created, true);
+  assert.equal(calls.some(([kind]) => kind === 'create'), false);
+  assert.equal(calls.some(([kind]) => kind === 'removeLabel'), false);
+});
+
+test('B15 consumes one explicit cap-lift and does not authorize another queue next pass', async () => {
+  const prior = queueIssue(901, CARD, [{ name: Q.RETRY_CAP_LIFT_LABEL }]);
+  const options = { closed: [prior], comments: { 901: paidPair(901, 1) }, events: { 901: [
+    { event: 'labeled', actor: { login: 'AARMOU' }, label: { name: Q.RETRY_CAP_LIFT_LABEL } },
+  ] } };
+  const first = await run(options);
+  assert.equal(first.result.created, true);
+  assert.ok(!prior.labels.some(l => l.name === Q.RETRY_CAP_LIFT_LABEL));
+  const second = await run(options);
+  assert.equal(second.result.created, undefined);
+  assert.deepEqual(second.result.held, [{ name: CARD, issue: 901 }]);
+});
+
+test('B15 treats malformed trusted attempt history as unknown and blocks auto-queue', () => {
+  const history = Q.paidAttemptHistory([{ user: BOT, body: A.LEDGER + '\nop:unknown\nrun:7' }]);
+  assert.equal(history.complete, false);
 });
 
 test('owner-selected supported card is prioritized over automatic suggestions', () => {

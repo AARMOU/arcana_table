@@ -41,7 +41,7 @@ test('admitted failure records the unit reservation, then one controlled mention
   const x=fixture();assert.equal((await routeFailure(x.args)).state,'repair-requested');
   assert.equal(x.records.length,1);assert.equal(x.calls.length,1);const b=x.calls[0].body;
   assert.match(b,/run-id:12/);assert.ok(b.includes(sha));assert.match(b,/job 123/);
-  assert.match(b,/Repair request 1 of 2 for unit #67/);assert.equal(b.match(/@/g).length,1);
+  assert.match(b,/Repair request 1 of 1 for unit #67/);assert.equal(b.match(/@/g).length,1);
 });
 test('denied admission records an observation with its reason and no agent request',async()=>{
   const x=fixture({authorize:deny('capacity: 1 of 1 active')});
@@ -236,7 +236,7 @@ test('dispatcher success recovers a CI failure withheld until the builder finish
   assert.equal(x.deliveryCalls.length,1);
   const reservation=x.calls.find(c=>c.issue_number===67);
   assert.match(reservation.body,/op:repair-request/);
-  assert.match(x.deliveryCalls[0].body,/Repair request 1 of 2/);
+  assert.match(x.deliveryCalls[0].body,/Repair request 1 of 1/);
   assert.ok(x.calls.indexOf(reservation)<x.calls.indexOf(x.deliveryCalls[0]));
   // The owner-authored delivery is deduplicated on the next dispatcher tick.
   x.comments.push({...bot(x.deliveryCalls[0].body),user:{login:'AARMOU',type:'User'},author_association:'OWNER'});

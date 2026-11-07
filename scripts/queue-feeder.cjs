@@ -275,6 +275,8 @@ function queueSummary(p) {
     p.autoQueue.stuck.map(x => '#' + x.issue + ' (' + x.cards.join(', ') + ')').join(', ').slice(0, 600)] : []),
   ...((p.autoQueue?.held || []).length ? ['Held for the owner after two closed queue attempts that did not land (one automatic retry already used): ' +
     p.autoQueue.held.map(x => x.name + ' (#' + x.issue + ')').join(', ').slice(0, 600)] : []),
+  ...((p.autoQueue?.attemptHistoryUnknown || []).length ? ['Not queued because paid-attempt history could not be verified: ' +
+    p.autoQueue.attemptHistoryUnknown.map(x => x.name).join(', ').slice(0, 600)] : []),
   ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
     ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') +
       (p.autoQueue?.pending ? ' (#' + p.autoQueue.issue + ' queued; guarded dispatcher requested)' : '') + '.'])];
@@ -290,6 +292,13 @@ const isCopilotAssigned = i => (i.assignees || []).some(a => ['copilot', 'copilo
 // destroy-outcome review); after two closed attempts the card is held for the owner instead of being paid
 // for again. Bounded: at most one extra session per card.
 const MAX_AUTO_ATTEMPTS = 2;
+const HARD_CARD_LABEL = 'needs-hard-card-worker';
+const RETRY_CAP_LIFT_LABEL = 'arcana:lift-copilot-attempt-cap';
+const HARD_CARD_NOTE_MARKER = '<!-- arcana-hard-card-handoff-v1 -->';
+const HARD_CARD_SECTION_START = '<!-- arcana-hard-card-handoff:start -->';
+const HARD_CARD_SECTION_END = '<!-- arcana-hard-card-handoff:end -->';
+const HARD_CARD_COMMENT_MARKER = '<!-- arcana-hard-card-handoff-comment-v1 -->';
+const CAP_LIFT_APPROVAL_EVENT = 'labeled';
 function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
@@ -305,24 +314,107 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
     .filter(x => x.cards.length);
   const pending = waiting.find(i => !stuck.some(x => x.issue === i.number));
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting', stuck };
+  // A cap-lift is consumed by the first successfully created retry queue. Keep this
+  // marker in that queue so a failed label removal cannot reuse the same approval later.
+  const consumedCapLiftIssues = new Set();
+  for (const i of closedIssues.filter(x => trustedIssue(x) && String(x.title || '').startsWith('[Arcana Queue]'))) {
+    const consumed = String(i.body || '').match(/<!-- retry-cap-lift-consumed-from: #(\d+) -->/);
+    if (consumed) consumedCapLiftIssues.add(Number(consumed[1]));
+  }
   const attempted = new Map();
+  const capLiftedBy = new Map();
   for (const i of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]')))
     for (const n of F.unitCards(i.body)) {
       const k = F.normName(n);
       if (!attempted.has(k)) attempted.set(k, []);
       if (!attempted.get(k).includes(i.number)) attempted.get(k).push(i.number);
+      const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+      const authorizedLiftIssues = payload.authorizedCapLiftIssues instanceof Set ? payload.authorizedCapLiftIssues : new Set();
+      if (labels.includes(RETRY_CAP_LIFT_LABEL) && authorizedLiftIssues.has(i.number) &&
+          !consumedCapLiftIssues.has(i.number) &&
+          (!capLiftedBy.has(k) || i.number > capLiftedBy.get(k)))
+        capLiftedBy.set(k, i.number);
     }
-  const held = [];
+  const held = [], attemptHistoryUnknown = [];
   let retryOf = null;
-  const s = (payload.suggestions || []).find(x => {
+  let capLiftIssue = null;
+  let s = null;
+  for (const x of payload.suggestions || []) {
     if (!(x.ready && x.body && A.queueUnitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
-      !safeIssues.some(i => String(i.title || '') === x.title))) return false;
-    const prior = attempted.get(F.normName(x.name)) || [];
-    if (prior.length >= MAX_AUTO_ATTEMPTS) { held.push({ name: x.name, issue: Math.max(...prior) }); return false; }
-    retryOf = prior.length ? Math.max(...prior) : null;
-    return true;
-  });
-  return s ? { suggestion: s, stuck, held, ...(retryOf ? { retryOf } : {}) } : { reason: 'no-unclaimed-ready-card', stuck, held };
+      !safeIssues.some(i => String(i.title || '') === x.title))) continue;
+    const key = F.normName(x.name), prior = attempted.get(key) || [];
+    const paidCount = payload.attemptCounts instanceof Map ? payload.attemptCounts.get(key) : undefined;
+    const unknown = payload.attemptHistoryUnknown instanceof Set && payload.attemptHistoryUnknown.has(key);
+    const liftedBy = capLiftedBy.get(key);
+    if (unknown) { attemptHistoryUnknown.push({ name: x.name, issue: Math.max(0, ...prior) }); continue; }
+    if ((paidCount ?? prior.length) >= MAX_AUTO_ATTEMPTS && !liftedBy) {
+      held.push({ name: x.name, issue: Math.max(0, ...prior) });
+      continue;
+    }
+    if (!s) { s = x; retryOf = prior.length ? Math.max(...prior) : null; capLiftIssue = liftedBy || null; }
+  }
+  return s ? { suggestion: s, stuck, held, attemptHistoryUnknown, ...(retryOf ? { retryOf } : {}), ...(capLiftIssue ? { capLiftIssue } : {}) }
+    : { reason: 'no-unclaimed-ready-card', stuck, held, attemptHistoryUnknown };
+}
+
+function paidAttemptHistory(comments = [], expectedIssue = null) {
+  if (!Array.isArray(comments)) return { complete: false, count: 0 };
+  const marked = comments.filter(c => c?.user?.type === 'Bot' && c?.user?.login === 'github-actions[bot]' &&
+    String(c.body || '').startsWith(A.LEDGER));
+  const ledger = A.parseLedger(comments);
+  if (ledger.length !== marked.length || (expectedIssue !== null && ledger.some(r => String(r.issue) !== String(expectedIssue))))
+    return { complete: false, count: 0 };
+  const results = new Map(ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => [r.run, r]));
+  const attempts = new Set(), pending = new Set();
+  for (const r of ledger) {
+    if (r.op === 'authorizing') {
+      const result = results.get(r.run);
+      if (!result) { attempts.add('assign:' + r.run); pending.add(r.run); }
+      else if (result.op === 'resolution' ? result.result === 'assigned' : ['confirmed', 'error', 'not-confirmed'].includes(result.result))
+        attempts.add('assign:' + r.run);
+    } else if (r.op === 'repair-request') attempts.add('repair:' + r.run);
+  }
+  return { complete: pending.size === 0, count: attempts.size };
+}
+
+async function attemptHistoryForCards({ github, owner, repo, closedIssues, names }) {
+  const wanted = new Set(names.map(F.normName)), counts = new Map(), unknown = new Set();
+  for (const issue of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]'))) {
+    const cards = F.unitCards(issue.body).filter(name => wanted.has(F.normName(name)));
+    if (!cards.length) continue;
+    let history;
+    try {
+      if (!github.rest.issues.listComments) throw Error('ledger comments endpoint unavailable');
+      const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue.number, per_page: 100 });
+      history = paidAttemptHistory(comments, issue.number);
+    } catch { history = { complete: false, count: 0 }; }
+    for (const name of cards) {
+      const key = F.normName(name);
+      const legacyAssigned = history.complete && history.count === 0 && isCopilotAssigned(issue);
+      if (!history.complete || legacyAssigned) unknown.add(key);
+      counts.set(key, (counts.get(key) || 0) + history.count + (legacyAssigned ? 1 : 0));
+    }
+  }
+  return { counts, unknown };
+}
+
+async function authorizedCapLiftIssues({ github, owner, repo, closedIssues }) {
+  const authorized = new Set();
+  if (!github.rest.issues.listEventsForTimeline) return authorized;
+  for (const issue of closedIssues.filter(i => {
+    const labels = (i.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+    return labels.includes(RETRY_CAP_LIFT_LABEL);
+  })) {
+    try {
+      const events = await github.paginate(github.rest.issues.listEventsForTimeline,
+        { owner, repo, issue_number: issue.number, per_page: 100 });
+      if (events.some(e => e.event === CAP_LIFT_APPROVAL_EVENT &&
+          e.actor?.login?.toLowerCase() === OWNER &&
+          (typeof e.label === 'string' ? e.label : e.label?.name) === RETRY_CAP_LIFT_LABEL))
+        authorized.add(issue.number);
+    } catch { /* missing timeline evidence fails closed */ }
+  }
+  return authorized;
 }
 
 async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
@@ -351,19 +443,29 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   payload = { ...payload, suggestions: (payload.suggestions || []).filter(x => !onDestination.has(F.normName(x.name))) };
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const closed = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'closed', per_page: 100 });
+  const history = await attemptHistoryForCards({ github, owner, repo, closedIssues: closed,
+    names: (payload.suggestions || []).map(s => s.name) });
+  const authorizedLifts = await authorizedCapLiftIssues({ github, owner, repo, closedIssues: closed });
+  payload = { ...payload, attemptCounts: history.counts, attemptHistoryUnknown: history.unknown,
+    authorizedCapLiftIssues: authorizedLifts };
   const pick = chooseAutoQueue(payload, open, closed);
   if (skippedOnDestination.length) pick.skippedOnDestination = skippedOnDestination;
-  const notes = { stuck: pick.stuck || [], held: pick.held || [], ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
+  const notes = { stuck: pick.stuck || [], held: pick.held || [], attemptHistoryUnknown: pick.attemptHistoryUnknown || [],
+    ...(pick.skippedOnDestination ? { skippedOnDestination: pick.skippedOnDestination } : {}) };
   if (!pick.suggestion) return { reason: pick.reason, ...notes, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
+  // Create first: a failed create must not consume the owner's audited approval.
+  // The durable marker also prevents reuse if label removal fails after creation.
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
+    ...(pick.capLiftIssue ? ['<!-- retry-cap-lift-consumed-from: #' + pick.capLiftIssue + ' -->'] : []),
     ...(s.requestedIssue ? ['<!-- owner-selected-card-request: #' + s.requestedIssue + ' -->'] : []),
     ...(pick.retryOf ? ['<!-- automatic-retry-of: #' + pick.retryOf + ' (one retry; a second closed attempt holds the card for the owner) -->'] : []),
     s.body.trim(), ''].join('\n');
   const issue = (await github.rest.issues.create({ owner, repo, title: s.title, body })).data;
   if (issue.user?.login !== 'github-actions[bot]' || issue.user?.type !== 'Bot')
     throw Error('auto-queue-issuer-not-github-actions-bot; no dispatch');
+  if (pick.capLiftIssue) await github.rest.issues.removeLabel({ owner, repo, issue_number: pick.capLiftIssue, name: RETRY_CAP_LIFT_LABEL });
   return { created: true, issue: issue.number, name: s.name, url: issue.html_url, ...(pick.retryOf ? { retryOf: pick.retryOf } : {}), ...notes };
 }
 
@@ -510,6 +612,104 @@ function needsSiteRefresh(previous, payload) {
     previous && /^[a-f0-9]{40}$/.test(String(previous.baseSha || '')) && previous.baseSha !== payload.baseSha);
 }
 
+// Replace only our generated board section; every other owner decision and board line is preserved.
+function hardCardSection(body, cards = []) {
+  const entries = cards.filter(x => Number.isSafeInteger(x.issue) && typeof x.name === 'string')
+    .map(x => '- [#' + x.issue + '](https://github.com/AARMOU/arcana_table/issues/' + x.issue + ') — ' + x.name.replace(/[\r\n@]/g, ' ').slice(0, 140) +
+      ': Copilot stopped after two failed attempts; waiting for a worker.');
+  const section = [HARD_CARD_SECTION_START, '## Hard cards waiting for a worker',
+    ...(entries.length ? entries : ['_None currently capped._']),
+    'Only the owner can authorize one additional queue by adding label ' + RETRY_CAP_LIFT_LABEL + ' to the capped issue.',
+    HARD_CARD_SECTION_END].join('\n');
+  const text = String(body || '');
+  const start = text.indexOf(HARD_CARD_SECTION_START), end = text.indexOf(HARD_CARD_SECTION_END);
+  if (start >= 0 && end >= start) return text.slice(0, start) + section + text.slice(end + HARD_CARD_SECTION_END.length);
+  const marker = text.indexOf('## 2a. ⏰ Worker schedule');
+  return marker >= 0 ? text.slice(0, marker) + section + '\n\n' + text.slice(marker) : text.trimEnd() + '\n\n' + section + '\n';
+}
+
+function existingHardCardEntries(body) {
+  const text = String(body || '');
+  const start = text.indexOf(HARD_CARD_SECTION_START), end = text.indexOf(HARD_CARD_SECTION_END);
+  if (start < 0 || end < start) return [];
+  const section = text.slice(start, end);
+  const entries = [];
+  const row = /^- \[#(\d+)\]\(https:\/\/github\.com\/AARMOU\/arcana_table\/issues\/\1\) — (.+?): Copilot stopped after two failed attempts; waiting for a worker\.$/gm;
+  for (const match of section.matchAll(row)) entries.push({ issue: Number(match[1]), name: match[2] });
+  return entries;
+}
+
+async function ensureHardCardLabels(github, owner, repo) {
+  for (const [name, color, description] of [
+    [HARD_CARD_LABEL, '6f42c1', 'Copilot stopped after the approved two failed attempts; route to a human worker.'],
+    [RETRY_CAP_LIFT_LABEL, 'fbca04', 'Owner-only authorization for exactly one additional Copilot queue attempt.'],
+  ]) {
+    try { await github.rest.issues.getLabel({ owner, repo, name }); }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      try { await github.rest.issues.createLabel({ owner, repo, name, color, description }); }
+      catch (createError) { if (createError.status !== 422) throw createError; }
+    }
+  }
+}
+
+async function syncHardCardHandoffs({ github, owner, repo, held = [] }) {
+  const cards = new Map();
+  for (const item of held) {
+    if (!Number.isSafeInteger(item.issue) || typeof item.name !== 'string') continue;
+    const issue = (await github.rest.issues.get({ owner, repo, issue_number: item.issue })).data;
+    if (issue.state !== 'closed' || !trustedIssue(issue) ||
+        !String(issue.title || '').startsWith('[Arcana Queue]') ||
+        !F.unitCards(issue.body).some(n => F.normName(n) === F.normName(item.name))) continue;
+    await ensureHardCardLabels(github, owner, repo);
+    const labels = (issue.labels || []).map(l => typeof l === 'string' ? l : l?.name);
+    if (!labels.includes(HARD_CARD_LABEL))
+      await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [HARD_CARD_LABEL] });
+    const handoffComments = await github.paginate(github.rest.issues.listComments,
+      { owner, repo, issue_number: issue.number, per_page: 100 });
+    const hasHandoff = handoffComments.some(c => c.user?.login === 'github-actions[bot]' &&
+      String(c.body || '').startsWith(HARD_CARD_NOTE_MARKER));
+    if (!hasHandoff) {
+      await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+        body: HARD_CARD_NOTE_MARKER +
+          '\nHard-card hand-off: Copilot stopped after two failed attempts. Waiting for a worker. ' +
+          'An owner may authorize one additional queue only by applying ' + RETRY_CAP_LIFT_LABEL + '.' });
+    }
+    cards.set(issue.number, { name: item.name, issue: issue.number });
+  }
+  const previousEntries = [];
+  const openIssues = await github.paginate(github.rest.issues.listForRepo,
+    { owner, repo, state: 'open', per_page: 100 });
+  const history = await github.paginate(github.rest.issues.listForRepo,
+    { owner, repo, state: 'closed', per_page: 100 });
+  for (const issue of history.filter(i => trustedIssue(i) &&
+      String(i.title || '').startsWith('[Arcana Queue]') &&
+      (i.labels || []).some(l => (typeof l === 'string' ? l : l?.name) === HARD_CARD_LABEL))) {
+    for (const name of F.unitCards(issue.body)) {
+      const isRequeued = openIssues.some(openIssue => trustedIssue(openIssue) &&
+        String(openIssue.title || '').startsWith('[Arcana Queue]') &&
+        F.unitCards(openIssue.body).some(n => F.normName(n) === F.normName(name)));
+      const hasLift = (issue.labels || []).some(l => (typeof l === 'string' ? l : l?.name) === RETRY_CAP_LIFT_LABEL);
+      if (!isRequeued && !hasLift) cards.set(issue.number, { name, issue: issue.number });
+    }
+  }
+  const lines = [...cards.values()].sort((a,b)=>a.name.localeCompare(b.name))
+    .map(x => '- ' + x.name + ' (queue #' + x.issue + ')');
+  const commentBody = [HARD_CARD_COMMENT_MARKER, '## Hard cards waiting for a worker',
+    ...(lines.length ? lines : ['No cards are currently waiting.'])].join('\n');
+  const comments = await github.paginate(github.rest.issues.listComments,
+    { owner, repo, issue_number: 883, per_page: 100 });
+  const existing = comments.find(c => c.user?.login === 'github-actions[bot]' &&
+    String(c.body || '').startsWith(HARD_CARD_COMMENT_MARKER));
+  const changed = existing?.body !== commentBody;
+  if (changed && existing)
+    await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: commentBody });
+  else if (changed)
+    await github.rest.issues.createComment({ owner, repo, issue_number: 883, body: commentBody });
+  return { cards: [...cards.values()], boardUpdated: changed, boardConflict: false };
+}
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
-  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK };
+  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK,
+  MAX_AUTO_ATTEMPTS, HARD_CARD_LABEL, RETRY_CAP_LIFT_LABEL, hardCardSection, existingHardCardEntries,
+  paidAttemptHistory, attemptHistoryForCards, syncHardCardHandoffs };
