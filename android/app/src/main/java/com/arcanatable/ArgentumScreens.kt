@@ -189,7 +189,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
             if (manaChoices.isNotEmpty()) {
                 if (choices.isNotEmpty()) StudioText("ArgentumScreens.Text.15", "Stack and actions", false, "ADD MANA (FLOATS UNTIL THE STEP ENDS)", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
                 else StudioText("ArgentumScreens.Text.16", "Stack and actions", false, "Floats in your mana pool until the step ends. Casting uses floating mana first.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     manaChoices.forEach { info ->
                         StudioOutlinedButton("ArgentumScreens.OutlinedButton.3", "Stack and actions", enabled = !busy, onClick = { onChoose(info) }, modifier = Modifier.heightIn(min = 44.dp).testTag("float-mana"),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Muted.copy(alpha = 0.35f))) {

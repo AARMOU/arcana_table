@@ -714,7 +714,7 @@ internal fun TableController.TableOverlays() {
                                 var libraryChip by remember(decision) { mutableStateOf<LibraryChip?>(null) }
                                 var librarySort by remember(decision) { mutableStateOf(LibrarySort.TYPE) }
                                 val chips = remember(allLibraryItems) { LibraryChip.present(allLibraryItems.map { it.typeLine }) }
-                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
                                         StudioFilterChip("TableOverlays.FilterChip.1", "Dialogs and overlays", librarySort == sort, { librarySort = sort }, label = { StudioText("TableOverlays.Text.48", "Dialogs and overlays", true, sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))

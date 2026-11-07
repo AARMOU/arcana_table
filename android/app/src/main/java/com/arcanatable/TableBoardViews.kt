@@ -984,7 +984,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 }
             }
             val rows = cards.chunked(grid.columns.coerceAtLeast(1))
-            val container = if (grid.rows == 1) Modifier.fillMaxWidth().horizontalScroll(handScrollState)
+            val container = if (grid.rows == 1) Modifier.fillMaxWidth().hintedHorizontalScroll(handScrollState)
                 else Modifier.fillMaxWidth().heightIn(max = areaHeight).verticalScroll(handScrollState)
             Column(container.testTag("hand-grid").tutorialTarget("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
             rows.forEach { rowCards -> Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
