@@ -236,18 +236,18 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun store()=StudioControlStore(prefs,orientation,profile)
     fun record(info:StudioLiveControl,callback:(()->Unit)?) {
         val previous=controls[info.id]
-        val next=info.copy(title=if(info.kind=="container-action" && info.title=="Control")previous?.title ?: info.title else info.title,
+        val next=info.copy(title=StudioNames.of(info.id) ?: if(info.kind=="container-action" && info.title=="Control")previous?.title ?: info.title else info.title,
             bounds=previous?.bounds ?: info.bounds,window=info.window.takeIf{it!=0} ?: previous?.window ?: 0,
             viewportWidth=previous?.viewportWidth ?: info.viewportWidth,viewportHeight=previous?.viewportHeight ?: info.viewportHeight)
         if(previous!=next)controls[info.id]=next
         if(callback!=null)callbacks[info.id]=callback else callbacks.remove(info.id)
-        captions.filterValues{it==info.id}.keys.forEach {id->controls[id]?.let{if(it.title!=info.title)controls[id]=it.copy(title=info.title)}}
+        captions.filterValues{it==info.id}.keys.forEach {id->controls[id]?.let{val t=StudioNames.of(id) ?: info.title;if(it.title!=t)controls[id]=it.copy(title=t)}}
     }
     fun remove(id:String){controls.remove(id);callbacks.remove(id);captions.remove(id);liveText.remove(id)}
     fun bounds(id:String,rect:Rect,window:Int,width:Float=0f,height:Float=0f){controls[id]?.let {
         val child=if(it.kind=="container-action" && !it.captionEditable) controls.values.filter {c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}.minByOrNull{c->c.bounds.top} else null
         child?.let{c->captions[id]=c.id}
-        val next=it.copy(title=child?.title ?: it.title,bounds=rect,window=window,viewportWidth=width,viewportHeight=height)
+        val next=it.copy(title=StudioNames.of(id) ?: child?.title ?: it.title,bounds=rect,window=window,viewportWidth=width,viewportHeight=height)
         if(next!=it)controls[id]=next
     }}
     fun project()=if(editing)draft else applied
@@ -513,3 +513,20 @@ internal val LocalStudioControls=compositionLocalOf<StudioControlsRuntime?>{null
 internal data class StudioControlParent(val id:String,val style:StudioControlStyle,val report:(String,String)->Unit,val proxy:Boolean=false,
     val boundCaption:String?=null)
 internal val LocalStudioControlParent=compositionLocalOf<StudioControlParent?>{null}
+
+/**
+ * Owner note 12: plain names for panels that otherwise took their name from the first thing inside them (the opponent
+ * panel was called "40", its life total). Keyed by code site; everything else keeps its own label.
+ */
+internal object StudioNames {
+    private val names=mapOf(
+        "TableBoardViews.combinedClickable.2" to "Player panel",
+        "TableBoardViews.combinedClickable.3" to "Commander picture",
+        "TableBoardViews.combinedClickable.4" to "Commander picture",
+        "TableBoardViews.combinedClickable.5" to "Turn timer",
+        "TableBoardViews.combinedClickable.7" to "Mana pool",
+        "TableBoardViews.combinedClickable.8" to "Commander",
+        "TableMainLayout.combinedClickable.1" to "Turn label",
+    )
+    fun of(id:String):String?=names[StudioEditorGeometry.siteOf(id)]
+}
