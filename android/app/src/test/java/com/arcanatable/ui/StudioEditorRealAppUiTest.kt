@@ -101,14 +101,15 @@ class StudioEditorRealAppUiTest {
             s.onActivity{it.tableController!!.nativeStudioOpen=true};UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-tab-screen-Hand").performClick();UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-hand-workspace").assertIsDisplayed()
-            s.onActivity{a->assertEquals("landscape",a.tableController!!.studioControlsRuntime!!.orientation);UiTestSupport.screenshot(a,"studio-b1-landscape-hand")}
+            // Owner feedback bug 24 changed this contract: one layout for every orientation and fold state.
+            s.onActivity{a->assertEquals(STUDIO_LAYOUT_KEY,a.tableController!!.studioControlsRuntime!!.orientation);UiTestSupport.screenshot(a,"studio-b1-landscape-hand")}
             rule.onNodeWithTag("studio-more").performClick();UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-hand-Balanced").performClick();UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-more-panel-close").performClick();UiTestSupport.settle(rule)
             rule.onNodeWithTag("studio-apply").performClick();UiTestSupport.settle(rule)
-            assertNotNull(StudioStore(prefs(),"landscape",StudioProfiles(prefs(),"landscape").activeName()).load())
-            assertNull("portrait untouched",StudioStore(prefs(),"portrait","Default").load())
-        } finally {s.close();StudioProfiles(prefs(),"landscape").resetAll()}
+            assertNotNull("saved once, used in portrait and landscape",
+                StudioStore(prefs(),STUDIO_LAYOUT_KEY,StudioProfiles(prefs(),STUDIO_LAYOUT_KEY).activeName()).load())
+        } finally {s.close();StudioProfiles(prefs(),STUDIO_LAYOUT_KEY).resetAll();StudioProfiles(prefs(),"landscape").resetAll()}
     }
 
     @Test fun ownerHandDesignAppliesUnchangedFromTheHandScreen() {

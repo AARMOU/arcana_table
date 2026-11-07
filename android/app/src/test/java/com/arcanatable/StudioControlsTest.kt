@@ -177,7 +177,8 @@ class StudioControlsTest {
         runtime.begin();runtime.chooseProfile("Default");runtime.copyProfile("Copied draft");runtime.apply()
         assertEquals(4,StudioStore(p,"portrait","Copied draft").load()!!.snap)
         assertEquals(8,StudioStore(p,"portrait","Default").load()!!.snap)
-        runtime.begin();runtime.edit(a,StudioControlStyle(width=1f))
+        // Owner note 14: a tiny control is only advice now, so a malformed one (zero width) is what can't be copied.
+        runtime.begin();runtime.edit(a,StudioControlStyle(width=0f))
         assertTrue(runCatching{runtime.copyProfile("Invalid copy")}.isFailure)
         assertFalse("Invalid copy" in StudioProfiles(p,"portrait").names())
     }
