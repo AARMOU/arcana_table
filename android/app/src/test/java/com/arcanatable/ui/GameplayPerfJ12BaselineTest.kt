@@ -38,12 +38,14 @@ import java.util.concurrent.atomic.AtomicInteger
  * STUDIO-J12 speed baseline (Claude B, covering Crayola's stalled job; owner Nov 6 note 32).
  *
  * Question: does Arcana Studio slow ordinary play? One app build, one activity, the J10 busy four-player fixture,
- * and the same stream of game updates fed to five phases in an A-B-C-A-B order so warm-up drift shows up:
+ * and the same stream of game updates fed to seven phases in an A-B-C-A-B-A-B order so warm-up drift shows up:
  *  1. unedited   Studio built in, nothing applied (runtime present, `active == false`)
  *  2. applied    one applied resize edit on a Table action (every Studio widget is live; `studioFitContents` runs)
  *  3. editing    Studio open (positions are tracked with `onGloballyPositioned` only here, note 32)
  *  4. unedited   profile reset, back to nothing applied
  *  5. applied    the same edit applied again
+ *  6-7.           a second unedited/applied pair (J12b), for steadier warm numbers
+ * J12b edits an always-visible Table toolbar button shrunk to 70%, so studioFitContents must scale its contents.
  * Running all phases in one build removes the engine-jar confound between revisions (Crayola, #950 19:02 UTC).
  *
  * Each update is a real `stateUpdate` (life totals and one permanent's tapped state change) handed to the app's own
@@ -64,7 +66,7 @@ class GameplayPerfJ12BaselineTest {
 
     private companion object {
         const val WARMUP = 40
-        const val MEASURED = 160
+        const val MEASURED = 240
         const val SAMPLE_MS = 2L
         val BUCKETS = listOf("studioWidget", "studioFitContents", "onGloballyPositioned", "anyStudioCode")
     }
@@ -163,8 +165,9 @@ class GameplayPerfJ12BaselineTest {
     private fun recomposerChanges(): Long = runCatching {
         val companion = Class.forName("androidx.compose.runtime.Recomposer").getField("Companion").get(null)
         val flow = companion.javaClass.getMethod("getRunningRecomposers").invoke(companion)
-        val set = flow.javaClass.getMethod("getValue").invoke(flow) as Set<*>
-        set.sumOf { info -> (info!!.javaClass.methods.first { it.name == "getChangeCount" }.apply { isAccessible = true }.invoke(info) as Number).toLong() }
+        val set = Class.forName("kotlinx.coroutines.flow.StateFlow").getMethod("getValue").invoke(flow) as Set<*>
+        val changeCount = Class.forName("androidx.compose.runtime.RecomposerInfo").getMethod("getChangeCount")
+        set.sumOf { info -> (changeCount.invoke(info) as Number).toLong() }
     }.getOrDefault(-1L)
 
     private fun percentile(values: List<Double>, p: Double): Double {
@@ -173,6 +176,7 @@ class GameplayPerfJ12BaselineTest {
         return sorted[((sorted.size - 1) * p).toInt()]
     }
 
+    private fun fd(v: Float) = String.format(java.util.Locale.ROOT, "%.1f", v)
     private fun f(v: Double) = String.format(java.util.Locale.ROOT, "%.2f", v)
 
     @Volatile private var lastProgress = System.nanoTime()
@@ -229,9 +233,14 @@ class GameplayPerfJ12BaselineTest {
                     UiTestSupport.settle(rule, 600)
                     val candidates = runtime.controls.values
                         .filter { it.screen == "Table" && it.isAction && !it.requiredNativeAction && it.bounds.width > 0f && it.bounds.height > 0f }
-                        .sortedBy { it.id }
+                        // J12b: an always-visible Table toolbar button (TableMainLayout site), largest first, so the
+                        // edit is on screen every frame; other Table actions only as a fallback.
+                        .sortedWith(compareBy<com.arcanatable.StudioLiveControl>({ if (it.id.startsWith("native:TableMainLayout.")) 0 else 1 },
+                            { -(it.bounds.width * it.bounds.height) }, { it.id }))
                     for (c in candidates) {
-                        val style = runtime.style(c.id).copy(width = c.bounds.width / density + 8f, height = c.bounds.height / density + 4f)
+                        // Shrunk to 70% of its drawn size, so its contents no longer fit and studioFitContents scales them.
+                        val style = runtime.style(c.id).copy(width = (c.bounds.width / density * 0.7f).coerceAtLeast(20f),
+                            height = (c.bounds.height / density * 0.7f).coerceAtLeast(20f))
                         val ok = runCatching { scenario.onActivity { runtime.edit(c.id, style); runtime.apply() } }.isSuccess && !runtime.editing
                         if (ok) { editedId = c.id; editStyle = style; break }
                         scenario.onActivity { if (!runtime.editing) runtime.begin(); runtime.discard(); runtime.begin() }
@@ -294,19 +303,24 @@ class GameplayPerfJ12BaselineTest {
                 measure("4 unedited again")
                 applyOneEdit(); assertTrue(runtime.active); assertFalse(runtime.editing)
                 measure("5 applied again")
+                scenario.onActivity { runtime.resetProfile() }; UiTestSupport.settle(rule, 800)
+                assertFalse("phase 6 is back to nothing applied", runtime.active)
+                measure("6 unedited (pass 2)")
+                applyOneEdit(); assertTrue(runtime.active); assertFalse(runtime.editing)
+                measure("7 applied (pass 2)")
             } finally { sampler.close() }
 
             progress("all phases done")
-            report(phases, editedId)
+            report(phases, editedId, editStyle)
         }
     }
 
-    private fun report(phases: List<Phase>, editedId: String?) {
+    private fun report(phases: List<Phase>, editedId: String?, editStyle: StudioControlStyle?) {
         val md = StringBuilder()
         md.appendLine("# STUDIO-J12 speed baseline (Robolectric, report only)")
         md.appendLine()
         md.appendLine("Busy four-player J10 fixture, cover size w344dp-h800dp, ${WARMUP} warm-up + ${MEASURED} measured updates per phase, " +
-            "each update = app stateUpdate handler + two 16 ms frames. Edited control: `$editedId` (resize).")
+            "each update = app stateUpdate handler + two 16 ms frames. Edited control: `$editedId` resized to ${editStyle?.width?.let { fd(it) }}×${editStyle?.height?.let { fd(it) }} dp (70% of drawn size).")
         md.appendLine("**Not phone FPS. Not device-verified.** CI-runner wall time; compare phases with each other, not with 16 ms.")
         md.appendLine()
         md.appendLine("| Phase | Studio active | Editing | Live Studio controls | Update median ms | p90 | p99 | Handler median | Frames median | Recomposer changes | Samples | studioWidget | studioFitContents | onGloballyPositioned | any Studio code |")
