@@ -1,0 +1,8 @@
+{
+  "key": "assault-suit",
+  "name": "Assault Suit",
+  "issue": 736,
+  "source": "certification/AssaultSuitIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AssaultSuitIndependentCertificationTest",
+  "tests": 7
+}
