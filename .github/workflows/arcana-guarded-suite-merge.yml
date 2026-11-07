@@ -1,0 +1,67 @@
+name: Arcana Guarded Suite Merge
+# An opt-in, narrow automatic merge lane for NEW trusted two-file independent
+# certification suites only. The older report-only workflow remains the
+# default/fallback and has no write permission.
+on:
+  pull_request:
+    paths:
+      - 'certification/guarded-suite-merge.*'
+      - '.github/workflows/arcana-guarded-suite-merge.yml'
+  workflow_run:
+    workflows: [Arcana Card Certification Premerge]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: arcana-main-writer
+  cancel-in-progress: false
+jobs:
+  guard-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test certification/*.test.cjs
+  guarded-merge:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && vars.ARCANA_GUARDED_SUITE_MERGE == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Never execute the candidate's changed code with a writer token.
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        env:
+          # One dedicated least-privilege token; never use a dispatcher or admin token.
+          ARCANA_SUITE_MERGE_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN }}
+        with:
+          script: |
+            const { execute } = require('./certification/guarded-suite-merge.cjs');
+            const token = process.env.ARCANA_SUITE_MERGE_TOKEN;
+            // Missing token => report-only. Do not fall back to GITHUB_TOKEN.
+            const writer = token ? new github.constructor({ auth: token }) : null;
+            const result = await execute({
+              github, writer, ...context.repo, run: context.payload.workflow_run,
+              enabled: !!writer && process.env.GITHUB_EVENT_NAME === 'workflow_run', core,
+            });
+            core.info(JSON.stringify(result));
+            await core.summary.addHeading('Guarded suite merge decision').addCodeBlock(
+              JSON.stringify(result, null, 2)).write();
+            if (result.blockers?.length) core.notice('Suite not merged: ' + result.blockers.join(', '));
