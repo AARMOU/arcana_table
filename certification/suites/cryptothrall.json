@@ -1,0 +1,9 @@
+{
+  "key": "cryptothrall",
+  "name": "Cryptothrall",
+  "issue": 833,
+  "source": "certification/CryptothrallIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CryptothrallIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
