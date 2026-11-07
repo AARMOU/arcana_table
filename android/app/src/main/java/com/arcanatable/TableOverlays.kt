@@ -878,7 +878,7 @@ internal fun TableController.TableOverlays() {
     }
 
     // Studio "Show me…" samples (owner, Nov 7). Only while Studio is editing and the real screen isn't showing.
-    val previewing = studioPreview?.takeIf { studioControlsRuntime?.editing == true }
+    val previewing = studioPreview?.takeIf { StudioPreviews.ENABLED && studioControlsRuntime?.editing == true }
     // Samples are built once: a fresh plan on every recomposition would reset the board's remembered state each frame.
     if (previewing == "Combat" && argentumAttackPlan == null) {
         val sample = remember { StudioPreviews.attackPlan() }

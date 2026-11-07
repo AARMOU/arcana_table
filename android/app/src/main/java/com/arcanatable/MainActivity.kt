@@ -325,17 +325,20 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                     else {optionsOpen=false;if(gameInProgress)homeOpen=false;if(!studio.editing)studio.begin()}}}
                 // Switching screens in Studio closes whatever overlay was open first, so each pick shows exactly that screen.
                 val studioCloseAll={studioPreview=null;optionsOpen=false;stackOpen=false;zoneDialog=null;deckPickerOpen=false;playSheetOpen=false;wifiMultiConfigOpen=false;showHand=false;logOpen=false}
-                val studioDestinations=mapOf(
-                        "Table" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=true}),
-                        "Player" to (gameInProgress to {studioCloseAll();homeOpen=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
-                        "Stack" to (gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true}),
-                        "Zones" to (gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
-                        "Log" to (gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true}),
-                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up.
-                        "Combat" to (gameInProgress to {studioCloseAll();homeOpen=false;if(argentumAttackPlan==null && argentumBlockPlan==null)studioPreview="Combat"}),
-                        "Opening hand" to (gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Opening hand"}),
-                        "Actions" to (gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Actions"}),
-                    )
+                val studioDestinations=buildMap<String,Pair<Boolean,()->Unit>> {
+                        put("Table",gameInProgress to {studioCloseAll();homeOpen=false;showOverview=true})
+                        put("Player",gameInProgress to {studioCloseAll();homeOpen=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)})
+                        put("Stack",gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true})
+                        put("Zones",gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"})
+                        put("Log",gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true})
+                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up. Switched off
+                        // (StudioPreviews.ENABLED) until the hang its CI test found is understood; Combat is then editable in combat.
+                        if(StudioPreviews.ENABLED) {
+                            put("Combat",gameInProgress to {studioCloseAll();homeOpen=false;if(argentumAttackPlan==null && argentumBlockPlan==null)studioPreview="Combat"})
+                            put("Opening hand",gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Opening hand"})
+                            put("Actions",gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Actions"})
+                        } else put("Combat",(argentumAttackPlan!=null || argentumBlockPlan!=null) to {studioCloseAll();homeOpen=false})
+                    }
                 val studioPractice:(()->Unit)?=if(gameInProgress) null else ({studioCloseAll();startOfflineGame()})
                 LaunchedEffect(studio.editing){if(!studio.editing)studioPreview=null}
                 if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
