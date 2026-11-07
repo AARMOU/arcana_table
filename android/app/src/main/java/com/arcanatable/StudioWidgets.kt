@@ -211,10 +211,9 @@ internal fun StudioButton(site:String,screen:String,onClick:()->Unit,modifier:Mo
     border:BorderStroke?=null,contentPadding:PaddingValues=ButtonDefaults.ContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.Button(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }
@@ -225,10 +224,9 @@ internal fun StudioTextButton(site:String,screen:String,onClick:()->Unit,modifie
     border:BorderStroke?=null,contentPadding:PaddingValues=ButtonDefaults.TextButtonContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.TextButton(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }
@@ -239,10 +237,9 @@ internal fun StudioOutlinedButton(site:String,screen:String,onClick:()->Unit,mod
     border:BorderStroke?=ButtonDefaults.outlinedButtonBorder(enabled),contentPadding:PaddingValues=ButtonDefaults.ContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.OutlinedButton(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }

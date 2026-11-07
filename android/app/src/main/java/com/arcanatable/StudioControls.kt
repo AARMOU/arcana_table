@@ -11,6 +11,8 @@ internal data class StudioControlStyle(
     val dx:Float=0f,val dy:Float=0f,val width:Float?=null,val height:Float?=null,
     val font:Float?=null,val radius:Float?=null,val fill:String?=null,val ink:String?=null,
     val label:String?=null,val visible:Boolean=true,val binding:String?=null,val icon:String="None",val layer:Float=0f,
+    /** Owner note 26: one of [StudioButtonTypes] names, or null for the button's own look. */
+    val type:String?=null,
 ) {
     fun problems()=buildList {
         if(listOfNotNull(dx,dy,width,height,font,radius,layer).any {!it.isFinite()})add("Use finite dimensions.")
@@ -22,12 +24,14 @@ internal data class StudioControlStyle(
         if(binding!=null && (binding.length>180 || !binding.startsWith("native:") || !StudioSites.contains(binding)))add("Unknown native binding.")
         if(icon !in StudioLayout.icons)add("Unknown icon.")
         if(layer !in -100f..100f)add("Layer must be between -100 and 100.")
+        if(type!=null && type !in StudioButtonTypes.names)add("Unknown button type.")
     }
     /** Owner note 14: soft advice only. It marks the control red in the editor and never blocks Apply. */
     fun advice():String?=if(width!=null && width<44f || height!=null && height<44f)"Hard to tap: smaller than 44." else null
     fun json()=JSONObject().put("dx",dx).put("dy",dy).put("visible",visible).put("icon",icon).put("layer",layer).apply {
         width?.let{put("width",it)};height?.let{put("height",it)};font?.let{put("font",it)};radius?.let{put("radius",it)}
         fill?.let{put("fill",it)};ink?.let{put("ink",it)};label?.let{put("label",it)};binding?.let{put("binding",it)}
+        type?.let{put("type",it)}
     }
     companion object {
         fun parse(o:JSONObject):StudioControlStyle {
@@ -35,7 +39,7 @@ internal data class StudioControlStyle(
             fun text(k:String)=if(o.has(k))o.getString(k) else null
             return StudioControlStyle(o.optDouble("dx",0.0).toFloat(),o.optDouble("dy",0.0).toFloat(),number("width"),number("height"),
                 number("font"),number("radius"),text("fill"),text("ink"),text("label"),o.optBoolean("visible",true),text("binding"),
-                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat()).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
+                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat(),text("type")).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
         }
     }
 }

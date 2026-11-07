@@ -172,7 +172,7 @@ internal object StudioEditorGeometry {
         return member.copy(dx=(member.dx+next.dx-lead.dx).coerceIn(-2000f,2000f),dy=(member.dy+next.dy-lead.dy).coerceIn(-4000f,4000f),
             width=size(lead.width,next.width,member.width,leadW,memW,2000f),height=size(lead.height,next.height,member.height,leadH,memH,4000f),
             font=pick(lead.font,next.font,member.font),radius=pick(lead.radius,next.radius,member.radius),fill=pick(lead.fill,next.fill,member.fill),
-            ink=pick(lead.ink,next.ink,member.ink),visible=pick(lead.visible,next.visible,member.visible),icon=pick(lead.icon,next.icon,member.icon),
+            ink=pick(lead.ink,next.ink,member.ink),type=pick(lead.type,next.type,member.type),visible=pick(lead.visible,next.visible,member.visible),icon=pick(lead.icon,next.icon,member.icon),
             layer=pick(lead.layer,next.layer,member.layer))
     }
 

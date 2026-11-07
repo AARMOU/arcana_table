@@ -51,6 +51,7 @@ internal object StudioLog {
             if (before.label != after.label) add("label \"${before.label ?: "native"}\"→\"${after.label ?: "native"}\"")
             if (before.binding != after.binding) add("action ${before.binding ?: "native"}→${after.binding ?: "native"}")
             if (before.fill != after.fill || before.ink != after.ink) add("colours ${before.fill ?: "-"}/${before.ink ?: "-"}→${after.fill ?: "-"}/${after.ink ?: "-"}")
+            if (before.type != after.type) add("type ${before.type ?: "native"}→${after.type ?: "native"}")
             if (before.font != after.font) add("text size ${f(before.font)}→${f(after.font)}")
             if (before.radius != after.radius) add("corners ${f(before.radius)}→${f(after.radius)}")
             if (before.layer != after.layer) add("layer ${f(before.layer)}→${f(after.layer)}")

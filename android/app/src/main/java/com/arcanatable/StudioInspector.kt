@@ -26,14 +26,14 @@ internal enum class StudioInspectorTab(val title:String) {Layout("Layout"),Style
 
 /** What the selected native control allows, mirroring the validation in [StudioControlsRuntime.problems]. */
 internal data class StudioCapabilities(val label:Boolean,val font:Boolean,val radius:Boolean,val ink:Boolean,val icon:Boolean,
-    val rebind:Boolean,val information:Boolean,val duplicate:Boolean) {
+    val rebind:Boolean,val information:Boolean,val duplicate:Boolean,val type:Boolean=false) {
     companion object {
         fun of(c:StudioLiveControl)=StudioCapabilities(
             label=!c.protectedLabel && c.captionEditable && c.kind in listOf("action","container-action","icon-action","label","input","icon"),
             font=!(c.kind in listOf("range","toggle","icon","icon-action","card-action") || !c.captionEditable),
             radius=c.kind!="container-action",ink=c.kind!="card-action",icon=c.kind in listOf("action","icon-action"),
             rebind=c.isAction && c.kind!="card-action" && (c.kind!="container-action" || c.captionEditable),
-            information=c.kind in listOf("data","label"),duplicate=c.isAction || c.kind in listOf("data","label"))
+            information=c.kind in listOf("data","label"),duplicate=c.isAction || c.kind in listOf("data","label"),type=c.kind=="action")
     }
 }
 
@@ -153,6 +153,14 @@ private fun StyleTab(style:StudioControlStyle,caps:StudioCapabilities,palette:Li
         var text by remember(style.label){mutableStateOf(style.label.orEmpty())}
         OutlinedTextField(text,{t->text=t.take(120);change{it.copy(label=text.takeIf(String::isNotBlank))}},singleLine=true,
             label={Text("Label (blank = native)")},modifier=Modifier.fillMaxWidth().testTag("studio-label"))
+    }
+    if(caps.type) {
+        // Owner note 26: pick a whole look at once; Fill, Text and Corners below still fine-tune it.
+        Text("Button type",color=darkTableColors.muted,fontSize=12.sp)
+        Row(Modifier.hintedHorizontalScroll(rememberScrollState()).testTag("studio-button-types")) {
+            StudioChip("Its own",true,"studio-type-native",selected=style.type==null){change{it.copy(type=null)}}
+            StudioButtonTypes.names.forEach {name->StudioChip(name,true,"studio-type-$name",selected=style.type==name){change{it.copy(type=name,fill=null,ink=null,radius=null)}}}
+        }
     }
     StudioColorField("Fill",style.fill,palette,{v->change{it.copy(fill=v)}},"studio-fill")
     if(caps.ink)StudioColorField("Text",style.ink,palette,{v->change{it.copy(ink=v)}},"studio-ink")

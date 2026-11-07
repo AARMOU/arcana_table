@@ -879,18 +879,19 @@ internal fun TableController.TableOverlays() {
 
     // Studio "Show me…" samples (owner, Nov 7). Only while Studio is editing and the real screen isn't showing.
     val previewing = studioPreview?.takeIf { studioControlsRuntime?.editing == true }
+    // Samples are built once: a fresh plan on every recomposition would reset the board's remembered state each frame.
     if (previewing == "Combat" && argentumAttackPlan == null) {
-        val sample = StudioPreviews.attackPlan()
+        val sample = remember { StudioPreviews.attackPlan() }
         ArgentumAttackBoard(sample, StudioPreviews::piece, busy = false, onConfirm = {}, onDismiss = { studioPreview = null })
     }
     if (previewing == "Opening hand" && !argentumMulliganPrompt) StudioScreen("Opening hand") { ArgentumOpeningHandScreen(
-        cards = StudioPreviews.cards(7), title = "Opening hand", subtitle = "You're on the play · Your first mulligan is FREE",
+        cards = remember { StudioPreviews.cards(7) }, title = "Opening hand", subtitle = "You're on the play · Your first mulligan is FREE",
         selectable = false, selection = emptySet(), onToggle = {},
         primaryLabel = "KEEP 7", primaryEnabled = true, onPrimary = {},
         secondaryLabel = "MULLIGAN", secondaryEnabled = true, onSecondary = {},
     ) }
     if (previewing == "Actions" && argentumActionChoices.isEmpty()) StudioScreen("Legal actions") { ArgentumActionSheet(
-        card = StudioPreviews.cards(1).first(), choices = StudioPreviews.actions(), hidManaAbilities = false, busy = false,
+        card = remember { StudioPreviews.cards(1).first() }, choices = remember { StudioPreviews.actions() }, hidManaAbilities = false, busy = false,
         onChoose = {}, onDismiss = { studioPreview = null },
     ) }
     argentumAttackPlan?.let { plan ->
