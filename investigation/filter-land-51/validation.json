@@ -1,0 +1,40 @@
+{
+  "recorded_at": "2026-11-06T18:44:31.234893+00:00",
+  "runtime_commit": "7e823fd747f31eb3a920c48f6a885fc34b0cb4be",
+  "upstream": "f5dc31813bfe12dbc12c412f69687452e86bd63f",
+  "overlay_sha256": "6d1d6b9676109354600fcb91e48e97d327eb0cb3629acb7aa5e70801ddee83ea",
+  "patch_sha256": "6918fa2fbddd95f7d01b9cf0101409180a55b7698f93851e280b7ec86f78ecb2",
+  "baseline_focused": {
+    "tests": 10,
+    "failures": 5,
+    "errors": 0,
+    "skipped": 0
+  },
+  "candidate_focused": {
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "candidate_full_custom_cards": {
+    "tests": 468,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "unchanged_runtime_sha256": {
+    "argentum-ai.jar": "1b0a5523e822e4217bfad10ca858861e16112eef8a47bfaab6f7c5a48b727083",
+    "argentum-mtg-sdk-tooling.jar": "176cc2d65276d099086c1bcc8a0749bde2175ffadc71677f439c48a4e04103c4",
+    "argentum-mtg-sdk.jar": "5cd5e3f6d5209ea12f16ab7c21d225bae704eec14d77a36ff74bcf4f10e506d8",
+    "argentum-rules-engine.jar": "ca21982d86bc4536bc3e67b345f89dddfc7cf33187ff8c37d7dae2f4973aa95f"
+  },
+  "baseline_and_candidate_jars_unchanged": true,
+  "source_pin_patch_applicability": "173a09a2ed15763dce854e385b2df0d085e03975 + relevant mandatory patches: PASS (not compilation)",
+  "not_verified": [
+    "full rebuilt engine suite",
+    "Android app suite",
+    "device gameplay",
+    "runtime adoption",
+    "remote exact-head CI"
+  ]
+}

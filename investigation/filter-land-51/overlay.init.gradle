@@ -1,0 +1,11 @@
+allprojects { p ->
+    p.afterEvaluate {
+        if (p.path == ':custom-cards') {
+            def overlay = new File(p.rootDir, '../investigation/filter-land-51/build/overlay')
+            p.kotlin.sourceSets.test.kotlin.srcDir(overlay)
+            p.tasks.named('compileTestKotlin') {
+                compilerOptions.freeCompilerArgs.add('-Xfriend-paths=' + new File(p.rootDir, 'app/libs/argentum-rules-engine.jar').absolutePath)
+            }
+        }
+    }
+}

@@ -1,3 +1,7 @@
 # Python bytecode (the weekly upgrade builds its candidate from the checkout)
 __pycache__/
 *.pyc
+
+# Crayola's isolated source checkout and temporary validation classes/reports.
+/investigation/crayola-filter-engine/
+/investigation/filter-land-51/build/
