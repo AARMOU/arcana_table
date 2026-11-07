@@ -1,0 +1,9 @@
+{
+  "key": "deathleaper-terror-weapon",
+  "name": "Deathleaper, Terror Weapon",
+  "issue": 842,
+  "source": "certification/DeathleaperTerrorWeaponIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DeathleaperTerrorWeaponIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
