@@ -267,7 +267,7 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-profile-copy").performClick();rule.waitForIdle()
         assertEquals("Fold cover",runtime.profile)
         rule.onNodeWithTag("studio-more-tab-Project").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-classic").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-classic").performScrollTo().performClick();rule.waitForIdle()
         assertEquals(listOf("classic"),calls)
     }
 
