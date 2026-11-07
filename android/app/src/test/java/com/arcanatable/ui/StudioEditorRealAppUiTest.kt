@@ -207,4 +207,25 @@ class StudioEditorRealAppUiTest {
             assertNull("portrait untouched",StudioStore(prefs(),"portrait","Default").load())
         } finally {scenario.close();StudioProfiles(prefs(),"landscape").resetAll()}
     }
+
+    /** A fresh install has a way in: Settings → ARCANA STUDIO opens the editor over the live app. */
+    @Test fun freshInstallOpensStudioFromSettings() {
+        StudioProfiles(prefs(),"portrait").resetAll()
+        context.getSharedPreferences("arcana_tutorial",Context.MODE_PRIVATE).edit()
+            .putStringSet("first_visit_guides_v2",setOf("HOME","TABLE","PLAYER","HAND","MENU_MAIN","MENU_TOOLS","MENU_GAME","MENU_DECKS","LOBBY","OPTIONS","DECK_IMPORT","STACK","LOG")).commit()
+        val scenario=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            UiTestSupport.settle(rule)
+            if(rule.onAllNodesWithText("NOT NOW").fetchSemanticsNodes().isNotEmpty()){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
+            scenario.onActivity {assertFalse(it.tableController!!.studioControlsRuntime!!.active);it.tableController!!.optionsOpen=true}
+            UiTestSupport.settle(rule)
+            rule.onNodeWithTag("settings-open-studio").performScrollTo().performClick();UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-editor").assertIsDisplayed()
+            scenario.onActivity {activity->
+                val c=activity.tableController!!
+                assertFalse(c.optionsOpen);assertTrue(c.studioControlsRuntime!!.editing)
+                assertTrue("native controls registered once editing starts",c.studioControlsRuntime!!.controls.isNotEmpty())
+            }
+        } finally {scenario.close();StudioProfiles(prefs(),"portrait").resetAll()}
+    }
 }

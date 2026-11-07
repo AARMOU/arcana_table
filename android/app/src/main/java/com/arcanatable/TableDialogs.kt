@@ -756,7 +756,7 @@ internal fun OptionsPage(
     respondToOwnStack: Boolean = false, onRespondToOwnStack: (Boolean) -> Unit = {},
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
-    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
+    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {}, onOpenStudio: (() -> Unit)? = null,
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
     onClearAllData: () -> Unit, onDismiss: () -> Unit,
 ) {
@@ -813,6 +813,12 @@ internal fun OptionsPage(
                 }
                 StudioTextButton("TableDialogs.TextButton.27", "Dialogs and overlays", onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     StudioText("TableDialogs.Text.126", "Dialogs and overlays", false, "ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+                }
+                // Development builds: the full-screen Arcana Studio editor (a plain button, outside the editable catalog).
+                onOpenStudio?.let { open ->
+                    androidx.compose.material3.TextButton(onClick = open, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).testTag("settings-open-studio")) {
+                        androidx.compose.material3.Text("ARCANA STUDIO  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+                    }
                 }
                 Section("GAMEPLAY")
                 SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
