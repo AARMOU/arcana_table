@@ -161,6 +161,15 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             TextButton(onClick={runCatching{runtime.copyProfile(profileName.trim())}.onSuccess{profileName=""}.onFailure{onMessage(it.message ?: "Cannot copy profile.")}},
                 enabled=profileName.isNotBlank(),modifier=Modifier.heightIn(min=48.dp).testTag("studio-profile-copy")){Text("Save")}
         }
+        StudioSection("Show on screen")
+        SCREEN_PIECES.forEach {(key,name)->
+            val shown=key !in runtime.draft.hiddenPieces
+            Row(Modifier.fillMaxWidth().heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text(name,color=darkTableColors.text,fontSize=13.sp,modifier=Modifier.weight(1f))
+                Switch(shown,{on->runtime.change(runtime.draft.copy(hiddenPieces=if(on)runtime.draft.hiddenPieces-key else runtime.draft.hiddenPieces+key))},
+                    modifier=Modifier.testTag("studio-piece-$key"))
+            }
+        }
         StudioSection("Turn label")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             listOf("both" to "R2 · T3","round" to "Round 2","turn" to "Turn 3","hidden" to "Hidden").forEach {(mode,text)->

@@ -49,4 +49,11 @@ class TurnLabelTest {
         assertEquals("round", StudioControlProject.parse(p.json()).turnLabel)
         assertEquals("both", StudioControlProject.parse(StudioControlProject().json()).turnLabel)
     }
+    /** Owner, Nov 7: Show on screen switches save with the project; unknown pieces are refused. */
+    @Test fun hiddenPiecesSaveWithTheProject() {
+        val p = StudioControlProject(hiddenPieces = setOf("engineThinking", "timer"))
+        assertEquals(setOf("engineThinking", "timer"), StudioControlProject.parse(p.json()).hiddenPieces)
+        val bad = org.json.JSONObject(StudioControlProject().json()).put("hiddenPieces", org.json.JSONArray(listOf("nope"))).toString()
+        assertTrue(runCatching { StudioControlProject.parse(bad) }.isFailure)
+    }
 }

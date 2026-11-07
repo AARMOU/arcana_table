@@ -43,6 +43,15 @@ internal data class StudioControlStyle(
 internal val TURN_LABELS=listOf("both","round","turn","hidden")
 
 /**
+ * Owner, Nov 7: "settings that toggle ui elements on the screen", all in the editor. Each entry is a piece of the
+ * main table screen that can be switched off; switched-off pieces take no space. More pieces are added as GPT's
+ * STUDIO-J13 inventory lands.
+ */
+internal val SCREEN_PIECES=linkedMapOf(
+    "engineThinking" to "Engine \"thinking\" bar",
+    "timer" to "Turn timer")
+
+/**
  * Owner, Nov 7: "A full turn is counted after everyone goes." The engine counts every player's turn; a round is one
  * turn for everyone at the table. [turnNumber] is the engine's 1-based count; [seats] the players at the table.
  */
@@ -56,9 +65,11 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
     val copies:List<StudioControlCopy> = emptyList(),val density:String="Balanced",val theme:Map<String,String> = emptyMap(),
     val owners:Map<String,String> = emptyMap(),val screenDensity:Map<String,String> = emptyMap(),
     /** Owner, Nov 7: what the top turn label shows — "both" (R2 · T3), "round", "turn" or "hidden". */
-    val turnLabel:String="both") {
+    val turnLabel:String="both",
+    /** Owner, Nov 7: main-screen pieces switched off in Studio ⋮ > Layout > Show on screen (see [SCREEN_PIECES]). */
+    val hiddenPieces:Set<String> = emptySet()) {
     fun colors(base:TableColors)=StudioLayout(emptyList(),theme=theme).colors(base)
-    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("controls",JSONObject().apply {
+    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("controls",JSONObject().apply {
         controls.forEach {(id,style)->put(id,style.json())}
     }).put("copies",JSONArray().apply {copies.forEach {put(JSONObject().put("id",it.id).put("source",it.source).put("style",it.style.json()))}}).toString()
     companion object {
@@ -92,10 +103,13 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
             val densities=stringMap("screenDensity")
             require(densities.all{(name,value)->name.length in 1..100 && value in listOf("Minimal","Balanced","Detailed")}){"Invalid screen density."}
             val turnLabel=root.optString("turnLabel","both");require(turnLabel in TURN_LABELS){"Unknown turn label."}
+            val piecesArray=root.optJSONArray("hiddenPieces") ?: JSONArray()
+            val hiddenPieces=(0 until piecesArray.length()).map{piecesArray.getString(it)}.toSet()
+            require(hiddenPieces.all{it in SCREEN_PIECES}){"Unknown screen piece."}
             return StudioControlProject(controls.keys().asSequence().associateWith {id->
                 require(id.startsWith("native:") && id.length<=180 && StudioSites.contains(id)){"Unknown control ID."}
                 StudioControlStyle.parse(controls.getJSONObject(id))
-            },parsedCopies,density,theme,owners,densities,turnLabel)
+            },parsedCopies,density,theme,owners,densities,turnLabel,hiddenPieces)
         }
     }
 }
@@ -224,6 +238,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             val a=before.controls[id] ?: StudioControlStyle();val b=after.controls[id] ?: StudioControlStyle()
             if(a!=b)StudioLog.add("Edit ${title(id)} [${controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?"}]: ${StudioLog.diff(a,b)}")
         }
+        if(before.hiddenPieces!=after.hiddenPieces)StudioLog.add("Show on screen: hidden ${after.hiddenPieces.sorted().ifEmpty{listOf("nothing")}.joinToString()}")
         if(before.turnLabel!=after.turnLabel)StudioLog.add("Turn label ${before.turnLabel}→${after.turnLabel}")
         val oldCopies=before.copies.associateBy{it.id};val newCopies=after.copies.associateBy{it.id}
         (newCopies.keys-oldCopies.keys).forEach{StudioLog.add("Duplicate of ${title(newCopies[it]!!.source)} added")}

@@ -201,7 +201,7 @@ internal fun TableController.TableMainLayout() {
                 StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) listOfNotNull(
                     // Owner, Nov 7: rounds as well as turns ("R2 · T3"), changeable in Studio ⋮ > Layout.
                     if (BuildConfig.STUDIO_ENABLED) turnLabelText(studioControlsRuntime?.project()?.turnLabel ?: "both", turnNumber, players.size.coerceAtLeast(1)) else "T$turnNumber",
-                    if (turnTimerVisible) formatClock(elapsedTurnSeconds) else null).joinToString(" · ") else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                    if (turnTimerVisible && (!BuildConfig.STUDIO_ENABLED || "timer" !in (studioControlsRuntime?.project()?.hiddenPieces ?: emptySet()))) formatClock(elapsedTurnSeconds) else null).joinToString(" · ") else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.heightIn(min = 44.dp).tutorialTarget("turn-timer").wrapContentHeight(Alignment.CenterVertically).studioCombinedClickable("TableMainLayout.combinedClickable.1", "Table and player", enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.1", "Table and player", text = { StudioText("TableMainLayout.Text.6", "Table and player", true, if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
@@ -289,14 +289,23 @@ internal fun TableController.TableMainLayout() {
         }
 
         // Compact table: the strip appears only for problems, a waiting confirmation, game over or a non-empty stack.
-        val stripNeeded = argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null || argentumAwaitingUpdate || gameEndedOnline ||
+        // Owner, Nov 7: the "thinking" state only shows once the engine has been busy for half a second (no flashing),
+        // and can be switched off in Studio ⋮ > Layout > Show on screen. Problems and decisions still always show.
+        var thinkingShown by remember { mutableStateOf(false) }
+        LaunchedEffect(argentumAwaitingUpdate) {
+            if (!BuildConfig.STUDIO_ENABLED) thinkingShown = argentumAwaitingUpdate
+            else if (argentumAwaitingUpdate) { kotlinx.coroutines.delay(500); thinkingShown = true } else thinkingShown = false
+        }
+        val thinkingVisible = thinkingShown && argentumAwaitingUpdate &&
+            (!BuildConfig.STUDIO_ENABLED || "engineThinking" !in (studioControlsRuntime?.project()?.hiddenPieces ?: emptySet()))
+        val stripNeeded = argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null || thinkingVisible || gameEndedOnline ||
             argentumSnapshot == null || argentumSnapshot?.stack?.isNotEmpty() == true
         if (argentumEnabled && stripNeeded) ArgentumStatusStrip(
             model = ArgentumStatusModel(
                 connection = argentumStatus,
                 gameActive = argentumSnapshot != null && !gameEndedOnline,
                 gameOver = gameEndedOnline,
-                awaitingUpdate = argentumAwaitingUpdate,
+                awaitingUpdate = thinkingVisible,
                 turnLabel = argentumSnapshot?.let { "Turn ${it.turnNumber} · ${it.stepName.lowercase().replaceFirstChar(Char::uppercase)} · ${if (it.activePlayer == localSeat) "your turn" else "${players.getOrNull(it.activePlayer)?.name ?: "opponent"}'s turn"}" },
                 priorityLabel = argentumPrimaryLabel,
                 needsHandling = argentumNeedsHandling,
