@@ -4,6 +4,7 @@ _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan)
 
 ## Update: Nov 7, ~15:00 MT (owner: "No I want you to finish studio")
 - **CI hang found:** `StudioCoverageAuditTest.showMeSamplesOpenWithoutTheRealMoment` (not J10). The Show me samples were rebuilt on every recomposition; now `remember`ed (`bfbf49f`). Claude B's per-test names and 25-min timeout made this visible.
+- **Still hung with remembered samples** (run 42417032930), so "Show me" is switched off (`StudioPreviews.ENABLED=false`, `b99666d`) and the test is `@Ignore`d. Next: bisect by tab (Combat / Opening hand / Actions); note the test deals a real opening hand (`fake.dealOpeningHand=true`), so a real mulligan pop-up may be up underneath. Test APK `b99666d` built.
 - **Landed:**
   - Multi-select: hold an item to pick all like it (same code site, same screen); tap adds/removes; drag or any inspector change applies to all as one Undo (`StudioEditorGeometry.groupEdit`)
   - Line up: Left edges, Top edges, Centres, In a row, In a column, Same size, against the first picked (`StudioEditorGeometry.align`)
