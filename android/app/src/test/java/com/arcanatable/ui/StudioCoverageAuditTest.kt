@@ -88,6 +88,26 @@ class StudioCoverageAuditTest {
         } finally {s.close()}
     }
 
+    /** Owner, Nov 7: moment-only screens open as samples in Studio, with no real combat, mulligan or action list needed. */
+    @Test fun showMeSamplesOpenWithoutTheRealMoment() {
+        fake.dealOpeningHand=true
+        val s=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            startGame(s)
+            s.onActivity{it.tableController!!.nativeStudioOpen=true};UiTestSupport.settle(rule)
+            rule.onNodeWithTag("studio-tab-screen-Combat").performScrollTo().performClick();UiTestSupport.settle(rule)
+            rule.onAllNodes(hasTestTag("combat-board"),useUnmergedTree=true).fetchSemanticsNodes().let{assertTrue("combat sample shown",it.isNotEmpty())}
+            s.onActivity{UiTestSupport.screenshot(it,"studio-showme-combat")}
+            rule.onNodeWithTag("studio-tab-screen-Opening hand").performScrollTo().performClick();UiTestSupport.settle(rule)
+            assertTrue("opening hand sample shown",rule.onAllNodesWithText("KEEP 7").fetchSemanticsNodes().isNotEmpty())
+            rule.onAllNodes(hasTestTag("combat-board"),useUnmergedTree=true).assertCountEquals(0)
+            rule.onNodeWithTag("studio-tab-screen-Actions").performScrollTo().performClick();UiTestSupport.settle(rule)
+            assertTrue("actions sample shown",rule.onAllNodesWithText("Cast Grizzly Bears",substring=true).fetchSemanticsNodes().isNotEmpty())
+            s.onActivity{a->a.tableController!!.studioControlsRuntime!!.cancel()};UiTestSupport.settle(rule)
+            assertTrue("samples close with Studio",rule.onAllNodesWithText("Cast Grizzly Bears",substring=true).fetchSemanticsNodes().isEmpty())
+        } finally {s.close()}
+    }
+
     /** Opens [screen] from the screen bar, then selects and restyles one control through the editing canvas. */
     private fun audit(s:ActivityScenario<MainActivity>,screen:String) {
         rule.onNodeWithTag("studio-tab-screen-$screen").performScrollTo().performClick();UiTestSupport.settle(rule,2_500)
