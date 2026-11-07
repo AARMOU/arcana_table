@@ -245,20 +245,21 @@ class StudioControlsTest {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
         val chips=(0..2).map{"native:HomeScreen.OutlinedButton.1/s1:$it"}
         chips.forEachIndexed{i,id->runtime.record(StudioLiveControl(id,"Home","action","Chip $i",true,androidx.compose.ui.geometry.Rect(10f+100f*i,20f*i,90f+100f*i,60f+20f*i)),{})}
-        runtime.record(StudioLiveControl(b,"Home","action","Other",true,androidx.compose.ui.geometry.Rect(0f,300f,80f,340f)),{})
+        val other="native:HomeScreen.TextButton.1/s1:0"
+        runtime.record(StudioLiveControl(other,"Home","action","Other",true,androidx.compose.ui.geometry.Rect(0f,300f,80f,340f)),{})
         runtime.begin()
         runtime.holdSelect(chips[0])
         assertEquals(chips.toSet(),runtime.members().toSet())
         runtime.editGroup(runtime.style(chips[0]).copy(dx=4f),1f)
         assertTrue(chips.all{runtime.style(it).dx==4f})
-        assertEquals(0f,runtime.style(b).dx,0f)
+        assertEquals(0f,runtime.style(other).dx,0f)
         runtime.undo()
         assertTrue("one Undo for the group",chips.all{runtime.style(it).dx==0f})
         runtime.toggleMember(chips[2])
         assertEquals(setOf(chips[0],chips[1]),runtime.members().toSet())
         runtime.align(StudioEditorGeometry.Align.Top,1f)
         assertEquals(-20f,runtime.style(chips[1]).dy,0f)
-        runtime.selected=b
+        runtime.selected=other
         assertTrue("a plain selection goes back to one item",runtime.group.isEmpty())
     }
 }
