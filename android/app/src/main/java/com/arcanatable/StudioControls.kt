@@ -71,7 +71,7 @@ internal val SCREEN_PIECES=linkedMapOf(
  */
 @androidx.compose.runtime.Composable
 internal fun studioPieceShown(key:String):Boolean =
-    !BuildConfig.STUDIO_ENABLED || key !in (LocalStudioControls.current?.project()?.hiddenPieces ?: emptySet())
+    !BuildConfig.STUDIO_ENABLED || TutorialCoachState.model!=null || key !in (LocalStudioControls.current?.project()?.hiddenPieces ?: emptySet())
 
 /**
  * Owner, Nov 7: "A full turn is counted after everyone goes." The engine counts every player's turn; a round is one
@@ -265,6 +265,9 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         val style=project.controls[id] ?: shared ?: project.copies.firstOrNull{it.id==id}?.style ?: StudioControlStyle(
             visible=!((project.screenDensity[onScreen] ?: project.density)=="Minimal" && (kind ?: controls[id]?.kind)=="data" &&
                 onScreen?.contains("log",ignoreCase=true)!=true))
+        // Owner note 33: a running tutorial needs what it points at, so hidden items show again until it ends. Moved and
+        // resized items need nothing: the coach follows where each item really is.
+        if(!editing && !style.visible && TutorialCoachState.model!=null)return style.copy(visible=true)
         if(!editing && !style.visible) {
             val replacements=project.copies.filter{it.style.visible && (it.style.binding ?: it.source)==id}
             if(replacements.isNotEmpty() && replacements.all{it.id in recovered})return StudioControlStyle()
