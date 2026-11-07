@@ -67,7 +67,7 @@ class HexmarkDestroyerIndependentCertificationTest {
         assertFalse(d.getGraveyardCardNames(player).contains(name))
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(player, listOf(hexmark), opponent).error)
-        d.passPriorityUntil(Step.END_STEP)
+        d.passPriorityUntil(Step.END)
         d.resolveAll()
 
         assertTrue(d.zoneNames(player, Zone.EXILE).contains(name))
