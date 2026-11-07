@@ -32,7 +32,7 @@ The following submitted cards are still left out. These are concrete gaps in the
 - Ephemerate needs an immediate exile-and-return of any creature, plus rebound. The SDK has rebound and an end-step blink, but its immediate exile-and-return is limited to double-faced cards.
 - Determined Iteration's populate effect is available, but the engine cannot give the created token haste and schedule its sacrifice.
 - Lotus Vale needs an enter-the-battlefield replacement that sacrifices two untapped lands.
-- Gemstone Caverns needs a starting-hand/game-start replacement effect.
+- Gemstone Caverns: supported by the engine's pregame phase (see 2026-11-06 note below).
 
 ## Three decks reviewed for Build 108
 
@@ -58,3 +58,4 @@ The app's exported custom-card data does not add these cards to Argentum's onlin
 ## Export and checks
 
 There are 103 registered custom-card definitions. The custom-card test suite completed 111 tests with 0 failures in this work session. `:custom-cards:exportCards` wrote 103 card records to `app/src/main/assets/argentum/custom-cards.jsonl` and 103 names to `custom-cards.index.tsv`; a second export produced byte-identical files.
+- **Gemstone Caverns (2026-11-06):** plays from Argentum's library; the opening-hand action (begin the game on the battlefield with a luck counter, exile a card) runs in the engine's pregame phase, which the app's offline host uses (`skipMulligans = false`). `GemstoneCavernsScenarioTest` (6 cases incl. four-player) proves it; the old 'game-start replacement' blocker is removed.
