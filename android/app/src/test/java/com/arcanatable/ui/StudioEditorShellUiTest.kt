@@ -38,14 +38,14 @@ class StudioEditorShellUiTest {
         rule.setContent {MaterialTheme {CompositionLocalProvider(LocalStudioControls provides runtime) {
             Box(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(top=320.dp,start=40.dp)) {
-                    StudioScreen("Home") {
+                    StudioScreen("Player") {
                         StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="play"},Modifier.testTag("play")){StudioText("HomeScreen.Text.1","Home",false,"Play")}
                         Spacer(Modifier.height(24.dp))
                         StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="decks"},Modifier.testTag("decks")){StudioText("HomeScreen.Text.1","Home",false,"Decks")}
                     }
                 }
                 if(runtime.editing && showShell.value)StudioEditorShell(runtime,
-                    mapOf("Home" to (true to {calls+="nav:Home"}),"Table" to (false to {calls+="nav:Table"})),
+                    mapOf("Table" to (true to {calls+="nav:Table"}),"Player" to (true to {calls+="nav:Player"}),"Combat" to (false to {calls+="nav:Combat"})),
                     onApplied={applied++},onClassic={calls+="classic"},
                     handCards=(1..5).map{GameCard(it,"Real card $it","Creature",androidx.compose.ui.graphics.Color.DarkGray)})
             }
@@ -162,16 +162,16 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-layers-panel").assertDoesNotExist()
     }
 
-    @Test fun screenMenuNavigatesOnlyToAvailableScreens() {
+    @Test fun screenBarIsAlwaysVisibleAndOnlyOpensAvailableScreens() {
         render()
-        rule.onNodeWithTag("studio-screen-picker").assertTextContains("Home",substring=true)
-        rule.onNodeWithTag("studio-screen-picker").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-screen-Table").assertIsNotEnabled()
-        rule.onNodeWithTag("studio-screen-Table").performClick();rule.waitForIdle()
-        assertTrue(calls.isEmpty())
-        rule.onNodeWithTag("studio-screen-Home").performClick();rule.waitForIdle()
-        assertEquals(listOf("nav:Home"),calls)
-        rule.onNodeWithTag("studio-screen-menu").assertDoesNotExist()
+        rule.onNodeWithTag("studio-screen-bar").assertIsDisplayed()
+        listOf("Table","Player","Hand","Combat").forEach{rule.onNodeWithTag("studio-tab-screen-$it").assertExists()}
+        rule.onNodeWithTag("studio-tab-screen-Combat").performClick();rule.waitForIdle()
+        assertTrue("an unavailable screen explains itself instead of navigating",calls.isEmpty())
+        rule.onNodeWithTag("studio-notice").assertIsDisplayed()
+        rule.onNodeWithTag("studio-tab-screen-Player").performClick();rule.waitForIdle()
+        assertEquals(listOf("nav:Player"),calls)
+        rule.onNodeWithTag("studio-screen-title").assert(hasAnyDescendant(hasText("Player")))
         assertTrue("still editing after navigation",runtime.editing)
     }
 
@@ -235,7 +235,7 @@ class StudioEditorShellUiTest {
         assertEquals(4f,runtime.style(control("Play").id).dx,0.01f)
         rule.onNodeWithTag("studio-more-tab-Layout").performClick();rule.waitForIdle()
         rule.onNodeWithTag("studio-density-Minimal").assertIsDisplayed().performClick();rule.waitForIdle()
-        assertEquals("Minimal",runtime.draft.screenDensity["Home"])
+        assertEquals("Minimal",runtime.draft.screenDensity["Player"])
         rule.onNodeWithTag("studio-profile-name").performScrollTo().performTextReplacement("Fold cover")
         rule.onNodeWithTag("studio-profile-copy").performClick();rule.waitForIdle()
         assertEquals("Fold cover",runtime.profile)
@@ -248,10 +248,10 @@ class StudioEditorShellUiTest {
     private fun prefs()=runtime.prefs
     private fun hand()=rule.activity.resources.configuration.let{StudioHandEditing.layout(runtime,it.screenWidthDp.toFloat(),it.screenHeightDp.toFloat())}
     private fun openHandScreen() {
-        rule.onNodeWithTag("studio-screen-picker").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-screen-Hand").performScrollTo().performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-tab-screen-Hand").performClick();rule.waitForIdle()
         rule.onNodeWithTag("studio-hand-workspace").assertIsDisplayed()
-        rule.onNodeWithTag("studio-screen-picker").assertTextContains("Hand",substring=true)
+        rule.onNodeWithTag("studio-hand-drawer").assertIsDisplayed()
+        rule.onNodeWithTag("studio-screen-title").assert(hasAnyDescendant(hasText("Hand")))
     }
     /** Root-space point of a hand element → local point on the hand overlay (what a finger would touch). */
     private fun handPoint(id:String,at:(androidx.compose.ui.geometry.Rect)->Offset={it.center}):Offset {
@@ -349,7 +349,7 @@ class StudioEditorShellUiTest {
         render()
         tapCanvas(bounds("play").center);rule.waitForIdle()
         val d=density()
-        listOf("studio-close","studio-screen-picker","studio-undo","studio-redo","studio-layers","studio-more","studio-apply").forEach {tag->
+        listOf("studio-close","studio-undo","studio-redo","studio-layers","studio-more","studio-apply").forEach {tag->
             val b=bounds(tag)
             assertTrue("$tag inside ${width}dp: $b",b.left>=-1f && b.right<=width*d+1f)
             assertTrue("$tag is a 44dp target: $b",b.width>=44f*d-1f && b.height>=44f*d-1f)

@@ -36,13 +36,10 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
     Surface(color=darkTableColors.panel,shape=RoundedCornerShape(bottomStart=16.dp,bottomEnd=16.dp),shadowElevation=6.dp,modifier=Modifier.fillMaxWidth().testTag("studio-top-bar")) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal=if(narrow)0.dp else 2.dp),verticalAlignment=Alignment.CenterVertically) {
             StudioBarIcon(Icons.Default.Close,"Close Studio","studio-close",onClick=onClose)
-            Row(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(12.dp)).clickable(onClickLabel="Choose screen",onClick=onScreens).padding(horizontal=if(narrow)2.dp else 6.dp).testTag("studio-screen-picker"),
-                verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f,fill=false)) {
-                    Text(screen,color=darkTableColors.text,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
-                    Text(if(narrow)"${runtime.profile} ▾" else runtime.profile,color=darkTableColors.muted,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
-                }
-                if(!narrow)Icon(Icons.Default.ArrowDropDown,"Choose screen",tint=darkTableColors.text)
+            // A plain label: screens are chosen from the always-visible screen bar below.
+            Column(Modifier.weight(1f).heightIn(min=44.dp).padding(horizontal=if(narrow)2.dp else 6.dp).testTag("studio-screen-title"),verticalArrangement=Arrangement.Center) {
+                Text(screen,color=darkTableColors.text,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
+                Text(runtime.profile,color=darkTableColors.muted,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
             }
             StudioBarIcon(Icons.AutoMirrored.Filled.Undo,"Undo","studio-undo",enabled=runtime.canUndo){runtime.undo()}
             StudioBarIcon(Icons.AutoMirrored.Filled.Redo,"Redo","studio-redo",enabled=runtime.canRedo){runtime.redo()}
@@ -81,11 +78,11 @@ internal fun StudioScreenMenu(destinations:Map<String,Pair<Boolean,()->Unit>>,cu
 
 /** Collapsible layer list for the live screen: tap to select, eye to hide/show, search to filter. */
 @Composable
-internal fun StudioLayersPanel(runtime:StudioControlsRuntime,window:Int,onDismiss:()->Unit,modifier:Modifier=Modifier) {
+internal fun StudioLayersPanel(runtime:StudioControlsRuntime,window:Int,onDismiss:()->Unit,modifier:Modifier=Modifier,allowedScreens:Set<String>?=null) {
     var query by remember{mutableStateOf("")}
     var allWindows by remember{mutableStateOf(false)}
     // window 0 = "whatever window is on top": used when a game dialog is open, so its controls are listed first.
-    val rows=runtime.controls.values.filter {(allWindows || window==0 || it.window==window) && it.title.contains(query,true)}
+    val rows=runtime.controls.values.filter {(allWindows || window==0 || it.window==window) && (allowedScreens==null || it.screen in allowedScreens) && it.title.contains(query,true)}
         .sortedWith(compareBy<StudioLiveControl>({it.screen},{-runtime.style(it.id).layer},{it.bounds.top},{it.bounds.left}))
     Surface(modifier.fillMaxHeight().widthIn(max=340.dp).fillMaxWidth(0.86f).testTag("studio-layers-panel"),color=darkTableColors.panel,
         shape=RoundedCornerShape(topStart=16.dp,bottomStart=16.dp),shadowElevation=10.dp) {
@@ -172,8 +169,10 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         if(page=="Palette") {
         StudioSection("Palette")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
-            StudioChip("Table default",runtime.draft.theme.isNotEmpty(),"studio-palette-default"){runtime.change(runtime.draft.copy(theme=emptyMap()))}
-            tablePalettePresets.forEach {preset->StudioChip(preset.name,true,"studio-palette-${preset.name}"){
+            StudioChip("Table default",runtime.draft.theme.isNotEmpty(),"studio-palette-default",selected=runtime.draft.theme.isEmpty()){runtime.change(runtime.draft.copy(theme=emptyMap()))}
+            tablePalettePresets.forEach {preset->
+                val presetTheme=StudioLayout.themeRoles.associateWith{role->tableColorHex(preset.colors.colorRole(if(role=="gold")"counter" else role))}
+                StudioChip(preset.name,true,"studio-palette-${preset.name}",selected=runtime.draft.theme==presetTheme){
                 runtime.change(runtime.draft.copy(theme=StudioLayout.themeRoles.associateWith{role->tableColorHex(preset.colors.colorRole(if(role=="gold")"counter" else role))}))
             }}
         }

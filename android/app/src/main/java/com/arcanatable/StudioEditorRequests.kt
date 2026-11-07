@@ -30,4 +30,6 @@ internal object StudioEditorRequests {
     var mainWindow by mutableStateOf(0)
     /** One selection canvas per secondary window, owned by whichever Studio control in it claimed it first. */
     val canvasOwners=androidx.compose.runtime.mutableStateMapOf<Int,Any>()
+    /** Game pop-ups currently drawn in place by the editor, oldest first. */
+    val popups=androidx.compose.runtime.mutableStateListOf<StudioPopupEntry>()
 }

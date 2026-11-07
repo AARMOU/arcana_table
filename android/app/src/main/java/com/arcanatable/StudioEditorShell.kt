@@ -10,8 +10,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PanTool
-import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,36 +54,55 @@ internal enum class StudioEditorTool {Select,Scroll}
  */
 @Composable
 internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<String,Pair<Boolean,()->Unit>>,onApplied:()->Unit,
-    onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList()) {
+    onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList(),onPractice:(()->Unit)?=null,onLeaveScreen:()->Unit={}) {
     val window=System.identityHashCode(LocalView.current.rootView)
     val density=LocalDensity.current.density
     var tool by StudioEditorRequests::tool
     var layersOpen by remember{mutableStateOf(false)}
     var moreOpen by remember{mutableStateOf(false)}
-    var screensOpen by remember{mutableStateOf(false)}
     var collapsed by remember{mutableStateOf(false)}
     var confirmClose by remember{mutableStateOf(false)}
-    var snap by StudioEditorRequests::snap
-    var outlines by StudioEditorRequests::outlines
+    // Editor preferences persist between sessions (owner plan item 22).
+    val prefs=runtime.prefs
+    var snap by remember{mutableStateOf(prefs.getBoolean("studio_editor_snap",true))}
+    var outlines by remember{mutableStateOf(prefs.getBoolean("studio_editor_outlines",true))}
+    SideEffect{StudioEditorRequests.snap=snap;StudioEditorRequests.outlines=outlines}
+    val setSnap:(Boolean)->Unit={snap=it;prefs.edit().putBoolean("studio_editor_snap",it).apply()}
+    val setOutlines:(Boolean)->Unit={outlines=it;prefs.edit().putBoolean("studio_editor_outlines",it).apply()}
     var message by remember{mutableStateOf<String?>(null)}
     var origin by remember{mutableStateOf(Offset.Zero)}
     var height by remember{mutableFloatStateOf(0f)}
-    // Hand mode edits the hand drawer's absolute layout with the same canvas, inspector, undo and Apply.
-    var handMode by remember{mutableStateOf(false)}
+    var barBottom by remember{mutableFloatStateOf(0f)}
+    // The screen being edited is the tab the player picked (not guessed from what happens to be behind the editor).
+    val tabs=destinations.keys.toList().let{k->k.take(2)+"Hand"+k.drop(2)}
+    var tab by remember{mutableStateOf("Table")}  // outside a game, Table shows the practice card
+    val handMode=tab=="Hand"
     var handSelected by remember{mutableStateOf<String?>(null)}
     val configuration=androidx.compose.ui.platform.LocalConfiguration.current
     val handLayout=if(handMode)StudioHandEditing.layout(runtime,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat()) else null
     val handElement=handLayout?.elements?.firstOrNull{it.id==handSelected}
-    val openHand:()->Unit={handMode=true;runtime.selected=null;handSelected=null}
+    val popups=StudioEditorRequests.popups
+    val popupScreens=popups.map{it.screen}.toSet().takeIf{it.isNotEmpty()}
+    val noGame=destinations.values.none{it.first}
     val selected=if(handMode)null else runtime.selected?.let{runtime.controls[it]}
-    val screen=if(handMode)"Hand" else studioCurrentScreen(runtime,window,selected)
+    val screen=if(handMode)"Hand" else popupScreens?.let{p->selected?.screen?.takeIf{it in p} ?: popups.last().screen} ?: selected?.screen ?: tab
     val foreign=!handMode && runtime.controls.values.any{it.window!=0 && it.window!=window && it.bounds.width>0f}
     val apply:()->Unit={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message ?: "Fix the listed problems before applying."}}
     val close:()->Unit={if(runtime.canUndo)confirmClose=true else runtime.cancel()}
     val problems=runtime.problems().distinct()
+    val pick:(String)->Unit={name->
+        if(name=="Hand"){onLeaveScreen();tab="Hand";runtime.selected=null;handSelected=null}
+        else destinations[name]?.let{(available,open)->
+            if(available){tab=name;handSelected=null;runtime.selected=null;open()}
+            else message=if(name=="Combat")"Combat can be edited during combat in a practice game." else "Start a practice game to edit $name."
+        }
+    }
+    // Back closes the open pop-up the way the game would; with none open, it offers to leave the editor.
+    androidx.activity.compose.BackHandler(enabled=true) {if(popups.isNotEmpty())popups.last().dismiss() else close()}
 
     val bar=@Composable {
-        StudioTopBar(runtime,screen,close,{screensOpen=true},{layersOpen=!layersOpen},layersOpen,{moreOpen=true},apply)
+        StudioTopBar(runtime,screen,close,{},{layersOpen=!layersOpen},layersOpen,{moreOpen=true},apply)
+        StudioScreenBar(tabs,tab,destinations,pick,popups.lastOrNull()?.let{p->({p.dismiss()})},if(handMode)null else tab)
         val notice=message ?: problems.firstOrNull()
         if(notice!=null)Surface(color=darkTableColors.raised,shape=RoundedCornerShape(12.dp),modifier=Modifier.padding(6.dp).fillMaxWidth()
             .clickable{message=null}.testTag("studio-notice")) {
@@ -96,58 +117,102 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
         Box(Modifier.fillMaxSize()) {
             val layersModifier=Modifier.align(Alignment.CenterEnd).statusBarsPadding().padding(top=56.dp)
             if(layersOpen)if(handLayout!=null)StudioHandLayersPanel(runtime,handLayout,handSelected,{handSelected=it},{layersOpen=false},layersModifier)
-                else StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},layersModifier)
-            if(screensOpen)StudioScreenMenu(destinations,screen,{name->screensOpen=false;handMode=false;runtime.selected=null;destinations[name]?.second?.invoke()},
-                {screensOpen=false;openHand()},{screensOpen=false})
-            if(moreOpen)StudioMorePanel(runtime,screen,snap,{snap=it},outlines,{outlines=it},onApplied,onClassic,
-                if(handMode)null else ({moreOpen=false;openHand()}),{message=it},{moreOpen=false},
+                else StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},layersModifier,popupScreens)
+            if(moreOpen)StudioMorePanel(runtime,screen,snap,setSnap,outlines,setOutlines,onApplied,onClassic,
+                if(handMode)null else ({moreOpen=false;pick("Hand")}),{message=it},{moreOpen=false},
                 hand=handLayout?.let{l->{confirm->StudioHandOptions(runtime,l,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat(),onApplied,{message=it},confirm)}})
         }
     }
-    // Requests from inside game dialogs (their Studio button, or a back/outside dismissal held while editing).
-    val firstMenuRequest=remember{StudioEditorRequests.menuRequests}
-    LaunchedEffect(StudioEditorRequests.menuRequests){if(StudioEditorRequests.menuRequests!=firstMenuRequest)screensOpen=true}
-    val firstHandRequest=remember{StudioEditorRequests.handRequests-(if(StudioEditorRequests.handPending)1 else 0)}
-    LaunchedEffect(StudioEditorRequests.handRequests){if(StudioEditorRequests.handRequests!=firstHandRequest){StudioEditorRequests.handPending=false;openHand()}}
     SideEffect{StudioEditorRequests.mainWindow=window}
     DisposableEffect(runtime){StudioEditorRequests.clear();StudioEditorRequests.shellActive=true;StudioEditorRequests.tool=StudioEditorTool.Select
         onDispose{StudioEditorRequests.clear();StudioEditorRequests.shellActive=false}}
     CompositionLocalProvider(LocalTableColors provides darkTableColors) {
     MaterialTheme(colorScheme=darkColorScheme(primary=darkTableColors.accent,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
         Box(Modifier.fillMaxSize().onGloballyPositioned{origin=it.boundsInRoot().topLeft;height=it.size.height.toFloat()}.testTag("studio-editor")) {
-            if(handLayout!=null)StudioHandWorkspace(runtime,handLayout,handCards,handSelected,{handSelected=it},tool==StudioEditorTool.Select,snap,outlines,
-                topPad=60.dp,bottomPad=if(handElement!=null && !collapsed)420.dp else 120.dp)
-            else StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density)
-            Column(Modifier.align(Alignment.TopCenter).statusBarsPadding()) {bar()}
+            // Game pop-ups drawn in place, in the game's own colours, under the editing canvas.
+            if(!handMode)CompositionLocalProvider(LocalTableColors provides (runtime.project().colors(LocalStudioBaseColors.current ?: darkTableColors))) {
+                // Pop-ups sit below the toolbar and screen bar so their top row and "‹ Back" never overlap.
+                val top=with(LocalDensity.current){(barBottom-origin.y).coerceAtLeast(0f).toDp()}
+                Box(Modifier.fillMaxSize().padding(top=top)) {popups.forEach{p->key(p.key){p.content()}}}
+            }
+            when {
+                handLayout!=null->StudioHandWorkspace(runtime,handLayout,handCards,handSelected,{handSelected=it},tool==StudioEditorTool.Select,snap,outlines,
+                    bottomPad=if(handElement!=null && !collapsed)360.dp else 96.dp)
+                noGame->StudioPracticeCard(onPractice,{pick("Hand")},Modifier.align(Alignment.Center))
+                else->StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density,popupScreens)
+            }
+            Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().onGloballyPositioned{barBottom=it.boundsInRoot().bottom}) {bar()}
             // Dock the inspector away from the selection so the element being edited is never hidden.
             val dockTop=!handMode && selected!=null && selected.window==window && (selected.bounds.center.y-origin.y)>height*0.55f
             Column(Modifier.align(if(dockTop)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth()
-                .then(if(dockTop)Modifier.statusBarsPadding().padding(top=60.dp) else Modifier.navigationBarsPadding()).padding(horizontal=6.dp,vertical=4.dp)) {
-                if(!dockTop)StudioToolSwitch(tool){tool=it}
+                .then(if(dockTop)Modifier.statusBarsPadding().padding(top=112.dp) else Modifier.navigationBarsPadding()).padding(horizontal=6.dp,vertical=4.dp)) {
+                if(!dockTop && !noGame)StudioToolSwitch(tool){tool=it}
                 if(!foreign || selected?.window==window)inspector(Modifier.widthIn(max=640.dp).align(Alignment.CenterHorizontally))
                 if(dockTop)StudioToolSwitch(tool){tool=it}
             }
             if(!foreign)sheets()
         }
-        // A game dialog is its own window above this one. Mirror the toolbar and inspector into small, non-modal windows
-        // above it, so dialogs are edited in place instead of through a separate form.
+        // Windows Studio can't draw in place yet (e.g. bottom sheets) keep a floating toolbar and inspector above them.
         if(foreign) {
             StudioFloatingWindow(top=true,tag="studio-floating-bar") {bar()}
-            if(selected!=null && selected.window!=window && !layersOpen && !screensOpen && !moreOpen)
+            if(selected!=null && selected.window!=window && !layersOpen && !moreOpen)
                 StudioFloatingWindow(top=false,tag="studio-floating-inspector") {inspector(Modifier.padding(6.dp))}
-            if(layersOpen || screensOpen || moreOpen)StudioOverlayWindow {sheets()}
-        }
-        StudioEditorRequests.pendingDismiss?.let {
-            AlertDialog(onDismissRequest={StudioEditorRequests.clear()},title={Text("Close this window?")},
-                text={Text("Studio held a back/outside tap so a decision isn't cancelled by accident. Close the window as the game normally would?")},
-                confirmButton={TextButton(onClick={StudioEditorRequests.consumeDismiss()?.invoke()},modifier=Modifier.testTag("studio-dismiss-window")){Text("Close window")}},
-                dismissButton={TextButton(onClick={StudioEditorRequests.clear()},modifier=Modifier.testTag("studio-keep-window")){Text("Keep editing")}})
+            if(layersOpen || moreOpen)StudioOverlayWindow {sheets()}
         }
         if(confirmClose)AlertDialog(onDismissRequest={confirmClose=false},title={Text("Leave Studio?")},
             text={Text("Your draft is kept and reopens next time. Nothing changes in the game until you Apply.")},
             confirmButton={TextButton(onClick={confirmClose=false;runtime.cancel()},modifier=Modifier.testTag("studio-close-confirm")){Text("Leave")}},
             dismissButton={TextButton(onClick={confirmClose=false;apply()},modifier=Modifier.testTag("studio-close-apply")){Text("Apply and leave")}})
     }
+    }
+}
+
+/** Always-visible screen tabs (owner: make choosing hand/table/zones prominent), plus "‹ Back" while a pop-up is open. */
+@Composable
+internal fun StudioScreenBar(tabs:List<String>,current:String,destinations:Map<String,Pair<Boolean,()->Unit>>,onPick:(String)->Unit,
+    onBack:(()->Unit)?,backTo:String?) {
+    Surface(color=darkTableColors.panel.copy(alpha=0.97f),shape=RoundedCornerShape(14.dp),modifier=Modifier.padding(horizontal=6.dp,vertical=4.dp).fillMaxWidth().testTag("studio-screen-bar")) {
+        // "‹ Back" stays pinned at the start; only the screen tabs scroll, so Back is never scrolled out of view.
+        Row(Modifier.padding(4.dp),verticalAlignment=Alignment.CenterVertically) {
+            if(onBack!=null) {
+                Row(Modifier.heightIn(min=44.dp).clip(RoundedCornerShape(12.dp)).background(darkTableColors.counter.copy(alpha=0.22f))
+                    .clickable(onClick=onBack).padding(horizontal=12.dp).testTag("studio-popup-back"),verticalAlignment=Alignment.CenterVertically) {
+                    Text("‹ Back to ${backTo ?: "screen"}",color=darkTableColors.counter,fontSize=13.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),verticalAlignment=Alignment.CenterVertically) {
+            tabs.forEach {name->
+                val on=name==current
+                val available=name=="Hand" || destinations[name]?.first==true
+                Column(Modifier.widthIn(min=56.dp).heightIn(min=48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if(on)darkTableColors.accent else Color.Transparent).clickable{onPick(name)}.padding(horizontal=10.dp,vertical=4.dp)
+                    .semantics{contentDescription=if(available)"Edit $name" else "$name: start a practice game first"}.testTag("studio-tab-screen-$name"),
+                    horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                    Icon(studioScreenIcon(name),null,tint=if(on)darkTableColors.background else if(available)darkTableColors.text else darkTableColors.muted.copy(alpha=0.6f),modifier=Modifier.size(20.dp))
+                    Text(name,fontSize=11.sp,color=if(on)darkTableColors.background else if(available)darkTableColors.text else darkTableColors.muted.copy(alpha=0.6f),maxLines=1)
+                }
+            }
+            }
+        }
+    }
+}
+
+private fun studioScreenIcon(name:String)=when(name){"Table"->Icons.Default.TableRestaurant;"Player"->Icons.Default.Person;"Hand"->Icons.Default.ViewCarousel
+    "Stack"->Icons.Default.Layers;"Zones"->Icons.Default.Inventory2;"Log"->Icons.AutoMirrored.Filled.List;"Combat"->Icons.Default.Bolt;else->Icons.Default.Dashboard}
+
+/** Studio edits game screens; outside a game it offers a paused offline practice game (or the hand design). */
+@Composable
+private fun StudioPracticeCard(onPractice:(()->Unit)?,onHand:()->Unit,modifier:Modifier) {
+    Surface(modifier.padding(24.dp).widthIn(max=420.dp).testTag("studio-practice-card"),color=darkTableColors.panel,shape=RoundedCornerShape(20.dp),shadowElevation=8.dp) {
+        Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("Edit your game screens",color=darkTableColors.text,fontSize=18.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+            Text("Studio changes the table, player, stack, zones and log screens. Start an offline practice game against the AI to see and edit them. Your layout then applies to every game.",
+                color=darkTableColors.muted,fontSize=13.sp)
+            if(onPractice!=null)Button(onClick=onPractice,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("studio-start-practice"),
+                colors=ButtonDefaults.buttonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)){Text("Start practice game")}
+            OutlinedButton(onClick=onHand,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("studio-practice-hand")){Text("Edit the hand",color=darkTableColors.text)}
+        }
     }
 }
 
@@ -176,7 +241,11 @@ private fun StudioToolSwitch(tool:StudioEditorTool,onTool:(StudioEditorTool)->Un
  * selection moves it and the eight handles resize it. One gesture commits one undo step.
  */
 @Composable
-internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,origin:Offset,intercept:Boolean,snap:Boolean,outlines:Boolean,density:Float) {
+internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,origin:Offset,intercept:Boolean,snap:Boolean,outlines:Boolean,density:Float,
+    allowedScreens:Set<String>?=null) {
+    // While a pop-up is open only its controls can be picked or outlined; the screen behind it is dimmed.
+    val pickable:(StudioLiveControl)->Boolean={c->allowedScreens==null || c.screen in allowedScreens}
+    val currentPickable by rememberUpdatedState(pickable)
     var handle by remember{mutableStateOf<StudioHandle?>(null)}
     var drag by remember{mutableStateOf(Offset.Zero)}
     val currentOrigin by rememberUpdatedState(origin)
@@ -204,7 +273,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                 runtime.edit(selection.id,StudioEditorGeometry.commit(style,grabbed,selection.bounds.width/density,selection.bounds.height/density,
                     Offset(total.x/density,total.y/density),currentSnap))
             } else if(!StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop)) {
-                runtime.selected=StudioEditorGeometry.hitTest(runtime.controls.values,point,window){runtime.style(it).visible}?.id
+                runtime.selected=StudioEditorGeometry.hitTest(runtime.controls.values.filter(currentPickable),point,window){runtime.style(it).visible}?.id
             }
             handle=null;drag=Offset.Zero
         }
@@ -216,7 +285,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
     Canvas(Modifier.fillMaxSize().then(gestures).testTag("studio-canvas").semantics{contentDescription="Studio canvas"}) {
         // Outline only what can actually be picked: table controls hidden behind a full-screen page are skipped.
         val covered=outlines && runtime.controls.values.any{it.window==window && it.bounds.width>0f && it.screen in StudioEditorGeometry.FULL_SCREENS}
-        if(outlines)runtime.controls.values.forEach {c->
+        if(outlines)runtime.controls.values.filter(pickable).forEach {c->
             if(c.window==window && c.bounds.width>0f && c.id!=selection?.id && !(covered && c.screen==StudioEditorGeometry.BASE_SCREEN)) {
                 val r=c.bounds.translate(-origin)
                 drawRect(accent.copy(alpha=if(c.isAction)0.35f else 0.18f),r.topLeft,r.size,

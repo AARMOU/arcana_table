@@ -65,7 +65,7 @@ internal object StudioHandEditing {
 
 @Composable
 internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayout,cards:List<GameCard>,selected:String?,onSelect:(String?)->Unit,
-    intercept:Boolean,snap:Boolean,outlines:Boolean,topPad:androidx.compose.ui.unit.Dp,bottomPad:androidx.compose.ui.unit.Dp,scroll:ScrollState=rememberScrollState()) {
+    intercept:Boolean,snap:Boolean,outlines:Boolean,bottomPad:androidx.compose.ui.unit.Dp,scroll:ScrollState=rememberScrollState(),drawerFraction:Float=0.5f) {
     val currentLayout by rememberUpdatedState(layout)
     val currentSnap by rememberUpdatedState(snap)
     val currentSelected by rememberUpdatedState(selected)
@@ -75,10 +75,15 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
     val reach=with(LocalDensity.current){24.dp.toPx()}
     val accent=darkTableColors.accent
     val measurer=rememberTextMeasurer()
-    Box(Modifier.fillMaxSize().background(darkTableColors.background).testTag("studio-hand-workspace")) {
-        Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-            Spacer(Modifier.height(topPad))
-            Text("Hand · ${runtime.orientation} · real hand drawer renderer",color=darkTableColors.muted,fontSize=11.sp,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
+    // The hand is edited where it lives: a half-open drawer over the dimmed table (owner plan item 2), one colour
+    // from its top edge down (item 6), never under the Studio toolbar (item 1).
+    val drawerColor=layout.colors(runtime.project().colors(darkTableColors)).panel
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.45f)).testTag("studio-hand-workspace")) {
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(drawerFraction)
+            .clip(RoundedCornerShape(topStart=24.dp,topEnd=24.dp)).background(drawerColor).testTag("studio-hand-drawer").verticalScroll(scroll)) {
+            Box(Modifier.fillMaxWidth().height(20.dp),contentAlignment=Alignment.Center) {
+                Box(Modifier.size(40.dp,4.dp).clip(RoundedCornerShape(2.dp)).background(darkTableColors.muted.copy(alpha=0.5f)))
+            }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val unit=constraints.maxWidth/layout.canvasWidth.coerceIn(240f,2000f)
                 val minPx=24f*unit

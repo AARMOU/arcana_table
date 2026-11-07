@@ -69,7 +69,8 @@ internal fun StudioHandCanvas(layout: StudioLayout, state: StudioHandState,
                 e.w<=4000 && e.h<=4000 && e.y<=4000 && e.fs in 1f..100f && e.r>=0
         }
         val extent = ((renderElements.maxOfOrNull { it.y+it.h } ?: origin)-origin).coerceIn(44f,4000f)
-        Box(Modifier.fillMaxWidth().height((extent*scale).dp).background(Ink).testTag("studio-hand-canvas")) {
+        // The hand design draws on the drawer's own surface colour, so the drawer is one colour top to bottom.
+        Box(Modifier.fillMaxWidth().height((extent*scale).dp).background(Panel).testTag("studio-hand-canvas")) {
             renderElements.forEach { e ->
                 val shape = RoundedCornerShape((e.r*scale).dp)
                 var delta by remember(e.id) { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }

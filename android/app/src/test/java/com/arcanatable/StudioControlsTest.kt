@@ -18,11 +18,11 @@ class StudioControlsTest {
     @Test fun resetUsesPersistedLogicalScreenAndDensityDoesNotLeakToOtherScreens() {
         val prefs=prefs();val runtime=StudioControlsRuntime(prefs,"portrait")
         runtime.record(StudioLiveControl(a,"Opening hand","action","Draw",true),{})
-        runtime.record(StudioLiveControl(b,"Settings","action","Theme",true),{})
+        runtime.record(StudioLiveControl(b,"Stack","action","Theme",true),{})
         runtime.begin();runtime.edit(a,StudioControlStyle(dx=8f));runtime.edit(b,StudioControlStyle(dx=16f))
         runtime.density("Opening hand","Minimal")
         assertFalse(runtime.style("native:HomeScreen.Text.1/20","Opening hand","data").visible)
-        assertTrue(runtime.style("native:HomeScreen.Text.1/21","Settings","data").visible)
+        assertTrue(runtime.style("native:HomeScreen.Text.1/21","Stack","data").visible)
         runtime.apply()
         val reopened=StudioControlsRuntime(prefs,"portrait");reopened.begin()
         assertEquals("Opening hand",reopened.draft.owners[a])
@@ -42,12 +42,12 @@ class StudioControlsTest {
     @Test fun informationBindingsRejectActionsAndOtherWindows() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
         val info="native:HomeScreen.Text.1/10";val other="native:HomeScreen.Text.2/10"
-        runtime.record(StudioLiveControl(info,"Home","data","Life",true,window=1),null)
-        runtime.record(StudioLiveControl(other,"Home","data","Private dialog",true,window=2),null)
-        runtime.record(StudioLiveControl(a,"Home","action","Play",true,window=1),{})
+        runtime.record(StudioLiveControl(info,"Player","data","Life",true,window=1),null)
+        runtime.record(StudioLiveControl(other,"Player","data","Private dialog",true,window=2),null)
+        runtime.record(StudioLiveControl(a,"Player","action","Play",true,window=1),{})
         runtime.begin(info);runtime.duplicate(info,1f)
         val copy=runtime.draft.copies.single()
-        runtime.record(StudioLiveControl(copy.id,"Home","data","Life",true,window=1,protectedLabel=true),null)
+        runtime.record(StudioLiveControl(copy.id,"Player","data","Life",true,window=1,protectedLabel=true),null)
         runtime.edit(copy.id,copy.style.copy(binding=other));assertTrue(runtime.problems().isNotEmpty())
         runtime.edit(copy.id,copy.style.copy(binding=a));assertTrue(runtime.problems().isNotEmpty())
         runtime.edit(copy.id,copy.style.copy(binding=info));assertTrue(runtime.problems().isEmpty())
@@ -67,19 +67,19 @@ class StudioControlsTest {
     }
     @Test fun nativeCallbacksMustBeCurrentAndAvailable() {
         val runtime=StudioControlsRuntime(prefs(),"portrait");var calls=0
-        runtime.record(StudioLiveControl(a,"Home","action","Play",true)){calls++}
+        runtime.record(StudioLiveControl(a,"Player","action","Play",true)){calls++}
         assertTrue(runtime.invoke(a));assertEquals(1,calls)
-        runtime.record(StudioLiveControl(a,"Home","action","Play",false)){calls++}
+        runtime.record(StudioLiveControl(a,"Player","action","Play",false)){calls++}
         assertFalse(runtime.invoke(a));assertEquals(1,calls)
         runtime.remove(a);assertFalse(runtime.invoke(a))
     }
     @Test fun wrongScreenAndUnavailableRebindingsCannotApply() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
-        runtime.record(StudioLiveControl(a,"Home","action","Play",true)){}
+        runtime.record(StudioLiveControl(a,"Player","action","Play",true)){}
         runtime.record(StudioLiveControl(b,"Game","action","Concede",true)){}
         runtime.begin(a);runtime.edit(a,StudioControlStyle(binding=b))
         assertTrue(runtime.problems().isNotEmpty());assertTrue(runCatching{runtime.apply()}.isFailure)
-        runtime.record(StudioLiveControl(b,"Home","action","Import",false)){}
+        runtime.record(StudioLiveControl(b,"Player","action","Import",false)){}
         assertTrue(runtime.problems().isNotEmpty())
     }
     @Test fun requiredActionsAndDynamicDataRemainTruthful() {
@@ -125,7 +125,7 @@ class StudioControlsTest {
     }
     @Test fun requiredOriginalCanBeHiddenOnlyWhenItsReplacementRemainsAvailableInTheDesign() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
-        runtime.record(StudioLiveControl(a,"Home","action","PASS priority",true)){}
+        runtime.record(StudioLiveControl(a,"Player","action","PASS priority",true)){}
         runtime.begin(a);runtime.duplicate(a,1f);runtime.edit(a,StudioControlStyle(visible=false))
         assertTrue(runtime.problems().isEmpty())
         val id=runtime.draft.copies.single().id
@@ -133,8 +133,8 @@ class StudioControlsTest {
     }
     @Test fun sameScreenStillCannotRebindAcrossNativeWindows() {
         val runtime=StudioControlsRuntime(prefs(),"portrait")
-        runtime.record(StudioLiveControl(a,"Home","action","Play",true,window=1)){}
-        runtime.record(StudioLiveControl(b,"Home","action","Leave modal",true,window=2)){}
+        runtime.record(StudioLiveControl(a,"Player","action","Play",true,window=1)){}
+        runtime.record(StudioLiveControl(b,"Player","action","Leave modal",true,window=2)){}
         runtime.begin(a);runtime.edit(a,StudioControlStyle(binding=b));assertTrue(runtime.problems().isNotEmpty())
         assertFalse(runtime.invokeFrom(a,b))
     }

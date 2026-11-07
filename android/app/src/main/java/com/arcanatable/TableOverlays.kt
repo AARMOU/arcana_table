@@ -257,6 +257,7 @@ internal fun TableController.TableOverlays() {
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
                 onSettings = { optionsOpen = true; TutorialActions.tap("home-settings") },
                 onReturnToTable = { run { homeOpen = false } },
+                onStudio = if (BuildConfig.STUDIO_ENABLED) ({ nativeStudioOpen = true }) else null,
             ) }
             if (playSheetOpen) StudioScreen("Setup") { PlaySheet(
                 deckName = activeDeck?.name,
@@ -953,7 +954,7 @@ internal fun TableController.TableOverlays() {
     // While a combat board or another Argentum choice is open, the hand is for looking only.
     val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
 
-    val handActionsBusy = LocalStudioControls.current?.editing==true || handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
+    val handActionsBusy = handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
     val handActions = handDrawerActions(argentumSnapshot?.legalActions.orEmpty(), handActionsBusy)
     val handCards = players.getOrNull(handSeat)?.hand.orEmpty()
     val handCastActions = handDrawerCastActions(handActions, handCards.mapNotNull { argentumSnapshot?.serverCardIds?.get(it.id) }.toSet())
@@ -962,7 +963,7 @@ internal fun TableController.TableOverlays() {
 
     val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioProfiles(optionPrefs, layoutOrientationSuffix).activeStore() }
     val studioLayout = remember(studioStore, nativeStudioRevision) {
-        if (BuildConfig.DEBUG && studioStore.enabled()) studioStore.load() else null
+        if (BuildConfig.STUDIO_ENABLED && studioStore.enabled()) studioStore.load() else null
     }
     val studioFrame = studioLayout != null && argentumEnabled && studioLayout.viewportProblems(
         configuration.screenWidthDp.toFloat(), LocalDensity.current.fontScale, configuration.screenHeightDp.toFloat()).isEmpty()
@@ -994,7 +995,8 @@ internal fun TableController.TableOverlays() {
                         .fillMaxHeight(effectiveHandFraction)
                         .verticalScroll(rememberScrollState())
                         .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .background(Panel)
+                        // One colour from the drawer's top strip down: the saved hand design's surface when it has one.
+                        .background(if (studioFrame) studioLayout!!.colors(LocalTableColors.current).panel else Panel)
                         .navigationBarsPadding()
                         .onGloballyPositioned { handSheetBounds = it.boundsInRoot() }
                         .clickable { }

@@ -26,8 +26,8 @@ class StudioNativeControlsUiTest {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-ui",0),"portrait").also{it.enableCatalog()}
         val enabled=mutableStateOf(true);val calls=mutableListOf<String>()
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="source"},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Home",false,"Source")}
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="target"},Modifier.testTag("target"),enabled=enabled.value){StudioText("HomeScreen.Text.1","Home",false,"Target")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+="source"},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Player",false,"Source")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+="target"},Modifier.testTag("target"),enabled=enabled.value){StudioText("HomeScreen.Text.1","Player",false,"Target")}
         }}}}
         rule.waitForIdle()
         val source=runtime.controls.values.single{it.title=="Source"}
@@ -44,7 +44,7 @@ class StudioNativeControlsUiTest {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-inspect",0),"portrait")
         var actions=0
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{actions++},Modifier.testTag("action")){StudioText("HomeScreen.Text.1","Home",false,"Play")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{actions++},Modifier.testTag("action")){StudioText("HomeScreen.Text.1","Player",false,"Play")}
         }}}
         rule.waitForIdle();rule.runOnIdle{runtime.begin();runtime.inspectNativeScreen()};rule.waitForIdle()
         rule.onNodeWithTag("action").performClick();assertEquals(0,actions);assertNotNull(runtime.selected);assertTrue(runtime.panelOpen)
@@ -53,7 +53,7 @@ class StudioNativeControlsUiTest {
     @Test fun liveInformationCanBeHiddenWithoutSerializingItsCurrentValue() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-data",0),"portrait").also{it.enableCatalog()}
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
-            StudioText("HomeScreen.Text.1","Home",true,"Live life 40",Modifier.testTag("life"))
+            StudioText("HomeScreen.Text.1","Player",true,"Live life 40",Modifier.testTag("life"))
         }}}
         rule.waitForIdle();val id=runtime.controls.values.single().id
         rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(visible=false));runtime.apply()};rule.waitForIdle()
@@ -65,8 +65,8 @@ class StudioNativeControlsUiTest {
         val state=mutableStateOf(StudioControlsRuntime(prefs,"portrait").also{it.enableCatalog()})
         val life=mutableStateOf(40);val mana=mutableStateOf(3)
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides state.value){Column(Modifier.fillMaxSize()){
-            StudioText("HomeScreen.Text.1","Home",true,"Life ${life.value}",Modifier.testTag("life"))
-            StudioText("HomeScreen.Text.2","Home",true,androidx.compose.ui.text.AnnotatedString("Mana ${mana.value}"),Modifier.testTag("mana"))
+            StudioText("HomeScreen.Text.1","Player",true,"Life ${life.value}",Modifier.testTag("life"))
+            StudioText("HomeScreen.Text.2","Player",true,androidx.compose.ui.text.AnnotatedString("Mana ${mana.value}"),Modifier.testTag("mana"))
         }}}}
         rule.waitForIdle();var runtime=state.value
         val source=runtime.controls.values.single{it.title=="Life 40"}.id
@@ -97,7 +97,11 @@ class StudioNativeControlsUiTest {
         rule.onNodeWithTag("studio-copy-${copy.id}").assertTextEquals("Mana 1")
 
     }
-    @Test fun nondismissableCustomizedDialogAlwaysKeepsStudioRecoveryReachable() {
+    /**
+     * Owner D33 removed the floating in-window Studio button. The guarantee it gave is now enforced at Apply instead:
+     * a non-dismissable window can never lose its last visible button, so it can't become a dead end.
+     */
+    @Test fun nondismissableCustomizedDialogCanNeverLoseItsLastButton() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-window-recovery",0),"portrait").also{it.enableCatalog()}
         var gameActions=0;var dismissed=0;val alert=mutableStateOf(false)
         @Composable fun Choice() {StudioButton("HomeScreen.OutlinedButton.1","Choice",{gameActions++},Modifier.testTag("only-choice")){
@@ -111,20 +115,21 @@ class StudioNativeControlsUiTest {
         listOf(false,true).forEach {useAlert->
             rule.runOnIdle{alert.value=useAlert};rule.waitForIdle()
             val source=runtime.controls.values.single{it.isAction}.id
-            rule.runOnIdle{runtime.begin(source);runtime.edit(source,StudioControlStyle(visible=false));runtime.apply()}
-            rule.waitForIdle();rule.onNodeWithTag("only-choice").assertIsNotDisplayed()
-            rule.onNodeWithTag("studio-window-escape").assertIsDisplayed().performClick()
-            assertTrue(runtime.editing);assertTrue(runtime.panelOpen)
+            rule.runOnIdle{runtime.begin(source);runtime.edit(source,StudioControlStyle(visible=false))}
+            assertTrue(runtime.problems().any{it.startsWith("Keep at least one button visible")})
+            assertTrue("Apply refuses the dead-end window",runCatching{runtime.apply()}.isFailure)
+            rule.runOnIdle{runtime.cancel();runtime.enableCatalog()};rule.waitForIdle()
+            rule.onNodeWithTag("studio-window-escape").assertDoesNotExist()
+            rule.onNodeWithTag("only-choice").assertIsDisplayed()
             assertEquals(0,gameActions);assertEquals(0,dismissed)
-            rule.runOnIdle{runtime.cancel()};rule.waitForIdle()
         }
     }
     @Test fun repeatedListControlsHaveDistinctCallbacksAndStableSlots() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-repeat",0),"portrait").also{it.enableCatalog()}
         val calls=mutableListOf<Int>()
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
-            (0..9).forEach {i->StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+=i},Modifier.testTag("repeat-$i")){
-                StudioText("HomeScreen.Text.1","Home",true,"Choice $i")
+            (0..9).forEach {i->StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+=i},Modifier.testTag("repeat-$i")){
+                StudioText("HomeScreen.Text.1","Player",true,"Choice $i")
             }}
         }}}}
         rule.waitForIdle()
@@ -136,7 +141,7 @@ class StudioNativeControlsUiTest {
         val prefs=rule.activity.getSharedPreferences("controls-copy",0)
         val state=mutableStateOf(StudioControlsRuntime(prefs,"portrait").also{it.enableCatalog()});var calls=0
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides state.value){Column(Modifier.fillMaxSize()){
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls++},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Home",false,"Source")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls++},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Player",false,"Source")}
         }}}}
         rule.waitForIdle();var runtime=state.value
         val source=runtime.controls.values.single{it.isAction}.id

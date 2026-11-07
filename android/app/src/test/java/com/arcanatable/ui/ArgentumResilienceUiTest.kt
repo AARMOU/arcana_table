@@ -2,6 +2,8 @@ package com.arcanatable.ui
 
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -367,13 +369,17 @@ class ArgentumResilienceUiTest {
     }
 
     @Test @Config(qualifiers = "w412dp-h928dp-port-xhdpi")
-    fun studioNativeHomeEditRestoresAcrossActualActivityRecreation() {
+    /**
+     * Owner D33 (Nov 6): Home and Settings are outside Arcana Studio and there is no floating Studio button in play.
+     * Replaces the earlier "Home edit restores across recreation" test, whose premise the owner reversed: the project
+     * still persists across recreation, but Home is never catalogued or recoloured and Settings always opens Studio.
+     */
+    fun studioExcludesHomeAndSettingsAcrossActualActivityRecreation() {
         StudioProfiles(context.getSharedPreferences("arcana_options",Context.MODE_PRIVATE),"portrait").resetAll()
         val scenario=ActivityScenario.launch(MainActivity::class.java)
         try {
             UiTestSupport.settle(rule)
             if(shown("NOT NOW",false)){rule.onNodeWithText("NOT NOW").performClick();UiTestSupport.settle(rule)}
-            var id="";var before=0f
             scenario.onActivity {activity->
                 val runtime=activity.tableController!!.studioControlsRuntime!!
                 assertFalse(runtime.active);runtime.enableCatalog()
@@ -381,36 +387,25 @@ class ArgentumResilienceUiTest {
             UiTestSupport.settle(rule)
             scenario.onActivity {activity->
                 val runtime=activity.tableController!!.studioControlsRuntime!!
-                val title=runtime.controls.values.first{StudioSites.site(it.id)=="HomeScreen.Text.1"}
-                id=title.id;before=title.bounds.left
-                runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=8f,font=20f))
-                runtime.change(runtime.draft.copy(theme=StudioLayout.themeRoles.associateWith{"#000000"}))
+                assertTrue("Home is not editable",runtime.controls.values.none{StudioSites.site(it.id).startsWith("HomeScreen.")})
+                runtime.begin();runtime.change(runtime.draft.copy(theme=StudioLayout.themeRoles.associateWith{"#000000"}));runtime.apply()
             }
             UiTestSupport.settle(rule)
-            scenario.onActivity {it.tableController!!.studioControlsRuntime!!.apply()}
-            UiTestSupport.settle(rule)
-            scenario.onActivity {activity->
-                assertTrue(activity.tableController!!.studioControlsRuntime!!.controls[id]!!.bounds.left>before)
-                UiTestSupport.screenshot(activity,"studio-home-applied")
-            }
             scenario.recreate();UiTestSupport.settle(rule)
-            rule.onNodeWithTag("studio-root-escape").assertIsDisplayed().performClick();UiTestSupport.settle(rule)
+            rule.onAllNodesWithTag("studio-root-escape").assertCountEquals(0)
             scenario.onActivity {activity->
                 val runtime=activity.tableController!!.studioControlsRuntime!!
-                assertEquals(8f,runtime.style(id).dx);assertTrue(runtime.controls.containsKey(id))
-                assertTrue(runtime.editing && runtime.panelOpen)
-                activity.tableController!!.optionsOpen=true;runtime.inspectNativeScreen()
+                assertEquals("#000000",runtime.project().theme["background"])
+                UiTestSupport.screenshot(activity,"studio-home-unaffected-by-palette")
+                activity.tableController!!.optionsOpen=true
             }
             UiTestSupport.settle(rule)
+            rule.onNodeWithTag("settings-open-studio").performScrollTo().performClick();UiTestSupport.settle(rule)
             scenario.onActivity {activity->
                 val c=activity.tableController!!;val runtime=c.studioControlsRuntime!!
-                assertTrue(runtime.editing);assertFalse(c.gameInProgress)
-                assertTrue(runtime.controls.values.any{it.kind=="toggle" || it.kind=="range"})
-                runtime.panelOpen=true
-            }
-            UiTestSupport.settle(rule)
-            scenario.onActivity {activity->
-                UiTestSupport.screenshot(activity,"studio-all-screens-native-editor")
+                assertTrue(runtime.editing);assertFalse(c.gameInProgress);assertFalse(c.optionsOpen)
+                assertTrue("Settings controls are never catalogued",runtime.controls.values.none{it.kind=="toggle" || it.kind=="range"})
+                UiTestSupport.screenshot(activity,"studio-opened-from-settings")
             }
         } finally {scenario.close();StudioProfiles(context.getSharedPreferences("arcana_options",Context.MODE_PRIVATE),"portrait").resetAll()}
     }

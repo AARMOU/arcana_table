@@ -42,7 +42,7 @@ internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String
 internal fun studioWidget(site:String,screen:String,kind:String,title:String,enabled:Boolean=true,protectedLabel:Boolean=false,
     onClick:(()->Unit)?=null):StudioWidget? {
     val runtime=LocalStudioControls.current ?: return null
-    if(!runtime.active)return null
+    if(!runtime.active || LocalStudioExcluded.current)return null
     if(kind.endsWith("action") && LocalStudioControlParent.current?.proxy==true)return null
     val base="native:$site/${currentCompositeKeyHash}"
     val token=remember{Any()}

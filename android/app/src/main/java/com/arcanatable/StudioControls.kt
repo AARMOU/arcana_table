@@ -179,6 +179,8 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             controls[id]?.requiredNativeAction==true && (!style.visible || style.binding!=null && style.binding!=id) && !hasReplacement(applied,id)
         }.keys.map{"A required native action was restored; update its saved layout."} else emptyList())
     fun isRecovered(id:String)=!editing && id in recovered
+    /** Names of controls restored to their native layout because the saved one didn't fit (for the notice). */
+    fun recoveredTitles():List<String> = recovered.keys.mapNotNull{controls[it]?.title?.takeIf(String::isNotBlank)}.distinct().take(3)
     fun available(id:String):Boolean=controls[id]?.enabled==true && id in callbacks
     fun canInvoke(source:String,target:String):Boolean {
         val from=controls[source] ?: return false
@@ -191,7 +193,13 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     }
     fun invokeFrom(source:String,target:String):Boolean=if(canInvoke(source,target))invoke(target) else false
     fun invoke(id:String):Boolean {if(!available(id))return false;callbacks[id]?.invoke() ?: return false;return true}
-    fun begin(id:String?=null){capturing=true;draft=store().draft() ?: applied;pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
+    /** Edits made before Home/Decks/Setup/Lobby/Settings left Studio (owner D33) are dropped, never applied again. */
+    private fun withoutExcluded(p:StudioControlProject)=p.copy(
+        controls=p.controls.filterKeys{!StudioScope.excluded(p.owners[it] ?: StudioSites.screen(it))},
+        copies=p.copies.filterNot{StudioScope.excluded(p.owners[it.source] ?: StudioSites.screen(it.source))},
+        owners=p.owners.filterValues{!StudioScope.excluded(it)},
+        screenDensity=p.screenDensity.filterKeys{!StudioScope.excluded(it)})
+    fun begin(id:String?=null){capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
     fun select(id:String){if(!editing)begin(id) else {selected=id;panelOpen=true}}
     fun inspectNativeScreen(){editing=true;panelOpen=false}
     private fun saveDraft() {
@@ -270,6 +278,12 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         change(controls,hand)
     }
     fun problems():List<String> = buildList {
+        // There is no floating Studio button in play (owner D33), so no window may lose its last visible button:
+        // a pop-up that can't be dismissed would otherwise become a dead end.
+        controls.values.filter{it.isAction && it.window!=0}.groupBy{it.window to it.screen}.values.forEach {group->
+            if(group.none{this@StudioControlsRuntime.style(it.id).visible} && group.any{draft.controls[it.id]?.visible==false})
+                add("Keep at least one button visible on ${group.first().screen}.")
+        }
         if(draft.theme.keys.any{it !in StudioLayout.themeRoles} || draft.theme.values.any{parseTableColorHex(it)==null})add("Invalid palette roles or colors.")
         pendingHand?.let{addAll(it.problems())}
         (draft.controls+draft.copies.associate{it.id to it.style}).forEach {(id,style)->
@@ -286,11 +300,15 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
                 val r=control.bounds
                 if(r.left< -1 || r.top< -1 || r.right>control.viewportWidth+1 || r.bottom>control.viewportHeight+1)
                     add("${control.title} is outside its native window.")
-                controls.values.filter{it.id!=id && it.isAction && it.window==control.window && this@StudioControlsRuntime.style(it.id).visible}.forEach {other->
+                // Only real collisions: same screen, and never a container against something drawn inside it
+                // (e.g. the hand tray and its cards, which may be partly scrolled out of the tray).
+                controls.values.filter{it.id!=id && it.isAction && it.window==control.window && it.screen==control.screen &&
+                    this@StudioControlsRuntime.style(it.id).visible}.forEach {other->
                     val b=other.bounds
                     val contains=r.left<=b.left && r.top<=b.top && r.right>=b.right && r.bottom>=b.bottom
                     val contained=b.left<=r.left && b.top<=r.top && b.right>=r.right && b.bottom>=r.bottom
-                    if(b.width>0 && r.overlaps(b) && !contains && !contained)add("${control.title} overlaps ${other.title}.")
+                    val nested=(control.kind=="container-action" && r.contains(b.center)) || (other.kind=="container-action" && b.contains(r.center))
+                    if(b.width>0 && r.overlaps(b) && !contains && !contained && !nested)add("${control.title} overlaps ${other.title}.")
                 }
             }
         }

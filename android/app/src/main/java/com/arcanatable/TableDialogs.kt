@@ -811,14 +811,13 @@ internal fun OptionsPage(
                         StudioTextButton("TableDialogs.TextButton.26", "Dialogs and overlays", onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { StudioText("TableDialogs.Text.125", "Dialogs and overlays", true, if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
                     }
                 }
-                StudioTextButton("TableDialogs.TextButton.27", "Dialogs and overlays", onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
-                    StudioText("TableDialogs.Text.126", "Dialogs and overlays", false, "ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
-                }
-                // Development builds: the full-screen Arcana Studio editor (a plain button, outside the editable catalog).
-                onOpenStudio?.let { open ->
-                    androidx.compose.material3.TextButton(onClick = open, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).testTag("settings-open-studio")) {
+                // Arcana Studio replaces "Adjust UI layout" behind the single STUDIO_ENABLED switch (owner D33).
+                if (onOpenStudio != null) {
+                    androidx.compose.material3.TextButton(onClick = onOpenStudio, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).tutorialTarget("setting-adjust-ui").testTag("settings-open-studio")) {
                         androidx.compose.material3.Text("ARCANA STUDIO  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                     }
+                } else StudioTextButton("TableDialogs.TextButton.27", "Dialogs and overlays", onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
+                    StudioText("TableDialogs.Text.126", "Dialogs and overlays", false, "ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
                 Section("GAMEPLAY")
                 SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
