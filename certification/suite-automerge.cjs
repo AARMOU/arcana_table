@@ -1,7 +1,5 @@
 'use strict';
-// Merges a Copilot suite PR that answers an [Arcana Suite] request, only after a green
-// Arcana Card Certification Premerge run on its exact head actually executed the suite against
-// the card PR. See .github/workflows/arcana-suite-automerge.yml. Never touches card PRs.
+// Reports suite eligibility after exact-head certification; owner approval and merge remain manual.
 const { SUITE_TITLE, SUITE_MARKER, SUITE_BASE, isIntegratedSuite } = require('../scripts/admission.cjs');
 
 const PREMERGE = 'Arcana Card Certification Premerge';
@@ -9,7 +7,7 @@ const SCENARIOS = 'Execute trusted independent card scenarios';
 const COPILOT = new Set(['copilot', 'copilot-swe-agent[bot]']);
 const field = (body, name) => (String(body || '').match(new RegExp('^' + name + ': (\\S+)\\s*$', 'm')) || [])[1];
 
-// Pure: every reason this PR must not merge (empty = merge).
+// Pure: reasons certification is ineligible (empty still requires owner approval).
 function mergeBlockers({ run, pr, request, files, jobs, suite }) {
   const r = [];
   const repoName = pr?.base?.repo?.full_name;
@@ -35,12 +33,11 @@ function mergeBlockers({ run, pr, request, files, jobs, suite }) {
   return r;
 }
 
-const NOTICE = '<!-- arcana-suite-merge-needs-owner-v1 -->';
-
-// `writer` marks the draft ready and merges. GitHub refuses markPullRequestReadyForReview from the workflow
-// token, so the workflow passes a client for ARCANA_SUITE_MERGE_TOKEN, else COPILOT_DISPATCH_TOKEN. If the
-// write still fails, one notice on the suite PR tells the owner the exact two clicks; nothing else waits.
-async function mergeSuitePr({ github, writer = github, owner, repo, run, core }) {
+// Historical function name retained for callers; this function performs reads only.
+async function mergeSuitePr({ github, owner, repo, run, core }) {
+  if (!run || run.name !== PREMERGE || run.event !== 'pull_request' || run.conclusion !== 'success' ||
+      !/^[0-9a-f]{40}$/.test(run.head_sha || '') || !run.head_branch || !run.id)
+    return { merged: false, blockers: ['premerge-not-green-or-malformed'] };
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base: SUITE_BASE, head: `${owner}:${run.head_branch}`, per_page: 100 });
   const pr = prs.find(p => p.head?.sha === run.head_sha) || prs[0];
   if (!pr) return { merged: false, reason: 'no-open-pr' };
@@ -58,24 +55,7 @@ async function mergeSuitePr({ github, writer = github, owner, repo, run, core })
   } catch {}
   const blockers = mergeBlockers({ run, pr, request, files, jobs, suite });
   if (blockers.length) { core?.warning(`Suite PR #${pr.number} not merged: ${blockers.join(', ')}`); return { merged: false, pr: pr.number, blockers }; }
-  try {
-    if (pr.draft) {
-      const res = await writer.graphql('mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }', { id: pr.node_id });
-      if (res?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false) throw Error('GitHub did not confirm ready-for-review');
-    }
-    await writer.rest.pulls.merge({ owner, repo, pull_number: pr.number, sha: run.head_sha, merge_method: 'squash' });
-  } catch (error) {
-    const why = String(error?.message || error).replace(/[@\r\n]/g, ' ').slice(0, 200);
-    core?.warning(`Suite PR #${pr.number} is green but could not be merged automatically: ${why}`);
-    const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 });
-    if (!comments.some(c => c.user?.login === 'github-actions[bot]' && String(c.body || '').startsWith(NOTICE)))
-      await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: [NOTICE,
-        `**Owner action (one time for this PR):** this suite passed premerge against its card PR but GitHub refused the automatic merge (${why}).`,
-        `Open https://github.com/${owner}/${repo}/pull/${pr.number}, click **Ready for review**, then **Squash and merge**. Certification of the card then starts by itself.`,
-        'To stop this happening: add a repository secret `ARCANA_SUITE_MERGE_TOKEN` (fine-grained token for this repository: Contents and Pull requests read/write).'].join('\n\n') });
-    return { merged: false, pr: pr.number, reason: 'merge-refused', why };
-  }
-  return { merged: true, pr: pr.number, request: n, key };
+  return { merged: false, pr: pr.number, request: n, key, reason: 'owner-merge-required' };
 }
 
-module.exports = { mergeBlockers, mergeSuitePr, PREMERGE, NOTICE };
+module.exports = { mergeBlockers, mergeSuitePr, PREMERGE };

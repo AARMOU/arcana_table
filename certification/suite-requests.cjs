@@ -2,7 +2,7 @@
 // Turns "this Copilot card PR has no certification suite" into work: one [Arcana Suite] issue per
 // card unit, opened by github-actions[bot]. The dispatcher (scripts/dispatch-runner.cjs) assigns it
 // to Copilot on main through the same admission/budget gate as card work, and
-// .github/workflows/arcana-suite-automerge.yml merges the suite PR only after a green premerge.
+// .github/workflows/arcana-suite-automerge.yml reports green premerge eligibility; owner merge required.
 const { SUITE_TITLE, SUITE_MARKER, SUITE_BASE } = require('../scripts/admission.cjs');
 
 const BOT = 'github-actions[bot]';
@@ -47,7 +47,7 @@ function suiteRequest({ pr, issue, name, oracle }) {
       '## Acceptance', '',
       '- Every ability, cost, restriction and timing in the Oracle text has a positive scenario, with at least one negative scenario.',
       '- No placeholders, approximations, skipped or weakened assertions.',
-      `- \`Arcana Card Certification Premerge\` runs the suite against card PR #${pr}; it merges automatically only when that run is green.`, '',
+      `- \`Arcana Card Certification Premerge\` runs the suite against card PR #${pr}; a green result is report-only and still requires explicit owner merge approval.`, '',
       '## Oracle record', '', '    ' + oracle.line, ''].join('\n'),
   };
 }
