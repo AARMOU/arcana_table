@@ -290,6 +290,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             LocalStudioBaseColors provides LocalTableColors.current,
             LocalTableColors provides (studioRuntime?.project()?.colors(LocalTableColors.current) ?: LocalTableColors.current)) {
         Box(Modifier.fillMaxSize().background(Ink)) {
+            StudioBackdropLayer()
             TableMainLayout()
             TableOverlays()
             TableOverlaysB()

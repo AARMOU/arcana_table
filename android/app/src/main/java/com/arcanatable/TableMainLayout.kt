@@ -141,7 +141,7 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableMainLayout() {
     Column(
-        Modifier.fillMaxSize().background(Ink)
+        Modifier.fillMaxSize().background(if (studioBackdropShown()) Color.Transparent else Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             // While Studio is open the screen starts below its bar instead of sliding underneath (owner notes 4, 10).
             .padding(start = 10.dp, top = 8.dp + StudioEditorRequests.screenTopInset, end = 10.dp)

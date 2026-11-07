@@ -89,7 +89,9 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
     /** Owner, Nov 7: what the top turn label shows — "both" (R2 · T3), "round", "turn" or "hidden". */
     val turnLabel:String="both",
     /** Owner, Nov 7: main-screen pieces switched off in Studio ⋮ > Layout > Show on screen (see [SCREEN_PIECES]). */
-    val hiddenPieces:Set<String> = emptySet()) {
+    val hiddenPieces:Set<String> = emptySet(),
+    /** Owner notes 16/17: the table's background picture (a name from [StudioBackdrop]), how it fits, and how dimmed. */
+    val backdrop:String?=null,val backdropFit:String="Fill",val backdropDim:Float=0.35f) {
     fun colors(base:TableColors)=StudioLayout(emptyList(),theme=theme).colors(base)
     /**
      * Moves old position-based IDs (`native:<site>/<compose key hash>:<n>`) to stable ones (`native:<site>/s<screen>:<n>`).
@@ -109,7 +111,7 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
         fun m(id:String)=map[id] ?: id
         return copy(controls=controls.mapKeys{m(it.key)},copies=copies.map{it.copy(source=m(it.source))},owners=owners.mapKeys{m(it.key)})
     }
-    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("controls",JSONObject().apply {
+    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("backdropFit",backdropFit).put("backdropDim",backdropDim.toDouble()).apply{backdrop?.let{put("backdrop",it)}}.put("controls",JSONObject().apply {
         controls.forEach {(id,style)->put(id,style.json())}
     }).put("copies",JSONArray().apply {copies.forEach {put(JSONObject().put("id",it.id).put("source",it.source).put("style",it.style.json()))}}).toString()
     companion object {
@@ -146,10 +148,14 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
             val piecesArray=root.optJSONArray("hiddenPieces") ?: JSONArray()
             val hiddenPieces=(0 until piecesArray.length()).map{piecesArray.getString(it)}.toSet()
             require(hiddenPieces.all{it in SCREEN_PIECES}){"Unknown screen piece."}
+            val backdrop=if(root.has("backdrop"))root.getString("backdrop") else null
+            require(backdrop==null || StudioBackdrop.validName(backdrop)){"Unknown background picture."}
+            val fit=root.optString("backdropFit","Fill");require(fit in StudioBackdrop.FITS){"Unknown background fit."}
+            val dim=root.optDouble("backdropDim",0.35).toFloat();require(dim in 0f..0.9f){"Background dimming out of range."}
             return StudioControlProject(controls.keys().asSequence().associateWith {id->
                 require(id.startsWith("native:") && id.length<=180 && StudioSites.contains(id)){"Unknown control ID."}
                 StudioControlStyle.parse(controls.getJSONObject(id))
-            },parsedCopies,density,theme,owners,densities,turnLabel,hiddenPieces)
+            },parsedCopies,density,theme,owners,densities,turnLabel,hiddenPieces,backdrop,fit,dim)
         }
     }
 }
@@ -208,7 +214,9 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     var panelOpen by mutableStateOf(false)
     private var lead by mutableStateOf<String?>(null)
     /** Setting the selection directly (a tap, a list row, Close) always goes back to one item. */
-    var selected:String? get()=lead;set(v){lead=v;group=emptySet()}
+    var selected:String? get()=lead;set(v){lead=v;group=emptySet();if(v!=null)tablePicked=false}
+    /** Owner notes 16/17: the table itself is picked (empty table space was tapped); its panel sets the background. */
+    var tablePicked by mutableStateOf(false)
     /** Multi-select (owner, Nov 7): other controls edited together with [selected]. Empty = one item selected. */
     var group by mutableStateOf<Set<String>>(emptySet())
     fun members()=listOfNotNull(selected)+(group-setOfNotNull(selected))
@@ -294,7 +302,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         copies=p.copies.filterNot{StudioScope.excluded(p.owners[it.source] ?: StudioSites.screen(it.source))},
         owners=p.owners.filterValues{!StudioScope.excluded(it)},
         screenDensity=p.screenDensity.filterKeys{!StudioScope.excluded(it)})
-    fun begin(id:String?=null){StudioLog.add("Opened Studio · profile $profile${id?.let{" · selected ${title(it)}"}.orEmpty()}");capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
+    fun begin(id:String?=null){StudioLog.add("Opened Studio · profile $profile${id?.let{" · selected ${title(it)}"}.orEmpty()}");capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;tablePicked=false;panelOpen=true}
     fun select(id:String){if(!editing)begin(id) else {selected=id;panelOpen=true}}
     /**
      * Hold on a control: select it and every other control of the same kind on the same screen (all player chips, all
@@ -354,6 +362,8 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             if(a!=b)StudioLog.add("Edit ${title(id)} [${controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?"}]: ${StudioLog.diff(a,b)}")
         }
         if(before.hiddenPieces!=after.hiddenPieces)StudioLog.add("Show on screen: hidden ${after.hiddenPieces.sorted().ifEmpty{listOf("nothing")}.joinToString()}")
+        if(before.backdrop!=after.backdrop || before.backdropFit!=after.backdropFit || before.backdropDim!=after.backdropDim)
+            StudioLog.add("Background: ${after.backdrop?.let{"picture, ${after.backdropFit}, dim ${(after.backdropDim*100).toInt()}%"} ?: "none"}")
         if(before.turnLabel!=after.turnLabel)StudioLog.add("Turn label ${before.turnLabel}→${after.turnLabel}")
         val oldCopies=before.copies.associateBy{it.id};val newCopies=after.copies.associateBy{it.id}
         (newCopies.keys-oldCopies.keys).forEach{StudioLog.add("Duplicate of ${title(newCopies[it]!!.source)} added")}

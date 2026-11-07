@@ -93,7 +93,7 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     val pick:(String)->Unit={name->
         if(name=="Hand"){onLeaveScreen();tab="Hand";runtime.selected=null;handSelected=null}
         else destinations[name]?.let{(available,open)->
-            if(available){tab=name;handSelected=null;runtime.selected=null;open()}
+            if(available){tab=name;handSelected=null;runtime.selected=null;runtime.tablePicked=false;open()}
             else message=if(name=="Combat")"Combat can be edited during combat in a practice game." else "Start a practice game to edit $name."
         }
     }
@@ -116,7 +116,8 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     }
     val inspector:@Composable (Modifier)->Unit={mod->
         if(handLayout!=null)handElement?.let {StudioHandInspector(runtime,handLayout,it,collapsed,{v->collapsed=v},{id->handSelected=id},mod)}
-        else selected?.let {StudioInspector(runtime,it,density,collapsed,{v->collapsed=v},{m->message=m},mod)}
+        else if(selected!=null)StudioInspector(runtime,selected,density,collapsed,{v->collapsed=v},{m->message=m},mod)
+        else if(runtime.tablePicked)StudioTableInspector(runtime,collapsed,{v->collapsed=v},{m->message=m},mod)
     }
     val sheets=@Composable {
         Box(Modifier.fillMaxSize()) {
@@ -291,7 +292,10 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
                 when {
                     hit!=null && upAt-down.uptimeMillis>=viewConfiguration.longPressTimeoutMillis->runtime.holdSelect(hit)
                     hit!=null && runtime.group.isNotEmpty()->runtime.toggleMember(hit)
-                    else->runtime.selected=hit
+                    // Owner notes 16/17: tapping empty table space picks the table (for its background); tapping
+                    // empty space again, or while something is selected, just deselects.
+                    hit==null && allowedScreens==null && runtime.selected==null && !runtime.tablePicked->runtime.tablePicked=true
+                    else->{runtime.selected=hit;if(hit==null)runtime.tablePicked=false}
                 }
             }
             handle=null;drag=Offset.Zero
