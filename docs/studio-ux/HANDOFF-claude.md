@@ -2,6 +2,16 @@
 
 _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan), #883 (owner decisions), #1016 (GPT index)._
 
+## Update: Nov 7, ~15:00 MT (owner: "No I want you to finish studio")
+- **CI hang found:** `StudioCoverageAuditTest.showMeSamplesOpenWithoutTheRealMoment` (not J10). The Show me samples were rebuilt on every recomposition; now `remember`ed (`bfbf49f`). Claude B's per-test names and 25-min timeout made this visible.
+- **Landed:**
+  - Multi-select: hold an item to pick all like it (same code site, same screen); tap adds/removes; drag or any inspector change applies to all as one Undo (`StudioEditorGeometry.groupEdit`)
+  - Line up: Left edges, Top edges, Centres, In a row, In a column, Same size, against the first picked (`StudioEditorGeometry.align`)
+  - Button types (note 26): Action, Panel, Counter, Phase tab, Tray bar (`StudioButtonTypes`, field `type`)
+  - Table background (16/17): tap empty table space → Table panel: picture (private copy), Fill/Whole, Dim, Remove, Match picture, Shuffle (`StudioBackdrop`, `StudioPictureColors`, `runtime.tablePicked`)
+  - Back up / Restore / Share layout (34); plain names for the player panel etc. (`StudioNames`, 12); commander `art_crop` and wrapping name (12); tutorials show hidden items while running (33)
+- **Still open:** two-finger scroll (needs pass-through; the toolbar toggle stays), J8 per-player keys (28), Fill it up preview (29), chip reflow in the scrolling seat row.
+
 ## Update: Nov 7, ~14:00 MT (owner hit usage limits; GPT workers stopped)
 - **Second Claude account handoff** (J12, engine/rules queue, reviews; never touches #1013): [#81 comment 6712053976](https://github.com/AARMOU/arcana_table/issues/81#issuecomment-6712053976).
 - **Landed since 37188ed:**
