@@ -73,6 +73,7 @@ class StudioCoverageAuditTest {
      * pieces off in Show on screen removes their rows, so the table area below gets taller (Goose STUDIO-J13 acceptance).
      */
     @Test fun hidingScreenPiecesGivesTheirSpaceToTheBoard() {
+        fake.dealOpeningHand=true
         val s=ActivityScenario.launch(MainActivity::class.java)
         try {
             startGame(s)

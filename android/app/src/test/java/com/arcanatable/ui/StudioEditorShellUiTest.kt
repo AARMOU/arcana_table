@@ -261,7 +261,7 @@ class StudioEditorShellUiTest {
         rule.onNodeWithTag("studio-json-import").performClick();rule.waitForIdle()
         assertEquals(4f,runtime.style(control("Play").id).dx,0.01f)
         rule.onNodeWithTag("studio-more-tab-Layout").performClick();rule.waitForIdle()
-        rule.onNodeWithTag("studio-density-Minimal").assertIsDisplayed().performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-density-Minimal").performScrollTo().assertIsDisplayed().performClick();rule.waitForIdle()
         assertEquals("Minimal",runtime.draft.screenDensity["Player"])
         rule.onNodeWithTag("studio-profile-name").performScrollTo().performTextReplacement("Fold cover")
         rule.onNodeWithTag("studio-profile-copy").performClick();rule.waitForIdle()
