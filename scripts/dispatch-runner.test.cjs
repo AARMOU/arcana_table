@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runDispatch, INTERRUPT_MARKER } = require('./dispatch-runner.cjs');
 const A = require('./admission.cjs');
+const Q = require('./queue-feeder.cjs');
 
 const BASE_SHA = 'c'.repeat(40);
 const core = () => { const log = []; return { log, info: m => log.push(m), warning: m => log.push('W:' + m),
@@ -15,7 +16,7 @@ const ago = m => new Date(Date.now() - m * 60000).toISOString();
 // Default history: issue written 60 min ago, one-shot label applied by the owner 10 min ago.
 const labeledEvent = (m = 10) => ({ event: 'labeled', created_at: ago(m), label: { name: A.ONE_SHOT_LABEL }, actor: { login: 'AARMOU' } });
 
-function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, otherCiRuns = [], removeFails = false, freshAssignees = [], report81 = [],
+function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], closedIssues = [], ledger = {}, ci = true, otherCiRuns = [], removeFails = false, freshAssignees = [], report81 = [],
   timeline = n => (issues.find(i => i.number === n)?.labels || []).some(l => l.name === A.ONE_SHOT_LABEL) ? [labeledEvent()] : [],
   editedAt = () => ago(60), freshAssociation = 'OWNER' } = {}) {
   const writes = [], dispatches = [];
@@ -26,7 +27,7 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
     paginate: async (fn, args) => fn(args),
     rest: {
       issues: {
-        listForRepo: () => issues, listComments: a => comments(a.issue_number), listEventsForTimeline: a => timeline(a.issue_number),
+        listForRepo: a => a.state === 'closed' ? closedIssues : issues, listComments: a => comments(a.issue_number), listEventsForTimeline: a => timeline(a.issue_number),
         createComment: async a => { writes.push(['comment', a.issue_number, a.body]); },
         removeLabel: async a => { if (removeFails) throw { status: 500 }; writes.push(['removeLabel', a.issue_number, a.name]); },
         get: async a => ({ data: { ...issues.find(i => i.number === a.issue_number), state: 'open', assignees: freshAssignees, number: a.issue_number, author_association: freshAssociation } }),
@@ -43,7 +44,7 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
 const ctx = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 555 };
 const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't',
   // Cardkit verdict for the test card on BASE_SHA (feasibility gate).
-  ARCANA_FEASIBILITY: JSON.stringify({ schema: 1, baseSha: 'c'.repeat(40), cards: { 'eldrazi monument': { name: 'Eldrazi Monument', readiness: 'SUPPORTED', route: 'copilot' } } }), ...x });
+  ARCANA_FEASIBILITY: JSON.stringify({ schema: 1, baseSha: 'c'.repeat(40), cards: { 'eldrazi monument': { name: 'Eldrazi Monument', readiness: 'SUPPORTED', route: 'copilot' }, "akroma's will": { name: "Akroma's Will", readiness: 'SUPPORTED', route: 'copilot' } } }), ...x });
 const readBudget = async () => ({ snapshot: { used: 300, allowance: 1500, measuredAt: new Date().toISOString() } });
 const fetchOk = calls => async (url, init) => { calls.push([url, JSON.parse(init.body)]); return { ok: true, json: async () => ({ assignees: [{ login: 'Copilot' }] }) }; };
 const run = (f, e, extra = {}) => runDispatch({ github: f.github, context: ctx, core: core(), env: env(e), readBudget, ...extra });
@@ -139,6 +140,43 @@ test('assignment failure is recorded once and never retried', async () => {
   const f = fake(); let n = 0;
   const r = await run(f, {}, { fetchImpl: async () => { n++; return { ok: false }; } });
   assert.equal(r.result, 'error'); assert.equal(n, 1); assert.match(f.writes[2][2], /result:error/);
+});
+
+const OTHER_BODY = BODY.replace('Eldrazi Monument', "Akroma's Will");
+const closedQueue = (n, body = BODY) => ({ number: n, title: '[Arcana Queue] historical ' + n,
+  body: A.AUTO_QUEUE_MARKER + '\n' + body, labels: [], assignees: [], state: 'closed',
+  author_association: 'NONE', user: { login: 'github-actions[bot]', type: 'Bot' } });
+const paidHistory = n => [
+  bot(A.formatLedger({ op: 'authorizing', issue: n, run: 1, at: ago(120) })),
+  bot(A.formatLedger({ op: 'attempt-result', issue: n, run: 1, result: 'confirmed', at: ago(119) })),
+  bot(A.formatLedger({ op: 'repair-request', issue: n, run: 2, at: ago(118) })),
+];
+
+test('B15 final dispatch gate skips an exhausted card and continues with an unrelated eligible card', async () => {
+  const f = fake({ issues: [queue(68), queue(69, [], OTHER_BODY)], closedIssues: [closedQueue(901)],
+    ledger: { 901: paidHistory(901) } });
+  const calls = [], report = {};
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls), report });
+  assert.equal(r.issue, 69, JSON.stringify({ r, report })); assert.equal(calls.length, 1);
+  assert.match(calls[0][1].agent_assignment.custom_instructions, /Unit: #69/);
+});
+
+test('B15 final dispatch gate honors one audited owner cap-lift receipt', async () => {
+  const lifted = BODY + '\n<!-- retry-cap-lift-consumed-from: #901 -->';
+  const f = fake({ issues: [queue(68, [], lifted)], closedIssues: [closedQueue(901)],
+    ledger: { 901: paidHistory(901) },
+    timeline: n => n === 901 ? [{ event: 'labeled', label: { name: Q.RETRY_CAP_LIFT_LABEL }, actor: { login: 'AARMOU' } }] : [] });
+  const calls = [];
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
+  assert.equal(r.issue, 68); assert.equal(calls.length, 1);
+});
+
+test('B15 final dispatch gate fails closed when trusted historical ledger data is malformed', async () => {
+  const malformed = bot(A.LEDGER + '\nop:unknown\nissue:901\nrun:7');
+  const f = fake({ issues: [queue(68)], closedIssues: [closedQueue(901)], ledger: { 901: [malformed] } });
+  const calls = [];
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
+  assert.equal(r.state, 'nothing-eligible'); assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
 });
 
 test('unknown budget denies without writes', async () => {
@@ -336,3 +374,4 @@ test('the exact-head CI check filters by conclusion itself (the API status filte
   const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }) });
   assert.notEqual(r.state, 'ci-not-ready');
 });
+
