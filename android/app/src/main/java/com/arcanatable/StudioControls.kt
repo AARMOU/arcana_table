@@ -365,6 +365,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     private fun title(id:String)=controls[id]?.title?.takeIf{it.isNotBlank()} ?: id
     /** Studio log (owner, Nov 7): one line per edited control or hand change, "title: field before→after". */
     private fun logChange(before:StudioControlProject,after:StudioControlProject,handBefore:StudioLayout?,handAfter:StudioLayout?) {
+        if(quiet)return
         (before.controls.keys+after.controls.keys).forEach {id->
             val a=before.controls[id] ?: StudioControlStyle();val b=after.controls[id] ?: StudioControlStyle()
             if(a!=b)StudioLog.add("Edit ${title(id)} [${StudioNames.screen(controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?")}]: ${StudioLog.diff(a,b)}")
@@ -470,16 +471,23 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             (pendingHand ?: StudioStore(prefs,orientation,profile).load())?.let{put("hand",JSONObject(it.json()))}
         }.toString()
     fun importProject(text:String) {
-        StudioLog.add("Imported a project")
+        StudioLog.add("Import started")
         require(text.length in 1..5_000_000){"Project is empty or too large."}
         val root=JSONObject(text)
-        if(root.optString("renderer")=="native-flow"){change(StudioControlProject.parse(text).withStableIds());return}
+        if(root.optString("renderer")=="native-flow"){val p=StudioControlProject.parse(text).withStableIds();quietly{change(p)}
+            StudioLog.add("Imported into profile $profile: ${p.controls.size} edited items, ${p.copies.size} duplicates");return}
         require(root.getInt("version")==3 && root.getString("renderer")=="arcana-native"){"Unsupported project."}
-        require(root.getString("orientation")==orientation){"Select the project's orientation before importing."}
+        // Owner, Nov 7: "trouble getting profiles imported". The first try was refused with "Select the project's
+        // orientation", which the owner can't do: Studio keeps one layout for every orientation and fold state
+        // (STUDIO_LAYOUT_KEY), so a file saved in landscape or portrait imports the same way.
         val controls=StudioControlProject.parse(root.getJSONObject("controls").toString()).withStableIds()
         val hand=root.optJSONObject("hand")?.let{StudioLayout.parse(it.toString())}
-        change(controls,hand)
+        quietly{change(controls,hand)}
+        StudioLog.add("Imported into profile $profile: ${controls.controls.size} edited items, ${controls.copies.size} duplicates${if(hand!=null)", hand design" else ""}")
     }
+    /** One import used to write a log line per item (hundreds), pushing everything else out of the shared log. */
+    private var quiet=false
+    private fun quietly(block:()->Unit){quiet=true;try{block()}finally{quiet=false}}
     fun problems():List<String> = buildList {
         // There is no floating Studio button in play (owner D33), so no window may lose its last visible button:
         // a pop-up that can't be dismissed would otherwise become a dead end.

@@ -192,13 +192,20 @@ class StudioControlsTest {
         assertTrue(runCatching{runtime.copyProfile("Invalid copy")}.isFailure)
         assertFalse("Invalid copy" in StudioProfiles(p,"portrait").names())
     }
-    @Test fun bundleRejectsWrongOrientationAndMalformedHandBeforeMutatingDraft() {
+    @Test fun bundleRejectsMalformedHandBeforeMutatingDraft() {
         val runtime=StudioControlsRuntime(prefs(),"portrait");runtime.begin()
-        val bundle=JSONObject(runtime.exportProject()).put("orientation","landscape")
-        assertTrue(runCatching{runtime.importProject(bundle.toString())}.isFailure)
-        bundle.put("orientation","portrait").put("hand",JSONObject("{}"))
+        val bundle=JSONObject(runtime.exportProject()).put("hand",JSONObject("{}"))
         assertTrue(runCatching{runtime.importProject(bundle.toString())}.isFailure)
         assertTrue(runtime.draft.controls.isEmpty())
+    }
+    /** Owner, Nov 7: a backup saved in landscape was refused ("Select the project's orientation"). One layout fits all. */
+    @Test fun backupFromEitherOrientationImports() {
+        val source=StudioControlsRuntime(prefs(),"portrait");source.begin();source.edit(a,StudioControlStyle(dx=12f))
+        val bundle=JSONObject(source.exportProject()).put("orientation","landscape")
+        val runtime=StudioControlsRuntime(prefs(),"portrait");runtime.begin()
+        runtime.importProject(bundle.toString())
+        assertEquals(12f,runtime.draft.controls[a]!!.dx)
+        runtime.apply();assertEquals(12f,runtime.style(a).dx)
     }
     @Test fun paletteBelongsToProjectAndUnknownRolesCannotBeImported() {
         val theme=StudioControlProject(theme=mapOf("background" to "#010203","gold" to "#FFEEDD"))
