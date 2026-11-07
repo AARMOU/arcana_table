@@ -107,6 +107,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
+    "The Swarmlord": {
+      "reason": "no DynamicAmount/API exposes how many times the commander was cast from the command zone this game; commanderColorIdentityCount is not a cast counter",
+      "source": "AARMOU/arcana_table#127; generated SDK reference docs/agents/generated/sdk-api.md",
+      "verified": false
+    },
     "Thunderherd Migration": {
       "reason": "reveal-or-pay additional cost",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
