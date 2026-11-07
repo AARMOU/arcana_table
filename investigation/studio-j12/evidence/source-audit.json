@@ -1,0 +1,46 @@
+{
+  "baseline": {
+    "sha": "01053b6024f748773e90eb63550094ef65688439",
+    "committed_files_verified": 148,
+    "jars": {
+      "android/app/libs/argentum-ai.jar": {
+        "git_blob": "b7529cf72eba70bf9b179942eed71a787f8fc8cf",
+        "sha256": "1b0a5523e822e4217bfad10ca858861e16112eef8a47bfaab6f7c5a48b727083"
+      },
+      "android/app/libs/argentum-mtg-sdk-tooling.jar": {
+        "git_blob": "9e1cf4246fa27698df785ceac6933d02a89b1fba",
+        "sha256": "176cc2d65276d099086c1bcc8a0749bde2175ffadc71677f439c48a4e04103c4"
+      },
+      "android/app/libs/argentum-mtg-sdk.jar": {
+        "git_blob": "dde69d58f485b9403670a9c5267141a826cbcdbd",
+        "sha256": "5cd5e3f6d5209ea12f16ab7c21d225bae704eec14d77a36ff74bcf4f10e506d8"
+      },
+      "android/app/libs/argentum-rules-engine.jar": {
+        "git_blob": "8bd92884f480b87eebd3fe13cf91e1f3ca841e56",
+        "sha256": "ca21982d86bc4536bc3e67b345f89dddfc7cf33187ff8c37d7dae2f4973aa95f"
+      }
+    }
+  },
+  "studio": {
+    "sha": "3ccba4ebf3e4e7dd411b8bd06520bade56d714ee",
+    "committed_files_verified": 253,
+    "jars": {
+      "android/app/libs/argentum-ai.jar": {
+        "git_blob": "a228033a20420c422b6130b0d799aab2ab30f294",
+        "sha256": "0e5278c155374725ce1f7be5ca055981df62fe37c7d25ddf53b7db51d45a34e1"
+      },
+      "android/app/libs/argentum-mtg-sdk-tooling.jar": {
+        "git_blob": "9e1cf4246fa27698df785ceac6933d02a89b1fba",
+        "sha256": "176cc2d65276d099086c1bcc8a0749bde2175ffadc71677f439c48a4e04103c4"
+      },
+      "android/app/libs/argentum-mtg-sdk.jar": {
+        "git_blob": "737c951b54eb566936f0d2bb6f7de3c709f3a339",
+        "sha256": "6ce0415f7b6f3386e5cf8dedb1191f25decda07f2fbff8ac02348d0b3bca0e31"
+      },
+      "android/app/libs/argentum-rules-engine.jar": {
+        "git_blob": "79b113a35be9800bccb8759248a3ee656a93a0e9",
+        "sha256": "0a17ad838d237fd97b0efdb080a94d080b8bc266370c59a53059bb24061ba938"
+      }
+    }
+  }
+}
