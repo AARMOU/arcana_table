@@ -91,6 +91,12 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
             Box(Modifier.fillMaxWidth().height(20.dp),contentAlignment=Alignment.Center) {
                 Box(Modifier.size(40.dp,4.dp).clip(RoundedCornerShape(2.dp)).background(darkTableColors.muted.copy(alpha=0.5f)))
             }
+            // Owner note 36: the same one-line top the game draws above the design, so editor and game match.
+            Row(Modifier.fillMaxWidth().heightIn(min=44.dp).padding(start=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text(compactHandLine(cards.size,"Turn 1 · Precombat main",cards.size,0),color=darkTableColors.text,fontSize=12.sp,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,maxLines=1,modifier=Modifier.weight(1f))
+                Box(Modifier.size(44.dp),contentAlignment=Alignment.Center){Icon(Icons.Default.Close,null,tint=darkTableColors.text)}
+            }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val unit=constraints.maxWidth/layout.canvasWidth.coerceIn(240f,2000f)
                 val minPx=24f*unit

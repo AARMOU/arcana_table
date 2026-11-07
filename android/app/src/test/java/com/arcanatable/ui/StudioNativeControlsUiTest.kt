@@ -22,6 +22,22 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk=[34],qualifiers="w412dp-h928dp-port-xhdpi")
 class StudioNativeControlsUiTest {
     @get:Rule val rule=createAndroidComposeRule<ComponentActivity>()
+    /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
+    @Test fun resizedButtonKeepsItsTextInsideItsEdges() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-fit",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.testTag("b")){
+                StudioText("HomeScreen.Text.1","Player",false,"PASS TO ATTACKERS",modifier=Modifier.testTag("t"))}
+        }}}}
+        rule.waitForIdle()
+        val id=runtime.controls.values.single{it.isAction}.id
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(width=72f,height=31f));runtime.apply()}
+        rule.waitForIdle()
+        val b=rule.onNodeWithTag("b").fetchSemanticsNode().boundsInRoot
+        assertEquals(72f*rule.density.density,b.width,2f);assertEquals(31f*rule.density.density,b.height,2f)
+        rule.onNodeWithTag("t",useUnmergedTree=true).assertExists()
+    }
+
     @Test fun actualButtonMovesAndRebindsOnlyToAnAvailableNativeCallback() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-ui",0),"portrait").also{it.enableCatalog()}
         val enabled=mutableStateOf(true);val calls=mutableListOf<String>()

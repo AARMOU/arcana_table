@@ -853,8 +853,14 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         LocalDensity.current.fontScale, LocalConfiguration.current.screenHeightDp.toFloat()).orEmpty()
     if (studioLayout != null && argentumMode && studioGeometryProblems.isEmpty()) {
         Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                StudioIconButton("TableBoardViews.IconButton.4", "Table and player", onClick = onClose) { StudioIcon("TableBoardViews.Icon.5", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
+            // Owner, Nov 7: with a custom hand design the drawer top matches the editor: one compact line with the ✕,
+            // no row of its own and no empty band.
+            Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+                StudioText("TableBoardViews.Text.80", "Table and player", true,
+                    compactHandLine(cards.size, turnContext, if (argentumMode) cards.count { it.id in playableIds } else null, if (argentumMode) stackCount else 0),
+                    color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp).testTag("hand-context"))
+                StudioIconButton("TableBoardViews.IconButton.4", "Table and player", onClick = onClose, modifier = Modifier.size(44.dp)) { StudioIcon("TableBoardViews.Icon.5", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
             }
             StudioHandCanvas(studioLayout, StudioHandState(
                 labels = mapOf("pass" to (if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel ?: "WAITING"),
@@ -888,11 +894,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
         // Owner note 9 (Studio builds): one compact line instead of three, e.g. "Hand 7 · Main 1 · 3 playable".
         if (BuildConfig.STUDIO_ENABLED) Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
-            val phase = turnContext?.split(" · ")?.getOrNull(1)?.let { when (it.lowercase()) {
-                "precombat main" -> "Main 1"; "postcombat main" -> "Main 2"; else -> it } }
-            val line = listOfNotNull("Hand ${cards.size}", phase,
-                if (argentumMode) "${cards.count { it.id in playableIds }} playable" else null,
-                if (argentumMode && stackCount > 0) "Stack $stackCount" else null).joinToString(" · ")
+            val line = compactHandLine(cards.size, turnContext, if (argentumMode) cards.count { it.id in playableIds } else null, if (argentumMode) stackCount else 0)
             StudioText("TableBoardViews.Text.80", "Table and player", true, line, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("hand-context"))
             StudioIconButton("TableBoardViews.IconButton.5", "Table and player", onClick = onClose, modifier = Modifier.size(44.dp)) { StudioIcon("TableBoardViews.Icon.6", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
@@ -1037,4 +1039,11 @@ internal fun CardPreviewPopup(item: CardPreview, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** Owner note 9: "Hand 7 · Main 1 · 3 playable [· Stack N]", the one-line drawer top (game and Studio editor). */
+internal fun compactHandLine(cards: Int, turnContext: String?, playable: Int?, stack: Int): String {
+    val phase = turnContext?.split(" · ")?.getOrNull(1)?.let { when (it.lowercase()) {
+        "precombat main" -> "Main 1"; "postcombat main" -> "Main 2"; else -> it } }
+    return listOfNotNull("Hand $cards", phase, playable?.let { "$it playable" }, if (stack > 0) "Stack $stack" else null).joinToString(" · ")
 }

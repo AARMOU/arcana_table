@@ -1023,7 +1023,10 @@ internal fun TableController.TableOverlays() {
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        BottomSheetDefaults.DragHandle(color = Muted)
+                        // Owner, Nov 7: the grab handle must show. The stock handle needs ~48dp of height and vanished in the
+                        // shorter Studio grip strip, so draw the bar itself.
+                        if (BuildConfig.STUDIO_ENABLED) Box(Modifier.size(width = 40.dp, height = 5.dp).background(Muted, RoundedCornerShape(3.dp)).testTag("hand-drawer-handle"))
+                        else BottomSheetDefaults.DragHandle(color = Muted)
                     }
                     // Owner note 9: no drag hint in Studio builds; the grip says it.
                     if (!studioFrame && !BuildConfig.STUDIO_ENABLED) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))

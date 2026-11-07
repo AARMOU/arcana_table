@@ -1,5 +1,8 @@
 package com.arcanatable
 
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -63,6 +66,28 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     return StudioWidget(runtime,id,style,available,caption,source)
 }
 
+
+/**
+ * Scales a resized control's contents down so they fit its Studio size. The control is measured at the size it
+ * needs (from its intrinsic sizes) and drawn scaled into the box, so text, icons and pictures shrink together and stay
+ * centred. Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
+ */
+internal fun Modifier.studioFitContents():Modifier=this.layout {measurable,constraints->
+    if(!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val w=constraints.maxWidth;val h=constraints.maxHeight
+    val needW=runCatching{measurable.minIntrinsicWidth(h)}.getOrNull() ?: w
+    val needH=runCatching{measurable.minIntrinsicHeight(w)}.getOrNull() ?: h
+    val scale=minOf(1f,w/needW.coerceAtLeast(1).toFloat(),h/needH.coerceAtLeast(1).toFloat()).coerceAtLeast(0.6f)
+    if(scale>=0.999f) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val inner=androidx.compose.ui.unit.Constraints.fixed((w/scale).toInt().coerceAtLeast(1),(h/scale).toInt().coerceAtLeast(1))
+    val p=measurable.measure(inner)
+    layout(w,h){p.placeWithLayer((w-p.width)/2,(h-p.height)/2){scaleX=scale;scaleY=scale}}
+}
+
 @Composable
 internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     if(widget==null)return this
@@ -85,7 +110,13 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
     var result=sized.then(this).offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
         s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
-    s.radius?.takeIf{it.isFinite()}?.let{result=result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
+    // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its
+    // own edges (previously only when a corner radius was set, hence "hit and miss"), and contents that don't fit
+    // the new size are scaled down to fit, never below a readable 60%; below that the editor marks it red.
+    val resized=s.width!=null || s.height!=null
+    result=s.radius?.takeIf{it.isFinite()}?.let{result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
+        ?: if(resized)result.clipToBounds() else result
+    if(resized)result=result.studioFitContents()
     s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
         .pointerInput(widget.id,true) {
