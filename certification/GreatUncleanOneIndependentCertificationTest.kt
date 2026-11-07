@@ -24,7 +24,17 @@ class GreatUncleanOneIndependentCertificationTest {
     private fun GameTestDriver.tokens(player: EntityId): List<EntityId> =
         getPermanents(player).filter { state.getEntity(it)?.has<TokenComponent>() == true }
 
+    private fun GameTestDriver.passPriorityTo(player: EntityId) {
+        repeat(3) {
+            if (priorityPlayer == player) return
+            val current = priorityPlayer ?: throw AssertionError("No player has priority")
+            assertNull(passPriority(current).error)
+        }
+        assertEquals(player, priorityPlayer)
+    }
+
     private fun shock(d: GameTestDriver, caster: EntityId, target: EntityId) {
+        d.passPriorityTo(caster)
         val shock = d.putCardInHand(caster, "Shock")
         d.giveMana(caster, Color.RED)
         assertNull(d.castSpellWithTargets(caster, shock, listOf(ChosenTarget.Player(target))).error)
