@@ -194,6 +194,17 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             onHand?.let{StudioChip("Edit hand",true,"studio-more-hand"){it()}}
             onClassic?.let{StudioChip("Classic panel",true,"studio-classic",onClick=it)}
         }
+        // Owner, Nov 7: Studio's own log, separate from Arcana's debug logs.
+        StudioSection("Studio log")
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            StudioChip("Share Studio log",true,"studio-log-share"){
+                val text=StudioLog.text().ifBlank{"The Studio log is empty."}
+                runCatching{context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply{
+                    type="text/plain";putExtra(android.content.Intent.EXTRA_SUBJECT,"Arcana Studio log");putExtra(android.content.Intent.EXTRA_TEXT,text)},"Share Studio log"))}
+                    .onFailure{onMessage("Couldn't open sharing on this phone.")}
+            }
+            StudioChip("Clear Studio log",true,"studio-log-clear"){confirm="Clear the Studio log?" to {StudioLog.clear()}}
+        }
         StudioSection("Reset")
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             StudioChip("Reset $screen",true,"studio-reset-screen"){confirm="Reset every change on $screen?" to {runtime.resetScreen(screen)}}

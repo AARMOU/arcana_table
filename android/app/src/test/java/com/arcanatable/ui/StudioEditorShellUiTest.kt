@@ -72,6 +72,33 @@ class StudioEditorShellUiTest {
         assertNull("tapping empty canvas clears the selection",runtime.selected)
     }
 
+    /** Owner, Nov 7: "I tap it once and can't tap it anymore" (the Width/Height +/- steppers). Every tap must count. */
+    @Test fun sizeSteppersKeepWorkingAfterTheFirstTap() {
+        render()
+        tapCanvas(bounds("play").center);rule.waitForIdle()
+        val id=control("Play").id
+        val widths=mutableListOf<Float>()
+        repeat(3){rule.onNodeWithTag("studio-width-plus").performClick();rule.waitForIdle();widths+=runtime.style(id).width!!}
+        assertEquals("three taps, three changes",3,widths.distinct().size)
+        val heights=mutableListOf<Float>()
+        repeat(3){rule.onNodeWithTag("studio-height-plus").performClick();rule.waitForIdle();heights+=runtime.style(id).height!!}
+        assertEquals(3,heights.distinct().size)
+        rule.onNodeWithTag("studio-width-minus").performClick();rule.waitForIdle()
+        assertEquals(widths[1],runtime.style(id).width!!,0.01f)
+    }
+
+    @Test fun handSizeSteppersKeepWorkingAfterTheFirstTap() {
+        render()
+        openHandScreen()
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{click(handPoint("pass"))};rule.waitForIdle()
+        val widths=mutableListOf<Float>()
+        repeat(3){rule.onNodeWithTag("studio-width-plus").performClick();rule.waitForIdle();widths+=hand().elements.single{it.id=="pass"}.w}
+        assertEquals("three taps, three changes: $widths",3,widths.distinct().size)
+        val heights=mutableListOf<Float>()
+        repeat(3){rule.onNodeWithTag("studio-height-plus").performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h}
+        assertEquals("three taps, three changes: $heights",3,heights.distinct().size)
+    }
+
     @Test fun directDragMovesTheRealControlAndIsOneUndoStep() {
         render()
         val before=bounds("play")

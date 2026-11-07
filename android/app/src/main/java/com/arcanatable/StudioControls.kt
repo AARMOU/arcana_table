@@ -201,8 +201,22 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         copies=p.copies.filterNot{StudioScope.excluded(p.owners[it.source] ?: StudioSites.screen(it.source))},
         owners=p.owners.filterValues{!StudioScope.excluded(it)},
         screenDensity=p.screenDensity.filterKeys{!StudioScope.excluded(it)})
-    fun begin(id:String?=null){capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
+    fun begin(id:String?=null){StudioLog.add("Opened Studio · profile $profile${id?.let{" · selected ${title(it)}"}.orEmpty()}");capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
     fun select(id:String){if(!editing)begin(id) else {selected=id;panelOpen=true}}
+    private fun title(id:String)=controls[id]?.title?.takeIf{it.isNotBlank()} ?: id
+    /** Studio log (owner, Nov 7): one line per edited control or hand change, "title: field before→after". */
+    private fun logChange(before:StudioControlProject,after:StudioControlProject,handBefore:StudioLayout?,handAfter:StudioLayout?) {
+        (before.controls.keys+after.controls.keys).forEach {id->
+            val a=before.controls[id] ?: StudioControlStyle();val b=after.controls[id] ?: StudioControlStyle()
+            if(a!=b)StudioLog.add("Edit ${title(id)} [${controls[id]?.screen ?: before.owners[id] ?: after.owners[id] ?: "?"}]: ${StudioLog.diff(a,b)}")
+        }
+        val oldCopies=before.copies.associateBy{it.id};val newCopies=after.copies.associateBy{it.id}
+        (newCopies.keys-oldCopies.keys).forEach{StudioLog.add("Duplicate of ${title(newCopies[it]!!.source)} added")}
+        (oldCopies.keys-newCopies.keys).forEach{StudioLog.add("Duplicate of ${title(oldCopies[it]!!.source)} removed")}
+        newCopies.forEach{(id,c)->oldCopies[id]?.takeIf{it.style!=c.style}?.let{StudioLog.add("Edit copy of ${title(c.source)}: ${StudioLog.diff(it.style,c.style)}")}}
+        if(handAfter!=handBefore && handAfter!=null)StudioLog.add(StudioLog.handDiff(handBefore ?: handDraftStored(),handAfter))
+    }
+    private fun handDraftStored()=StudioStore(prefs,orientation,profile).let{it.draft() ?: it.load()}
     fun inspectNativeScreen(){editing=true;panelOpen=false}
     private fun saveDraft() {
         store().saveDraft(draft)
@@ -210,6 +224,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         prefs.edit().putBoolean(pendingHandKey,pendingHand!=null).apply()
     }
     fun change(project:StudioControlProject,hand:StudioLayout?=pendingHand){if(project!=draft || hand!=pendingHand){
+        logChange(draft,project,pendingHand,hand)
         undo.addLast(Revision(draft,pendingHand));if(undo.size>100)undo.removeFirst();redo.clear();draft=project;pendingHand=hand;saveDraft();revision++
     }}
     fun edit(id:String,style:StudioControlStyle) {
@@ -231,28 +246,32 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun handDraft():StudioLayout?=pendingHand ?: StudioStore(prefs,orientation,profile).let{it.draft() ?: it.load()}
     fun hasPendingHand()=pendingHand!=null
     fun changeHand(hand:StudioLayout)=change(draft,hand)
-    fun undo(){if(undo.isNotEmpty()){redo.addLast(Revision(draft,pendingHand));val previous=undo.removeLast();draft=previous.controls;pendingHand=previous.hand;saveDraft();revision++}}
-    fun redo(){if(redo.isNotEmpty()){undo.addLast(Revision(draft,pendingHand));val next=redo.removeLast();draft=next.controls;pendingHand=next.hand;saveDraft();revision++}}
+    fun undo(){if(undo.isNotEmpty()){StudioLog.add("Undo");redo.addLast(Revision(draft,pendingHand));val previous=undo.removeLast();draft=previous.controls;pendingHand=previous.hand;saveDraft();revision++}}
+    fun redo(){if(redo.isNotEmpty()){StudioLog.add("Redo");undo.addLast(Revision(draft,pendingHand));val next=redo.removeLast();draft=next.controls;pendingHand=next.hand;saveDraft();revision++}}
     /**
      * Leave the editor and KEEP the draft (owner feedback bugs 18, 20, 21). Leaving used to drop the pending-hand flag
      * while the stored hand draft still showed on reopen, so Apply silently skipped it; button edits were kept but hand
      * edits were not. Now both stay as a draft until Apply or [discard].
      */
-    fun cancel(){pendingHand=null;profile=StudioProfiles(prefs,orientation).activeName();applied=store().load();draft=applied;editing=false;capturing=false;panelOpen=false;revision++}
+    fun cancel(){if(editing)StudioLog.add("Left Studio · draft kept");pendingHand=null;profile=StudioProfiles(prefs,orientation).activeName();applied=store().load();draft=applied;editing=false;capturing=false;panelOpen=false;revision++}
     /** Throw the draft away (buttons and hand) and go back to the applied layout. */
-    fun discard(){store().saveDraft(applied);StudioStore(prefs,orientation,profile).clearDraft()
+    fun discard(){StudioLog.add("Discarded draft");store().saveDraft(applied);StudioStore(prefs,orientation,profile).clearDraft()
         prefs.edit().remove(pendingHandKey).apply();cancel()}
     fun hasDraft()=store().draft()?.let{it!=applied}==true || prefs.getBoolean(pendingHandKey,false)
     fun apply() {
-        val errors=problems();require(errors.isEmpty()){errors.joinToString("\n")}
+        val errors=problems()
+        if(errors.isNotEmpty())StudioLog.add("Apply refused: ${errors.joinToString(" | ")}")
+        require(errors.isEmpty()){errors.joinToString("\n")}
+        advice().forEach{(id,why)->StudioLog.add("Applied with red mark · ${if(id.startsWith("hand:"))id.removePrefix("hand:") else title(id)}: $why")}
         val edit=store().stage(prefs.edit(),draft)
         pendingHand?.let{StudioStore(prefs,orientation,profile).stage(edit,it)}
         StudioProfiles(prefs,orientation).stageActive(edit,profile)
         check(edit.remove(pendingHandKey).commit()){"Could not save project."}
+        StudioLog.add("Applied · profile $profile · ${draft.controls.size} edited controls, ${draft.copies.size} duplicates${if(pendingHand!=null)", hand design" else ""}")
         pendingHand=null
         applied=draft;editing=false;capturing=false;panelOpen=false;recovered.clear();revision++
     }
-    fun chooseProfile(name:String){require(name in StudioProfiles(prefs,orientation).names());profile=name;applied=store().load();draft=store().draft() ?: applied
+    fun chooseProfile(name:String){StudioLog.add("Profile → $name");require(name in StudioProfiles(prefs,orientation).names());profile=name;applied=store().load();draft=store().draft() ?: applied
         pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null
         editing=true;undo.clear();redo.clear();revision++}
     fun copyProfile(name:String) {
@@ -273,7 +292,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun resetScreen(screen:String){change(draft.copy(controls=draft.controls.filterKeys{owner(it)!=screen},
         copies=draft.copies.filterNot{owner(it.source)==screen},owners=draft.owners.filterValues{it!=screen},
         screenDensity=draft.screenDensity+(screen to "Balanced")))}
-    fun resetProfile(){store().reset();StudioStore(prefs,orientation,profile).reset();prefs.edit().remove(pendingHandKey).commit();pendingHand=null;applied=StudioControlProject();draft=applied;recovered.clear();revision++}
+    fun resetProfile(){StudioLog.add("Reset profile $profile");store().reset();StudioStore(prefs,orientation,profile).reset();prefs.edit().remove(pendingHandKey).commit();pendingHand=null;applied=StudioControlProject();draft=applied;recovered.clear();revision++}
     fun exportProject():String=JSONObject().put("version",3).put("renderer","arcana-native").put("orientation",orientation)
         .put("controls",JSONObject(draft.json())).apply {
             (pendingHand ?: StudioStore(prefs,orientation,profile).load())?.let{put("hand",JSONObject(it.json()))}

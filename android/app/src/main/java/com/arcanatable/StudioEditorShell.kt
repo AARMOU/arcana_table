@@ -87,6 +87,7 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     val selected=if(handMode)null else runtime.selected?.let{runtime.controls[it]}
     val screen=if(handMode)"Hand" else popupScreens?.let{p->selected?.screen?.takeIf{it in p} ?: popups.last().screen} ?: selected?.screen ?: tab
     val foreign=!handMode && runtime.controls.values.any{it.window!=0 && it.window!=window && it.bounds.width>0f}
+    LaunchedEffect(message){message?.let{StudioLog.add("Shown to owner: $it")}}
     val apply:()->Unit={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message ?: "Fix the listed problems before applying."}}
     val close:()->Unit={if(runtime.canUndo || runtime.hasDraft())confirmClose=true else runtime.cancel()}
     val pick:(String)->Unit={name->
