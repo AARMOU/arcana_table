@@ -1,0 +1,9 @@
+{
+  "key": "eldrazi-temple",
+  "name": "Eldrazi Temple",
+  "issue": 753,
+  "source": "certification/EldraziTempleIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.EldraziTempleIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
