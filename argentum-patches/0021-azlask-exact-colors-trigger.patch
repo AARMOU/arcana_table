@@ -9,10 +9,10 @@ Subject: [PATCH] arcana: 0021-azlask-exact-colors-trigger
  1 file changed, 14 insertions(+)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index 70bc20daf9..7546c84ed7 100644
+index 8b4f36b2cf3..92edd9666f0 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-@@ -1723,6 +1723,17 @@ class TriggerMatcher(
+@@ -1728,6 +1728,17 @@ class TriggerMatcher(
                              entity?.has<com.wingedsheep.engine.state.components.identity.TokenComponent>() == true
                          }
                      }
@@ -30,7 +30,7 @@ index 70bc20daf9..7546c84ed7 100644
                      is com.wingedsheep.sdk.scripting.predicates.CardPredicate.Or ->
                          predicate.predicates.any { matchesLkiPredicate(it) }
                      is com.wingedsheep.sdk.scripting.predicates.CardPredicate.And ->
-@@ -2007,6 +2018,9 @@ class TriggerMatcher(
+@@ -2024,6 +2035,9 @@ class TriggerMatcher(
                  !isFaceDown && predicate.color.name in colors()
              is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotColor ->
                  isFaceDown || predicate.color.name !in colors()

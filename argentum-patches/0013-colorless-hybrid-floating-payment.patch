@@ -14,7 +14,7 @@ Subject: [PATCH] arcana: 0013-colorless-hybrid-floating-payment
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
-index 3625608517..f95cf2963c 100644
+index 3625608517f..f95cf2963c2 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AlternativePaymentHandler.kt
 @@ -443,7 +443,8 @@ class AlternativePaymentHandler(
@@ -28,7 +28,7 @@ index 3625608517..f95cf2963c 100644
          if (hybridIndex >= 0) {
              mutableSymbols.removeAt(hybridIndex)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
-index 17abe99afa..c9046f4b0e 100644
+index ea6b13f6089..7338239470f 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
 @@ -1760,6 +1760,7 @@ class CostCalculator(
@@ -40,7 +40,7 @@ index 17abe99afa..c9046f4b0e 100644
              }
          }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
-index 25044cc560..3c9f8ababb 100644
+index 25044cc5600..3c9f8ababbe 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/FloatingManaAllocation.kt
 @@ -120,6 +120,7 @@ private fun ManaPool.matchFloating(
@@ -52,7 +52,7 @@ index 25044cc560..3c9f8ababb 100644
                  acceptsColor(unit, symbol.color1) || acceptsColor(unit, symbol.color2)
              is ManaSymbol.Phyrexian -> acceptsColor(unit, symbol.color)
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index b3a3d0a491..19937b09ac 100644
+index b3a3d0a4910..19937b09acf 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -410,7 +410,7 @@ data class ManaPool(
@@ -107,7 +107,7 @@ index b3a3d0a491..19937b09ac 100644
              }
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
 new file mode 100644
-index 0000000000..a175b46d36
+index 00000000000..a175b46d36e
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
 @@ -0,0 +1,82 @@

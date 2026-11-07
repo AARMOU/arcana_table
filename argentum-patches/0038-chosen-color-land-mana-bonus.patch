@@ -18,10 +18,10 @@ Subject: [PATCH] arcana: 0038-chosen-color-land-mana-bonus
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index 70c2a753c5..5aadedab0c 100644
+index 67a89f1d14c..061fe57f0ad 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -12977,7 +12977,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13071,7 +13071,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    `{S}` spent. When auto-pay taps a snow land for a `{S}` pip, it also spends that land's any-color
    snow-aura bonus on a further `{S}` pip (a fixed-color bonus floats instead). (Elvish Guidance = fixed `{G}`; **Fertile
    Ground** = `anyColor`; **Glittering Frost** = `anyColor` + `GrantSupertype("SNOW")` on a snow Aura)
@@ -30,7 +30,7 @@ index 70c2a753c5..5aadedab0c 100644
    a `<sourceFilter>` is tapped for mana, that player adds …". `color = null` mirrors the produced color.
    `rider` is an optional non-mana `Effect` resolved inline, controlled by the tapping player
    (`EffectTarget.Controller` = tapper, `EffectTarget.Self` = the static's source). (Lavaleaper = basic-land
-@@ -12992,6 +12992,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13086,6 +13086,18 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    Oblivion** = `GameObjectFilter.Land.youControl()`, `color = null`, `whenProducing = COLORLESS`. Gated
    on all three mana paths (manual tap, color-choice-resume mirror, and the auto-pay `ManaSolver`, whose
    colorless bonus floats as a colorless `BonusManaEntry`).
@@ -50,10 +50,10 @@ index 70c2a753c5..5aadedab0c 100644
    produces `<multiplier>` times as much of that mana instead." The **multiplicative** sibling of
    `AdditionalManaOnSourceTap`, sharing its filter convention (the filter is evaluated from the static's own
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index de3af7ceb6..297dabfb29 100644
+index 0e6d99a1159..a46c49090eb 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1847,7 +1847,7 @@ Families:
+@@ -1851,7 +1851,7 @@ Families:
  - `AdditionalETBOrLTBTriggers(filter: GameObjectFilter, mustBeYouControl: Boolean, directions: Set<BattlefieldDirection>, description: String)` — When a permanent matching filter crosses the battlefield boundary in one of directions, triggered abilities of permanents controlled by this ability's controller that fired from that event trigger…
  - `AdditionalLifeGainTriggers` — If you gaining life causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time (CR 603.2d) — Dr.
  - `AdditionalManaForEntryCounters(spellFilter: GameObjectFilter, counterType: CounterType)` — "As an additional cost to cast spellFilter spells, you may pay any amount of mana.
@@ -63,7 +63,7 @@ index de3af7ceb6..297dabfb29 100644
  - `AdditionalSourceTriggers(sourceFilter: GameObjectFilter, excludeSelf: Boolean, alsoSource: Boolean, condition: Condition?, description: String)` — If a triggered ability of a permanent matching sourceFilter you control triggers, it triggers an additional time.
  - `AnimateLandGroup(filter: GroupFilter, power: Int, toughness: Int, creatureSubtypes: List<String>, colors: Set<Color>)` — Animates a group of lands into creatures while keeping them as lands.
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
-index be46a651f7..57d5d2d191 100644
+index d5d7219e96f..c579a8a3d75 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/MiscStaticAbilities.kt
 @@ -325,7 +325,14 @@ data class OverrideEnchantedLandManaColor(
@@ -124,7 +124,7 @@ index be46a651f7..57d5d2d191 100644
  
  /**
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
-index bf566d2385..eca290c732 100644
+index bf566d23853..eca290c7325 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/ability/ActivatedManaAbilityResolver.kt
 @@ -296,7 +296,11 @@ internal class ActivatedManaAbilityResolver(
@@ -141,7 +141,7 @@ index bf566d2385..eca290c732 100644
              currentState, action.sourceId, cardComponent, action.playerId,
              manaEvent, eventsWithMana + effectResult.events, producedColors
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
-index 034dc01faa..bed42ef33c 100644
+index 034dc01faa2..bed42ef33c0 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ColorChoiceContinuationResumer.kt
 @@ -253,7 +253,11 @@ class ColorChoiceContinuationResumer(
@@ -158,7 +158,7 @@ index 034dc01faa..bed42ef33c 100644
              tracked,
              sourceId, sourceCard, tapperId, producedMana, events,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
-index 412ca98c84..4b22a290a1 100644
+index 412ca98c84c..4b22a290a1d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ManaAbilityResolutionPipeline.kt
 @@ -127,7 +127,7 @@ class ManaAbilityResolutionPipeline(
@@ -247,7 +247,7 @@ index 412ca98c84..4b22a290a1 100644
  
      /**
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
-index 0091bd548c..2846587f3f 100644
+index 0091bd548cf..2846587f3fc 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/mana/ScopedManaProduction.kt
 @@ -36,5 +36,6 @@ fun finishScopedManaProduction(
@@ -258,7 +258,7 @@ index 0091bd548c..2846587f3f 100644
      else ExecutionResult.success(tracked, visible)
  }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 9ab971c641..7500207deb 100644
+index 9ab971c6417..7500207deb1 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 @@ -2663,9 +2663,11 @@ class ManaSolver private constructor(
@@ -337,7 +337,7 @@ index 9ab971c641..7500207deb 100644
      /**
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 new file mode 100644
-index 0000000000..04de5b84af
+index 00000000000..04de5b84af8
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/ChosenColorLandManaBonusTest.kt
 @@ -0,0 +1,242 @@

@@ -14,10 +14,10 @@ Subject: [PATCH] arcana: 0016-granted-keyword-mana-value-cap
  6 files changed, 74 insertions(+), 15 deletions(-)
 
 diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
-index c0bc043d08..1b8120d2f1 100644
+index df52ecc1efa..00b1f1f9ff7 100644
 --- a/docs/card-sdk-language-reference.md
 +++ b/docs/card-sdk-language-reference.md
-@@ -13577,7 +13577,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13678,7 +13678,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    has left. The legal action carries `maxAdditionalManaForCounters` (a picker bound; the client shows an
    amount selector before mana payment). Only creature *spells* as cast — never a permanent put onto the
    battlefield by an effect.
@@ -26,7 +26,7 @@ index c0bc043d08..1b8120d2f1 100644
    permanent is on the battlefield, spells its controller casts matching `spellFilter` effectively have `keyword`
    ("you cast" semantics). `fromZone` narrows it to spells cast **from** that zone — "Spells you cast from exile have
    convoke" (**Hoarding Broodlord**: `GrantKeywordToOwnSpells(CONVOKE, GameObjectFilter.Any, fromZone = Zone.EXILE)`).
-@@ -13593,6 +13593,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+@@ -13694,6 +13694,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
    - **Cost-modifying keywords** (CONVOKE, DELVE, IMPROVISE) surface in the cast enumerator / alternative-payment handler —
      e.g. **Eirdu, Carrier of Dawn** (`GrantKeywordToOwnSpells(CONVOKE, Creature)`), **Teval, Arbiter of Virtue**
      (`DELVE`), **Ironheart, Clever Champion** (`IMPROVISE`, `GameObjectFilter.Noncreature`).
@@ -43,10 +43,10 @@ index c0bc043d08..1b8120d2f1 100644
      `GrantedKeywordResolver.countGrants` when `CastSpellHandler` builds the spell's storm triggers — one storm
      instance per matching grant (CR 702.40b), added to the printed-keyword count. **Prismari, the Inspiration** =
 diff --git a/docs/sdk-index.md b/docs/sdk-index.md
-index 87c9774500..b87eb70e14 100644
+index 1bac3464b63..c20213441d6 100644
 --- a/docs/sdk-index.md
 +++ b/docs/sdk-index.md
-@@ -1934,7 +1934,7 @@ Families:
+@@ -1939,7 +1939,7 @@ Families:
  - `GrantHexproofToController` — You have hexproof.
  - `GrantKeyword(keyword: String, filter: GroupFilter)` — Grants a keyword (or ability flag) to a filtered set of permanents.
  - `GrantKeywordByCounter(keyword: Keyword, counterType: CounterType, controllerOnly: Boolean)` — Grants a keyword to all creatures that have a specific counter type.
@@ -56,7 +56,7 @@ index 87c9774500..b87eb70e14 100644
  - `GrantMadnessToOwnedCards(filter: GameObjectFilter)` — Grants madness (CR 702.35) to cards the granter's controller **owns** that match filter and aren't on the battlefield, with the madness cost equal to each card's own mana cost.
  - `GrantMayCastFromLinkedExile(filter: GameObjectFilter, duringYourTurnOnly: Boolean, additionalCost: AdditionalCost?, ownedByYou: Boolean, withoutPayingManaCost: Boolean, oncePerTurn: Boolean, maxManaValue: DynamicAmount?, exiledThisTurnOnly: Boolean, entersWithCounter: CounterType?, withAnyManaType: Boolean)` — You may cast cards exiled with this permanent (linked via LinkedExileComponent).
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
-index 068a9a1730..ac91dd31bd 100644
+index 88823739d85..aaf8136fc74 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
 @@ -335,6 +335,13 @@ data class GrantMayCastFromLinkedExile(
@@ -107,7 +107,7 @@ index 068a9a1730..ac91dd31bd 100644
  }
  
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
-index e2402481ee..04045deb97 100644
+index e2402481eed..04045deb979 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
 @@ -188,7 +188,7 @@ class CastSpellHandler(
@@ -120,7 +120,7 @@ index e2402481ee..04045deb97 100644
          cardRegistry, turnManager, costCalculator, alternativePaymentHandler, costHandler, targetValidator,
          conditionEvaluator, zoneResolver, castPermissionUtils, castCostTotaller, castCostPayer,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
-index 9c499c0939..8539326b83 100644
+index 9c499c0939c..8539326b839 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
 @@ -67,7 +67,17 @@ internal class CastTriggers(
@@ -151,7 +151,7 @@ index 9c499c0939..8539326b83 100644
      }
  
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
-index f99d04fa76..db39a7c7b7 100644
+index f99d04fa766..db39a7c7b7f 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
 @@ -16,6 +16,7 @@ import com.wingedsheep.sdk.scripting.GrantKeywordToOwnSpells
