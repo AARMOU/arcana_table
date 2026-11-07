@@ -98,3 +98,30 @@ test('workflow grants reads only and has no writer token or post-merge backfill'
   assert.doesNotMatch(workflow, /: write|MERGE_TOKEN|COPILOT_DISPATCH_TOKEN|new github.constructor|backfill|setOutput/);
   assert.match(workflow, /owner merge required/);
 });
+
+test('eligible workflow_run executes the actual report script with a read-only client', async () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-suite-automerge.yml'), 'utf8');
+  const script = workflow.match(/          script: \|\n([\s\S]*?)(?=      - name: Save)/)[1]
+    .split('\n').map(line => line.replace(/^            /, '')).join('\n');
+  const g = good(), calls = [], output = [];
+  const github = client(g, calls);
+  // Expose only the five REST read endpoints needed for an eligibility report.
+  delete github.graphql;
+  delete github.rest.pulls.merge; delete github.rest.pulls.update;
+  delete github.rest.issues.createComment; delete github.rest.actions.reRunWorkflow;
+  const summary = { addHeading() { return this; }, addCodeBlock(value) { output.push(JSON.parse(value)); return this; }, async write() {} };
+  const core = { info() {}, warning() {}, summary };
+  const load = name => {
+    if (name === './scripts/gh-etag-cache.cjs') return { install() {} };
+    assert.equal(name, './certification/suite-automerge.cjs');
+    return { mergeSuitePr };
+  };
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  await new AsyncFunction('github', 'context', 'core', 'require', script)(github,
+    { repo: { owner: 'AARMOU', repo: 'arcana_table' }, payload: { workflow_run: g.run } }, core, load);
+  assert.equal(output.length, 1);
+  assert.equal(output[0].reason, 'owner-merge-required');
+  assert.equal(output[0].merged, false);
+  assert.deepEqual(calls, []);
+});

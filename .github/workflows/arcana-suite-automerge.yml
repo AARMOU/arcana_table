@@ -1,15 +1,35 @@
 name: Arcana Suite Certification Report
 # Reports exact-head suite certification eligibility. The owner decides whether to merge.
 on:
+  pull_request:
+    paths:
+      - 'certification/**'
+      - '.github/workflows/arcana-suite-automerge.yml'
   workflow_run:
     workflows: [Arcana Card Certification Premerge]
     types: [completed]
 permissions:
   contents: read
 concurrency:
-  group: arcana-suite-automerge
+  group: arcana-suite-automerge-${{ github.event_name }}-${{ github.event.pull_request.number || 'reports' }}
   cancel-in-progress: false
 jobs:
+  safeguard-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify report-only certification and fail-closed scenarios
+        run: node --test certification/*.test.cjs
   report:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
