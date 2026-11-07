@@ -1,0 +1,9 @@
+{
+  "key": "herald-of-slaanesh",
+  "name": "Herald of Slaanesh",
+  "issue": 1022,
+  "source": "certification/HeraldOfSlaaneshIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HeraldOfSlaaneshIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
