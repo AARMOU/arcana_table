@@ -191,7 +191,7 @@ internal fun StudioScreenBar(tabs:List<String>,current:String,destinations:Map<S
                 }
                 Spacer(Modifier.width(6.dp))
             }
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),verticalAlignment=Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).hintedHorizontalScroll(),verticalAlignment=Alignment.CenterVertically) {
             tabs.forEach {name->
                 val on=name==current
                 val available=name=="Hand" || destinations[name]?.first==true

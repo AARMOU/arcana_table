@@ -135,7 +135,9 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
             })
         }.drawWithContent {
             drawContent()
-            if(widget.runtime.selected==widget.id) {
+            // Owner, Nov 7: no stray mint grip. The editor draws the selection frame and handles itself; this older
+            // outline only remains for the classic panel.
+            if(widget.runtime.selected==widget.id && !StudioEditorRequests.shellActive) {
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),style=androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),topLeft=Offset(size.width-16.dp.toPx(),size.height-16.dp.toPx()),size=androidx.compose.ui.geometry.Size(16.dp.toPx(),16.dp.toPx()))
             }

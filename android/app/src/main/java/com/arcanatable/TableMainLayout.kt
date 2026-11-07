@@ -152,7 +152,7 @@ internal fun TableController.TableMainLayout() {
         val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
-            Row(rowModifier.tutorialTarget("player-tabs").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(rowModifier.tutorialTarget("player-tabs").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }

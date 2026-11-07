@@ -151,7 +151,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         if(page=="Hand")hand?.invoke{q,a->confirm=q to a}
         if(page=="Layout") {
         StudioSection("Layout profile")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             StudioProfiles(runtime.prefs,runtime.orientation).names().forEach {name->
                 StudioChip(name,true,"studio-profile-$name",selected=name==runtime.profile){runCatching{runtime.chooseProfile(name)}.onFailure{onMessage(it.message ?: "Cannot open profile.")}}
             }
@@ -171,7 +171,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             }
         }
         StudioSection("Turn label")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             listOf("both" to "R2 · T3","round" to "Round 2","turn" to "Turn 3","hidden" to "Hidden").forEach {(mode,text)->
                 StudioChip(text,true,"studio-turn-label-$mode",selected=runtime.draft.turnLabel==mode){runtime.change(runtime.draft.copy(turnLabel=mode))}
             }
@@ -186,7 +186,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         }
         if(page=="Palette") {
         StudioSection("Palette")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Table default",runtime.draft.theme.isNotEmpty(),"studio-palette-default",selected=runtime.draft.theme.isEmpty()){runtime.change(runtime.draft.copy(theme=emptyMap()))}
             tablePalettePresets.forEach {preset->
                 val presetTheme=StudioLayout.themeRoles.associateWith{role->tableColorHex(preset.colors.colorRole(if(role=="gold")"counter" else role))}
@@ -203,7 +203,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         }
         if(page=="Project") {
         StudioSection("Project")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Copy / paste",true,"studio-export"){json=runtime.exportProject()}
             StudioChip("Save file",true,"studio-save-file"){saveFile.launch("Arcana-Studio-${runtime.orientation}-${runtime.profile}.json")}
             StudioChip("Open file",true,"studio-open-file"){openFile.launch(arrayOf("application/json","text/plain"))}
@@ -212,7 +212,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         }
         // Owner, Nov 7: Studio's own log, separate from Arcana's debug logs.
         StudioSection("Studio log")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Share Studio log",true,"studio-log-share"){
                 val text=StudioLog.text().ifBlank{"The Studio log is empty."}
                 runCatching{context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply{
@@ -222,7 +222,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
             StudioChip("Clear Studio log",true,"studio-log-clear"){confirm="Clear the Studio log?" to {StudioLog.clear()}}
         }
         StudioSection("Reset")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
+        Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Reset $screen",true,"studio-reset-screen"){confirm="Reset every change on $screen?" to {runtime.resetScreen(screen)}}
             StudioChip("Reset profile",true,"studio-reset-profile"){confirm="Reset the ${runtime.profile} profile to native layouts? This is saved immediately." to {runtime.resetProfile();onApplied()}}
             StudioChip("Reset all Studio",true,"studio-reset-all"){confirm="Remove every Studio profile and layout? This is saved immediately." to {
