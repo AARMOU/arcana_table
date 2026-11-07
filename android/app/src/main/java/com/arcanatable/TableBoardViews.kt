@@ -479,7 +479,7 @@ internal fun PlayerBoard(
             // Keep the actual floating pool visible even at zero. Untapped lands are
             // deliberately labelled as lands, NOT as spendable mana: fetch lands,
             // restrictions and conditional sources make that number different.
-            if (engineGame && engineControlled) {
+            if (engineGame && engineControlled && studioPieceShown("manaBar")) {
                 val floating = player.manaPool.filterValues { it > 0 }
                 val readyLands = player.battlefield.count { it.type.contains("Land", ignoreCase = true) && !it.tapped }
                 Row(
@@ -503,13 +503,13 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (studioPieceShown("buttonRow")) Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
                 // Quick Actions in the order chosen in Adjust UI (only actions that work in Argentum games).
                 quickActionOrder.distinct().sortedBy { if (it == "PASS_TO_TURN") 0 else if (it == "UNDO") 1 else 2 }.forEach { action -> when (action) {
-                    "CAST_COMMANDER" -> player.commanderCard?.let { commander ->
+                    "CAST_COMMANDER" -> player.commanderCard?.takeIf { studioPieceShown("commanderChip") }?.let { commander ->
                         // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
                         val castable = engineControlled && !commanderUnavailable && !player.isEliminated
                         Row(

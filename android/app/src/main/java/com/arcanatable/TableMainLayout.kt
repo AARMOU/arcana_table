@@ -153,9 +153,9 @@ internal fun TableController.TableMainLayout() {
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
             Row(rowModifier.tutorialTarget("player-tabs").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
+                if (studioPieceShown("tableButton")) Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
-                val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
+                val tabOrder = if (studioPieceShown("playerChips")) players.indices.sortedBy { if (it == localSeat) -1 else it } else emptyList()
                 tabOrder.forEach { index -> val player = players[index]
                     Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) {
                         val snap = argentumSnapshot
@@ -182,11 +182,13 @@ internal fun TableController.TableMainLayout() {
                 val dotColor = when { argentumStatus != ArgentumConnectionStatus.CONNECTED -> Color(0xFFE9978B); argentumAwaitingUpdate -> CounterGold; else -> Mint }
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
                 Spacer(Modifier.width(8.dp))
+                // Owner, Nov 7: the phase bar can be switched off in Studio; the row keeps the status dot and ⋮ menu.
+                val phaseShown = studioPieceShown("phaseBar")
                 if (tabsInTopBar) {
-                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent)
-                    Spacer(Modifier.width(8.dp))
+                    if (phaseShown) { PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent); Spacer(Modifier.width(8.dp)) }
                     seatTabs(Modifier.weight(1f))
-                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
+                } else if (phaseShown) PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
+                else Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(6.dp))
             } else Column {
                 StudioText("TableMainLayout.Text.1", "Table and player", false, "ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -197,7 +199,10 @@ internal fun TableController.TableMainLayout() {
                 } else StudioText("TableMainLayout.Text.4", "Table and player", false, "ARGENTUM ENGINE", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
             if (!compactArgentumTable) Spacer(Modifier.weight(1f))
-            Box(Modifier) {
+            // With both the turn label and the timer switched off in Studio, the label takes no space at all.
+            val topLabelGone = BuildConfig.STUDIO_ENABLED && compactArgentumTable &&
+                studioControlsRuntime?.project()?.turnLabel == "hidden" && (!turnTimerVisible || !studioPieceShown("timer"))
+            if (!topLabelGone) Box(Modifier) {
                 StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) listOfNotNull(
                     // Owner, Nov 7: rounds as well as turns ("R2 · T3"), changeable in Studio ⋮ > Layout.
                     if (BuildConfig.STUDIO_ENABLED) turnLabelText(studioControlsRuntime?.project()?.turnLabel ?: "both", turnNumber, players.size.coerceAtLeast(1)) else "T$turnNumber",
@@ -324,13 +329,13 @@ internal fun TableController.TableMainLayout() {
             onLeave = { argentumLeaveConfirm = true },
             compact = true,
         )
-        if (!tabsInTopBar) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!tabsInTopBar && (studioPieceShown("playerChips") || studioPieceShown("tableButton"))) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
             seatTabs(Modifier.weight(1f))
         }
 
         HorizontalPager(
             state = viewPagerState,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("table-pager"),
             // Player boards contain horizontal card and zone lists. Keep
             // gestures inside those lists; use the player tabs to switch boards.
             userScrollEnabled = showOverview,
@@ -342,7 +347,7 @@ internal fun TableController.TableMainLayout() {
         Column(Modifier.fillMaxSize()) {
         val showingView = page - 1
         if (showingView < 0) {
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (studioPieceShown("fullTableLabel")) Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("FULL TABLE · ${players.size}/4 PLAYERS", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
             }
             val compactOverview = screenWidthDp < 900 && isLandscape && players.size >= 3

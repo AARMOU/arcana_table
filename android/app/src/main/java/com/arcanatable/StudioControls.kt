@@ -48,8 +48,23 @@ internal val TURN_LABELS=listOf("both","round","turn","hidden")
  * STUDIO-J13 inventory lands.
  */
 internal val SCREEN_PIECES=linkedMapOf(
+    "phaseBar" to "Turn / phase bar",
+    "playerChips" to "Player chips",
+    "tableButton" to "TABLE button",
+    "fullTableLabel" to "\"FULL TABLE · players\" label",
+    "manaBar" to "Mana pool bar",
+    "buttonRow" to "Button row (Pass, Graveyard, Exile…)",
+    "commanderChip" to "Commander chip",
     "engineThinking" to "Engine \"thinking\" bar",
     "timer" to "Turn timer")
+
+/**
+ * Whether a main-screen piece is shown (Studio ⋮ > Layout > Show on screen). Callers leave the whole piece out, row
+ * and all, so the battlefield takes the space (Goose STUDIO-J13: hiding only the children left the rows behind).
+ */
+@androidx.compose.runtime.Composable
+internal fun studioPieceShown(key:String):Boolean =
+    !BuildConfig.STUDIO_ENABLED || key !in (LocalStudioControls.current?.project()?.hiddenPieces ?: emptySet())
 
 /**
  * Owner, Nov 7: "A full turn is counted after everyone goes." The engine counts every player's turn; a round is one

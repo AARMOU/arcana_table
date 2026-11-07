@@ -68,6 +68,25 @@ class StudioCoverageAuditTest {
         UiTestSupport.settle(rule,1_000)
     }
 
+    /**
+     * Owner, Nov 7: "If I hide all the player chips and phase banner I want to be able to resize the board." Switching
+     * pieces off in Show on screen removes their rows, so the table area below gets taller (Goose STUDIO-J13 acceptance).
+     */
+    @Test fun hidingScreenPiecesGivesTheirSpaceToTheBoard() {
+        val s=ActivityScenario.launch(MainActivity::class.java)
+        try {
+            startGame(s)
+            val before=rule.onNodeWithTag("table-pager",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
+            val r=runtime(s)
+            s.onActivity{r.begin();r.change(r.draft.copy(hiddenPieces=setOf("phaseBar","playerChips","tableButton","fullTableLabel","manaBar")));r.apply()}
+            UiTestSupport.settle(rule,500)
+            rule.onAllNodes(hasTestTag("phase-tracker"),useUnmergedTree=true).assertCountEquals(0)
+            val after=rule.onNodeWithTag("table-pager",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
+            assertTrue("board grew: $before -> $after",after.height>before.height+20f)
+            s.onActivity{UiTestSupport.screenshot(it,"studio-show-on-screen-hidden")}
+        } finally {s.close()}
+    }
+
     /** Opens [screen] from the screen bar, then selects and restyles one control through the editing canvas. */
     private fun audit(s:ActivityScenario<MainActivity>,screen:String) {
         rule.onNodeWithTag("studio-tab-screen-$screen").performScrollTo().performClick();UiTestSupport.settle(rule,2_500)
