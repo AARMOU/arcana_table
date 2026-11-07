@@ -1,0 +1,9 @@
+{
+  "key": "great-unclean-one",
+  "name": "Great Unclean One",
+  "issue": 1015,
+  "source": "certification/GreatUncleanOneIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GreatUncleanOneIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
