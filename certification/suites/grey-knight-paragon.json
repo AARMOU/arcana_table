@@ -1,0 +1,9 @@
+{
+  "key": "grey-knight-paragon",
+  "name": "Grey Knight Paragon",
+  "issue": 1018,
+  "source": "certification/GreyKnightParagonIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.GreyKnightParagonIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
