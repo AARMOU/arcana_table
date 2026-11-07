@@ -19,7 +19,7 @@
 | Stack | **6** distinct instances in Stack zone |
 | Graveyards | **58** total across four seats (24 + 21 + 6 + 7) |
 | Counters | poison **2, 6, 8, 3** by player |
-| Commander damage | human/third-seat `commanderDamage` scenarios of **18/19**, respectively. **Schema/renderer compatibility still needs a test**; do not declare them rendered without verification. |
+| Commander damage | human/third-seat `commanderDamage` scenarios of **18/19**, respectively, using consumer fields `commanderId` and `amount`. `StudioBusyFixtureTest` asserts the real app projection preserves both values; execution status is reported separately below. |
 
 Unique-card ownership invariant checked during construction: no duplicate IDs across zone lists; every zone card ID resolves in `state.cards`; four players and six stack objects are present.
 
@@ -49,3 +49,31 @@ Follow the server start, seed, launch and settlement pattern in `ui/ArgentumResi
 ## Constraints
 
 Test resource only. No `Studio*.kt`, app runtime, `MainActivity`, hand drawer, engine, JAR, APK, merge, cloud deploy, permission or worker changes. Destination is a **draft** PR targeting `gpt/arcana-integration-next`; Claude's Studio branch remains untouched.
+
+## J10 correction and executable acceptance tests (Elmer follow-through)
+
+The original fixture used `sourceCommanderId` / `damage`, but the app's projection reads
+`commanderId` (or `commanderName`) / `amount`. The corrected fixture preserves 18/19 instead
+of projecting an empty commander key and zero damage. Production parsing is unchanged.
+
+- `com.arcanatable.StudioBusyFixtureTest`: real `ArgentumTableSnapshot.parse` checks four
+  seats, life extremes, local battlefield/token counts, six distinct stack entries, 58
+  graveyard cards and both commander-damage values. Also checks zone uniqueness, sizes,
+  resolvable cards and attachment references.
+- `com.arcanatable.ui.StudioBusyFixtureUiTest`: existing fake-server startup with the fixture,
+  all four seat tabs and controller-state assertions, then Table and local Player PNGs at
+  cover (344x800dp) and unfolded (673x928dp) qualifiers. Outputs:
+  `android/app/build/screenshots/studio-j10-{cover,unfolded}-{table,player}.png`.
+
+Run from `android/`, only after claiming the shared heavy-PC slot:
+
+```powershell
+.\gradlew.bat --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.StudioBusyFixtureTest --tests com.arcanatable.ui.StudioBusyFixtureUiTest
+```
+
+**Execution status at preparation:** Android tests and screenshots pending a coordinated
+runner slot. These new tests are not yet claimed compiled or passed. The fixture branch is
+based on the existing integration line, not Claude's Studio implementation. Successful
+execution here proves fixture compatibility and baseline rendering; Studio edit/apply
+behavior and physical Fold acceptance require separate execution on the chosen Studio SHA.
+PNG existence is not a visual-quality verdict: inspect all four captures before acceptance.

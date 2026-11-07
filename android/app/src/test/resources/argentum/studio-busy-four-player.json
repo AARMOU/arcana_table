@@ -14828,8 +14828,8 @@
         "energyCounters": 0,
         "commanderDamage": [
           {
-            "sourceCommanderId": "e100",
-            "damage": 18
+            "commanderId": "e100",
+            "amount": 18
           }
         ],
         "completedDungeons": [],
@@ -14868,8 +14868,8 @@
         "energyCounters": 0,
         "commanderDamage": [
           {
-            "sourceCommanderId": "e0",
-            "damage": 19
+            "commanderId": "e0",
+            "amount": 19
           }
         ],
         "completedDungeons": [],
