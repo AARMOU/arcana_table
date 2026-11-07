@@ -1,0 +1,9 @@
+{
+  "key": "hexmark-destroyer",
+  "name": "Hexmark Destroyer",
+  "issue": 1027,
+  "source": "certification/HexmarkDestroyerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HexmarkDestroyerIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
