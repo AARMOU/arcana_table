@@ -10,7 +10,7 @@ Subject: [PATCH] arcana: 0003-full-library-export
  2 files changed, 41 insertions(+), 14 deletions(-)
 
 diff --git a/arcana-export/build.gradle.kts b/arcana-export/build.gradle.kts
-index e137c4484f..4c8fde1924 100644
+index e137c4484fc..4c8fde19242 100644
 --- a/arcana-export/build.gradle.kts
 +++ b/arcana-export/build.gradle.kts
 @@ -1,4 +1,4 @@
@@ -37,7 +37,7 @@ index e137c4484f..4c8fde1924 100644
      args(rootProject.layout.projectDirectory.dir("arcana-export-out").asFile.absolutePath)
  }
 diff --git a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
-index 3b9b6fa91d..7b0b7e65a0 100644
+index 3b9b6fa91d3..7b0b7e65a0b 100644
 --- a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
 +++ b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
 @@ -1,26 +1,53 @@

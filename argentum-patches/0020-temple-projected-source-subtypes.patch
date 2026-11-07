@@ -10,7 +10,7 @@ Subject: [PATCH] arcana: 0020-temple-projected-source-subtypes
  2 files changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
-index befb346ca1..28aaf5e308 100644
+index befb346ca14..28aaf5e3089 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 @@ -51,6 +51,12 @@ internal fun buildAbilityPaymentContext(
@@ -27,7 +27,7 @@ index befb346ca1..28aaf5e308 100644
          isClassLevelUpActivation = ability?.effect is com.wingedsheep.sdk.scripting.effects.LevelUpClassEffect,
          hasXInCost = ability?.cost?.extractManaCost()?.hasX == true,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
-index a672dd909d..bd802fb49e 100644
+index a672dd909dd..bd802fb49e7 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
 @@ -155,6 +155,13 @@ data class SpellPaymentContext(

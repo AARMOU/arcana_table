@@ -11,7 +11,7 @@ Subject: [PATCH] arcana: 0014-colorless-hybrid-auto-tap
  create mode 100644 rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
-index 4dd83dd3d5..9ab971c641 100644
+index 4dd83dd3d54..9ab971c6417 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
 @@ -868,10 +868,13 @@ class ManaSolver private constructor(
@@ -125,7 +125,7 @@ index 4dd83dd3d5..9ab971c641 100644
          }
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 new file mode 100644
-index 0000000000..90f3c36ce2
+index 00000000000..90f3c36ce2d
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
 @@ -0,0 +1,97 @@

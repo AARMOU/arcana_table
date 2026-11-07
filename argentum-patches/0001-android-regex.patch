@@ -13,7 +13,7 @@ Subject: [PATCH] arcana: 0001-android-regex
  5 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
-index f139cb32cd..312d8ced80 100644
+index f139cb32cdd..312d8ced80c 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
 @@ -14,7 +14,7 @@ internal object DraftsimMana {
@@ -26,7 +26,7 @@ index f139cb32cd..312d8ced80 100644
      /**
       * Converted mana cost of a single-face cost string. Numeric generic symbols add their value;
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
-index dd525a18e0..4f9467e9fa 100644
+index dd525a18e01..4f9467e9fae 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
 +++ b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
 @@ -23,7 +23,7 @@ class AiResponseParser {
@@ -39,7 +39,7 @@ index dd525a18e0..4f9467e9fa 100644
          if (bracketMatch != null) {
              val index = GameStateFormatter.letterToIndex(bracketMatch.groupValues[1])
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
-index 3891b9ca44..ff50d4d9e5 100644
+index 3891b9ca445..ff50d4d9e57 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
 @@ -443,7 +443,7 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
@@ -52,7 +52,7 @@ index 3891b9ca44..ff50d4d9e5 100644
              regex.findAll(costString).forEach { match ->
                  val content = match.groupValues[1]
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
-index 4df6ecf22a..11e6600b3f 100644
+index 4df6ecf22a4..11e6600b3fc 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
 @@ -20,7 +20,7 @@ import kotlin.reflect.KClass
@@ -65,7 +65,7 @@ index 4df6ecf22a..11e6600b3f 100644
  /** Offers a single FROM/TO decision constrained to the effect's word categories. */
  class ChangeWordInTextExecutor(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
-index 5c2edec2ce..e9d765dae2 100644
+index 5c2edec2ce4..e9d765dae22 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
 @@ -209,7 +209,7 @@ internal class CardFacesProjector(

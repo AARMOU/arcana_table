@@ -10,7 +10,7 @@ Subject: [PATCH] arcana: 0023-face-down-exile-hidden-from-owner
  2 files changed, 40 insertions(+), 1 deletion(-)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
-index ce6bf5eb46..74efab8b9b 100644
+index ce6bf5eb467..74efab8b9b8 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardProjector.kt
 @@ -97,7 +97,14 @@ internal class CardProjector(
@@ -30,7 +30,7 @@ index ce6bf5eb46..74efab8b9b 100644
              // Also check LookAtFaceDownCreatures (e.g., Lens of Clarity) — only for battlefield creatures,
              // not face-down spells on the stack (per ruling).
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
-index c676c2c8aa..8ea9ebff41 100644
+index c676c2c8aa1..8ea9ebff411 100644
 --- a/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/CardIdentityVisibilityTest.kt
 @@ -318,6 +318,38 @@ class CardIdentityVisibilityTest : ScenarioTestBase() {

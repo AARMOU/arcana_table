@@ -17,7 +17,7 @@ Subject: [PATCH] arcana: 0002-engine-trial-build
 
 diff --git a/arcana-export/build.gradle.kts b/arcana-export/build.gradle.kts
 new file mode 100644
-index 0000000000..e137c4484f
+index 00000000000..e137c4484fc
 --- /dev/null
 +++ b/arcana-export/build.gradle.kts
 @@ -0,0 +1,20 @@
@@ -43,7 +43,7 @@ index 0000000000..e137c4484f
 +}
 diff --git a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
 new file mode 100644
-index 0000000000..3b9b6fa91d
+index 00000000000..3b9b6fa91d3
 --- /dev/null
 +++ b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
 @@ -0,0 +1,26 @@
@@ -75,7 +75,7 @@ index 0000000000..3b9b6fa91d
 +}
 diff --git a/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts b/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts
 new file mode 100644
-index 0000000000..b07af250d5
+index 00000000000..b07af250d51
 --- /dev/null
 +++ b/buildSrc/src/main/kotlin/arcana-android-target.gradle.kts
 @@ -0,0 +1,24 @@
@@ -104,7 +104,7 @@ index 0000000000..b07af250d5
 +    if (!name.contains("Test")) compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
 +}
 diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-index 4d92858dbd..abdb2d39dc 100644
+index 4d92858dbdc..abdb2d39dc5 100644
 --- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 +++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 @@ -12,6 +12,8 @@ plugins {
@@ -117,7 +117,7 @@ index 4d92858dbd..abdb2d39dc 100644
  
  kotlin {
 diff --git a/settings.gradle.kts b/settings.gradle.kts
-index 2c0b79f053..5c26424105 100644
+index 2c0b79f0533..5c264241058 100644
 --- a/settings.gradle.kts
 +++ b/settings.gradle.kts
 @@ -44,6 +44,8 @@ include(":mtg-sdk")
