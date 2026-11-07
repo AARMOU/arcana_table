@@ -299,9 +299,13 @@ class StudioEditorShellUiTest {
         rule.waitForIdle()
         val moved=hand().elements.single{it.id=="undo"}
         assertEquals("travel snapped to the hand's 8-unit grid",before.y+40f,moved.y,0.01f);assertEquals(before.x,moved.x,0.01f)
+        // The drawer's one-line top (owner note 36) moves the design down; on this small test screen the corner would sit
+        // under the open panel, so collapse the panel first, as a player would.
+        rule.onNodeWithTag("studio-inspector-collapse").performClick();rule.waitForIdle()
         rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{
             down(handPoint("undo"){it.bottomRight});repeat(8){moveBy(Offset(24f*unit/8,16f*unit/8))};up()}
         rule.waitForIdle()
+        rule.onNodeWithTag("studio-inspector-collapse").performClick();rule.waitForIdle()
         val resized=hand().elements.single{it.id=="undo"}
         assertTrue(resized.w>moved.w && resized.h>moved.h)
         rule.onNodeWithTag("studio-undo").performClick();rule.waitForIdle()
