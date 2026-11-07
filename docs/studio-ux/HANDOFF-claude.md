@@ -2,6 +2,29 @@
 
 _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan), #883 (owner decisions), #1016 (GPT index)._
 
+## Update: Nov 7, ~10:30 MT, batch 2b in progress (owner: no APK until GPT's jobs are verified DONE)
+- **Owner feedback** on #995: [2a notes](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6707718742) and [2b part 1 notes plus the button-text finding](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6709459150). GPT jobs in priority order (J9 → J7 → J8, J13–J15): [#950 comment 6709459381](https://github.com/AARMOU/arcana_table/issues/950#issuecomment-6709459381). **Don't build or send an APK until the owner confirms GPT is done.**
+- **2b done:**
+  - `StudioLog` (separate file; Share and Clear in ⋮ > Project; logs edits, stepper taps, Apply, advice, messages)
+  - +/- fix (`StudioHandEditing.edit` reads `runtime.handDraft()` at tap time)
+  - `turnLabelText` and `StudioControlProject.turnLabel` ("R2 · T3", changeable)
+  - Editor chrome colours from the palette (`StudioEditorRequests.chromeGold/chromeAction`; square handles; APPLY)
+  - `studioFitContents()` plus always-clip for resized controls (text no longer leaves buttons)
+  - Drawer top with a custom design uses the one-line `compactHandLine` (editor shows the same line); the grab handle is drawn directly
+  - Thinking strip waits 0.5s and can be hidden (`hiddenPieces`, `SCREEN_PIECES`, ⋮ > Layout > Show on screen)
+  - `hitTest(..., current)`: a small group (≤12× the part's area) is picked first, a second tap goes inside
+  - Minimal keeps the log text
+  - Log entries share an edited sibling's style
+  - `hintedHorizontalScroll()` arrows
+  - Legacy mint grip off while the shell is active
+- **2b still open:**
+  - "Neighbours make room" (Table group height clipped by weight, the YOU chip pushing OFFLINE AI off, hand tray frame vs drawn size). Needs per-panel changes in `TableMainLayout`; do it with J7/J13.
+  - The rest of Show on screen (chips, phase bar, mana bar, TABLE, button row) after J13
+  - "Show me…" samples after J9
+  - Multi-select, Align, button types (note 26), selectable battlefield and background (16/17)
+  - Plain names after J7
+- **Risk, check first:** Studio IDs are `native:<site>/<currentCompositeKeyHash>`. If the compiler's group keys depend on source position, editing a file can change IDs after the edit point and detach saved owner edits between builds. J7's permanent names are the fix (Nov 6 note 27); confirm whether the owner's applied edits survived 2a → 2b.
+
 ## Update: Nov 7, 00:45 MT, batch 2a first drop
 - **Owner feedback on the batch-1 APK** is the plan now: 36 items on #995 ([comment 6703609046](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6703609046)). Goose jobs J7–J12 are on #950 (comment 6703633081); they feed notes 27–30, 32 and 33.
 - **2a done** (commits `5bac020`, `4165b7c`, `2f0d15c`):
