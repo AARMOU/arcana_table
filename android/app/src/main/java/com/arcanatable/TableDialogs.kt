@@ -202,7 +202,7 @@ internal fun LibrarySearchDialog(
                     label = { StudioText("TableDialogs.Text.4", "Dialogs and overlays", false, "Search name, type, or rules text") },
                     placeholder = { StudioText("TableDialogs.Text.5", "Dialogs and overlays", false, "Blank search shows the full library") }
                 )
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                     LibrarySort.entries.forEach { s -> StudioFilterChip("TableDialogs.FilterChip.1", "Dialogs and overlays", sort == s, { sort = s }, label = { StudioText("TableDialogs.Text.6", "Dialogs and overlays", true, s.label, fontSize = 11.sp) }) }
                     chips.forEach { (c, n) -> StudioFilterChip("TableDialogs.FilterChip.2", "Dialogs and overlays", chip == c, { chip = if (chip == c) null else c }, label = { StudioText("TableDialogs.Text.7", "Dialogs and overlays", true, "${c.label} $n", fontSize = 11.sp) }) }
                 }
@@ -212,7 +212,7 @@ internal fun LibrarySearchDialog(
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         StudioTextButton("TableDialogs.TextButton.2", "Dialogs and overlays", onClick = { selectedIds = emptySet() }, modifier = Modifier.heightIn(min = 40.dp)) { StudioText("TableDialogs.Text.9", "Dialogs and overlays", false, "CLEAR", color = Muted, fontSize = 9.sp) }
                     }
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         listOf(
                             Triple("TO HAND", onTakeToHand, true),
                             Triple("TO BATTLEFIELD", onPutBattlefield, true),
@@ -703,7 +703,7 @@ internal fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKe
                     color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)
                 )
                 if (choosingBottomCards) StudioText("TableDialogs.Text.110", "Dialogs and overlays", false, "Tap a card to enlarge it; use the button under a card to select it for the bottom.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 6.dp))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     player.hand.forEach { card ->
                         val selected = card.id in selectedCardIds
                         Column(Modifier.width(openingCardWidth), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -756,7 +756,7 @@ internal fun OptionsPage(
     respondToOwnStack: Boolean = false, onRespondToOwnStack: (Boolean) -> Unit = {},
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
-    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
+    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {}, onOpenStudio: (() -> Unit)? = null,
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
     onClearAllData: () -> Unit, onDismiss: () -> Unit,
 ) {
@@ -811,7 +811,12 @@ internal fun OptionsPage(
                         StudioTextButton("TableDialogs.TextButton.26", "Dialogs and overlays", onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { StudioText("TableDialogs.Text.125", "Dialogs and overlays", true, if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
                     }
                 }
-                StudioTextButton("TableDialogs.TextButton.27", "Dialogs and overlays", onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
+                // Arcana Studio replaces "Adjust UI layout" behind the single STUDIO_ENABLED switch (owner D33).
+                if (onOpenStudio != null) {
+                    androidx.compose.material3.TextButton(onClick = onOpenStudio, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).tutorialTarget("setting-adjust-ui").testTag("settings-open-studio")) {
+                        androidx.compose.material3.Text("ARCANA STUDIO  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+                    }
+                } else StudioTextButton("TableDialogs.TextButton.27", "Dialogs and overlays", onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     StudioText("TableDialogs.Text.126", "Dialogs and overlays", false, "ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
                 Section("GAMEPLAY")
@@ -1141,7 +1146,7 @@ internal fun LayoutLabPreview(
                     "STEP" -> Row(dragModifier.fillMaxWidth().height(24.dp).clickable { onSelectElement("STEP") }, verticalAlignment = Alignment.CenterVertically) {
                         StudioText("TableDialogs.Text.165", "Dialogs and overlays", false, "NEXT STEP  ›", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterVertically).padding(start = 5.dp))
                     }
-                    "ZONES" -> Row(dragModifier.fillMaxWidth().horizontalScroll(rememberScrollState()).clickable { onSelectElement("ZONES") }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    "ZONES" -> Row(dragModifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).clickable { onSelectElement("ZONES") }, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         quickActionOrder.forEach { id ->
                             StudioText("TableDialogs.Text.166", "Dialogs and overlays", true, "${layoutQuickActionTitle(id).uppercase()}${if (id in setOf("LIBRARY", "HAND", "GRAVEYARD", "EXILE", "REVEALED")) " 0" else ""}", color = SoftWhite, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(PanelLight).padding(horizontal = 5.dp, vertical = 4.dp))
                         }
@@ -2142,7 +2147,7 @@ internal fun TokenPickerDialog(onDismiss: () -> Unit, onAdd: (ScryfallCard) -> U
                     StudioIconButton("TableDialogs.IconButton.14", "Dialogs and overlays", onClick = onDismiss, modifier = Modifier.size(44.dp)) { StudioIcon("TableDialogs.Icon.15", "Dialogs and overlays", Icons.Filled.Close, "Close token search", tint = Muted) }
                 }
                 StudioOutlinedTextField("TableDialogs.OutlinedTextField.20", "Dialogs and overlays", query, { query = it }, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), singleLine = true, label = { StudioText("TableDialogs.Text.301", "Dialogs and overlays", false, "Search tokens") }, placeholder = { StudioText("TableDialogs.Text.302", "Dialogs and overlays", false, "Treasure, Clue, Zombie…") })
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     listOf("Treasure", "Clue", "Food", "Blood", "Zombie", "Goblin", "Soldier").forEach { suggestion ->
                         StudioAssistChip("TableDialogs.AssistChip.1", "Dialogs and overlays", onClick = { query = suggestion }, label = { StudioText("TableDialogs.Text.303", "Dialogs and overlays", true, suggestion, fontSize = 9.sp) })
                     }

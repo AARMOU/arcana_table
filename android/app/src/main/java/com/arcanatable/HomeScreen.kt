@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -105,6 +106,8 @@ fun ArcanaHomeScreen(
     onImport: () -> Unit,
     onSettings: () -> Unit,
     onReturnToTable: () -> Unit,
+    /** Test builds only (BuildConfig.STUDIO_ENABLED): opens Arcana Studio. */
+    onStudio: (() -> Unit)? = null,
 ) {
     var scenarioPickerOpen by remember { mutableStateOf(false) }
     Column(
@@ -119,6 +122,13 @@ fun ArcanaHomeScreen(
                     onClick = { scenarioPickerOpen = true },
                     modifier = Modifier.heightIn(min = 48.dp).testTag("test-scenarios-entry")
                 ) { StudioText("HomeScreen.Text.2", "Home and setup", true, "TESTS (${testScenarios.size})", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black) }
+                onStudio?.let { open ->
+                    // A plain button: Home is outside Studio's editable catalogue (owner D33).
+                    androidx.compose.material3.IconButton(onClick = open, modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, PanelLight, CircleShape).testTag("home-open-studio")) {
+                        androidx.compose.material3.Icon(Icons.Filled.Palette, contentDescription = "Arcana Studio", tint = Mint)
+                    }
+                    Spacer(Modifier.size(8.dp))
+                }
                 StudioIconButton("HomeScreen.IconButton.1", "Home and setup", onClick = onSettings, modifier = Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
                     StudioIcon("HomeScreen.Icon.1", "Home and setup", Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }

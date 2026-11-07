@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +51,7 @@ internal fun StudioHandCanvas(layout: StudioLayout, state: StudioHandState,
         val origin=layout.originY.takeIf {it.isFinite()} ?: 344f
         val density = LocalDensity.current
         val visible = layout.elements.filter { it.visible }
+        val advice = if (editing) layout.advice() else emptyMap()
         val slots = visible.filter { it.kind == "card" }.sortedBy { it.binding.removePrefix("card").toIntOrNull() ?: 0 }
         // Preserve exported slots. Extra real cards continue below the entire design, in reachable scrolling rows.
         val lastIndex = slots.maxOfOrNull { it.binding.removePrefix("card").toIntOrNull() ?: 0 } ?: -1
@@ -69,21 +69,30 @@ internal fun StudioHandCanvas(layout: StudioLayout, state: StudioHandState,
                 e.w<=4000 && e.h<=4000 && e.y<=4000 && e.fs in 1f..100f && e.r>=0
         }
         val extent = ((renderElements.maxOfOrNull { it.y+it.h } ?: origin)-origin).coerceIn(44f,4000f)
-        Box(Modifier.fillMaxWidth().height((extent*scale).dp).background(Ink).testTag("studio-hand-canvas")) {
+        // The hand design draws on the drawer's own surface colour, so the drawer is one colour top to bottom.
+        // Owner note 3: no paint of its own. The drawer behind it owns the colour, so the drawer is one colour from its top
+        // edge down (the canvas used to paint a different palette's panel colour under the design).
+        Box(Modifier.fillMaxWidth().height((extent*scale).dp).testTag("studio-hand-canvas")) {
             renderElements.forEach { e ->
                 val shape = RoundedCornerShape((e.r*scale).dp)
                 var delta by remember(e.id) { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
                 val gesture = if (editing) Modifier.pointerInput(e.id,e.locked,scale) {
-                    detectDragGesturesAfterLongPress(onDragStart={ select(e.id); delta=androidx.compose.ui.geometry.Offset.Zero },
+                    detectDragGestures(onDragStart={ select(e.id); delta=androidx.compose.ui.geometry.Offset.Zero },
                         onDrag={ change,amount -> change.consume(); delta+=amount },
                         onDragCancel={delta=androidx.compose.ui.geometry.Offset.Zero},
                         onDragEnd={ if (!e.locked) move(e.id, with(density){delta.x.toDp().value}/scale, with(density){delta.y.toDp().value}/scale); delta=androidx.compose.ui.geometry.Offset.Zero })
                 } else Modifier
-                Box(Modifier.offset((e.x*scale).dp,((e.y-origin)*scale).dp)
+                // Owner note 8: in play, a button drawn smaller than a fingertip grows around its centre to 44dp
+                // (the editor shows it at its true size, marked red). Cards keep their exact size.
+                val grow = !editing && e.kind != "card"
+                val drawW = if (grow) maxOf(e.w*scale,44f) else e.w*scale
+                val drawH = if (grow) maxOf(e.h*scale,44f) else e.h*scale
+                Box(Modifier.offset((e.x*scale-(drawW-e.w*scale)/2).dp,((e.y-origin)*scale-(drawH-e.h*scale)/2).dp)
                     .offset { androidx.compose.ui.unit.IntOffset(delta.x.roundToInt(),delta.y.roundToInt()) }
-                    .size((e.w*scale).dp,(e.h*scale).dp)
+                    .size(drawW.dp,drawH.dp)
                     .testTag("studio-bounds-${e.id}").then(gesture)
-                    .border(if (editing && selectedElement==e.id) 2.dp else 0.dp,Mint,shape)) {
+                    .border(if (editing && (selectedElement==e.id || e.id in advice)) 2.dp else 0.dp,
+                        if (e.id in advice) androidx.compose.ui.graphics.Color(0xFFE5534B) else StudioEditorRequests.chromeGold,shape)) {
                     val cardIndex = e.binding.removePrefix("card").toIntOrNull()
                     val card = cardIndex?.let { state.cards.getOrNull(it) }
                     if (e.kind=="card" && card!=null) CardFace(card,Modifier.fillMaxSize()

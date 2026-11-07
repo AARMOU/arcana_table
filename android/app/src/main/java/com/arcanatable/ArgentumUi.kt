@@ -284,7 +284,7 @@ fun DiagnosticLogDialog(log: DiagnosticLog, revision: Int, onExport: (List<Diagn
                     value = query, onValueChange = { query = it }, singleLine = true,
                     label = { StudioText("ArgentumUi.Text.21", "Table and player", false, "Search events") }, modifier = Modifier.fillMaxWidth().testTag("diagnostic-search")
                 )
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DiagnosticCategory.entries.forEach { category ->
                         StudioFilterChip("ArgentumUi.FilterChip.1", "Table and player",
                             selected = category in categories,
@@ -557,7 +557,7 @@ fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String,
                 }
                 if (plan.manaColors.isNotEmpty()) {
                     StudioText("ArgentumUi.Text.85", "Table and player", false, "Mana colour", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         plan.manaColors.forEach { c ->
                             StudioFilterChip("ArgentumUi.FilterChip.2", "Table and player", selected = color == c, onClick = { color = c }, label = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -583,7 +583,7 @@ fun ArgentumPileEditor(split: ArgentumPileSplit, nameOf: (String) -> String, ass
     Column {
         split.cards.forEach { card ->
             StudioText("ArgentumUi.Text.91", "Table and player", true, nameOf(card), color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (split.allowUnassigned) StudioFilterChip("ArgentumUi.FilterChip.3", "Table and player", selected = (assign[card] ?: -1) < 0, onClick = { onChange(assign + (card to -1)) }, label = { StudioText("ArgentumUi.Text.92", "Table and player", false, "None", fontSize = 11.sp) })
                 split.allowedPiles(card).forEach { p ->
                     StudioFilterChip("ArgentumUi.FilterChip.4", "Table and player", selected = assign[card] == p, onClick = { onChange(assign + (card to p)) }, label = { StudioText("ArgentumUi.Text.93", "Table and player", true, split.labels[p], fontSize = 11.sp) })

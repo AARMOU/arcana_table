@@ -340,13 +340,13 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
                     }
                     if (player.handRevealedToAll && player.hand.isNotEmpty()) {
                         StudioText("TableBoardViews.Text.22", "Table and player", false, "HAND REVEALED TO EVERYONE", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             player.hand.forEach { card -> CardFace(card, Modifier.width(if (compact) 30.dp else 44.dp), onClick = { onPreview(card) }, onLongClick = { onPreview(card) }, showCounters = false) }
                         }
                     }
                 }
             }
-            if (!compact) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (!compact) Row(Modifier.hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (player.graveyard.isNotEmpty()) ZoneChip("GRAVEYARD", player.graveyard.size) { onZone("Graveyard") }
                 if (player.exile.isNotEmpty()) ZoneChip("EXILE", player.exile.size) { onZone("Exile") }
                 if (player.revealed.isNotEmpty()) ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") }
@@ -479,7 +479,7 @@ internal fun PlayerBoard(
             // Keep the actual floating pool visible even at zero. Untapped lands are
             // deliberately labelled as lands, NOT as spendable mana: fetch lands,
             // restrictions and conditional sources make that number different.
-            if (engineGame && engineControlled) {
+            if (engineGame && engineControlled && studioPieceShown("manaBar")) {
                 val floating = player.manaPool.filterValues { it > 0 }
                 val readyLands = player.battlefield.count { it.type.contains("Land", ignoreCase = true) && !it.tapped }
                 Row(
@@ -503,13 +503,13 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (studioPieceShown("buttonRow")) Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
                 // Quick Actions in the order chosen in Adjust UI (only actions that work in Argentum games).
                 quickActionOrder.distinct().sortedBy { if (it == "PASS_TO_TURN") 0 else if (it == "UNDO") 1 else 2 }.forEach { action -> when (action) {
-                    "CAST_COMMANDER" -> player.commanderCard?.let { commander ->
+                    "CAST_COMMANDER" -> player.commanderCard?.takeIf { studioPieceShown("commanderChip") }?.let { commander ->
                         // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
                         val castable = engineControlled && !commanderUnavailable && !player.isEliminated
                         Row(
@@ -583,7 +583,7 @@ internal fun PlayerBoard(
         if (player.revealed.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 StudioText("TableBoardViews.Text.45", "Table and player", false, "PUBLIC REVEALS", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 7.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(Modifier.hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     player.revealed.take(10).forEach { card -> CardFace(card, Modifier.width(40.dp), onClick = {}, onLongClick = { onPublicPreview(card) }, showCounters = false) }
                 }
             }
@@ -853,8 +853,14 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         LocalDensity.current.fontScale, LocalConfiguration.current.screenHeightDp.toFloat()).orEmpty()
     if (studioLayout != null && argentumMode && studioGeometryProblems.isEmpty()) {
         Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                StudioIconButton("TableBoardViews.IconButton.4", "Table and player", onClick = onClose) { StudioIcon("TableBoardViews.Icon.5", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
+            // Owner, Nov 7: with a custom hand design the drawer top matches the editor: one compact line with the ✕,
+            // no row of its own and no empty band.
+            Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+                StudioText("TableBoardViews.Text.80", "Table and player", true,
+                    compactHandLine(cards.size, turnContext, if (argentumMode) cards.count { it.id in playableIds } else null, if (argentumMode) stackCount else 0),
+                    color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp).testTag("hand-context"))
+                StudioIconButton("TableBoardViews.IconButton.4", "Table and player", onClick = onClose, modifier = Modifier.size(44.dp)) { StudioIcon("TableBoardViews.Icon.5", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
             }
             StudioHandCanvas(studioLayout, StudioHandState(
                 labels = mapOf("pass" to (if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel ?: "WAITING"),
@@ -886,8 +892,13 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         return
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
-        if (studioGeometryProblems.isNotEmpty()) StudioText("TableBoardViews.Text.77", "Table and player", true, studioGeometryProblems.joinToString("\n"), color = CounterGold)
-        Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Owner note 9 (Studio builds): one compact line instead of three, e.g. "Hand 7 · Main 1 · 3 playable".
+        if (BuildConfig.STUDIO_ENABLED) Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+            val line = compactHandLine(cards.size, turnContext, if (argentumMode) cards.count { it.id in playableIds } else null, if (argentumMode) stackCount else 0)
+            StudioText("TableBoardViews.Text.80", "Table and player", true, line, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("hand-context"))
+            StudioIconButton("TableBoardViews.IconButton.5", "Table and player", onClick = onClose, modifier = Modifier.size(44.dp)) { StudioIcon("TableBoardViews.Icon.6", "Table and player", Icons.Filled.Close, "Close hand", tint = SoftWhite) }
+        } else Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 StudioText("TableBoardViews.Text.78", "Table and player", true, "YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 turnContext?.let { StudioText("TableBoardViews.Text.79", "Table and player", true, it, color = Muted, fontSize = 10.sp, maxLines = 2) }
@@ -923,7 +934,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 }
             }
         } else {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             actionOrder.forEach { action ->
                 when (action) {
                     "DRAW" -> if (canControl) HeaderButton("DRAW", onDraw)
@@ -973,7 +984,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 }
             }
             val rows = cards.chunked(grid.columns.coerceAtLeast(1))
-            val container = if (grid.rows == 1) Modifier.fillMaxWidth().horizontalScroll(handScrollState)
+            val container = if (grid.rows == 1) Modifier.fillMaxWidth().hintedHorizontalScroll(handScrollState)
                 else Modifier.fillMaxWidth().heightIn(max = areaHeight).verticalScroll(handScrollState)
             Column(container.testTag("hand-grid").tutorialTarget("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
             rows.forEach { rowCards -> Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
@@ -1028,4 +1039,11 @@ internal fun CardPreviewPopup(item: CardPreview, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** Owner note 9: "Hand 7 · Main 1 · 3 playable [· Stack N]", the one-line drawer top (game and Studio editor). */
+internal fun compactHandLine(cards: Int, turnContext: String?, playable: Int?, stack: Int): String {
+    val phase = turnContext?.split(" · ")?.getOrNull(1)?.let { when (it.lowercase()) {
+        "precombat main" -> "Main 1"; "postcombat main" -> "Main 2"; else -> it } }
+    return listOfNotNull("Hand $cards", phase, playable?.let { "$it playable" }, if (stack > 0) "Stack $stack" else null).joinToString(" · ")
 }

@@ -29,10 +29,14 @@ android {
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
+        // ONE switch for Arcana Studio (owner D33): replaces Adjust UI, removes the theme switch, adds Studio entries.
+        // Off for normal builds; flip this line (or the debug override below) to ship Studio.
+        buildConfigField("boolean", "STUDIO_ENABLED", "false")
     }
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "STUDIO_ENABLED", "true")
             // Separate package so this build installs beside the experimental/targeting test build.
             applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix").orElse(".b142studio").get()
             // The build number follows versionCode, so the installer never shows a stale one.

@@ -143,7 +143,8 @@ internal fun TableController.TableMainLayout() {
     Column(
         Modifier.fillMaxSize().background(Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(start = 10.dp, top = 8.dp, end = 10.dp)
+            // While Studio is open the screen starts below its bar instead of sliding underneath (owner notes 4, 10).
+            .padding(start = 10.dp, top = 8.dp + StudioEditorRequests.screenTopInset, end = 10.dp)
     ) {
         // Argentum game: one strip for connection, phase and timer (life is on the player tabs).
         val compactArgentumTable = argentumEnabled && argentumSnapshot != null
@@ -151,10 +152,10 @@ internal fun TableController.TableMainLayout() {
         val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
-            Row(rowModifier.tutorialTarget("player-tabs").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
+            Row(rowModifier.tutorialTarget("player-tabs").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                if (studioPieceShown("tableButton")) Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
-                val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
+                val tabOrder = if (studioPieceShown("playerChips")) players.indices.sortedBy { if (it == localSeat) -1 else it } else emptyList()
                 tabOrder.forEach { index -> val player = players[index]
                     Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) {
                         val snap = argentumSnapshot
@@ -181,11 +182,13 @@ internal fun TableController.TableMainLayout() {
                 val dotColor = when { argentumStatus != ArgentumConnectionStatus.CONNECTED -> Color(0xFFE9978B); argentumAwaitingUpdate -> CounterGold; else -> Mint }
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
                 Spacer(Modifier.width(8.dp))
+                // Owner, Nov 7: the phase bar can be switched off in Studio; the row keeps the status dot and ⋮ menu.
+                val phaseShown = studioPieceShown("phaseBar")
                 if (tabsInTopBar) {
-                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent)
-                    Spacer(Modifier.width(8.dp))
+                    if (phaseShown) { PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent); Spacer(Modifier.width(8.dp)) }
                     seatTabs(Modifier.weight(1f))
-                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
+                } else if (phaseShown) PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
+                else Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(6.dp))
             } else Column {
                 StudioText("TableMainLayout.Text.1", "Table and player", false, "ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -196,8 +199,14 @@ internal fun TableController.TableMainLayout() {
                 } else StudioText("TableMainLayout.Text.4", "Table and player", false, "ARGENTUM ENGINE", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
             if (!compactArgentumTable) Spacer(Modifier.weight(1f))
-            Box(Modifier) {
-                StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) "T${turnNumber}${if (turnTimerVisible) " · " + formatClock(elapsedTurnSeconds) else ""}" else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+            // With both the turn label and the timer switched off in Studio, the label takes no space at all.
+            val topLabelGone = BuildConfig.STUDIO_ENABLED && compactArgentumTable &&
+                studioControlsRuntime?.project()?.turnLabel == "hidden" && (!turnTimerVisible || !studioPieceShown("timer"))
+            if (!topLabelGone) Box(Modifier) {
+                StudioText("TableMainLayout.Text.5", "Table and player", true, if (compactArgentumTable) listOfNotNull(
+                    // Owner, Nov 7: rounds as well as turns ("R2 · T3"), changeable in Studio ⋮ > Layout.
+                    if (BuildConfig.STUDIO_ENABLED) turnLabelText(studioControlsRuntime?.project()?.turnLabel ?: "both", turnNumber, players.size.coerceAtLeast(1)) else "T$turnNumber",
+                    if (turnTimerVisible && (!BuildConfig.STUDIO_ENABLED || "timer" !in (studioControlsRuntime?.project()?.hiddenPieces ?: emptySet()))) formatClock(elapsedTurnSeconds) else null).joinToString(" · ") else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.heightIn(min = 44.dp).tutorialTarget("turn-timer").wrapContentHeight(Alignment.CenterVertically).studioCombinedClickable("TableMainLayout.combinedClickable.1", "Table and player", enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.1", "Table and player", text = { StudioText("TableMainLayout.Text.6", "Table and player", true, if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
@@ -224,8 +233,9 @@ internal fun TableController.TableMainLayout() {
                         StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.7", "Table and player", text = { StudioText("TableMainLayout.Text.12", "Table and player", false, "Game tools") }, modifier = Modifier.tutorialTarget("menu-game-tools"), onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.8", "Table and player", text = { StudioText("TableMainLayout.Text.13", "Table and player", false, "Room & game") }, modifier = Modifier.tutorialTarget("menu-room-game"), onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.9", "Table and player", text = { StudioText("TableMainLayout.Text.14", "Table and player", false, "What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        if (BuildConfig.DEBUG) StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.10", "Table and player", text = { StudioText("TableMainLayout.Text.15", "Table and player", false, "Arcana Studio") }, onClick = { topMenuExpanded = false; topMenuSection = null; nativeStudioOpen = true })
-                        StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.11", "Table and player", text = { StudioText("TableMainLayout.Text.16", "Table and player", false, "Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        if (BuildConfig.STUDIO_ENABLED) StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.10", "Table and player", text = { StudioText("TableMainLayout.Text.15", "Table and player", false, "Arcana Studio") }, onClick = { topMenuExpanded = false; topMenuSection = null; nativeStudioOpen = true }, modifier = Modifier.testTag("menu-open-studio"))
+                        // Arcana Studio replaces Adjust UI behind the single STUDIO_ENABLED switch (owner D33).
+                        if (!BuildConfig.STUDIO_ENABLED) StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.11", "Table and player", text = { StudioText("TableMainLayout.Text.16", "Table and player", false, "Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.12", "Table and player", text = { StudioText("TableMainLayout.Text.17", "Table and player", false, "Options") }, modifier = Modifier.tutorialTarget("menu-options"), onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
                         StudioDropdownMenuItem("TableMainLayout.DropdownMenuItem.13", "Table and player", text = { StudioText("TableMainLayout.Text.18", "Table and player", false, "‹ Main menu") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
@@ -284,14 +294,23 @@ internal fun TableController.TableMainLayout() {
         }
 
         // Compact table: the strip appears only for problems, a waiting confirmation, game over or a non-empty stack.
-        val stripNeeded = argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null || argentumAwaitingUpdate || gameEndedOnline ||
+        // Owner, Nov 7: the "thinking" state only shows once the engine has been busy for half a second (no flashing),
+        // and can be switched off in Studio ⋮ > Layout > Show on screen. Problems and decisions still always show.
+        var thinkingShown by remember { mutableStateOf(false) }
+        LaunchedEffect(argentumAwaitingUpdate) {
+            if (!BuildConfig.STUDIO_ENABLED) thinkingShown = argentumAwaitingUpdate
+            else if (argentumAwaitingUpdate) { kotlinx.coroutines.delay(500); thinkingShown = true } else thinkingShown = false
+        }
+        val thinkingVisible = thinkingShown && argentumAwaitingUpdate &&
+            (!BuildConfig.STUDIO_ENABLED || "engineThinking" !in (studioControlsRuntime?.project()?.hiddenPieces ?: emptySet()))
+        val stripNeeded = argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null || thinkingVisible || gameEndedOnline ||
             argentumSnapshot == null || argentumSnapshot?.stack?.isNotEmpty() == true
         if (argentumEnabled && stripNeeded) ArgentumStatusStrip(
             model = ArgentumStatusModel(
                 connection = argentumStatus,
                 gameActive = argentumSnapshot != null && !gameEndedOnline,
                 gameOver = gameEndedOnline,
-                awaitingUpdate = argentumAwaitingUpdate,
+                awaitingUpdate = thinkingVisible,
                 turnLabel = argentumSnapshot?.let { "Turn ${it.turnNumber} · ${it.stepName.lowercase().replaceFirstChar(Char::uppercase)} · ${if (it.activePlayer == localSeat) "your turn" else "${players.getOrNull(it.activePlayer)?.name ?: "opponent"}'s turn"}" },
                 priorityLabel = argentumPrimaryLabel,
                 needsHandling = argentumNeedsHandling,
@@ -310,13 +329,13 @@ internal fun TableController.TableMainLayout() {
             onLeave = { argentumLeaveConfirm = true },
             compact = true,
         )
-        if (!tabsInTopBar) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!tabsInTopBar && (studioPieceShown("playerChips") || studioPieceShown("tableButton"))) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
             seatTabs(Modifier.weight(1f))
         }
 
         HorizontalPager(
             state = viewPagerState,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("table-pager"),
             // Player boards contain horizontal card and zone lists. Keep
             // gestures inside those lists; use the player tabs to switch boards.
             userScrollEnabled = showOverview,
@@ -328,7 +347,7 @@ internal fun TableController.TableMainLayout() {
         Column(Modifier.fillMaxSize()) {
         val showingView = page - 1
         if (showingView < 0) {
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (studioPieceShown("fullTableLabel")) Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("FULL TABLE · ${players.size}/4 PLAYERS", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
             }
             val compactOverview = screenWidthDp < 900 && isLandscape && players.size >= 3

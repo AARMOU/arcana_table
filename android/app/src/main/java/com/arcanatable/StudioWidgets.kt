@@ -1,5 +1,8 @@
 package com.arcanatable
 
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -42,7 +45,7 @@ internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String
 internal fun studioWidget(site:String,screen:String,kind:String,title:String,enabled:Boolean=true,protectedLabel:Boolean=false,
     onClick:(()->Unit)?=null):StudioWidget? {
     val runtime=LocalStudioControls.current ?: return null
-    if(!runtime.active)return null
+    if(!runtime.active || LocalStudioExcluded.current)return null
     if(kind.endsWith("action") && LocalStudioControlParent.current?.proxy==true)return null
     val base="native:$site/${currentCompositeKeyHash}"
     val token=remember{Any()}
@@ -57,9 +60,32 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     val actualScreen=LocalStudioScreen.current ?: screen
     SideEffect {runtime.record(StudioLiveControl(id,actualScreen,kind,currentCaption,enabled,window=window,protectedLabel=protectedLabel,captionEditable=captionEditable),
         if(onClick==null)null else ({action?.invoke()}))}
+    StudioWindowCanvasHost(runtime,window)
     val style=runtime.style(id,actualScreen,kind)
     val available=enabled && (style.binding==null || if(kind.endsWith("action"))runtime.canInvoke(id,style.binding) else runtime.canDisplay(id,style.binding))
     return StudioWidget(runtime,id,style,available,caption,source)
+}
+
+
+/**
+ * Scales a resized control's contents down so they fit its Studio size. The control is measured at the size it
+ * needs (from its intrinsic sizes) and drawn scaled into the box, so text, icons and pictures shrink together and stay
+ * centred. Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
+ */
+internal fun Modifier.studioFitContents():Modifier=this.layout {measurable,constraints->
+    if(!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val w=constraints.maxWidth;val h=constraints.maxHeight
+    val needW=runCatching{measurable.minIntrinsicWidth(h)}.getOrNull() ?: w
+    val needH=runCatching{measurable.minIntrinsicHeight(w)}.getOrNull() ?: h
+    val scale=minOf(1f,w/needW.coerceAtLeast(1).toFloat(),h/needH.coerceAtLeast(1).toFloat()).coerceAtLeast(0.6f)
+    if(scale>=0.999f) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val inner=androidx.compose.ui.unit.Constraints.fixed((w/scale).toInt().coerceAtLeast(1),(h/scale).toInt().coerceAtLeast(1))
+    val p=measurable.measure(inner)
+    layout(w,h){p.placeWithLayer((w-p.width)/2,(h-p.height)/2){scaleX=scale;scaleY=scale}}
 }
 
 @Composable
@@ -76,11 +102,21 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         layout(0,0){} // Compose captions and guards, but never place, draw or hit-test hidden controls.
     }
     // Native anchors and parent-data (weights) remain intact. Draft and applied use this same modifier.
-    var result=this.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
+    // Owner feedback #11/#12 (bug 22): Studio's size goes OUTSIDE the call site's own modifiers. Placed after them,
+    // the native width()/height()/heightIn() fixed the slot and the saved size never showed. Outermost, the native
+    // size modifiers are coerced into Studio's exact constraints, so the visible control is the size in the panel.
+    var sized:Modifier=Modifier
+    s.width?.takeIf{it.isFinite()}?.let{sized=sized.requiredWidth(it.coerceIn(1f,2000f).dp)}
+    s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
+    var result=sized.then(this).offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
         s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
-    s.width?.takeIf{it.isFinite()}?.let{result=result.requiredWidth(it.coerceIn(1f,2000f).dp)}
-    s.height?.takeIf{it.isFinite()}?.let{result=result.requiredHeight(it.coerceIn(1f,4000f).dp)}
-    s.radius?.takeIf{it.isFinite()}?.let{result=result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
+    // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its
+    // own edges (previously only when a corner radius was set, hence "hit and miss"), and contents that don't fit
+    // the new size are scaled down to fit, never below a readable 60%; below that the editor marks it red.
+    val resized=s.width!=null || s.height!=null
+    result=s.radius?.takeIf{it.isFinite()}?.let{result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
+        ?: if(resized)result.clipToBounds() else result
+    if(resized)result=result.studioFitContents()
     s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
         .pointerInput(widget.id,true) {
@@ -93,25 +129,28 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
                 val style=current.runtime.style(current.id)
                 val bounds=current.runtime.controls[current.id]?.bounds
                 current.runtime.edit(current.id,if(resizing)style.copy(
-                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(44f),
-                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(44f)
+                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(StudioEditorGeometry.FLOOR_DP),
+                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(StudioEditorGeometry.FLOOR_DP)
                 ) else style.copy(dx=style.dx+dx,dy=style.dy+dy));drag=Offset.Zero
             })
         }.drawWithContent {
             drawContent()
-            if(widget.runtime.selected==widget.id) {
+            // Owner, Nov 7: no stray mint grip. The editor draws the selection frame and handles itself; this older
+            // outline only remains for the classic panel.
+            if(widget.runtime.selected==widget.id && !StudioEditorRequests.shellActive) {
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),style=androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),topLeft=Offset(size.width-16.dp.toPx(),size.height-16.dp.toPx()),size=androidx.compose.ui.geometry.Size(16.dp.toPx(),16.dp.toPx()))
             }
         }
-    return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f).onGloballyPositioned {coordinates->
+    result=result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f)
+    // Owner note 32: in play, nothing is measured per frame. Positions are only tracked while Studio is open.
+    if(!widget.runtime.editing)return result
+    return result.onGloballyPositioned {coordinates->
         val rect=coordinates.boundsInRoot()
+        // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
+        // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
+        // through style(); everything else is shown exactly as designed (owner note 36).
         widget.runtime.bounds(widget.id,rect,System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
-        if(s!=StudioControlStyle() && !widget.runtime.editing && widget.runtime.controls[widget.id]?.isAction==true) {
-            val minimum=with(density){44.dp.toPx()}
-            if(s.width!=null && rect.width<minimum-1 || s.height!=null && rect.height<minimum-1 || rect.left< -1 || rect.top< -1 ||
-                rect.right>root.width+1 || rect.bottom>root.height+1)widget.runtime.recover(widget.id,"A control did not fit this viewport; its native layout was restored.")
-        }
     }
 }
 
