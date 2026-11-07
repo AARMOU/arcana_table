@@ -1,0 +1,678 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 09:56:26 -0700
+Subject: [PATCH] arcana: 0041-more-than-meets-the-eye-living-metal
+
+More Than Meets the Eye (CR 702.162): cast a transforming DFC converted
+(back face up) from hand or the command zone for its printed alternative
+cost; mana value stays the front face's. New AlternativeCostType
+MORE_THAN_MEETS_THE_EYE riding the disturb/modal-back plumbing, with hand
+and command-zone legal-action offers.
+
+Living metal (CR 702.161): Keyword.LIVING_METAL plus the livingMetal()
+DSL helper (GrantCardType CREATURE gated by IsYourTurn).
+
+Reflexive triggers: a "you may transform/convert ~. When you do" action
+is infeasible when the transform would be ignored (CR 701.28f), impossible
+(701.27b) or blocked by daybound/nightbound, so "when you do" does not
+fire (CR 603.12). Ratchet, Field Medic's stacked life-gain triggers.
+---
+ .../wingedsheep/ai/engine/TargetSelection.kt  |   4 +-
+ docs/sdk-index.md                             |   1 +
+ .../com/wingedsheep/sdk/core/Keyword.kt       |  20 +++
+ .../sdk/dsl/mechanics/LivingMetalDsl.kt       |  29 ++++
+ .../dsl/mechanics/MoreThanMeetsTheEyeDsl.kt   |  23 +++
+ .../sdk/scripting/KeywordAbility.kt           |  30 ++++
+ .../test/resources/sdk-surface-baseline.txt   |   1 +
+ .../com/wingedsheep/engine/core/GameAction.kt |  10 +-
+ .../actions/spell/CastCostTotaller.kt         |   9 ++
+ .../actions/spell/CastSpellHandler.kt         |   3 +
+ .../handlers/actions/spell/CastValidator.kt   |   6 +
+ .../actions/spell/CastZoneResolver.kt         |  21 +++
+ .../ReflexiveTriggerEffectExecutor.kt         |   7 +
+ .../types/TransformEffectExecutor.kt          |  24 +++
+ .../enumerators/CastFromZoneEnumerator.kt     |   4 +
+ .../enumerators/CastSpellEnumerator.kt        |   4 +
+ .../enumerators/MoreThanMeetsTheEyeOffers.kt  | 142 ++++++++++++++++++
+ .../legalactions/utils/CastPermissionUtils.kt |   2 +
+ .../mechanics/MoreThanMeetsTheEyeCasts.kt     |  34 +++++
+ .../engine/mechanics/mana/CostCalculator.kt   |   3 +-
+ .../wingedsheep/engine/view/CastProvenance.kt |   1 +
+ web-client/src/types/enums.ts                 |   4 +
+ 22 files changed, 379 insertions(+), 3 deletions(-)
+ create mode 100644 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/LivingMetalDsl.kt
+ create mode 100644 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/MoreThanMeetsTheEyeDsl.kt
+ create mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/MoreThanMeetsTheEyeOffers.kt
+ create mode 100644 rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/MoreThanMeetsTheEyeCasts.kt
+
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/TargetSelection.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/TargetSelection.kt
+index 8a59ab4c56..b63e75c4bc 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/TargetSelection.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/TargetSelection.kt
+@@ -270,7 +270,9 @@ object TargetSelection {
+         }
+     }
+ 
+-    private val TRANSFORMED_ALT_COSTS = setOf(AlternativeCostType.DISTURB, AlternativeCostType.MODAL_BACK_FACE)
++    private val TRANSFORMED_ALT_COSTS = setOf(
++        AlternativeCostType.DISTURB, AlternativeCostType.MODAL_BACK_FACE, AlternativeCostType.MORE_THAN_MEETS_THE_EYE,
++    )
+ 
+     /**
+      * Whether [action] has a mandatory target slot whose **every** legal target is on the wrong side
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 297dabfb29..85500eb06f 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1378,6 +1378,7 @@ Families:
+ - `KeywordAbility.Madness(cost: ManaCost)` — Madness cost (CR 702.35).
+ - `KeywordAbility.Mayhem(cost: ManaCost)` — Mayhem cost (CR 702.187, Marvel's Spider-Man).
+ - `KeywordAbility.Miracle(cost: ManaCost)` — Miracle {cost} (CR 702.94a).
++- `KeywordAbility.MoreThanMeetsTheEye(cost: ManaCost)` — More Than Meets the Eye cost (CR 702.162a).
+ - `KeywordAbility.Morph(morphCost: PayCost, faceUpEffect: Effect?)` — Morph with a cost to turn face up.
+ - `KeywordAbility.Mutate(cost: ManaCost)` — Mutate cost (CR 702.140).
+ - `KeywordAbility.Ninjutsu(cost: ManaCost, commander: Boolean)` — Ninjutsu cost (CR 702.49).
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+index 257195cf72..29f28cb445 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt
+@@ -315,6 +315,26 @@ enum class Keyword(val displayName: String) {
+      * See [com.wingedsheep.sdk.scripting.KeywordAbility.Disturb].
+      */
+     DISTURB("Disturb"),
++    /**
++     * More Than Meets the Eye [cost] (CR 702.162). "You may cast this card converted by paying
++     * [cost] rather than its mana cost."
++     *
++     * Printed on the *front* face of a transforming double-faced card (the Transformers cards). The
++     * hand/command-zone sibling of [DISTURB]: the spell goes on the stack **back face up**, so its
++     * characteristics come from the back face (CR 712.8c) while its mana value is still the front
++     * face's. "Convert" (CR 701.28) is the same action as transform for these cards, so
++     * `Effects.Transform` converts them. See
++     * [com.wingedsheep.sdk.scripting.KeywordAbility.MoreThanMeetsTheEye].
++     */
++    MORE_THAN_MEETS_THE_EYE("More Than Meets the Eye"),
++    /**
++     * Living metal (CR 702.161). "As long as it's your turn, this permanent is also a creature."
++     *
++     * Write it with the `livingMetal()` card-builder helper, which records this keyword and the
++     * matching your-turn type-adding static ability together, so the ability is lost (and the
++     * Vehicle stops being a creature) whenever the permanent loses its abilities.
++     */
++    LIVING_METAL("Living metal"),
+     EVOKE("Evoke"),
+     BESTOW("Bestow"),
+     /**
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/LivingMetalDsl.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/LivingMetalDsl.kt
+new file mode 100644
+index 0000000000..54fe38d6e5
+--- /dev/null
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/LivingMetalDsl.kt
+@@ -0,0 +1,29 @@
++package com.wingedsheep.sdk.dsl
++
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.scripting.ConditionalStaticAbility
++import com.wingedsheep.sdk.scripting.GrantCardType
++import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
++
++/**
++ * Add Living metal (Transformers / The Brothers' War, CR 702.161).
++ *
++ * "As long as it's your turn, this permanent is also a creature." (CR 702.161a)
++ *
++ * Wires the whole keyword from one call: the [Keyword.LIVING_METAL] keyword (display and keyword
++ * queries) and a layer-4 type-adding static — [GrantCardType] `CREATURE` on the source, gated by
++ * [Conditions.IsYourTurn] — so the permanent is a creature exactly during its controller's turns.
++ * Being an ordinary static ability of the permanent, it stops applying when the permanent loses its
++ * abilities, and it is evaluated relative to the current controller (a stolen Vehicle is a creature
++ * on its new controller's turn). The printed power/toughness of the Vehicle face is what the
++ * creature has.
++ */
++fun CardBuilder.livingMetal() {
++    keywords(Keyword.LIVING_METAL)
++    staticAbilities.add(
++        ConditionalStaticAbility(
++            ability = GrantCardType("CREATURE", GroupFilter.source()),
++            condition = Conditions.IsYourTurn,
++        )
++    )
++}
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/MoreThanMeetsTheEyeDsl.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/MoreThanMeetsTheEyeDsl.kt
+new file mode 100644
+index 0000000000..df98a35e14
+--- /dev/null
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/mechanics/MoreThanMeetsTheEyeDsl.kt
+@@ -0,0 +1,23 @@
++package com.wingedsheep.sdk.dsl
++
++import com.wingedsheep.sdk.scripting.KeywordAbility
++
++/**
++ * Add More Than Meets the Eye [cost] (Transformers, CR 702.162).
++ *
++ * "You may cast this card converted by paying [cost] rather than its mana cost." (CR 702.162a)
++ * Belongs on the **front** face of a transforming double-faced card whose back face is a permanent.
++ *
++ * Display-only at the DSL layer — the behavior is the engine's alternative-cost pipeline, keyed off
++ * the [KeywordAbility.MoreThanMeetsTheEye] entry in `cardDef.keywordAbilities`. It is the hand (and
++ * command zone) sibling of [disturb]: the cast enumerators offer "cast <back face> (More Than Meets
++ * the Eye)" at the *back* face's timing, the cast handler charges [cost] instead of the mana cost and
++ * puts the card on the stack back face up (CR 712.8c), its mana value stays the front face's
++ * (CR 712.8e), and the permanent resolves converted (CR 712.13).
++ *
++ * "Convert" (CR 701.28) is the same physical action as transform for these cards, so a printed
++ * "convert ~" is `Effects.Transform(EffectTarget.Self)`.
++ */
++fun CardBuilder.moreThanMeetsTheEye(cost: String) {
++    keywordAbilityList.add(KeywordAbility.moreThanMeetsTheEye(cost))
++}
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
+index 6fd9445db4..4b66067d72 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/KeywordAbility.kt
+@@ -834,6 +834,30 @@ sealed interface KeywordAbility {
+         override val description: String = "Disturb $cost"
+     }
+ 
++    // =========================================================================
++    // More Than Meets the Eye
++    // =========================================================================
++
++    /**
++     * More Than Meets the Eye [cost] (CR 702.162a). "You may cast this card converted by paying
++     * [cost] rather than its mana cost."
++     *
++     * Printed on the front face of a transforming double-faced card whose back face is a permanent.
++     * It is an alternative cost (CR 118.9), so it applies wherever the card could be cast from —
++     * its owner's hand, and the command zone for a commander. The spell is put on the stack back
++     * face up (CR 702.162a, 712.8c): the back face's card types decide the timing and its
++     * characteristics are the spell's, while the mana value comes from the front face (CR 712.8e).
++     * The permanent enters converted (CR 712.13).
++     */
++    @SerialName("MoreThanMeetsTheEye")
++    @Serializable
++    data class MoreThanMeetsTheEye(
++        val cost: ManaCost
++    ) : KeywordAbility {
++        override val keyword: Keyword = Keyword.MORE_THAN_MEETS_THE_EYE
++        override val description: String = "More Than Meets the Eye $cost"
++    }
++
+     /** Optional draw replacement from the graveyard (Comprehensive Rules 702.52). */
+     @SerialName("Dredge")
+     @Serializable
+@@ -1747,6 +1771,12 @@ sealed interface KeywordAbility {
+          */
+         fun disturb(cost: String): KeywordAbility = Disturb(ManaCost.parse(cost))
+ 
++        /**
++         * Create More Than Meets the Eye with mana cost from string (e.g. "{1}{W}"). Belongs on the
++         * front face of a transforming double-faced card whose back face is a permanent.
++         */
++        fun moreThanMeetsTheEye(cost: String): KeywordAbility = MoreThanMeetsTheEye(ManaCost.parse(cost))
++
+         /**
+          * Create Kicker with a mana cost.
+          */
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index ef5bb0bdab..4f9dd365e2 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1729,6 +1729,7 @@ IterationSpace.TargetsOf — IterationSpace — Spinning Wheel Kick — Iteratio
+ KeywordAbility.BandsWithOther — KeywordAbility — Cathedral of Serra — KeywordAbility.Protection, KeywordAbility.Simple — Protection's ProtectionScope names what a permanent is protected from and has no card-name form ("bands with other creatures named Wolves of the Hunt"); Simple carries no quality at all
+ KeywordAbility.BeamMeUp — KeywordAbility — Open Communications — KeywordAbility.Flashback, KeywordAbility.WebSlinging — flashback bundles arbitrary additional costs but cannot identify beaming restrictions; web-slinging requires a tapped creature and lacks graveyard permission and exile on stack exit
+ KeywordAbility.CompanionAbility — KeywordAbility — Zirda, the Dawnwaker — KeywordAbility.Partner, KeywordAbility.Simple — a companion carries its deck-building condition (CompanionCondition), which Simple(Keyword) can't; and like Partner it functions outside the game (CR 702.139a), read by deck validation and game setup, so no client-mirrored Keyword value is needed
++KeywordAbility.MoreThanMeetsTheEye — KeywordAbility — Ratchet, Field Medic — KeywordAbility.Disturb, KeywordAbility.Escape — disturb is the same transformed cast but its permission is the graveyard and only the graveyard (CR 702.146a), which every disturb read site checks; More Than Meets the Eye is an ordinary alternative cost usable from hand and command zone (CR 702.162a, 118.9), so a zone axis on Disturb would change every disturb permission check; escape bundles a non-mana graveyard cost and casts the front face
+ KeywordAbility.Mutate — KeywordAbility — Gemrazer — KeywordAbility.Bestow, KeywordAbility.Evoke — both are alternative costs, but bestow's spell becomes an Aura that enters attached and evoke's creature enters and is sacrificed; a mutating spell targets a non-Human creature and merges with it without entering (CR 702.140c), so a mode axis on either would fork every engine read
+ KeywordAbility.Partner — KeywordAbility — Kodama of the East Tree — KeywordAbility.Simple, KeywordAbility.Conspire — partner abilities are parameterized (partner—[text] names a text, partner with names a card), which Simple(Keyword) can't carry; and they are deck-construction rules CommanderEligibility reads before the game, not a play-time keyword, so a Keyword enum value would add a client-mirrored constant nothing at the table reads
+ LearnEffect — Effect — Retriever Phoenix — ConniveEffect, CompositeEffect — ConniveEffect names a different action and carries a subject permanent learn doesn't have; a bare CompositeEffect can't be recognised as the learn keyword action, which is what a "would learn" replacement needs
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameAction.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameAction.kt
+index a4bc786e94..936a9b1dd0 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameAction.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameAction.kt
+@@ -406,7 +406,15 @@ enum class AlternativeCostType {
+      * (hand, not graveyard), in where the cost comes from, and in mana value — CR 712.8f gives a
+      * modal back face its *own* mana value, where CR 712.8e would keep the front's.
+      */
+-    MODAL_BACK_FACE
++    MODAL_BACK_FACE,
++    /**
++     * More Than Meets the Eye ([com.wingedsheep.sdk.scripting.KeywordAbility.MoreThanMeetsTheEye],
++     * CR 702.162) — hand or command zone, at the *back* face's normal timing. The [DISTURB]
++     * plumbing from another zone: pays the printed cost instead of the mana cost and puts the card
++     * on the stack converted (back face up, CR 712.8c); the mana value stays the front face's
++     * (CR 712.8e) and the permanent resolves converted (CR 712.13).
++     */
++    MORE_THAN_MEETS_THE_EYE
+ }
+ 
+ /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastCostTotaller.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastCostTotaller.kt
+index 260dc7351b..9f4d329808 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastCostTotaller.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastCostTotaller.kt
+@@ -9,6 +9,7 @@ import com.wingedsheep.engine.handlers.PredicateEvaluator
+ import com.wingedsheep.engine.handlers.effects.TargetResolutionUtils.toEntityId
+ import com.wingedsheep.engine.mechanics.CastCharacteristics
+ import com.wingedsheep.engine.mechanics.DisturbCasts
++import com.wingedsheep.engine.mechanics.MoreThanMeetsTheEyeCasts
+ import com.wingedsheep.engine.mechanics.EmergeCasts
+ import com.wingedsheep.engine.mechanics.FlashbackGrants
+ import com.wingedsheep.engine.mechanics.HarmonizeGrants
+@@ -516,6 +517,14 @@ internal class CastCostTotaller(
+                 ?.takeIf { zoneResolver.disturbCastFace(state, playerId, cardId) != null }
+                 ?.let { priced(it.cost) }
+         },
++        // More Than Meets the Eye (CR 702.162a) — printed on the front face, which is the face the
++        // cost-modifier pipeline is applied against, exactly as for disturb (mana value from the
++        // front face, CR 712.8e). Hand or command zone.
++        AlternativeCostType.MORE_THAN_MEETS_THE_EYE to {
++            MoreThanMeetsTheEyeCasts.printed(cardDef)
++                ?.takeIf { zoneResolver.convertCastFace(state, playerId, cardId) != null }
++                ?.let { priced(it.cost) }
++        },
+         // Modal DFC back face (CR 712.11b) — you pay that face's *own* printed mana cost, not an
+         // alternative one; unlike disturb the base is the back face's cost, because CR 712.8f gives
+         // a modal back face its own mana value. Only the back is evaluated (CR 712.11c), so it is
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
+index 04045deb97..534a80a301 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
+@@ -547,6 +547,9 @@ class CastSpellHandler(
+             zoneResolver.disturbCastFace(state, action.playerId, action.cardId)
+         } else null)
+             ?: modalBackFace
++            ?: (if (action.useAlternativeCost && action.altAllows(AlternativeCostType.MORE_THAN_MEETS_THE_EYE)) {
++                zoneResolver.convertCastFace(state, action.playerId, action.cardId)
++            } else null)
+             ?: zoneResolver.permissionTransformedCastFace(state, action.playerId, action.cardId)
+ 
+     /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastValidator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastValidator.kt
+index 3faaa8ce2d..4041c4bf57 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastValidator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastValidator.kt
+@@ -368,8 +368,14 @@ internal class CastValidator(
+         } else null
+         // The zone legality of a `castTransformed` permission was already settled by the exile /
+         // self-zone routes, so that lookup only answers *which face*.
++        // More Than Meets the Eye (CR 702.162a) — cast converted from hand or the command zone for
++        // the printed cost; the zone itself was settled by the hand / command routes above.
++        val convertFace = if (action.useAlternativeCost && action.altAllows(AlternativeCostType.MORE_THAN_MEETS_THE_EYE)) {
++            zoneResolver.convertCastFace(state, playerId, cardId)
++        } else null
+         val transformedFace = disturbFace
+             ?: modalBackFace
++            ?: convertFace
+             ?: zoneResolver.permissionTransformedCastFace(state, playerId, cardId)
+         return CastSource(resolvedRoute, transformedFace)
+     }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+index c75c730226..8af5587dd1 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+@@ -18,6 +18,7 @@ import com.wingedsheep.engine.mechanics.FlashbackGrants
+ import com.wingedsheep.engine.mechanics.EscapeCasts
+ import com.wingedsheep.engine.mechanics.HarmonizeGrants
+ import com.wingedsheep.engine.mechanics.ModalDfcCasts
++import com.wingedsheep.engine.mechanics.MoreThanMeetsTheEyeCasts
+ import com.wingedsheep.engine.mechanics.WarpGrants
+ import com.wingedsheep.engine.mechanics.SneakWindow
+ import com.wingedsheep.engine.handlers.EffectContext
+@@ -670,6 +671,26 @@ class CastZoneResolver(
+         return back
+     }
+ 
++    /**
++     * The back face a card would be cast as through More Than Meets the Eye (CR 702.162a), or null
++     * when it has no such keyword, no permanent back face, or isn't somewhere [playerId] may cast it
++     * from with an alternative cost: their **hand**, or their **command zone** (a commander — CR
++     * 903.8 lets it be cast from there, and an alternative cost applies to any cast, CR 118.9).
++     *
++     * Mirrors [disturbCastFace]: the caller needs the back face's characteristics right away.
++     */
++    fun convertCastFace(
++        state: GameState,
++        playerId: EntityId,
++        cardId: EntityId
++    ): CardDefinition? {
++        val inHand = cardId in state.getZone(ZoneKey(playerId, Zone.HAND))
++        val inCommand = cardId in state.getZone(ZoneKey(playerId, Zone.COMMAND))
++        if (!inHand && !inCommand) return null
++        val cardComponent = state.getEntity(cardId)?.get<CardComponent>() ?: return null
++        return MoreThanMeetsTheEyeCasts.castFace(cardRegistry.getCard(cardComponent.cardDefinitionId))
++    }
++
+     /**
+      * Check if a card in the graveyard has a Harmonize keyword ability — printed on the card or
+      * granted at runtime (Songcrafter Mage) — allowing it to be cast from the graveyard for its
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/ReflexiveTriggerEffectExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/ReflexiveTriggerEffectExecutor.kt
+index bf23b1cb7a..bbb705e2e3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/ReflexiveTriggerEffectExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/ReflexiveTriggerEffectExecutor.kt
+@@ -270,6 +270,13 @@ class ReflexiveTriggerEffectExecutor(
+         // explicitly rather than left to `else -> true` so the difference from the fixed-N branch
+         // is a stated decision, not an accident of fall-through.
+         is com.wingedsheep.sdk.scripting.effects.CollectEvidenceChosenAmountEffect -> true
++        // "You may convert/transform ~. When you do, …" (Ratchet, Field Medic): the action can't be
++        // performed when the transform would be ignored or impossible — CR 701.28f (the source has
++        // already transformed or converted since this ability was put on the stack), CR 701.27b
++        // (not a transforming double-faced permanent, or it can't transform), or a daybound /
++        // nightbound permanent. Then "when you do" must not trigger (CR 603.12).
++        is com.wingedsheep.sdk.scripting.effects.TransformEffect ->
++            com.wingedsheep.engine.handlers.effects.permanent.types.transformWouldHappen(state, action, context)
+         else -> true
+     }
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/TransformEffectExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/TransformEffectExecutor.kt
+index 36db36f9fc..6e96245293 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/TransformEffectExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/TransformEffectExecutor.kt
+@@ -657,3 +657,27 @@ internal fun ensureDoubleFacedComponent(
+         )
+     }
+ }
++
++/**
++ * Whether resolving [effect] in [context] would really transform its target — the same gates
++ * [TransformEffectExecutor] applies, answered without changing anything. Used where "when you do"
++ * (CR 603.12) depends on the transform having happened, e.g. Ratchet, Field Medic's "you may convert
++ * Ratchet. When you do, …": a second simultaneous trigger finds Ratchet already converted
++ * (CR 701.28f) and must neither convert it back nor fire its reflexive payoff.
++ */
++internal fun transformWouldHappen(
++    state: GameState,
++    effect: TransformEffect,
++    context: EffectContext,
++): Boolean {
++    val targetId = context.resolveTarget(effect.target) ?: return false
++    val container = state.getEntity(targetId) ?: return false
++    val projected = state.projectedState
++    if (projected.hasKeyword(targetId, Keyword.DAYBOUND) || projected.hasKeyword(targetId, Keyword.NIGHTBOUND)) return false
++    if (targetId == context.sourceId &&
++        context.sourceFaceChanges != null &&
++        context.sourceFaceChanges != container.get<DoubleFacedComponent>()?.faceChanges
++    ) return false
++    if (projected.hasKeyword(targetId, AbilityFlag.CANT_TRANSFORM)) return false
++    return container.get<DoubleFacedComponent>() != null && container.get<CardComponent>() != null
++}
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
+index fe77d5c381..a8be4653dc 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
+@@ -184,6 +184,10 @@ class CastFromZoneEnumerator(
+ 
+             val cardDef = context.cardRegistry.getCard(cardComponent.name) ?: continue
+ 
++            // More Than Meets the Eye (CR 702.162a) applies to a commander cast too; offered
++            // alongside the normal command-zone cast, with its own (back face) timing.
++            MoreThanMeetsTheEyeOffers.offer(context, cardId, cardDef, cardComponent, Zone.COMMAND, result)
++
+             val isInstant = cardComponent.typeLine.isInstant
+             val hasFlash = cardDef.keywords.contains(com.wingedsheep.sdk.core.Keyword.FLASH) ||
+                 context.castPermissionUtils.hasGrantedFlash(state, cardId, context.playerId)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastSpellEnumerator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastSpellEnumerator.kt
+index 0032e429b8..e2e7bf0d03 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastSpellEnumerator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastSpellEnumerator.kt
+@@ -220,6 +220,10 @@ class CastSpellEnumerator(
+                 enumerateModalBackFace(context, cardId, cardDef, result)
+             }
+ 
++            // More Than Meets the Eye (CR 702.162a) — cast this card converted (back face up) for
++            // its printed alternative cost. Falls through: the normal cast stays available too.
++            MoreThanMeetsTheEyeOffers.offer(context, cardId, cardDef, cardComponent, Zone.HAND, result)
++
+             if (cardDef.layout == com.wingedsheep.sdk.model.CardLayout.SPLIT && cardDef.cardFaces.isNotEmpty()) {
+                 cardDef.cardFaces.forEachIndexed { faceIndex, face ->
+                     // An aftermath half can't be cast from hand (CR 702.127a) — it is offered from
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/MoreThanMeetsTheEyeOffers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/MoreThanMeetsTheEyeOffers.kt
+new file mode 100644
+index 0000000000..d0bdd20447
+--- /dev/null
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/MoreThanMeetsTheEyeOffers.kt
+@@ -0,0 +1,142 @@
++package com.wingedsheep.engine.legalactions.enumerators
++
++import com.wingedsheep.engine.core.AlternativeCostType
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.handlers.TargetingSourceType
++import com.wingedsheep.engine.legalactions.EnumerationContext
++import com.wingedsheep.engine.legalactions.LegalAction
++import com.wingedsheep.engine.legalactions.surfacedRequirements
++import com.wingedsheep.engine.mechanics.MoreThanMeetsTheEyeCasts
++import com.wingedsheep.engine.mechanics.mana.spellPaymentContextFor
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.sdk.core.Keyword
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.EntityId
++
++/**
++ * The "cast converted" offer for a card with More Than Meets the Eye (CR 702.162a), from the hand
++ * or — for a commander — the command zone.
++ *
++ * Deliberately the same shape as `CastFromZoneEnumerator.enumerateDisturb`, because it is the same
++ * engine path from another zone: the card goes on the stack **back face up**, so everything except
++ * the cost is read off the back face — its card types decide the timing (a Vehicle back face is
++ * sorcery-speed unless it has flash), its targets decide what must be chosen, and its name labels
++ * the offer. The cost is the front face's printed keyword cost, run through the same cost-modifier
++ * pipeline as any cast of this card (so commander tax applies from the command zone).
++ *
++ * The callers have already applied the whole-card gates (`cantCastSpell`, the front face's
++ * `castRestrictions`) for the normal cast of this card; they are re-checked here only where the
++ * caller skips the card entirely.
++ */
++internal object MoreThanMeetsTheEyeOffers {
++
++    const val ACTION_TYPE = "CastConverted"
++
++    fun offer(
++        context: EnumerationContext,
++        cardId: EntityId,
++        cardDef: CardDefinition,
++        cardComponent: CardComponent,
++        fromZone: Zone,
++        result: MutableList<LegalAction>,
++    ) {
++        val printed = MoreThanMeetsTheEyeCasts.printed(cardDef) ?: return
++        val backFace = MoreThanMeetsTheEyeCasts.castFace(cardDef) ?: return
++        val state = context.state
++        val playerId = context.playerId
++
++        val hasFlash = backFace.keywords.contains(Keyword.FLASH) ||
++            context.castPermissionUtils.hasGrantedFlash(state, cardId, playerId)
++        if (!backFace.typeLine.isInstant && !hasFlash && !context.canPlaySorcerySpeed) return
++        if (context.cantCastSpell(cardId)) return
++        if (!context.legality.castRestrictionsMet(state, playerId, cardDef.script.castRestrictions)) return
++
++        val description = "Cast ${backFace.name} (More Than Meets the Eye)"
++        val action = CastSpell(
++            playerId, cardId,
++            useAlternativeCost = true,
++            alternativeCostType = AlternativeCostType.MORE_THAN_MEETS_THE_EYE,
++        )
++        val zoneName = fromZone.name
++
++        val pricing = context.costCalculator.priceByTargets(
++            state, cardDef, playerId, cardId, baseCost = printed.cost, withTable = !context.skipAutoTapPreview,
++            fromZone = fromZone,
++        )
++        val effectiveCost = pricing.min
++        val costString = effectiveCost.toString()
++        val costByTargetCount = pricing.byCountStrings()
++        val spellContext = spellPaymentContextFor(
++            cardComponent, colors = state.projectedState.colorSetOf(cardId), isFromHand = fromZone == Zone.HAND,
++        )
++        val canAfford = context.manaSolver.canPay(
++            state, playerId, effectiveCost, precomputedSources = context.availableManaSources, spellContext = spellContext,
++        )
++        if (!canAfford) {
++            result.add(
++                LegalAction(
++                    actionType = ACTION_TYPE,
++                    description = description,
++                    action = action,
++                    affordable = false,
++                    manaCostString = costString,
++                    manaCostByTargetCount = costByTargetCount,
++                    sourceZone = zoneName,
++                    castsTransformed = true,
++                )
++            )
++            return
++        }
++
++        val targetReqs = buildList {
++            addAll(backFace.script.targetRequirements)
++            backFace.script.castAuraTarget?.let { add(it) }
++        }
++        val autoTapPreview = if (context.skipAutoTapPreview) null else {
++            context.manaSolver.solve(
++                state, playerId, effectiveCost, precomputedSources = context.availableManaSources, spellContext = spellContext,
++            )?.sources?.map { it.entityId }
++        }
++        if (targetReqs.isEmpty()) {
++            result.add(
++                LegalAction(
++                    actionType = ACTION_TYPE,
++                    description = description,
++                    action = action,
++                    manaCostString = costString,
++                    manaCostByTargetCount = costByTargetCount,
++                    autoTapPreview = autoTapPreview,
++                    sourceZone = zoneName,
++                    castsTransformed = true,
++                )
++            )
++            return
++        }
++        val targetInfos = context.targetUtils.buildTargetInfos(
++            state, playerId, targetReqs, targetingSourceType = TargetingSourceType.SPELL,
++            spellSubtypes = backFace.typeLine.subtypes.mapTo(mutableSetOf()) { it.value },
++        )
++        if (!context.targetUtils.allRequirementsSatisfied(targetInfos)) return
++        val firstReq = targetReqs.first()
++        val firstInfo = targetInfos.first()
++        result.add(
++            LegalAction(
++                actionType = ACTION_TYPE,
++                description = description,
++                action = action,
++                validTargets = firstInfo.validTargets,
++                requiresTargets = true,
++                targetCount = firstInfo.maxTargets,
++                minTargets = firstReq.effectiveMinCount,
++                targetDescription = firstReq.description,
++                targetRequirements = targetInfos.surfacedRequirements(),
++                manaCostString = costString,
++                manaCostByTargetCount = costByTargetCount,
++                autoTapPreview = autoTapPreview,
++                sourceZone = zoneName,
++                castsTransformed = true,
++            )
++        )
++    }
++}
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/utils/CastPermissionUtils.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/utils/CastPermissionUtils.kt
+index f695c24c5e..a2a82847c8 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/utils/CastPermissionUtils.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/utils/CastPermissionUtils.kt
+@@ -275,6 +275,8 @@ class CastPermissionUtils(
+             castZones.disturbCastFace(state, action.playerId, action.cardId)
+         } else null) ?: (if (action.useAlternativeCost && action.altAllows(AlternativeCostType.MODAL_BACK_FACE)) {
+             castZones.modalBackCastFace(state, action.playerId, action.cardId)
++        } else null) ?: (if (action.useAlternativeCost && action.altAllows(AlternativeCostType.MORE_THAN_MEETS_THE_EYE)) {
++            castZones.convertCastFace(state, action.playerId, action.cardId)
+         } else null) ?: castZones.permissionTransformedCastFace(state, action.playerId, action.cardId)
+         val castCard = when {
+             action.castFaceDown -> current.copy(
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/MoreThanMeetsTheEyeCasts.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/MoreThanMeetsTheEyeCasts.kt
+new file mode 100644
+index 0000000000..030312bd12
+--- /dev/null
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/MoreThanMeetsTheEyeCasts.kt
+@@ -0,0 +1,34 @@
++package com.wingedsheep.engine.mechanics
++
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.scripting.KeywordAbility
++
++/**
++ * Single source of truth for "can this card be cast converted with More Than Meets the Eye, at what
++ * cost, and as which face?" — used by the hand and command-zone cast enumerators, the cast zone
++ * resolver, the cost totaller and the cast handler.
++ *
++ * More Than Meets the Eye (CR 702.162a) is printed on the *front* face of a transforming
++ * double-faced card and means "You may cast this card converted by paying [cost] rather than its
++ * mana cost." It is the hand-side sibling of [DisturbCasts]:
++ *
++ *  - The resulting spell is **back face up** (CR 712.8c), so its characteristics — card types
++ *    (hence timing), targets, P/T, abilities — all come from [castFace]. Only the cost comes from
++ *    the front face's keyword, and the mana value stays the front face's (CR 712.8e).
++ *  - The back face must be a permanent for the cast to exist at all.
++ */
++object MoreThanMeetsTheEyeCasts {
++
++    /** The printed More Than Meets the Eye keyword on [cardDef], or null when it has none. */
++    fun printed(cardDef: CardDefinition?): KeywordAbility.MoreThanMeetsTheEye? =
++        cardDef?.keywordAbilities?.filterIsInstance<KeywordAbility.MoreThanMeetsTheEye>()?.firstOrNull()
++
++    /**
++     * The face a converted cast of [cardDef] puts on the stack — its back face — or null when
++     * [cardDef] has no More Than Meets the Eye keyword or no permanent back face.
++     */
++    fun castFace(cardDef: CardDefinition?): CardDefinition? {
++        if (printed(cardDef) == null) return null
++        return cardDef?.backFace?.takeIf { it.isPermanent }
++    }
++}
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+index 0bf4a05cc0..ee363b12bf 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+@@ -99,7 +99,8 @@ class CostCalculator(
+         action.faceIndex?.let { index -> printed.cardFaces.getOrNull(index)?.let { return faceCharacteristics(printed, it) } }
+         val backSelected = action.useAlternativeCost &&
+             (action.alternativeCostType == com.wingedsheep.engine.core.AlternativeCostType.MODAL_BACK_FACE ||
+-                action.alternativeCostType == com.wingedsheep.engine.core.AlternativeCostType.DISTURB)
++                action.alternativeCostType == com.wingedsheep.engine.core.AlternativeCostType.DISTURB ||
++                action.alternativeCostType == com.wingedsheep.engine.core.AlternativeCostType.MORE_THAN_MEETS_THE_EYE)
+         val transformedPermission = state.mayPlayPermissions.any {
+             it.castTransformed && it.controllerId == action.playerId && action.cardId in it.cardIds
+         }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/CastProvenance.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/CastProvenance.kt
+index 510f8fe35d..8ea4efc1c3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/CastProvenance.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/CastProvenance.kt
+@@ -137,6 +137,7 @@ object CastProvenance {
+         // Phrased as a bare noun like its neighbours, because `badgeLabel` capitalizes the first
+         // character: "Back face", not "Its back face".
+         AlternativeCostType.MODAL_BACK_FACE -> "back face"
++        AlternativeCostType.MORE_THAN_MEETS_THE_EYE -> "more than meets the eye"
+         // Neither of these names a printed keyword the opponent could look up, so they read as the
+         // generic fact: this spell was not paid for with its mana cost.
+         AlternativeCostType.SELF_ALTERNATIVE, AlternativeCostType.GRANTED,
+diff --git a/web-client/src/types/enums.ts b/web-client/src/types/enums.ts
+index 6d1c90f871..08c32bedab 100644
+--- a/web-client/src/types/enums.ts
++++ b/web-client/src/types/enums.ts
+@@ -232,6 +232,8 @@ export enum Keyword {
+   MADNESS = 'MADNESS',
+   DREDGE = 'DREDGE',
+   DISTURB = 'DISTURB',
++  MORE_THAN_MEETS_THE_EYE = 'MORE_THAN_MEETS_THE_EYE',
++  LIVING_METAL = 'LIVING_METAL',
+   SPLICE = 'SPLICE',
+   IMPENDING = 'IMPENDING',
+   CLEAVE = 'CLEAVE',
+@@ -396,6 +398,8 @@ export const KeywordDisplayNames: Record<Keyword, string> = {
+   [Keyword.MADNESS]: 'Madness',
+   [Keyword.DREDGE]: 'Dredge',
+   [Keyword.DISTURB]: 'Disturb',
++  [Keyword.MORE_THAN_MEETS_THE_EYE]: 'More Than Meets the Eye',
++  [Keyword.LIVING_METAL]: 'Living metal',
+   [Keyword.SPLICE]: 'Splice',
+   [Keyword.IMPENDING]: 'Impending',
+   [Keyword.CLEAVE]: 'Cleave',

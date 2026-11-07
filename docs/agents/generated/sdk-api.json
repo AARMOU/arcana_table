@@ -5514,6 +5514,11 @@
     "surveilPipeline(DynamicAmount): CompositeEffect"
    ]
   },
+  "com.wingedsheep.sdk.dsl.LivingMetalDslKt": {
+   "livingMetal": [
+    "livingMetal(CardBuilder): Unit"
+   ]
+  },
   "com.wingedsheep.sdk.dsl.LoyaltyAbilityBuilder": {
    "build": [
     "build(): ActivatedAbility"
@@ -5699,6 +5704,11 @@
    ],
    "target": [
     "target: TargetRequirement"
+   ]
+  },
+  "com.wingedsheep.sdk.dsl.MoreThanMeetsTheEyeDslKt": {
+   "moreThanMeetsTheEye": [
+    "moreThanMeetsTheEye(CardBuilder, String): Unit"
    ]
   },
   "com.wingedsheep.sdk.dsl.NinjutsuDslKt": {
@@ -8275,6 +8285,9 @@
    "modular": [
     "modular(Int): KeywordAbility"
    ],
+   "moreThanMeetsTheEye": [
+    "moreThanMeetsTheEye(String): KeywordAbility"
+   ],
    "morph": [
     "morph(String): KeywordAbility"
    ],
@@ -8707,6 +8720,8 @@
    "FUSE",
    "DREDGE",
    "DISTURB",
+   "MORE_THAN_MEETS_THE_EYE",
+   "LIVING_METAL",
    "EVOKE",
    "BESTOW",
    "BLITZ",

@@ -22,7 +22,7 @@ The following submitted cards are still left out. These are concrete gaps in the
 - Grimlock, Dinobot Leader, Megatron, Tyrant, Optimus Prime, Hero, Starscream, Power Hungry, and Slicer, Hired Muscle need their transforming or converting behavior.
 - Heroes in a Half Shell needs to put a counter on each creature in the batch that damaged a player; the SDK does not expose that damage event's full creature group to the effect.
 - Locke, Treasure Hunter needs to gather cards milled from every player's library and grant permission to cast from that combined group; the current library/card-source effects do not expose that collection.
-- Ratchet, Field Medic needs Living Metal and conversion; the engine does not represent those mechanics.
+- Ratchet, Field Medic: implemented 2026-11-06 on engine patch 0041 (More Than Meets the Eye, Living metal, convert = transform).
 - Shredder, Shadow Master needs opponent-specific attacking copies and a sacrifice/life-loss sequence; that behavior has not been verified.
 - Vadrok, Apex of Thunder needs mutate and free casting from the graveyard; the engine does not provide the needed combination.
 - Doubling Cube needs to double the mana already in a player's mana pool.
@@ -51,7 +51,7 @@ The following 39 cards remain unimplemented: Pantlaza, Sun-Favored; Atla Palani,
 - Urza's Saga keeps its own lore counters.
 - Sakashima of a Thousand Faces makes its copies nonlegendary.
 - Goblin Welder is left out because the engine cannot perform the required zone swap.
-- Ratchet, Field Medic is left out because its convert / Living Metal behavior is unsupported.
+- Ratchet, Field Medic is now included (engine patch 0041); `RatchetFieldMedicScenarioTest` covers both faces.
 
 The app's exported custom-card data does not add these cards to Argentum's online server. They are for offline games. The custom card definitions now carry Scryfall image links. Some older set and collector-number metadata remains inaccurate and was left unchanged; the image links were matched to the card name instead.
 
