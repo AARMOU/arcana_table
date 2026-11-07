@@ -1,0 +1,9 @@
+{
+  "key": "deepfathom-skulker",
+  "name": "Deepfathom Skulker",
+  "issue": 844,
+  "source": "certification/DeepfathomSkulkerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DeepfathomSkulkerIndependentCertificationTest",
+  "tests": 11,
+  "target": "build"
+}
