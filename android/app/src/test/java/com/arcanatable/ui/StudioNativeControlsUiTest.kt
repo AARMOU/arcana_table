@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.arcanatable.*
 import org.junit.Assert.*
@@ -22,6 +23,25 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk=[34],qualifiers="w412dp-h928dp-port-xhdpi")
 class StudioNativeControlsUiTest {
     @get:Rule val rule=createAndroidComposeRule<ComponentActivity>()
+    /** Owner, Nov 7, "neighbours make room": a resized control that shared its row takes its size; the neighbour gets the rest. */
+    @Test fun resizingAWeightedControlMakesItsNeighbourGiveWay() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-weight",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
+            Row(Modifier.width(400.dp).testTag("row")) {
+                StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.weight(1f).testTag("a")){StudioText("HomeScreen.Text.1","Player",false,"A")}
+                StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.weight(1f).testTag("b")){StudioText("HomeScreen.Text.1","Player",false,"B")}
+            }
+        }}}
+        rule.waitForIdle()
+        val d=rule.density.density
+        assertEquals(200f*d,rule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.width,2f)
+        val a=runtime.controls.values.single{it.title=="A"}.id
+        rule.runOnIdle{runtime.begin(a);runtime.edit(a,StudioControlStyle(width=280f));runtime.apply()}
+        rule.waitForIdle()
+        assertEquals(280f*d,rule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.width,2f)
+        assertEquals("the neighbour gives way",120f*d,rule.onNodeWithTag("b").fetchSemanticsNode().boundsInRoot.width,2f)
+    }
+
     /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
     @Test fun resizedButtonKeepsItsTextInsideItsEdges() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-fit",0),"portrait").also{it.enableCatalog()}

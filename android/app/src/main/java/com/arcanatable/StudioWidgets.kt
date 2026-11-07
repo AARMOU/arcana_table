@@ -71,6 +71,21 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
 }
 
 
+/** Marks a resized control as fixed-size for its Row/Column parent (see [studioWidget]). */
+private object StudioFixedSlot
+private object StudioFixedSlotElement:androidx.compose.ui.node.ModifierNodeElement<StudioFixedSlotNode>() {
+    override fun create()=StudioFixedSlotNode()
+    override fun update(node:StudioFixedSlotNode){}
+    override fun hashCode()=7
+    override fun equals(other:Any?)=other===this
+}
+private class StudioFixedSlotNode:Modifier.Node(),androidx.compose.ui.node.ParentDataModifierNode {
+    // Applied outermost, so it sees the weight set by the call site and replaces it. Other parent data (Box alignment,
+    // custom layouts) is left exactly as it was.
+    override fun androidx.compose.ui.unit.Density.modifyParentData(parentData:Any?):Any? =
+        if(parentData?.javaClass?.name?.endsWith("RowColumnParentData")==true)StudioFixedSlot else parentData
+}
+
 /**
  * Scales a resized control's contents down so they fit its Studio size. The control is measured at the size it
  * needs (from its intrinsic sizes) and drawn scaled into the box, so text, icons and pictures shrink together and stay
@@ -109,7 +124,10 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     // Owner feedback #11/#12 (bug 22): Studio's size goes OUTSIDE the call site's own modifiers. Placed after them,
     // the native width()/height()/heightIn() fixed the slot and the saved size never showed. Outermost, the native
     // size modifiers are coerced into Studio's exact constraints, so the visible control is the size in the panel.
-    var sized:Modifier=Modifier
+    // Owner, Nov 7, "neighbours make room": a resized control that normally shares leftover space in its row or column
+    // (weight) is taken out of that sharing, so its parent gives it exactly the Studio size and the weighted neighbours
+    // split what's left. Before, the parent still gave it the old share and clipped the rest (Table panel height, hand tray).
+    var sized:Modifier=if(s.width!=null || s.height!=null)Modifier.then(StudioFixedSlotElement) else Modifier
     s.width?.takeIf{it.isFinite()}?.let{sized=sized.requiredWidth(it.coerceIn(1f,2000f).dp)}
     s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
     var result=sized.then(this).offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
