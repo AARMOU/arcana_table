@@ -47,8 +47,8 @@ class HexmarkDestroyerIndependentCertificationTest {
         assertNull(d.declareAttackers(player, listOf(hexmark), opponent).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
 
-        assertNotNull(d.declareBlockers(opponent, mapOf(hexmark to blockers.take(5))).error)
-        assertNull(d.declareBlockers(opponent, mapOf(hexmark to blockers)).error)
+        assertNotNull(d.declareBlockers(opponent, blockers.take(5).associateWith { listOf(hexmark) }).error)
+        assertNull(d.declareBlockers(opponent, blockers.associateWith { listOf(hexmark) }).error)
     }
 
     @Test
