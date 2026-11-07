@@ -2,7 +2,32 @@
 
 _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan), #883 (owner decisions), #1016 (GPT index)._
 
-## Where things stand
+## Update: Nov 7, 00:45 MT, batch 2a first drop
+- **Owner feedback on the batch-1 APK** is the plan now: 36 items on #995 ([comment 6703609046](https://github.com/AARMOU/arcana_table/issues/995#issuecomment-6703609046)). Goose jobs J7–J12 are on #950 (comment 6703633081); they feed notes 27–30, 32 and 33.
+- **2a done** (commits `5bac020`, `4165b7c`, `2f0d15c`):
+  - Bugs 18–21: Leave keeps the whole draft; `discard()` and "Discard draft" in the Leave dialog.
+  - Note 14: hard vs advice. `problems()` is only lock-outs and malformed data. `advice()` (runtime: id → line; `StudioLayout.advice()`) drives the red dashed outline and corner flag in `StudioSelectionCanvas` and `StudioHandCanvas`, and live red while dragging (`StudioEditorGeometry.dragTrouble`). Resizing can go down to `FLOOR_DP` = 16. The warning bar is gone; `studio-notice` shows only `message`.
+  - Bug 22: Studio size modifiers sit outside the call-site modifiers (`StudioWidgets.kt`).
+  - Bug 23: no in-game `recover()` from bounds.
+  - Bug 24: `STUDIO_LAYOUT_KEY`, one layout for every orientation.
+  - Note 8: `viewportProblems` no longer rejects; the hand canvas grows buttons to 44 in play.
+  - Bug 25: hand-canvas drag starts immediately.
+  - Note 5 (interim): Select/Scroll moved into the toolbar.
+  - Note 3: the canvas paints no background.
+  - Note 9: compact drawer line, Studio builds only.
+  - Notes 4/10: `StudioEditorRequests.screenTopInset` pads `TableMainLayout`.
+  - Note 6: rounding.
+  - Note 32: `onGloballyPositioned` only while editing.
+- **2a still open:**
+  - 5: true two-finger scroll, and removing the toggle
+  - 12: plain names, commander text fit, `art_crop`
+  - 15: content scaling, the ghost slot, past-edge
+  - 27/28: stable IDs and player keys. Wait for Goose J7/J8.
+  - 36: verify on device that PASS and the hand tray stay visible in Studio
+- **Then 2b:** 7, 13, 16, 1, 2, 26, 35. **Then 3:** 17, 16-background, 29, 30, 33, 34.
+- **Local tests:** Maven Central rate-limits this container (429), and Robolectric's `android-all-instrumented` jar won't download, so Robolectric tests can't run here. Compile locally, then rely on Development CI. Install the SDK with `sdkmanager --sdk_root=/opt/android-sdk "platforms;android-36" "build-tools;36.0.0"`.
+
+## Where things stood after batch 1
 - **Branch:** `claude/arcana-studio-ux-20261106`. **Draft PR:** #1013. It is stacked on Elmer's untouched `elmer/arcana-studio-native-20261106` @ `684b4d3`.
 - **Head:** `2773548`, batch 1. Development CI ✅ [42343944208](https://github.com/AARMOU/arcana_table/actions/runs/42343944208). 606 app unit tests pass locally.
 - **Owner APK:** batch-1 APK delivered in chat (`.claudestudio` package). The owner tests on a phone (Fold) and replies with screenshots.
