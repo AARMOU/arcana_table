@@ -47,10 +47,11 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
                 if(scrollMode)"studio-tool-Select" else "studio-tool-Scroll",active=scrollMode,onClick=onToggleScroll)
             StudioBarIcon(Icons.Default.Layers,"Layers","studio-layers",active=layersOpen,onClick=onLayers)
             StudioBarIcon(Icons.Default.MoreVert,"More options","studio-more",onClick=onMore)
-            if(narrow)FilledIconButton(onClick=onApply,modifier=Modifier.size(44.dp).testTag("studio-apply"),
-                colors=IconButtonDefaults.filledIconButtonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)) {Icon(Icons.Default.Check,"Apply")}
-            else Button(onClick=onApply,contentPadding=PaddingValues(horizontal=12.dp),modifier=Modifier.heightIn(min=44.dp).testTag("studio-apply"),
-                colors=ButtonDefaults.buttonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)) {Text("Apply",fontWeight=FontWeight.SemiBold)}
+            // Owner note 35: Apply is a squared Arcana Action button in the palette's accent, not a mint circle.
+            if(narrow)FilledIconButton(onClick=onApply,modifier=Modifier.size(44.dp).testTag("studio-apply"),shape=RoundedCornerShape(10.dp),
+                colors=IconButtonDefaults.filledIconButtonColors(containerColor=StudioEditorRequests.chromeAction,contentColor=darkTableColors.background)) {Icon(Icons.Default.Check,"Apply")}
+            else Button(onClick=onApply,contentPadding=PaddingValues(horizontal=12.dp),modifier=Modifier.heightIn(min=44.dp).testTag("studio-apply"),shape=RoundedCornerShape(10.dp),
+                colors=ButtonDefaults.buttonColors(containerColor=StudioEditorRequests.chromeAction,contentColor=darkTableColors.background)) {Text("APPLY",fontWeight=FontWeight.Bold,letterSpacing=0.6.sp)}
         }
     }
 }
@@ -58,7 +59,7 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
 @Composable
 private fun StudioBarIcon(icon:androidx.compose.ui.graphics.vector.ImageVector,description:String,tag:String,enabled:Boolean=true,active:Boolean=false,onClick:()->Unit) {
     IconButton(onClick=onClick,enabled=enabled,modifier=Modifier.size(44.dp).testTag(tag)) {
-        Icon(icon,description,tint=when{!enabled->darkTableColors.muted.copy(alpha=0.35f);active->darkTableColors.accent;else->darkTableColors.text})
+        Icon(icon,description,tint=when{!enabled->darkTableColors.muted.copy(alpha=0.35f);active->StudioEditorRequests.chromeGold;else->darkTableColors.text})
     }
 }
 
@@ -68,9 +69,9 @@ internal fun StudioScreenMenu(destinations:Map<String,Pair<Boolean,()->Unit>>,cu
     StudioSheet("Edit screen",onDismiss,"studio-screen-menu") {
         destinations.forEach {(name,entry)->
             Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled=entry.first){onPick(name)}
-                .background(if(name==current)darkTableColors.accent.copy(alpha=0.18f) else Color.Transparent).padding(horizontal=12.dp).testTag("studio-screen-$name"),
+                .background(if(name==current)StudioEditorRequests.chromeGold.copy(alpha=0.18f) else Color.Transparent).padding(horizontal=12.dp).testTag("studio-screen-$name"),
                 verticalAlignment=Alignment.CenterVertically) {
-                Text(name,color=if(!entry.first)darkTableColors.muted.copy(alpha=0.5f) else if(name==current)darkTableColors.accent else darkTableColors.text,modifier=Modifier.weight(1f))
+                Text(name,color=if(!entry.first)darkTableColors.muted.copy(alpha=0.5f) else if(name==current)StudioEditorRequests.chromeGold else darkTableColors.text,modifier=Modifier.weight(1f))
                 if(!entry.first)Text(when(name){"Setup","Lobby"->"Outside a game";"Combat"->"During combat";else->"Needs a live game"},color=darkTableColors.muted,fontSize=11.sp)
             }
         }
@@ -144,7 +145,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         Row(Modifier.fillMaxWidth()) {pages.forEach {p->
             Box(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(10.dp)).background(if(p==page)darkTableColors.raised else Color.Transparent)
                 .clickable{page=p}.testTag("studio-more-tab-$p"),contentAlignment=Alignment.Center) {
-                Text(p,color=if(p==page)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
+                Text(p,color=if(p==page)StudioEditorRequests.chromeGold else darkTableColors.muted,fontSize=13.sp)
             }
         }}
         if(page=="Hand")hand?.invoke{q,a->confirm=q to a}
@@ -243,7 +244,7 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
 }
 
 @Composable
-private fun StudioSection(title:String){Text(title,color=darkTableColors.accent,fontSize=12.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=10.dp,bottom=2.dp))}
+private fun StudioSection(title:String){Text(title,color=StudioEditorRequests.chromeGold,fontSize=12.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(top=10.dp,bottom=2.dp))}
 
 @Composable
 private fun StudioToggleRow(label:String,value:Boolean,tag:String,onChange:(Boolean)->Unit) {

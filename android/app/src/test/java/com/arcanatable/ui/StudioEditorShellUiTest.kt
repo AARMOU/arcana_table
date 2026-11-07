@@ -94,18 +94,9 @@ class StudioEditorShellUiTest {
         val widths=mutableListOf<Float>()
         repeat(3){rule.onNodeWithTag("studio-width-plus").performScrollTo().performClick();rule.waitForIdle();widths+=hand().elements.single{it.id=="pass"}.w}
         assertEquals("three taps, three changes: $widths",3,widths.distinct().size)
-        val start=hand().elements.single{it.id=="pass"}.h
         val heights=mutableListOf<Float>()
-        rule.onNodeWithTag("studio-height-plus").performScrollTo().performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h
-        if(heights[0]==start) throw AssertionError("DIAG-A first height tap did nothing")
-        val stillOpen=rule.onAllNodesWithTag("studio-height-plus").fetchSemanticsNodes().isNotEmpty()
-        if(!stillOpen) throw AssertionError("DIAG-B inspector closed after first height tap")
-        val stillSelected=rule.onAllNodesWithText("PASS",substring=true).fetchSemanticsNodes().isNotEmpty()
-        rule.onNodeWithTag("studio-height-plus").performScrollTo().performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h
-        if(heights[1]==heights[0] && !stillSelected) throw AssertionError("DIAG-C selection changed")
-        if(heights[1]==heights[0]) throw AssertionError("DIAG-D second height tap did nothing")
-        rule.onNodeWithTag("studio-height-plus").performScrollTo().performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h
-        if(heights[2]==heights[1]) throw AssertionError("DIAG-E third height tap did nothing")
+        repeat(3){rule.onNodeWithTag("studio-height-plus").performScrollTo().performClick();rule.waitForIdle();heights+=hand().elements.single{it.id=="pass"}.h}
+        assertEquals("three taps, three changes: $heights",3,heights.distinct().size)
     }
 
     @Test fun directDragMovesTheRealControlAndIsOneUndoStep() {

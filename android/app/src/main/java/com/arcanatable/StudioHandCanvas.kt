@@ -92,7 +92,7 @@ internal fun StudioHandCanvas(layout: StudioLayout, state: StudioHandState,
                     .size(drawW.dp,drawH.dp)
                     .testTag("studio-bounds-${e.id}").then(gesture)
                     .border(if (editing && (selectedElement==e.id || e.id in advice)) 2.dp else 0.dp,
-                        if (e.id in advice) androidx.compose.ui.graphics.Color(0xFFE5534B) else Mint,shape)) {
+                        if (e.id in advice) androidx.compose.ui.graphics.Color(0xFFE5534B) else StudioEditorRequests.chromeGold,shape)) {
                     val cardIndex = e.binding.removePrefix("card").toIntOrNull()
                     val card = cardIndex?.let { state.cards.getOrNull(it) }
                     if (e.kind=="card" && card!=null) CardFace(card,Modifier.fillMaxSize()

@@ -53,8 +53,15 @@ internal object StudioHandEditing {
     fun layout(runtime:StudioControlsRuntime,widthDp:Float,heightDp:Float):StudioLayout =
         runtime.handDraft() ?: StudioLayout.responsive(widthDp,heightDp,runtime.profile.takeIf{it in listOf("Minimal","Balanced","Detailed")} ?: "Balanced")
 
-    fun edit(runtime:StudioControlsRuntime,layout:StudioLayout,id:String,update:(StudioElement)->StudioElement)=
-        runtime.changeHand(layout.copy(elements=layout.elements.map{if(it.id==id)update(it) else it}))
+    /**
+     * Owner, Nov 7: "I tap it once and can't tap it anymore." Edits start from the hand draft as it is at the moment
+     * of the tap. A layout captured by the panel when it was drawn can be one edit behind, so the second + recomputed
+     * the same size as the first and nothing changed.
+     */
+    fun edit(runtime:StudioControlsRuntime,layout:StudioLayout,id:String,update:(StudioElement)->StudioElement) {
+        val current=runtime.handDraft() ?: layout
+        runtime.changeHand(current.copy(elements=current.elements.map{if(it.id==id)update(it) else it}))
+    }
 
     /** Frame of an element in px inside the canvas, given px-per-design-unit. */
     fun frame(e:StudioElement,layout:StudioLayout,unit:Float)=Rect(e.x*unit,(e.y-layout.originY)*unit,(e.x+e.w)*unit,(e.y-layout.originY+e.h)*unit)
@@ -73,7 +80,7 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
     var handle by remember{mutableStateOf<StudioHandle?>(null)}
     var drag by remember{mutableStateOf(Offset.Zero)}
     val reach=with(LocalDensity.current){24.dp.toPx()}
-    val accent=darkTableColors.accent
+    val accent=StudioEditorRequests.chromeGold
     val measurer=rememberTextMeasurer()
     // The hand is edited where it lives: a half-open drawer over the dimmed table (owner plan item 2), one colour
     // from its top edge down (item 6), never under the Studio toolbar (item 1).
@@ -131,7 +138,7 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                         if(handle!=null)drawRect(accent.copy(alpha=0.12f),f.topLeft,f.size)
                         drawRect(accent,f.topLeft,f.size,style=Stroke(2.dp.toPx()))
                         if(!e.locked)StudioEditorGeometry.handlePoints(f,StudioEditorGeometry.compact(f,reach)).values.forEach {p->
-                            drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
+                            drawRect(Color.White,p-Offset(6.dp.toPx(),6.dp.toPx()),Size(12.dp.toPx(),12.dp.toPx()));drawRect(accent,p-Offset(6.dp.toPx(),6.dp.toPx()),Size(12.dp.toPx(),12.dp.toPx()),style=Stroke(2.dp.toPx()))
                         }
                         val text=measurer.measure("${kotlin.math.round(f.width/unit).toInt()} × ${kotlin.math.round(f.height/unit).toInt()}"+if(e.locked)" · locked" else "",
                             TextStyle(color=darkTableColors.background,fontSize=11.sp))
@@ -173,7 +180,7 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
                 val on=t==tab
                 Box(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(10.dp)).background(if(on)darkTableColors.raised else Color.Transparent)
                     .clickable{tab=t}.testTag("studio-tab-${t.name}"),contentAlignment=Alignment.Center) {
-                    Text(if(t==StudioInspectorTab.Action && card)"Slot" else t.title,color=if(on)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
+                    Text(if(t==StudioInspectorTab.Action && card)"Slot" else t.title,color=if(on)StudioEditorRequests.chromeGold else darkTableColors.muted,fontSize=13.sp)
                 }
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
@@ -199,7 +206,7 @@ private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioEle
                 StudioPadButton(Icons.Default.KeyboardArrowLeft,"Move left","studio-nudge-left"){move(-step,0f)}
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(darkTableColors.raised)
                     .clickable{step=when(step){1f->4f;4f->layout.snap.toFloat().takeIf{it!=4f && it!=1f} ?: 16f;16f->1f;else->16f}}.testTag("studio-nudge-step"),
-                    contentAlignment=Alignment.Center){Text("${step.toInt()}",color=darkTableColors.accent,fontSize=12.sp)}
+                    contentAlignment=Alignment.Center){Text("${step.toInt()}",color=StudioEditorRequests.chromeGold,fontSize=12.sp)}
                 StudioPadButton(Icons.Default.KeyboardArrowRight,"Move right","studio-nudge-right"){move(step,0f)}
             }
             StudioPadButton(Icons.Default.KeyboardArrowDown,"Move down","studio-nudge-down"){move(0f,step)}
@@ -284,7 +291,7 @@ internal fun StudioHandOptions(runtime:StudioControlsRuntime,layout:StudioLayout
     val context=LocalContext.current
     val store=StudioStore(runtime.prefs,runtime.orientation,runtime.profile)
     var enabled by remember(runtime.profile,runtime.revision){mutableStateOf(store.enabled())}
-    Text("Start from",color=darkTableColors.accent,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
+    Text("Start from",color=StudioEditorRequests.chromeGold,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) {
         StudioChip("Owner design",true,"studio-hand-owner") {
             runCatching{context.assets.open(StudioHandEditing.OWNER_ASSET).bufferedReader().use{StudioLayout.parse(it.readText())}}
@@ -305,7 +312,7 @@ internal fun StudioHandOptions(runtime:StudioControlsRuntime,layout:StudioLayout
         Switch(enabled,{v->if(v && store.load()==null)onMessage("Apply a valid hand layout before turning it on.") else {store.enable(v);enabled=v;onApplied()}},
             modifier=Modifier.testTag("studio-hand-enabled"))
     }
-    Text("Hand palette (saved with the hand)",color=darkTableColors.accent,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
+    Text("Hand palette (saved with the hand)",color=StudioEditorRequests.chromeGold,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
     Row(Modifier.horizontalScroll(rememberScrollState())) {
         StudioChip("Inherit table",layout.theme.isNotEmpty(),"studio-hand-palette-inherit"){runtime.changeHand(layout.copy(theme=emptyMap()))}
         tablePalettePresets.forEach {preset->StudioChip(preset.name,true,"studio-hand-palette-${preset.name}"){

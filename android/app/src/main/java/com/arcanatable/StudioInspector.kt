@@ -73,7 +73,7 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
                 val on=t==tab
                 Box(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(10.dp)).background(if(on)darkTableColors.raised else Color.Transparent)
                     .clickable{tab=t}.testTag("studio-tab-${t.name}"),contentAlignment=Alignment.Center) {
-                    Text(if(t==StudioInspectorTab.Action && !caps.rebind)"Data" else t.title,color=if(on)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
+                    Text(if(t==StudioInspectorTab.Action && !caps.rebind)"Data" else t.title,color=if(on)StudioEditorRequests.chromeGold else darkTableColors.muted,fontSize=13.sp)
                 }
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
@@ -109,7 +109,7 @@ private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,chan
             Row {
                 StudioPadButton(Icons.Default.KeyboardArrowLeft,"Move left","studio-nudge-left"){change{StudioEditorGeometry.nudge(it,-step,0f)}}
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(darkTableColors.raised).clickable{step=if(step==4f)16f else if(step==16f)1f else 4f}.testTag("studio-nudge-step"),
-                    contentAlignment=Alignment.Center){Text("${step.toInt()}dp",color=darkTableColors.accent,fontSize=12.sp)}
+                    contentAlignment=Alignment.Center){Text("${step.toInt()}dp",color=StudioEditorRequests.chromeGold,fontSize=12.sp)}
                 StudioPadButton(Icons.Default.KeyboardArrowRight,"Move right","studio-nudge-right"){change{StudioEditorGeometry.nudge(it,step,0f)}}
             }
             StudioPadButton(Icons.Default.KeyboardArrowDown,"Move down","studio-nudge-down"){change{StudioEditorGeometry.nudge(it,0f,step)}}
@@ -218,18 +218,18 @@ internal fun StudioStepper(label:String,value:String,tag:String,onMinus:()->Unit
 @Composable
 internal fun StudioChip(text:String,enabled:Boolean,tag:String,selected:Boolean=false,onClick:()->Unit) {
     Box(Modifier.padding(end=6.dp,top=2.dp,bottom=2.dp).heightIn(min=44.dp).clip(RoundedCornerShape(22.dp))
-        .background(if(selected)darkTableColors.accent.copy(alpha=0.22f) else darkTableColors.raised)
+        .background(if(selected)StudioEditorRequests.chromeGold.copy(alpha=0.22f) else darkTableColors.raised)
         .clickable(enabled=enabled,onClick=onClick).padding(horizontal=14.dp).testTag(tag),contentAlignment=Alignment.Center) {
-        Text(text,color=if(!enabled)darkTableColors.muted.copy(alpha=0.5f) else if(selected)darkTableColors.accent else darkTableColors.text,fontSize=13.sp,maxLines=1)
+        Text(text,color=if(!enabled)darkTableColors.muted.copy(alpha=0.5f) else if(selected)StudioEditorRequests.chromeGold else darkTableColors.text,fontSize=13.sp,maxLines=1)
     }
 }
 
 @Composable
 internal fun StudioListRow(text:String,selected:Boolean,tag:String,trailing:(@Composable ()->Unit)?=null,onClick:()->Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clip(RoundedCornerShape(10.dp)).background(if(selected)darkTableColors.accent.copy(alpha=0.18f) else Color.Transparent)
+    Row(Modifier.fillMaxWidth().heightIn(min=48.dp).clip(RoundedCornerShape(10.dp)).background(if(selected)StudioEditorRequests.chromeGold.copy(alpha=0.18f) else Color.Transparent)
         .clickable(onClick=onClick).padding(horizontal=12.dp).testTag(tag),verticalAlignment=Alignment.CenterVertically) {
-        if(selected)Icon(Icons.Default.Check,null,tint=darkTableColors.accent,modifier=Modifier.size(18.dp).padding(end=4.dp))
-        Text(text,color=if(selected)darkTableColors.accent else darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f),fontSize=14.sp)
+        if(selected)Icon(Icons.Default.Check,null,tint=StudioEditorRequests.chromeGold,modifier=Modifier.size(18.dp).padding(end=4.dp))
+        Text(text,color=if(selected)StudioEditorRequests.chromeGold else darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f),fontSize=14.sp)
         trailing?.invoke()
     }
 }

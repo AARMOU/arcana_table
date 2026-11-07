@@ -27,6 +27,12 @@ internal object StudioEditorRequests {
     var shellActive by mutableStateOf(false)
     /** Height of Studio's toolbar + screen bar. The live screen starts below it while editing (owner notes 4, 10). */
     var screenTopInset by mutableStateOf(0.dp)
+    /**
+     * Owner note 35: the editor uses Arcana's own colours, not a separate mint. Gold (the palette's counter colour, like
+     * MAIN 1) marks selection, tabs and handles; the palette's accent (teal in the owner's palette) is Apply.
+     */
+    var chromeGold by mutableStateOf(androidx.compose.ui.graphics.Color(0xFFFFD166))
+    var chromeAction by mutableStateOf(androidx.compose.ui.graphics.Color(0xFF89E3B0))
     var tool by mutableStateOf(StudioEditorTool.Select)
     var snap by mutableStateOf(true)
     var outlines by mutableStateOf(true)

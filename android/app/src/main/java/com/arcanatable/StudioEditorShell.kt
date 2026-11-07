@@ -128,11 +128,12 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
                 hand=handLayout?.let{l->{confirm->StudioHandOptions(runtime,l,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat(),onApplied,{message=it},confirm)}})
         }
     }
-    SideEffect{StudioEditorRequests.mainWindow=window}
+    val palette=runtime.project().colors(darkTableColors)
+    SideEffect{StudioEditorRequests.mainWindow=window;StudioEditorRequests.chromeGold=palette.counter;StudioEditorRequests.chromeAction=palette.accent}
     DisposableEffect(runtime){StudioEditorRequests.clear();StudioEditorRequests.shellActive=true;StudioEditorRequests.tool=StudioEditorTool.Select
         onDispose{StudioEditorRequests.clear();StudioEditorRequests.shellActive=false;StudioEditorRequests.screenTopInset=0.dp}}
     CompositionLocalProvider(LocalTableColors provides darkTableColors) {
-    MaterialTheme(colorScheme=darkColorScheme(primary=darkTableColors.accent,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
+    MaterialTheme(colorScheme=darkColorScheme(primary=StudioEditorRequests.chromeGold,surface=darkTableColors.panel,onSurface=darkTableColors.text,background=darkTableColors.background)) {
         Box(Modifier.fillMaxSize().onGloballyPositioned{origin=it.boundsInRoot().topLeft;height=it.size.height.toFloat()}.testTag("studio-editor")) {
             // Game pop-ups drawn in place, in the game's own colours, under the editing canvas.
             if(!handMode)CompositionLocalProvider(LocalTableColors provides (runtime.project().colors(LocalStudioBaseColors.current ?: darkTableColors))) {
@@ -195,7 +196,7 @@ internal fun StudioScreenBar(tabs:List<String>,current:String,destinations:Map<S
                 val on=name==current
                 val available=name=="Hand" || destinations[name]?.first==true
                 Column(Modifier.widthIn(min=56.dp).heightIn(min=48.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if(on)darkTableColors.accent else Color.Transparent).clickable{onPick(name)}.padding(horizontal=10.dp,vertical=4.dp)
+                    .background(if(on)StudioEditorRequests.chromeGold else Color.Transparent).clickable{onPick(name)}.padding(horizontal=10.dp,vertical=4.dp)
                     .semantics{contentDescription=if(available)"Edit $name" else "$name: start a practice game first"}.testTag("studio-tab-screen-$name"),
                     horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
                     Icon(studioScreenIcon(name),null,tint=if(on)darkTableColors.background else if(available)darkTableColors.text else darkTableColors.muted.copy(alpha=0.6f),modifier=Modifier.size(20.dp))
@@ -219,7 +220,7 @@ private fun StudioPracticeCard(onPractice:(()->Unit)?,onHand:()->Unit,modifier:M
             Text("Studio changes the table, player, stack, zones and log screens. Start an offline practice game against the AI to see and edit them. Your layout then applies to every game.",
                 color=darkTableColors.muted,fontSize=13.sp)
             if(onPractice!=null)Button(onClick=onPractice,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("studio-start-practice"),
-                colors=ButtonDefaults.buttonColors(containerColor=darkTableColors.accent,contentColor=darkTableColors.background)){Text("Start practice game")}
+                colors=ButtonDefaults.buttonColors(containerColor=StudioEditorRequests.chromeGold,contentColor=darkTableColors.background)){Text("Start practice game")}
             OutlinedButton(onClick=onHand,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("studio-practice-hand")){Text("Edit the hand",color=darkTableColors.text)}
         }
     }
@@ -236,10 +237,10 @@ private fun StudioToolSwitch(tool:StudioEditorTool,onTool:(StudioEditorTool)->Un
     Row(Modifier.padding(bottom=4.dp).clip(RoundedCornerShape(22.dp)).background(darkTableColors.panel.copy(alpha=0.94f))) {
         listOf(StudioEditorTool.Select to Icons.Default.TouchApp,StudioEditorTool.Scroll to Icons.Default.PanTool).forEach {(t,icon)->
             val on=t==tool
-            Row(Modifier.heightIn(min=44.dp).clip(RoundedCornerShape(22.dp)).background(if(on)darkTableColors.accent.copy(alpha=0.25f) else Color.Transparent)
+            Row(Modifier.heightIn(min=44.dp).clip(RoundedCornerShape(22.dp)).background(if(on)StudioEditorRequests.chromeGold.copy(alpha=0.25f) else Color.Transparent)
                 .clickable{onTool(t)}.padding(horizontal=14.dp).testTag("studio-tool-${t.name}"),verticalAlignment=Alignment.CenterVertically) {
-                Icon(icon,if(narrow)"${t.name} mode" else null,tint=if(on)darkTableColors.accent else darkTableColors.muted,modifier=Modifier.size(18.dp))
-                if(!narrow)Text(" ${t.name}",color=if(on)darkTableColors.accent else darkTableColors.muted,fontSize=13.sp)
+                Icon(icon,if(narrow)"${t.name} mode" else null,tint=if(on)StudioEditorRequests.chromeGold else darkTableColors.muted,modifier=Modifier.size(18.dp))
+                if(!narrow)Text(" ${t.name}",color=if(on)StudioEditorRequests.chromeGold else darkTableColors.muted,fontSize=13.sp)
             }
         }
     }
@@ -288,7 +289,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
         }
     }
     val selection=runtime.selected?.let{runtime.controls[it]}?.takeIf{it.window==window && it.bounds.width>0f}
-    val accent=darkTableColors.accent
+    val accent=StudioEditorRequests.chromeGold
     val measurer=rememberTextMeasurer()
     val ink=darkTableColors.background
     Canvas(Modifier.fillMaxSize().then(gestures).testTag("studio-canvas").semantics{contentDescription="Studio canvas"}) {
@@ -321,7 +322,7 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
             if(handle!=null)drawRect(edge.copy(alpha=0.12f),frame.topLeft,frame.size)
             drawRect(edge,frame.topLeft,frame.size,style=Stroke(2.dp.toPx()))
             StudioEditorGeometry.handlePoints(frame,StudioEditorGeometry.compact(frame,reach)).values.forEach {p->
-                drawCircle(Color.White,7.dp.toPx(),p);drawCircle(accent,7.dp.toPx(),p,style=Stroke(2.dp.toPx()))
+                drawRect(Color.White,p-Offset(6.dp.toPx(),6.dp.toPx()),Size(12.dp.toPx(),12.dp.toPx()));drawRect(accent,p-Offset(6.dp.toPx(),6.dp.toPx()),Size(12.dp.toPx(),12.dp.toPx()),style=Stroke(2.dp.toPx()))
             }
             // Size readout rides on the frame, drawn (not laid out) so it can never feed back into layout.
             val text=measurer.measure("${kotlin.math.round(frame.width/density).toInt()} × ${kotlin.math.round(frame.height/density).toInt()}",TextStyle(color=ink,fontSize=11.sp))
