@@ -1,0 +1,9 @@
+{
+  "key": "heralds-of-tzeentch",
+  "name": "Heralds of Tzeentch",
+  "issue": 1025,
+  "source": "certification/HeraldsOfTzeentchIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HeraldsOfTzeentchIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
