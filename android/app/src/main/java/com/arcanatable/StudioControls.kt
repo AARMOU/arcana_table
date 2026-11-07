@@ -202,7 +202,12 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     var editing by mutableStateOf(false);private set
     private var capturing by mutableStateOf(false)
     var panelOpen by mutableStateOf(false)
-    var selected by mutableStateOf<String?>(null)
+    private var lead by mutableStateOf<String?>(null)
+    /** Setting the selection directly (a tap, a list row, Close) always goes back to one item. */
+    var selected:String? get()=lead;set(v){lead=v;group=emptySet()}
+    /** Multi-select (owner, Nov 7): other controls edited together with [selected]. Empty = one item selected. */
+    var group by mutableStateOf<Set<String>>(emptySet())
+    fun members()=listOfNotNull(selected)+(group-setOfNotNull(selected))
     var revision by mutableIntStateOf(0);private set
     var profile by mutableStateOf(StudioProfiles(prefs,orientation).activeName());private set
     private var applied by mutableStateOf(store().load())
@@ -287,6 +292,56 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         screenDensity=p.screenDensity.filterKeys{!StudioScope.excluded(it)})
     fun begin(id:String?=null){StudioLog.add("Opened Studio · profile $profile${id?.let{" · selected ${title(it)}"}.orEmpty()}");capturing=true;draft=withoutExcluded(store().draft() ?: applied);pendingHand=if(prefs.getBoolean(pendingHandKey,false))StudioStore(prefs,orientation,profile).draft() else null;undo.clear();redo.clear();editing=true;selected=id;panelOpen=true}
     fun select(id:String){if(!editing)begin(id) else {selected=id;panelOpen=true}}
+    /**
+     * Hold on a control: select it and every other control of the same kind on the same screen (all player chips, all
+     * log entries). Holding the lead again goes back to one item.
+     */
+    fun holdSelect(id:String) {
+        val c=controls[id] ?: return
+        if(selected==id && group.isNotEmpty()){group=emptySet();return}
+        val site=StudioEditorGeometry.siteOf(id)
+        lead=id;panelOpen=true
+        group=controls.values.filter{it.id!=id && it.screen==c.screen && it.window==c.window && it.bounds.width>0f &&
+            StudioEditorGeometry.siteOf(it.id)==site && style(it.id).visible}.map{it.id}.toSet()
+        StudioLog.add("Selected ${members().size} like ${title(id)}")
+    }
+    /** While several are selected, a tap adds or removes one item instead of replacing the selection. */
+    fun toggleMember(id:String) {
+        when {
+            id==lead->{lead=group.firstOrNull();group=group.drop(1).toSet()}
+            id in group->group=group-id
+            lead==null->lead=id
+            else->group=group+id
+        }
+    }
+    private fun withStyle(p:StudioControlProject,id:String,style:StudioControlStyle)=
+        if(id.startsWith("copy:"))p.copy(copies=p.copies.map{if(it.id==id)it.copy(style=style) else it})
+        else p.copy(controls=p.controls+(id to style),owners=controls[id]?.screen?.let{p.owners+(id to it)} ?: p.owners)
+    /** Edits every selected control in one step (one Undo), as the lead's change applied to each. */
+    fun editGroup(next:StudioControlStyle,density:Float) {
+        val first=selected ?: return
+        val leadStyle=style(first);val leadBox=controls[first]?.bounds
+        var p=withStyle(draft,first,next)
+        group.forEach {id->
+            val box=controls[id]?.bounds ?: return@forEach
+            p=withStyle(p,id,StudioEditorGeometry.groupEdit(leadStyle,next,style(id),(leadBox?.width ?: 0f)/density,(leadBox?.height ?: 0f)/density,
+                box.width/density,box.height/density))
+        }
+        change(p)
+    }
+    /** Lines up the selected controls against the one picked first (one Undo). */
+    fun align(mode:StudioEditorGeometry.Align,density:Float) {
+        val first=selected ?: return
+        val rects=members().mapNotNull{id->controls[id]?.bounds?.takeIf{it.width>0f}?.let{id to it}}.toMap()
+        var p=draft
+        StudioEditorGeometry.align(mode,rects,first,density).forEach {(id,m)->
+            val s=style(id)
+            p=withStyle(p,id,s.copy(dx=(s.dx+m.ddx).coerceIn(-2000f,2000f),dy=(s.dy+m.ddy).coerceIn(-4000f,4000f),
+                width=m.width?.coerceIn(StudioEditorGeometry.FLOOR_DP,2000f) ?: s.width,height=m.height?.coerceIn(StudioEditorGeometry.FLOOR_DP,4000f) ?: s.height))
+        }
+        StudioLog.add("Align ${mode.label}: ${rects.size} items")
+        change(p)
+    }
     private fun title(id:String)=controls[id]?.title?.takeIf{it.isNotBlank()} ?: id
     /** Studio log (owner, Nov 7): one line per edited control or hand change, "title: field before→after". */
     private fun logChange(before:StudioControlProject,after:StudioControlProject,handBefore:StudioLayout?,handAfter:StudioLayout?) {
@@ -313,10 +368,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         logChange(draft,project,pendingHand,hand)
         undo.addLast(Revision(draft,pendingHand));if(undo.size>100)undo.removeFirst();redo.clear();draft=project;pendingHand=hand;saveDraft();revision++
     }}
-    fun edit(id:String,style:StudioControlStyle) {
-        if(id.startsWith("copy:"))change(draft.copy(copies=draft.copies.map{if(it.id==id)it.copy(style=style) else it}))
-        else change(draft.copy(controls=draft.controls+(id to style),owners=controls[id]?.screen?.let{draft.owners+(id to it)} ?: draft.owners))
-    }
+    fun edit(id:String,style:StudioControlStyle)=change(withStyle(draft,id,style))
     fun duplicate(id:String,density:Float) {
         val control=controls[id] ?: error("Select a native button first.")
         require(control.isAction || control.kind in listOf("data","label")){"Select a button or information module."}

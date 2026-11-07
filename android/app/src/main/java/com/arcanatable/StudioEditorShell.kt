@@ -269,21 +269,30 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
             val point=down.position+currentOrigin
             val selection=runtime.selected?.let{runtime.controls[it]}?.takeIf{it.window==window && it.bounds.width>0f}
             val grabbed=selection?.let{StudioEditorGeometry.handleAt(it.bounds,point,reach)}
-            var total=Offset.Zero;var dragging=false
+            var total=Offset.Zero;var dragging=false;var upAt=down.uptimeMillis
             while(true) {
                 val event=awaitPointerEvent()
                 val change=event.changes.firstOrNull{it.id==down.id} ?: break
-                if(!change.pressed){change.consume();break}
+                if(!change.pressed){upAt=change.uptimeMillis;change.consume();break}
                 total+=change.positionChange();change.consume()
                 if(!dragging && grabbed!=null && StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop))dragging=true
                 if(dragging){handle=grabbed;drag=total}
             }
             if(dragging && grabbed!=null && selection!=null) {
                 val style=runtime.style(selection.id)
-                runtime.edit(selection.id,StudioEditorGeometry.commit(style,grabbed,selection.bounds.width/density,selection.bounds.height/density,
-                    Offset(total.x/density,total.y/density),currentSnap))
+                val next=StudioEditorGeometry.commit(style,grabbed,selection.bounds.width/density,selection.bounds.height/density,
+                    Offset(total.x/density,total.y/density),currentSnap)
+                // Several selected: dragging the lead moves (or resizes) all of them together.
+                if(runtime.group.isEmpty())runtime.edit(selection.id,next) else runtime.editGroup(next,density)
             } else if(!StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop)) {
-                runtime.selected=StudioEditorGeometry.hitTest(runtime.controls.values.filter(currentPickable),point,window,runtime.selected){runtime.style(it).visible}?.id
+                val hit=StudioEditorGeometry.hitTest(runtime.controls.values.filter(currentPickable),point,window,runtime.selected){runtime.style(it).visible}?.id
+                // Owner, Nov 7: hold an item to select it and everything like it; while several are selected a tap adds
+                // or removes one. A plain tap otherwise selects just that item, as before.
+                when {
+                    hit!=null && upAt-down.uptimeMillis>=viewConfiguration.longPressTimeoutMillis->runtime.holdSelect(hit)
+                    hit!=null && runtime.group.isNotEmpty()->runtime.toggleMember(hit)
+                    else->runtime.selected=hit
+                }
             }
             handle=null;drag=Offset.Zero
         }
@@ -311,6 +320,11 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
             drawRect(red,r.topLeft,r.size,style=Stroke(2.dp.toPx(),pathEffect=PathEffect.dashPathEffect(floatArrayOf(10f,5f))))
             val f=8.dp.toPx();val p=androidx.compose.ui.graphics.Path().apply{moveTo(r.right-f,r.top);lineTo(r.right,r.top);lineTo(r.right,r.top+f);close()}
             drawPath(p,red)
+        }
+        // Multi-select: the other selected items get a solid gold frame (the lead keeps its handles).
+        runtime.group.mapNotNull{runtime.controls[it]}.filter{it.window==window && it.bounds.width>0f}.forEach {c->
+            val r=c.bounds.translate(-origin).let{b->if(handle==StudioHandle.Move)b.translate(drag) else b}
+            drawRect(accent.copy(alpha=0.12f),r.topLeft,r.size);drawRect(accent,r.topLeft,r.size,style=Stroke(2.dp.toPx()))
         }
         selection?.let {s->
             val base=s.bounds.translate(-origin)

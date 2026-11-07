@@ -50,14 +50,19 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
     var tab by remember(control.id){mutableStateOf(StudioInspectorTab.Layout)}
     if(tab !in tabs)tab=StudioInspectorTab.Layout
     val widthDp=control.bounds.width/density;val heightDp=control.bounds.height/density
-    fun change(update:(StudioControlStyle)->StudioControlStyle)=runtime.edit(control.id,update(runtime.style(control.id)))
+    // Several selected: every change made here goes to all of them (sizes and moves by the same amount).
+    fun change(update:(StudioControlStyle)->StudioControlStyle) {
+        val next=update(runtime.style(control.id))
+        if(runtime.group.isEmpty() || control.id!=runtime.selected)runtime.edit(control.id,next) else runtime.editGroup(next,density)
+    }
+    val many=runtime.group.size+1
     val palette=runtime.project().colors(darkTableColors).let {c->listOf("Surface" to c.panel,"Raised" to c.raised,"Accent" to c.accent,
         "Text" to c.text,"Muted" to c.muted,"Gold" to c.counter,"Canvas" to c.background)}
     Surface(modifier.fillMaxWidth().testTag("studio-inspector"),color=darkTableColors.panel,shape=RoundedCornerShape(16.dp),shadowElevation=8.dp) {
         Column(Modifier.padding(horizontal=8.dp,vertical=4.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start=4.dp)) {
-                    Text(control.title.ifBlank{"Untitled"},color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
+                    Text(if(runtime.group.isEmpty())control.title.ifBlank{"Untitled"} else "$many selected",color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
                     Text("${control.screen} · ${kindName(control.kind)} · ${kotlin.math.round(widthDp).toInt()}×${kotlin.math.round(heightDp).toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
                 }
                 StudioParentButton(runtime,control)
@@ -69,6 +74,12 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
                 }
             }
             if(collapsed)return@Column
+            // Owner, Nov 7: line up the selected items, simply. Lined up against the item picked first.
+            if(runtime.group.isNotEmpty())Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).testTag("studio-align-row"),
+                verticalAlignment=Alignment.CenterVertically) {
+                Text("Line up:",color=darkTableColors.muted,fontSize=12.sp,modifier=Modifier.padding(horizontal=4.dp))
+                StudioEditorGeometry.Align.entries.forEach {a->StudioChip(a.label,true,"studio-align-${a.name}"){runtime.align(a,density)}}
+            }
             Row(Modifier.fillMaxWidth()) {tabs.forEach {t->
                 val on=t==tab
                 Box(Modifier.weight(1f).heightIn(min=44.dp).clip(RoundedCornerShape(10.dp)).background(if(on)darkTableColors.raised else Color.Transparent)

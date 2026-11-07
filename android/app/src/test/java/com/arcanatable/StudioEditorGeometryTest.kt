@@ -80,4 +80,47 @@ class StudioEditorGeometryTest {
         assertEquals(88f,p.width,0f)
         assertEquals(Rect(10f,5f,110f,105f),StudioEditorGeometry.preview(Rect(0f,0f,100f,100f),StudioHandle.Move,Offset(10f,5f),88f))
     }
+
+    /** Owner, Nov 7: several selected items change together; moves and size changes are added, not copied. */
+    @Test fun groupEditAddsMovesAndSizesToEachItem() {
+        val lead=StudioControlStyle()
+        val next=lead.copy(dx=4f,width=64f,fill="#112233",label="Lead")
+        val other=StudioControlStyle(dx=10f,width=80f,label="Mine")
+        val out=StudioEditorGeometry.groupEdit(lead,next,other,60f,44f,70f,44f)
+        assertEquals(14f,out.dx,0f)
+        assertEquals(84f,out.width!!,0f) // its own 80 + the lead's 4
+        assertEquals("#112233",out.fill)
+        assertEquals("Mine",out.label) // labels belong to each item
+        val native=StudioEditorGeometry.groupEdit(lead,next,StudioControlStyle(),60f,44f,70f,44f)
+        assertEquals(74f,native.width!!,0f) // native 70 + 4
+        assertNull(native.height)
+    }
+
+    @Test fun alignLinesItemsUpAgainstTheFirstPicked() {
+        val d=2f
+        val rects=mapOf("a" to Rect(100f,100f,200f,180f),"b" to Rect(300f,140f,360f,200f),"c" to Rect(150f,400f,250f,440f))
+        val left=StudioEditorGeometry.align(StudioEditorGeometry.Align.Left,rects,"a",d)
+        assertEquals(-100f,left["b"]!!.ddx,0f);assertEquals(0f,left["a"]!!.ddx,0f)
+        val top=StudioEditorGeometry.align(StudioEditorGeometry.Align.Top,rects,"a",d)
+        assertEquals(-20f,top["b"]!!.ddy,0f)
+        val size=StudioEditorGeometry.align(StudioEditorGeometry.Align.Size,rects,"a",d)
+        assertEquals(50f,size["c"]!!.width!!,0f);assertEquals(40f,size["c"]!!.height!!,0f)
+        // In a row: order a, c, b by left edge; span 100..360 = 260, widths 100+100+60 = 260, so they touch (gap 0).
+        val row=StudioEditorGeometry.align(StudioEditorGeometry.Align.Row,rects,"a",d)
+        assertEquals(0f,row["a"]!!.ddx,0f)
+        assertEquals((200f-150f)/d,row["c"]!!.ddx,0f)
+        assertEquals((300f-300f)/d,row["b"]!!.ddx,0f)
+        assertEquals((100f-400f)/d,row["c"]!!.ddy,0f) // tops line up with the first picked
+    }
+
+    @Test fun overlappingItemsGetAGapWhenPutInAColumn() {
+        val rects=mapOf("a" to Rect(0f,0f,50f,100f),"b" to Rect(0f,20f,50f,120f))
+        val col=StudioEditorGeometry.align(StudioEditorGeometry.Align.Column,rects,"a",1f)
+        assertEquals(0f,col["a"]!!.ddy,0f)
+        assertEquals(108f-20f,col["b"]!!.ddy,0f) // below a, 8dp apart
+    }
+
+    @Test fun sameKindMeansSameSite() {
+        assertEquals("TableMainLayout.Chip.1",StudioEditorGeometry.siteOf("native:TableMainLayout.Chip.1/s1a:2"))
+    }
 }

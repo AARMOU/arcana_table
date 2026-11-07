@@ -150,4 +150,64 @@ internal object StudioEditorGeometry {
         height=if(dh==0f)style.height else ((style.height ?: heightDp)+dh).coerceIn(FLOOR_DP,4000f))
 
     fun isMeaningfulDrag(drag:Offset,slop:Float)=drag.getDistance()>slop
+
+    // ---- Multi-select and Align (owner, Nov 7: "tap and hold similar elements and modify multiple objects at once",
+    // "a way to align the selected buttons ... multiple ways", "It needs to be simple"). ----
+
+    /** The piece of code a control comes from; controls that share it are "the same kind of thing" (all player chips). */
+    fun siteOf(id:String)=id.substringAfter("native:").substringBefore("/")
+
+    /**
+     * Applies the edit made on the lead control ([lead] → [next]) to another selected control: moves and size changes
+     * are added as amounts (every item moves 4dp, grows 4dp), everything else that changed is copied. The label and
+     * what the button does are never copied, since they belong to each item.
+     */
+    fun groupEdit(lead:StudioControlStyle,next:StudioControlStyle,member:StudioControlStyle,leadW:Float,leadH:Float,memW:Float,memH:Float):StudioControlStyle {
+        fun size(old:Float?,new:Float?,own:Float?,leadNative:Float,memNative:Float,max:Float)=when {
+            new==old->own
+            new==null->null
+            else->((own ?: memNative)+(new-(old ?: leadNative))).coerceIn(FLOOR_DP,max)
+        }
+        fun <T> pick(a:T,b:T,own:T)=if(a!=b)b else own
+        return member.copy(dx=(member.dx+next.dx-lead.dx).coerceIn(-2000f,2000f),dy=(member.dy+next.dy-lead.dy).coerceIn(-4000f,4000f),
+            width=size(lead.width,next.width,member.width,leadW,memW,2000f),height=size(lead.height,next.height,member.height,leadH,memH,4000f),
+            font=pick(lead.font,next.font,member.font),radius=pick(lead.radius,next.radius,member.radius),fill=pick(lead.fill,next.fill,member.fill),
+            ink=pick(lead.ink,next.ink,member.ink),visible=pick(lead.visible,next.visible,member.visible),icon=pick(lead.icon,next.icon,member.icon),
+            layer=pick(lead.layer,next.layer,member.layer))
+    }
+
+    /** One way to line items up. Labels are what the owner sees. */
+    enum class Align(val label:String){Left("Left edges"),Top("Top edges"),Centre("Centres"),Row("In a row"),Column("In a column"),Size("Same size")}
+
+    /** What one item needs: a move in dp and, for [Align.Size], a new size in dp. */
+    data class AlignMove(val ddx:Float,val ddy:Float,val width:Float?=null,val height:Float?=null)
+
+    /**
+     * Lines up [rects] (screen pixels) against the [lead] item, the one picked first. Row and Column keep the order the
+     * items are in on screen and spread them evenly between the first and last; if they overlap, they get an 8dp gap.
+     */
+    fun align(mode:Align,rects:Map<String,Rect>,lead:String,density:Float):Map<String,AlignMove> {
+        val anchor=rects[lead] ?: return emptyMap()
+        val d=density.coerceAtLeast(0.1f)
+        return when(mode) {
+            Align.Left->rects.mapValues{(_,r)->AlignMove((anchor.left-r.left)/d,0f)}
+            Align.Top->rects.mapValues{(_,r)->AlignMove(0f,(anchor.top-r.top)/d)}
+            Align.Centre->rects.mapValues{(_,r)->AlignMove((anchor.center.x-r.center.x)/d,(anchor.center.y-r.center.y)/d)}
+            Align.Size->rects.mapValues{(_,_)->AlignMove(0f,0f,anchor.width/d,anchor.height/d)}
+            Align.Row,Align.Column-> {
+                val across=mode==Align.Row
+                val order=rects.entries.sortedBy{if(across)it.value.left else it.value.top}
+                val start=if(across)order.first().value.left else order.first().value.top
+                val end=if(across)order.last().value.right else order.last().value.bottom
+                val total=order.sumOf{(if(across)it.value.width else it.value.height).toDouble()}.toFloat()
+                val gap=if(order.size<2)0f else ((end-start-total)/(order.size-1)).let{if(it<0f)8f*d else it}
+                var at=start
+                order.associate {(id,r)->
+                    val move=if(across)AlignMove((at-r.left)/d,(anchor.top-r.top)/d) else AlignMove((anchor.left-r.left)/d,(at-r.top)/d)
+                    at+=(if(across)r.width else r.height)+gap
+                    id to move
+                }
+            }
+        }
+    }
 }
