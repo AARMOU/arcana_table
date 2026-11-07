@@ -214,6 +214,8 @@ internal fun TableController.TableOverlays() {
                 offlineResumeAvailable = offlineResumeAvailable && !argentumEnabled,
                 onResumeOffline = { resumeOfflineGame() },
                 onDiscardOffline = { offlineDiscardConfirm = true },
+                testScenarios = TestScenarios.available,
+                onTestScenario = { startTestScenario(it) },
                 onResume = {
                     recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
                     argentumResumeRequested = true
@@ -250,8 +252,7 @@ internal fun TableController.TableOverlays() {
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
                 onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
             )
-            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
-                onPick = { choice ->
+            val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
@@ -260,9 +261,21 @@ internal fun TableController.TableOverlays() {
                         ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
-                },
+            }
+            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
+                onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
-                onDismiss = { deckPickerOpen = false })
+                onDismiss = { deckPickerOpen = false },
+                onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null)
+            if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
+                decks = savedDecks,
+                loadCatalog = { loadSupportCatalog() },
+                onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
+                onPlay = { deck ->
+                    deckBuilderOpen = false
+                    pickDeck(DeckChoice(deck.name, deck.name, deck.commander, builtIn = false, category = DeckChoiceCategory.OTHER))
+                },
+                onDismiss = { deckBuilderOpen = false })
         }
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
@@ -800,9 +813,9 @@ internal fun TableController.TableOverlays() {
     }
     argentumComposer?.let { plan ->
         ArgentumActionComposer(plan, ::argentumName, busy = argentumAwaitingUpdate || argentumXChecking != null,
-            onConfirm = { picks, x, distribution, color ->
+            onConfirm = { picks, x, distribution, color, removal, crew ->
                 val refs = argentumSnapshot?.targets.orEmpty()
-                val action = plan.build(picks, x, distribution, color) { id -> refs[id]?.let(ArgentumActionPlan::chosenTarget) }
+                val action = plan.build(picks, x, distribution, color, removal, crew) { id -> refs[id]?.let(ArgentumActionPlan::chosenTarget) }
                 val epoch = ArgentumActions.epochFor(plan.info, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
                     recordDiagnostic("Sent ${action.optString("type")} (${plan.description}) with ${plan.chosenTargets(picks).size} target(s)${x?.let { ", X=$it" }.orEmpty()}", DiagnosticCategory.ACTION)
@@ -984,7 +997,7 @@ internal fun TableController.TableOverlays() {
     if (deckEditorOpen) DeckEditorDialog(
         player = players[selectedPlayer],
         highlightedCardIds = importReviewCardIds,
-        onRename = { card, name -> editDeckCard(selectedPlayer, card.id, name) },
+        onRename = { card, name -> syncSavedDeckSwap(selectedPlayer, card.name, name); editDeckCard(selectedPlayer, card.id, name) },
         onRemove = { card -> editDeckCard(selectedPlayer, card.id, null, remove = true) },
         onAdd = { result -> updatePlayer(selectedPlayer) { p -> p.copy(library = p.library + makeCard(result.name, result.type, result.imageUrl, oracleText = result.oracleText, manaValue = result.manaValue, artCropUrl = result.artCropUrl, manaCost = result.manaCost, power = result.power, toughness = result.toughness, keywords = result.keywords)) } },
         onReplace = { card, result ->
@@ -998,8 +1011,10 @@ internal fun TableController.TableOverlays() {
                 p.copy(library = replace(p.library), hand = replace(p.hand), commanderCard = commander, commanderName = commander?.name ?: p.commanderName)
             }
             importReviewCardIds = importReviewCardIds - card.id
+            syncSavedDeckSwap(selectedPlayer, card.name, result.name)
         },
-        onDismiss = { deckEditorOpen = false }
+        onDismiss = { deckEditorOpen = false },
+        loadSupportCatalog = { loadSupportCatalog() }
     )
     if (combatDialogOpen && !showOverview) CombatDialog(
         players = players, attackerIndex = activePlayer,

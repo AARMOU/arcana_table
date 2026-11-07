@@ -127,6 +127,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import android.content.SharedPreferences
@@ -295,6 +296,8 @@ internal class TableController(
         runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
+    /** Developer-preview deck builder (see [DeckBuilderFlag]). */
+    var deckBuilderOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }
@@ -552,7 +555,7 @@ internal class TableController(
         snap.legalActions.mapNotNull { info ->
             val action = info.optJSONObject("action") ?: return@mapNotNull null
             if (!info.optBoolean("isAffordable", true) || info.optBoolean("isManaAbility")) return@mapNotNull null
-            listOf("cardId", "sourceId", "permanentId", "entityId").firstNotNullOfOrNull { key -> byServer[action.optString(key)] }
+            ArgentumActions.CARD_REF_KEYS.firstNotNullOfOrNull { key -> byServer[action.optString(key)] }
         }.toSet()
     }.orEmpty()
     // The one action Arcana's primary buttons perform in an Argentum game, named after what it does.
@@ -1364,13 +1367,29 @@ internal class TableController(
     }
 
     fun importDeck(text: String, saveAsMine: Boolean = true) {
-        val entries = parseDeckList(text)
-        if (entries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
+        val initial = parseDeckListDetailed(text)
+        if (initial.gameBlockers.isNotEmpty()) {
+            importError = initial.gameBlockers.joinToString(" ") + " " +
+                initial.diagnostics.take(3).joinToString(" ")
+            return
+        }
+        if (initial.playableEntries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
         importing = true
         importError = null
         scope.launch {
             try {
-                val found = Scryfall.lookup(entries).toMutableMap()
+                val catalog = loadSupportCatalog()
+                val parsed = parseDeckListDetailed(text, catalog)
+                if (parsed.gameBlockers.isNotEmpty()) {
+                    importError = parsed.gameBlockers.joinToString(" ") + " " +
+                        parsed.diagnostics.take(3).joinToString(" ")
+                    return@launch
+                }
+                val entries = parsed.playableEntries
+                val found = offlineImportMatches(entries, catalog).toMutableMap()
+                // Scryfall enriches supported local definitions when reachable. Failed requests
+                // must never discard the bundled definitions or a player's unknown card name.
+                found.putAll(Scryfall.lookup(entries))
                 val autoFixedEntries = mutableSetOf<DeckEntry>()
                 val autoFixedNames = mutableListOf<Pair<String, String>>()
                 val unmatchedEntries = entries.filterNot { it in found }
@@ -1394,7 +1413,9 @@ internal class TableController(
                     val nameConflict = match != null && !match.name.equals(entry.name, ignoreCase = true) && entry !in autoFixedEntries
                     val issue = when {
                         nameConflict -> "Requested ${entry.name}, but ${entry.setCode?.uppercase()} #${entry.collectorNumber} resolves to ${match?.name}. You’ll need to resolve it manually in the editor."
-                        match == null && printingRequested -> "Could not verify ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. You’ll need to resolve it manually in the editor."
+                        printingRequested && (match?.setCode?.equals(entry.setCode, ignoreCase = true) != true ||
+                            match.collectorNumber?.equals(entry.collectorNumber, ignoreCase = true) != true) ->
+                            "Could not verify the requested printing of ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. Offline rules data may still be available; check the printing in the editor."
                         match == null -> "Could not match ‘${entry.name}’ to a Magic card. You’ll need to resolve it manually in the editor."
                         else -> null
                     }
@@ -1423,6 +1444,17 @@ internal class TableController(
                     repeated.joinToString { "${it.name} ×${it.quantity}" }.ifBlank { "none" }
                 }
                 recordDiagnostic("Deck import [$importTraceId]: target seat ${selectedPlayer + 1}, parsed entries=${entries.size}, requested main-deck copies=${entries.filterNot { it.commander }.sumOf { it.count }}, commander entries=${entries.count { it.commander }}, built main-deck copies=${deck.size}, duplicate quantities=$duplicateDetail, unresolved entries=${issueDescriptions.size}, over-limit copies=${overflowIds.size}")
+                // Scryfall matching proves a card exists, not that Argentum can run it. Check the
+                // resolved names against the shipped library and tell the player now, not at game start.
+                val supportReport = loadSupportCatalog()?.let { catalog ->
+                    catalog.check(entries.map { entry ->
+                        val resolved = found[entry]?.takeIf { it.name.equals(entry.name, ignoreCase = true) || entry in autoFixedEntries }
+                        if (resolved != null) entry.copy(name = resolved.name) else entry
+                    })
+                }
+                if (supportReport != null) {
+                    recordDiagnostic("Deck import [$importTraceId]: ${supportReport.summary()}", if (supportReport.unsupportedCopies > 0) DiagnosticCategory.UNSUPPORTED else null)
+                }
                 val opening = deck.take(7)
                 if (onlineMode && selectedPlayer == localSeat && localSeat in lobbyReadyPlayers) {
                     lobbyReadyPlayers = lobbyReadyPlayers - localSeat
@@ -1509,6 +1541,17 @@ internal class TableController(
                         append("Imported ${deck.size} cards. Your opening hand is ready.")
                     }
                 }
+                if (supportReport != null && supportReport.unsupportedCopies > 0) {
+                    val names = supportReport.unsupportedNames
+                    message = buildString {
+                        append("${names.size} card ${if (names.size == 1) "name isn't" else "names aren't"} in Argentum's card library: ")
+                        append(names.take(6).joinToString())
+                        if (names.size > 6) append(", and ${names.size - 6} more")
+                        append(". ")
+                        if (supportReport.commanderUnsupported) append("That includes your commander. ")
+                        append("Argentum games leave them out. The deck editor (Edit imported deck, or Edit deck in the Argentum deck review) shows suggested Argentum swaps. Your deck was imported as written.")
+                    }
+                }
                 if (onlineMode && !gameStartedOnline) { showOverview = true; showHand = false; lobbyOpen = true }
             } catch (e: Exception) {
                 importError = e.message ?: "Could not load the deck. Check your internet connection and try again."
@@ -1576,7 +1619,13 @@ internal class TableController(
         return when {
             precon != null -> parseDeckList(precon.decklist).let { entries -> entries.flatMap { entry -> List(entry.count) { entry.name } } to precon.commander }
             premade != null -> premade.cards to premade.commander
-            saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
+            saved != null -> parseDeckList(saved.text).let { e ->
+                val commander = saved.commander ?: e.firstOrNull { it.commander }?.name
+                val names = e.flatMap { x -> List(x.count) { x.name } }
+                // An MTGO sideboard commander can be inferred during import but is not
+                // present in the compatibility parser's playable entries without a catalog.
+                (if (commander != null && names.none { it.equals(commander, true) }) names + commander else names) to commander
+            }
             else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
                 seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
         }
@@ -1600,6 +1649,39 @@ internal class TableController(
         }
 
     fun offlineLibrary() = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
+
+    /** Shipped card library for import-time support checks, search and swap suggestions (DeckSupport.kt). */
+    var supportCatalog by run { mutableStateOf<SupportedCardCatalog?>(null) }
+    var supportCatalogFailed by run { mutableStateOf(false) }
+    private val supportCatalogLock = kotlinx.coroutines.sync.Mutex()
+
+    /** Loads the library once, off the main thread; null when this build has no library assets. */
+    suspend fun loadSupportCatalog(): SupportedCardCatalog? = supportCatalog ?: supportCatalogLock.withLock {
+        supportCatalog?.let { return@withLock it }
+        if (supportCatalogFailed) return@withLock null
+        val loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { SupportedCardCatalog.load { path -> runCatching { context.assets.open(path) }.getOrNull() } }
+        }
+        // State and diagnostics are updated back on the caller's (main) thread.
+        loaded.onFailure { supportCatalogFailed = true; recordDiagnostic("Card library check unavailable: ${it.message}") }
+        loaded.getOrNull()?.also { supportCatalog = it }
+    }
+
+    /** Keeps the active saved deck in step with a swap made in the deck editor. */
+    fun syncSavedDeckSwap(playerIndex: Int, oldName: String, newName: String) {
+        if (playerIndex != localSeat || oldName.equals(newName, ignoreCase = true)) return
+        val active = activeDeckId ?: return
+        val saved = savedDecks.firstOrNull { it.name == active } ?: return
+        val text = replaceCardInDeckText(saved.text, oldName, newName)
+        if (text == null) {
+            recordDiagnostic("Deck editor swap $oldName → $newName not written to saved deck ${saved.name} (line not found or CSV list)")
+            return
+        }
+        val commander = if (saved.commander?.equals(oldName, ignoreCase = true) == true) newName else saved.commander
+        val updated = saved.copy(text = text, commander = commander)
+        savedDecks = savedDecks.map { if (it.name == saved.name && it.text == saved.text) updated else it }
+        saveSavedDecks(context, savedDecks)
+    }
 
     /** Request a full, unmasked engine checkpoint at the next action boundary. */
     fun saveOfflineGame() {
@@ -1633,28 +1715,7 @@ internal class TableController(
                         else library.load(required)
                     com.wingedsheep.engine.registry.CardRegistry().apply { register(definitions) }
                 }
-                argentumSocket.localHostFactory = { emit ->
-                    com.arcanatable.engine.LocalArgentumHost(
-                        registry, savedSeats[0], savedSeats[1], emit = emit,
-                        extraOpponents = savedSeats.drop(2), resumeCheckpoint = checkpoint.toString()
-                    )
-                }
-                offlineRestoreRequested = true
-                argentumOffline = true
-                argentumDeckForLobby = null
-                argentumCommanderForLobby = null
-                argentumLobbySubmitted = true
-                argentumLocalPlayersBackup = players.toList()
-                argentumEnabled = true
-                homeOpen = false
-                lobbyOpen = false
-                argentumSocket.connect(savedSeats[0].name)
-                var waitCount = 0
-                while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount++ < 20) delay(100)
-                if (argentumStatus != ArgentumConnectionStatus.CONNECTED ||
-                    !argentumSocket.createCommanderPracticeLobby(vsAi = true)) {
-                    error("Couldn't reconnect to the offline engine.")
-                }
+                launchOfflineCheckpoint(savedSeats, registry, checkpoint.toString())
             } catch (failure: Throwable) {
                 argentumSocket.close()
                 argentumSocket.localHostFactory = null
@@ -1670,6 +1731,62 @@ internal class TableController(
 
 
     /**
+     * Starts a local engine host from a full offline checkpoint and joins it as seat 1. Shared by
+     * "resume offline game" and the debug-only test scenarios. Marked as a restore, so starting it
+     * never clears the player's own saved offline game. Throws if the host can't be reached.
+     */
+    private suspend fun launchOfflineCheckpoint(
+        seats: List<com.arcanatable.engine.LocalSeat>,
+        registry: com.wingedsheep.engine.registry.CardRegistry,
+        checkpoint: String,
+    ) {
+        argentumSocket.localHostFactory = { emit ->
+            com.arcanatable.engine.LocalArgentumHost(
+                registry, seats[0], seats[1], emit = emit,
+                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint
+            )
+        }
+        offlineRestoreRequested = true
+        argentumOffline = true
+        argentumDeckForLobby = null
+        argentumCommanderForLobby = null
+        argentumLobbySubmitted = true
+        argentumLocalPlayersBackup = players.toList()
+        argentumEnabled = true
+        homeOpen = false
+        lobbyOpen = false
+        argentumSocket.connect(seats[0].name)
+        var waitCount = 0
+        while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount++ < 20) delay(100)
+        if (argentumStatus != ArgentumConnectionStatus.CONNECTED ||
+            !argentumSocket.createCommanderPracticeLobby(vsAi = true)) {
+            error("Couldn't reconnect to the offline engine.")
+        }
+    }
+
+    /** Debug builds only (TestScenarios is empty in release): start a ready-made test board vs the AI. */
+    fun startTestScenario(scenario: TestScenario) {
+        if (argentumEnabled || offlineStarting) return
+        offlineStarting = true
+        scope.launch {
+            try {
+                val game = withContext(Dispatchers.IO) { TestScenarios.build(scenario, offlineLibrary()) }
+                recordDiagnostic("Test scenario: ${scenario.title}", DiagnosticCategory.ENGINE)
+                launchOfflineCheckpoint(game.seats, game.registry, game.checkpoint.toString())
+            } catch (failure: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                message = "Couldn't start the test scenario: ${failure.message ?: failure.javaClass.simpleName}"
+                recordDiagnostic("Test scenario failed: ${failure.javaClass.simpleName}: ${failure.message}", DiagnosticCategory.ERROR)
+            } finally { offlineStarting = false }
+        }
+    }
+
+    /**
      * Offline game: Argentum's engine and AI run inside the app (engine/LocalArgentumHost). Your
      * imported Commander deck plays one of Argentum's premade Commander decks when the full card
      * library ships in the app; otherwise a Portal duel. Same table, same messages, no server.
@@ -1680,6 +1797,13 @@ internal class TableController(
         argentumLastError = null
         scope.launch {
             try {
+                // Saved text might predate current parsing. Refuse unplayable partner/companion
+                // decks rather than losing a commander when the singular engine slot starts.
+                activeDeckId?.let { id -> savedDecks.firstOrNull { it.name == id } }?.let { saved ->
+                    val parsed = parseDeckListDetailed(saved.text, loadSupportCatalog())
+                    val blockers = parsed.gameBlockers
+                    if (blockers.isNotEmpty()) error(blockers.joinToString(" ") + " " + parsed.diagnostics.take(3).joinToString(" "))
+                }
                 val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
                 val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId, offlineAiCount)

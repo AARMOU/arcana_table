@@ -12,6 +12,7 @@ plugins {
 kotlin {
     sourceSets.getByName("test").kotlin.srcDir("../app/src/main/java/com/arcanatable/engine/ai")
     sourceSets.getByName("test").kotlin.srcDir("../app/src/main/java/com/arcanatable/engine/priority")
+    sourceSets.getByName("test").kotlin.srcDir("../app/src/main/java/com/arcanatable/engine/costs")
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 java {
@@ -24,7 +25,7 @@ val assetsDir = rootProject.layout.projectDirectory.dir("app/src/main/assets/arg
 
 dependencies {
     implementation(argentumJars)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.slf4j:slf4j-api:2.0.18")
@@ -34,6 +35,9 @@ dependencies {
 tasks.test {
     maxHeapSize = "2g"
     systemProperty("arcana.assets", assetsDir.asFile.absolutePath)
+    // Which version of a card is in play depends on these, so a change must re-run the tests.
+    inputs.file(assetsDir.file("custom-overrides.txt")).optional().withPropertyName("customOverrides")
+    inputs.file(assetsDir.file("all-cards.index.tsv")).optional().withPropertyName("libraryIndex")
     // Engine threads recurse deeply on big boards.
     jvmArgs("-Xss16m")
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }

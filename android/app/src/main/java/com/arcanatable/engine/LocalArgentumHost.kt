@@ -1,5 +1,6 @@
 package com.arcanatable.engine
 
+import com.arcanatable.engine.costs.CounterRemovalCost
 import com.wingedsheep.ai.engine.AIPlayer
 import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.arcanatable.OfflineCheckpointStore
@@ -748,11 +749,11 @@ class LocalArgentumHost(
     private fun computeLegalActions(state: GameState, player: EntityId): List<LegalActionInfo> {
         (state.pendingDecision as? PlayCardDecision)?.let { play ->
             if (state.actorFor(play.playerId) != player) return emptyList()
-            return enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId)
+            return CounterRemovalCost.fill(enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId), state, registry)
         }
         if (state.pendingDecision != null || state.priorityPlayerId != player) return emptyList()
         val actions = enumerator.enumerate(state, player)
-        val enriched = enricher.enrich(actions, state, player)
+        val enriched = CounterRemovalCost.fill(enricher.enrich(actions, state, player), state, registry)
         // Some mana abilities require an explicit cost (Food for Gilded Goose, or
         // the source itself for Treasure). canPay can count such abilities even
         // when the actual automatic payment path cannot execute them. Verify

@@ -105,17 +105,18 @@ class GameTestDriver {
     // =========================================================================
 
     /**
-     * Register a card definition for use in tests.
+     * Register a card definition for use in tests. A custom card that Argentum's library now supersedes
+     * is registered as Argentum's version, so the test checks the card the app actually plays.
      */
     fun registerCard(card: CardDefinition) {
-        cardRegistry.register(card)
+        cardRegistry.register(CardPool.inPlay(card))
     }
 
     /**
-     * Register multiple card definitions.
+     * Register multiple card definitions (each as the app plays it; see [registerCard]).
      */
     fun registerCards(cards: Iterable<CardDefinition>) {
-        cardRegistry.register(cards)
+        cardRegistry.register(cards.map(CardPool::inPlay))
     }
 
     /**
@@ -996,6 +997,16 @@ class GameTestDriver {
         _state = _state.updateEntity(entityId) { container ->
             container.without<TappedComponent>()
         }
+    }
+
+    /** Simulate another effect exiling a card while a spell is on the stack. */
+    fun moveToExile(entityId: EntityId) {
+        val ownerId = _state.getEntity(entityId)
+            ?.get<OwnerComponent>()?.playerId
+            ?: return
+        val occupiedZones = _state.zones.keys.filter { entityId in _state.getZone(it) }
+        occupiedZones.forEach { _state = _state.removeFromZone(it, entityId) }
+        _state = _state.addToZone(ZoneKey(ownerId, Zone.EXILE), entityId)
     }
 
     /**

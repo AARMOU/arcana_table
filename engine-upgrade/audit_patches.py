@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "argentum-engine"
 PATCHES = ROOT / "argentum-patches"
 REPORT = ROOT / "engine-upgrade" / "patch-report.json"
-TARGET = "61e71e586b100faa661f86cac827ac3c3bbb5a78"
+TARGET = "6ad59cc2de841e03a6734f60db3ab6674cc70af3"
 MANDATORY = [
     "0001-android-regex.patch",
     "0002-engine-trial-build.patch",
@@ -26,8 +26,39 @@ MANDATORY = [
     "0005-last-known-negative-subtype.patch",
     "0006-ai-decision-deadline.patch",
     "0007-ai-bounded-stack-search.patch",
-    "0008-jvm-test-toolchain.patch",
+    "0011-stack-object-copying.patch",
+    "0012-colorless-hybrid-sdk.patch",
+    "0013-colorless-hybrid-floating-payment.patch",
+    "0014-colorless-hybrid-auto-tap.patch",
+    "0015-granted-cascade.patch",
+    "0016-granted-keyword-mana-value-cap.patch",
+    "0017-colorless-eldrazi-source-mana.patch",
+    "0018-devoid-after-temple.patch",
+    "0019-devoid-sdk-surface.patch",
+    "0020-temple-projected-source-subtypes.patch",
+    "0021-azlask-exact-colors-trigger.patch",
+    "0022-cant-be-sacrificed-by-effects.patch",
+    "0023-face-down-exile-hidden-from-owner.patch",
+    "0024-commander-cast-history-amount.patch",
+    "0025-akromas-will-modal-combat-trick.patch",
+    "0026-free-cast-once-each-turn.patch",
+    "0027-opponents-must-attack-anyone.patch",
+    "0028-base-power-toughness-at-most.patch",
+    "0032-per-player-target-binding.patch",
+    "0030-bloodthirst-keyword.patch",
+    "0033-property-sum-of-collection.patch",
+    "0034-commander-cast-count-counters-rider.patch",
+    "0035-ai-idle-mana-deploy.patch",
+    "0036-graveyard-card-activated-grant.patch",
+    "0037-static-attacking-chosen-player.patch",
+    "0038-chosen-color-land-mana-bonus.patch",
+    "0039-graveyard-lookback-granted-types.patch",
 ]
+# Patches no longer in the series, and why. The weekly upgrade's current-build check reads this so a
+# numbered build that still lists one is not reported as missing a patch; weekly.py adds upstream absorptions.
+RETIRED = {
+    "0008-jvm-test-toolchain.patch": "folded into 0002-engine-trial-build.patch (2026-11-02)",
+}
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 
 
@@ -57,6 +88,8 @@ def main() -> int:
     }
     for patch_name in MANDATORY:
         patch = forward_ports.get(patch_name, PATCHES / patch_name)
+        if not patch.is_file():  # weekly.py folds forward ports back into the refreshed series
+            patch = PATCHES / patch_name
         if not patch.is_file():
             outcome = "missing"
             diagnostics = "Patch file not found"

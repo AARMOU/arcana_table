@@ -1,0 +1,3 @@
+#!/bin/sh
+# cardkit — see tools/cardkit/README.md. Stdlib-only Python 3.9+.
+exec python3 "$(dirname "$0")/cardkit.py" "$@"

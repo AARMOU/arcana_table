@@ -50,7 +50,7 @@ object DiagnosticRedactor {
     private val secretPair = Regex("(?i)\\b(password|passwd|token|authToken|secret|api[_-]?key|session|cookie|authorization)(\\s*[:=]\\s*|\"\\s*:\\s*\")([^\\s\",}]+)")
     private val roomCode = Regex("(?i)\\b((?:room|join|lobby)\\s*(?:code|id)\\s*[:=]?\\s*)([a-z0-9-]{4,})")
     private val uuid = Regex("(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b")
-    private val longOpaque = Regex("\\b[A-Za-z0-9_\\-]{32,}={0,2}\\b")
+    private val longOpaque = Regex("\\b[A-Za-z0-9_-]{32,}={0,2}\\b")
 
     fun redact(text: String): String = text
         .replace(url, "<server>")

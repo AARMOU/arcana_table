@@ -21,6 +21,7 @@ class HomeScreenSizesTest {
     private fun homeShows(name: String) {
         UiTestSupport.settle(rule)
         rule.onNodeWithTag("home-play").assertIsDisplayed()
+        rule.onNodeWithTag("dev-goose-banner").assertIsDisplayed()
         UiTestSupport.screenshot(rule.activity, "home-$name")
     }
 
