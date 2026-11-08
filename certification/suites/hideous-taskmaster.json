@@ -1,0 +1,9 @@
+{
+  "key": "hideous-taskmaster",
+  "name": "Hideous Taskmaster",
+  "issue": 1035,
+  "source": "certification/HideousTaskmasterIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HideousTaskmasterIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
