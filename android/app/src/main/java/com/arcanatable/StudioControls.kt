@@ -15,6 +15,8 @@ internal data class StudioControlStyle(
     val type:String?=null,
     /** Owner, Nov 7: opacity for every editable item, 0–1 (null = solid). Pass and the way back never go below 0.5. */
     val alpha:Float?=null,
+    /** Owner, Nov 8: background opacity, 0–1 (null = solid). Fades only the box behind, never its words or cards. */
+    val backdrop:Float?=null,
 ) {
     fun problems()=buildList {
         if(listOfNotNull(dx,dy,width,height,font,radius,layer).any {!it.isFinite()})add("Use finite dimensions.")
@@ -28,13 +30,14 @@ internal data class StudioControlStyle(
         if(layer !in -100f..100f)add("Layer must be between -100 and 100.")
         if(type!=null && type !in StudioButtonTypes.names)add("Unknown button type.")
         if(alpha!=null && (!alpha.isFinite() || alpha !in 0f..1f))add("Opacity must be 0–100%.")
+        if(backdrop!=null && (!backdrop.isFinite() || backdrop !in 0f..1f))add("Background must be 0–100%.")
     }
     /** Owner note 14: soft advice only. It marks the control red in the editor and never blocks Apply. */
     fun advice():String?=if(width!=null && width<44f || height!=null && height<44f)"Hard to tap: smaller than 44." else null
     fun json()=JSONObject().put("dx",dx).put("dy",dy).put("visible",visible).put("icon",icon).put("layer",layer).apply {
         width?.let{put("width",it)};height?.let{put("height",it)};font?.let{put("font",it)};radius?.let{put("radius",it)}
         fill?.let{put("fill",it)};ink?.let{put("ink",it)};label?.let{put("label",it)};binding?.let{put("binding",it)}
-        type?.let{put("type",it)};alpha?.let{put("alpha",it.toDouble())}
+        type?.let{put("type",it)};alpha?.let{put("alpha",it.toDouble())};backdrop?.let{put("backdrop",it.toDouble())}
     }
     companion object {
         fun parse(o:JSONObject):StudioControlStyle {
@@ -42,7 +45,7 @@ internal data class StudioControlStyle(
             fun text(k:String)=if(o.has(k))o.getString(k) else null
             return StudioControlStyle(o.optDouble("dx",0.0).toFloat(),o.optDouble("dy",0.0).toFloat(),number("width"),number("height"),
                 number("font"),number("radius"),text("fill"),text("ink"),text("label"),o.optBoolean("visible",true),text("binding"),
-                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat(),text("type"),number("alpha")).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
+                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat(),text("type"),number("alpha"),number("backdrop")).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
         }
     }
 }
@@ -193,7 +196,10 @@ internal data class StudioLiveControl(val id:String,val screen:String,val kind:S
     val bounds:Rect=Rect.Zero,val window:Int=0,val protectedLabel:Boolean=false,val viewportWidth:Float=0f,val viewportHeight:Float=0f,
     val captionEditable:Boolean=true)
 internal val StudioLiveControl.isAction get()=kind.endsWith("action")
+// Owner, Nov 8: an opponent's board only repeats your own Pass/Confirm, so those copies may be hidden (IDs tied to an
+// opponent carry "@opp", see LocalStudioSeat). Yours, the main bar and every way back stay protected.
 internal val StudioLiveControl.requiredNativeAction get()=id.startsWith("native:") && isAction && kind!="card-action" &&
+    (!id.contains("@opp") || listOf("BACK","CLOSE","APP MENU","ARCANA STUDIO","RESUME","RECONNECT").any{title.uppercase().startsWith(it)}) &&
     (StudioSites.site(id)=="TableMainLayout.IconButton.2" || listOf("PASS","DECLARE","CONFIRM","KEEP","CANCEL","CLOSE","RESUME","RECONNECT","BACK","ARCANA STUDIO","APP MENU").any{title.uppercase().startsWith(it)})
 
 /** Only current, composed native callbacks can be invoked. No callbacks are serialized. */

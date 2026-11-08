@@ -201,7 +201,7 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     result=s.radius?.takeIf{it.isFinite()}?.let{result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
         ?: if(resized)result.clipToBounds() else result
     // The fill paints the whole box (it used to paint only behind the fitted contents).
-    s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
+    s.fill?.let(::parseTableColorHex)?.let {result=result.background(it.studioBackdrop(s.backdrop))}
     // Only words are centred at their natural size. Pictures and tappable boxes (a commander picture, a player chip)
     // fill the box they were resized to, as before; centring them left a picture at its old size in a bigger frame.
     if(resized)result=result.studioFitContents(center=widget.kind=="data" || widget.kind=="label")
@@ -360,5 +360,8 @@ internal fun Modifier.studioPanel(site:String,screen:String,title:String,shape:a
     val w=studioWidget(site,screen,"panel",title)
     val s=w?.style
     return this.studioWidget(w).clip(s?.radius?.takeIf{it.isFinite()}?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape)
-        .background(s?.fill?.let(::parseTableColorHex) ?: color)
+        .background((s?.fill?.let(::parseTableColorHex) ?: color).studioBackdrop(s?.backdrop))
 }
+
+/** Owner, Nov 8: the Background setting fades only the box's colour, so the board can be clear with its cards solid. */
+internal fun Color.studioBackdrop(backdrop:Float?)=backdrop?.takeIf{it.isFinite()}?.let{copy(alpha=alpha*it.coerceIn(0f,1f))} ?: this

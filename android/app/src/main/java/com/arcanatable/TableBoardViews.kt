@@ -229,7 +229,7 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
         name == "rhystic study" || name == "smothering tithe" ||
             (("whenever an opponent" in oracle || "whenever a player" in oracle) && ("unless" in oracle && "pay" in oracle || "may pay" in oracle))
     }
-    Column(modifier.animateContentSize().clip(RoundedCornerShape(14.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 1.dp, if (isActivePlayer) Mint else Color(0xFF33423D), RoundedCornerShape(14.dp)).studioCombinedClickable("TableBoardViews.combinedClickable.2", "Table and player", onClick = onOpen).padding(if (compact) 6.dp else 10.dp)) {
+    Column(modifier.animateContentSize().studioPanel("TableBoardViews.Panel.5", "Table and player", "Player card", RoundedCornerShape(14.dp), Panel).border(if (isActivePlayer) 2.dp else 1.dp, if (isActivePlayer) Mint else Color(0xFF33423D), RoundedCornerShape(14.dp)).studioCombinedClickable("TableBoardViews.combinedClickable.2", "Table and player", onClick = onOpen).padding(if (compact) 6.dp else 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 StudioText("TableBoardViews.Text.7", "Table and player", true, "${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name} · P${index + 1}${if (player.isComputer) " · AI" else ""}${if (player.isEliminated) " · OUT" else if (isActivePlayer) " · TURN" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontWeight = FontWeight.Bold, fontSize = if (compact) 9.sp else 12.sp, letterSpacing = 0.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
