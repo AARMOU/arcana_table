@@ -80,7 +80,9 @@ class StudioNativeControlsUiTest {
         }}}}
         rule.waitForIdle()
         val id=runtime.controls.values.single{it.isAction}.id
-        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=24f,dy=-8f,width=220f,height=168f))}
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=24f,dy=-8f,width=220f,height=168f));runtime.apply()}
+        rule.waitForIdle()
+        rule.runOnIdle{runtime.begin(id)} // frames are only measured while Studio is open
         rule.waitForIdle()
         val d=rule.density.density
         val chip=rule.onNodeWithTag("chip").fetchSemanticsNode().boundsInRoot

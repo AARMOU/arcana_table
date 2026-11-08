@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,7 +121,9 @@ fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, 
             .studioClickable("ArgentumUi.clickable.1", "Table and player", onClick = onClick).padding(end = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.width(40.dp).fillMaxHeight().background(Panel)) {
+        // Owner, Nov 7: "the commander image is not showing correctly". A fixed 40dp width became a tall sliver when
+        // the chip was made taller in Studio; the picture now keeps its shape and grows with the chip.
+        Box(Modifier.fillMaxHeight().aspectRatio(40f / 44f).background(Panel)) {
             if (!artUrl.isNullOrBlank()) CardArt(artUrl, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, label = artLabel)
         }
         Spacer(Modifier.width(7.dp))

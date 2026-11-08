@@ -92,7 +92,7 @@ private class StudioFixedSlotNode:Modifier.Node(),androidx.compose.ui.node.Paren
  * Fits a resized control's contents into its Studio size (owner, Nov 7: "results look bad").
  * - Words shrink on one line first (down to a readable 60%) instead of breaking letter by letter ("PASS TO MY TURN"
  *   at 16 wide became a column of letters). Only if one line can't fit at 60% does the text wrap.
- * - When [center] is set (text, labels and tappable boxes whose own background sits outside this), contents keep their
+ * - When [center] is set (text and labels, whose own background sits outside this), contents keep their
  *   natural size and sit in the middle of a box made bigger, instead of being stretched to its top-left corner.
  * Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
  */
@@ -170,7 +170,9 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         ?: if(resized)result.clipToBounds() else result
     // The fill paints the whole box (it used to paint only behind the fitted contents).
     s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
-    if(resized)result=result.studioFitContents(center=widget.kind!="action" && widget.kind!="icon-action")
+    // Only words are centred at their natural size. Pictures and tappable boxes (a commander picture, a player chip)
+    // fill the box they were resized to, as before; centring them left a picture at its old size in a bigger frame.
+    if(resized)result=result.studioFitContents(center=widget.kind=="data" || widget.kind=="label")
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
         .pointerInput(widget.id,true) {
             detectDragGesturesAfterLongPress(onDragStart={point->
