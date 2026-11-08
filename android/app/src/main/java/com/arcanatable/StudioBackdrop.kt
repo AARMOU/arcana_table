@@ -20,7 +20,10 @@ import kotlin.math.min
  * builds only, like the rest of Studio.
  */
 internal object StudioBackdrop {
-    private val NAME = Regex("^bg-[A-Za-z0-9-]{1,60}\\.jpg$")
+    private val NAME = Regex("^bg-[A-Za-z0-9-]{1,60}\\.(jpg|gif)$")
+    /** Owner, Nov 7: GIFs play behind the table. Kept as the original file (up to [MAX_GIF_BYTES]) so they still move. */
+    const val MAX_GIF_BYTES = 25L * 1024 * 1024
+    fun isGif(name: String) = name.endsWith(".gif")
     const val MAX_SIDE = 2048
     val FITS = listOf("Fill", "Fit")
     fun validName(name: String) = NAME.matches(name)
@@ -29,6 +32,8 @@ internal object StudioBackdrop {
 
     /** Copies the picked picture in, shrunk to at most [MAX_SIDE] pixels a side. Returns its stored name. */
     fun import(context: Context, uri: Uri): String {
+        val head = context.contentResolver.openInputStream(uri)?.use { s -> ByteArray(6).also { s.read(it) } } ?: error("Can't open that picture.")
+        if (String(head, Charsets.US_ASCII).startsWith("GIF8")) return importGif(context, uri)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         // Owner's screenshot, Nov 7: every pick said "Can't open that picture." A bounds-only decode always returns null
         // (it fills [bounds] instead), so the null check fired every time. Only a missing stream means it can't open.
@@ -45,6 +50,26 @@ internal object StudioBackdrop {
         StudioLog.add("Background picture added (${bitmap.width}×${bitmap.height})")
         return name
     }
+
+    private fun importGif(context: Context, uri: Uri): String {
+        val name = "bg-" + java.util.UUID.randomUUID().toString() + ".gif"
+        val file = File(dir(context), name)
+        context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { out ->
+            val buffer = ByteArray(64 * 1024); var total = 0L
+            while (true) {
+                val n = input.read(buffer); if (n < 0) break
+                total += n
+                if (total > MAX_GIF_BYTES) { out.close(); file.delete(); error("That GIF is too big (over 25 MB). Try a shorter or smaller one.") }
+                out.write(buffer, 0, n)
+            }
+        } } ?: error("Can't open that picture.")
+        val first = BitmapFactory.decodeFile(file.path)
+        if (first == null) { file.delete(); error("That file isn't a picture Studio can read.") }
+        StudioLog.add("Background GIF added (${first.width}×${first.height}, ${file.length() / 1024} KB)")
+        return name
+    }
+
+    fun file(context: Context, name: String): File? = if (validName(name)) File(dir(context), name).takeIf { it.isFile } else null
 
     fun load(context: Context, name: String): ImageBitmap? {
         if (!validName(name)) return null
@@ -136,9 +161,13 @@ internal fun StudioBackdropLayer() {
     val project = LocalStudioControls.current?.project() ?: return
     val name = project.backdrop ?: return
     val context = androidx.compose.ui.platform.LocalContext.current
-    val image = androidx.compose.runtime.remember(name) { StudioBackdrop.load(context, name) } ?: return
-    androidx.compose.foundation.Image(image, null, androidx.compose.ui.Modifier.fillMaxSize(),
-        contentScale = if (project.backdropFit == "Fit") androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
+    if (StudioBackdrop.isGif(name) && android.os.Build.VERSION.SDK_INT >= 28) StudioGifBackdrop(context, name, project.backdropFit == "Fit")
+    else {
+        // A GIF on Android 8 shows its first frame (moving pictures need Android 9).
+        val image = androidx.compose.runtime.remember(name) { StudioBackdrop.load(context, name) } ?: return
+        androidx.compose.foundation.Image(image, null, androidx.compose.ui.Modifier.fillMaxSize(),
+            contentScale = if (project.backdropFit == "Fit") androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
+    }
     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()
         .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = project.backdropDim.coerceIn(0f, 0.9f))))
 }
@@ -146,3 +175,30 @@ internal fun StudioBackdropLayer() {
 /** True while a background picture shows, so the table's own solid colour steps aside. */
 @androidx.compose.runtime.Composable
 internal fun studioBackdropShown() = LocalStudioControls.current?.project()?.backdrop != null
+
+/** Plays a GIF background (Android 9+), scaled down to at most [StudioBackdrop.MAX_SIDE] a side to keep memory low. */
+@androidx.annotation.RequiresApi(28)
+@androidx.compose.runtime.Composable
+private fun StudioGifBackdrop(context: Context, name: String, fit: Boolean) {
+    val drawable = androidx.compose.runtime.remember(name) {
+        StudioBackdrop.file(context, name)?.let { f -> runCatching {
+            android.graphics.ImageDecoder.decodeDrawable(android.graphics.ImageDecoder.createSource(f)) { decoder, info, _ ->
+                val side = max(info.size.width, info.size.height)
+                if (side > StudioBackdrop.MAX_SIDE) {
+                    val k = StudioBackdrop.MAX_SIDE.toFloat() / side
+                    decoder.setTargetSize((info.size.width * k).toInt().coerceAtLeast(1), (info.size.height * k).toInt().coerceAtLeast(1))
+                }
+            }
+        }.getOrNull() }
+    } ?: return
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { android.widget.ImageView(it) },
+        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+        update = { view ->
+            view.scaleType = if (fit) android.widget.ImageView.ScaleType.FIT_CENTER else android.widget.ImageView.ScaleType.CENTER_CROP
+            if (view.drawable !== drawable) view.setImageDrawable(drawable)
+            (drawable as? android.graphics.drawable.AnimatedImageDrawable)?.let { if (!it.isRunning) it.start() }
+        },
+        onRelease = { view -> (view.drawable as? android.graphics.drawable.AnimatedImageDrawable)?.stop(); view.setImageDrawable(null) },
+    )
+}

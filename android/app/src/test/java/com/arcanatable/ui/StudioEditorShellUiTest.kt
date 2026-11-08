@@ -177,6 +177,32 @@ class StudioEditorShellUiTest {
         buttons.forEach{id->assertEquals("one Undo",before.getValue(id),hand().elements.single{it.id==id}.w,0f)}
     }
 
+    /** Owner, Nov 7: hold + or − for a slider; the item changes live and the whole drag is one Undo. */
+    @Test fun holdingPlusOpensASliderThatResizesLiveAsOneUndo() {
+        render()
+        tapCanvas(bounds("play").center);rule.waitForIdle()
+        val id=control("Play").id
+        rule.onNodeWithTag("studio-width-plus").performTouchInput{longClick()};rule.waitForIdle()
+        rule.onNodeWithTag("studio-width-slider").assertIsDisplayed()
+        rule.onNodeWithTag("studio-width-slider").performTouchInput{swipeRight(startX=centerX,endX=right-4f)};rule.waitForIdle()
+        val w=runtime.style(id).width
+        assertNotNull("the slider resized it",w)
+        rule.onNodeWithTag("studio-width-slider-done").performClick();rule.waitForIdle()
+        rule.onNodeWithTag("studio-width-plus").assertIsDisplayed()
+        rule.onNodeWithTag("studio-undo").performClick();rule.waitForIdle()
+        assertNull("one Undo takes back the whole drag",runtime.style(id).width)
+    }
+
+    @Test fun opacityStepperFadesTheItem() {
+        render()
+        tapCanvas(bounds("play").center);rule.waitForIdle()
+        val id=control("Play").id
+        rule.onNodeWithTag("studio-tab-Style").performClick();rule.waitForIdle()
+        repeat(3){rule.onNodeWithTag("studio-opacity-minus").performScrollTo().performClick();rule.waitForIdle()}
+        assertEquals(0.7f,runtime.style(id).alpha!!,0.001f)
+        rule.onNodeWithTag("studio-opacity-value").assertTextEquals("70%")
+    }
+
     @Test fun directDragMovesTheRealControlAndIsOneUndoStep() {
         render()
         val before=bounds("play")

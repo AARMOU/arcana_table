@@ -13,6 +13,8 @@ internal data class StudioControlStyle(
     val label:String?=null,val visible:Boolean=true,val binding:String?=null,val icon:String="None",val layer:Float=0f,
     /** Owner note 26: one of [StudioButtonTypes] names, or null for the button's own look. */
     val type:String?=null,
+    /** Owner, Nov 7: opacity for every editable item, 0.2–1 (null = solid). Pass and the way back never go below 0.5. */
+    val alpha:Float?=null,
 ) {
     fun problems()=buildList {
         if(listOfNotNull(dx,dy,width,height,font,radius,layer).any {!it.isFinite()})add("Use finite dimensions.")
@@ -25,13 +27,14 @@ internal data class StudioControlStyle(
         if(icon !in StudioLayout.icons)add("Unknown icon.")
         if(layer !in -100f..100f)add("Layer must be between -100 and 100.")
         if(type!=null && type !in StudioButtonTypes.names)add("Unknown button type.")
+        if(alpha!=null && (!alpha.isFinite() || alpha !in 0.2f..1f))add("Opacity must be 20–100%.")
     }
     /** Owner note 14: soft advice only. It marks the control red in the editor and never blocks Apply. */
     fun advice():String?=if(width!=null && width<44f || height!=null && height<44f)"Hard to tap: smaller than 44." else null
     fun json()=JSONObject().put("dx",dx).put("dy",dy).put("visible",visible).put("icon",icon).put("layer",layer).apply {
         width?.let{put("width",it)};height?.let{put("height",it)};font?.let{put("font",it)};radius?.let{put("radius",it)}
         fill?.let{put("fill",it)};ink?.let{put("ink",it)};label?.let{put("label",it)};binding?.let{put("binding",it)}
-        type?.let{put("type",it)}
+        type?.let{put("type",it)};alpha?.let{put("alpha",it.toDouble())}
     }
     companion object {
         fun parse(o:JSONObject):StudioControlStyle {
@@ -39,7 +42,7 @@ internal data class StudioControlStyle(
             fun text(k:String)=if(o.has(k))o.getString(k) else null
             return StudioControlStyle(o.optDouble("dx",0.0).toFloat(),o.optDouble("dy",0.0).toFloat(),number("width"),number("height"),
                 number("font"),number("radius"),text("fill"),text("ink"),text("label"),o.optBoolean("visible",true),text("binding"),
-                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat(),text("type")).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
+                o.optString("icon","None"),o.optDouble("layer",0.0).toFloat(),text("type"),number("alpha")).also {require(it.problems().isEmpty()){it.problems().joinToString("\n")}}
         }
     }
 }
@@ -421,9 +424,20 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         return project.copy(controls=project.controls+forced.mapValues{(_,style)->style.copy(visible=true)})
     }
     fun change(proposed:StudioControlProject,hand:StudioLayout?=pendingHand){val project=keepRequiredVisible(proposed);if(project!=draft || hand!=pendingHand){
-        logChange(draft,project,pendingHand,hand)
+        // During a slider drag only the first step makes an Undo point; the log gets one line when the drag ends.
+        if(gesture && gestureStart!=null){draft=project;pendingHand=hand;revision++;return}
+        if(gesture)gestureStart=Revision(draft,pendingHand) else logChange(draft,project,pendingHand,hand)
         undo.addLast(Revision(draft,pendingHand));if(undo.size>100)undo.removeFirst();redo.clear();draft=project;pendingHand=hand;saveDraft();revision++
     }}
+    private var gesture=false
+    private var gestureStart:Revision?=null
+    /** Owner, Nov 7: hold +/− for a slider. A whole drag is one Undo step and one log line. */
+    fun beginGesture(){gesture=true;gestureStart=null}
+    fun endGesture(){
+        gesture=false
+        gestureStart?.let{start->logChange(start.controls,draft,start.hand,pendingHand);saveDraft()}
+        gestureStart=null
+    }
     fun edit(id:String,style:StudioControlStyle)=change(withStyle(draft,id,style))
     fun duplicate(id:String,density:Float) {
         val control=controls[id] ?: error("Select a native button first.")
@@ -625,4 +639,12 @@ internal object StudioNames {
     fun isGameLog(screen:String?)=screen==GAME_LOG_SCREEN
     /** [title] unless it is the bare "Control" placeholder and this site has a plain name. */
     fun orFallback(id:String,title:String):String=if(title=="Control")fallbacks[StudioEditorGeometry.siteOf(id)] ?: title else title
+}
+
+/** Opacity steps of 10% from 20% to solid. Solid is stored as null so untouched items stay exactly as they were. */
+internal object StudioOpacity {
+    fun step(current:Float?,dir:Int):Float? {
+        val pct=(((current ?: 1f)*100).let{kotlin.math.round(it/10f)*10f}+dir*10f).coerceIn(20f,100f)
+        return if(pct>=100f)null else pct/100f
+    }
 }

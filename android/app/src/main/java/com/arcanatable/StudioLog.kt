@@ -56,6 +56,7 @@ internal object StudioLog {
             if (before.radius != after.radius) add("corners ${f(before.radius)}→${f(after.radius)}")
             if (before.layer != after.layer) add("layer ${f(before.layer)}→${f(after.layer)}")
             if (before.icon != after.icon) add("icon ${before.icon ?: "-"}→${after.icon ?: "-"}")
+            if (before.alpha != after.alpha) add("opacity ${before.alpha?.let { "${(it * 100).toInt()}%" } ?: "solid"}→${after.alpha?.let { "${(it * 100).toInt()}%" } ?: "solid"}")
         }.joinToString(", ").ifEmpty { "no change" }
     }
 
@@ -71,6 +72,7 @@ internal object StudioLog {
                 if (o.visible != e.visible) add(if (e.visible) "shown" else "hidden")
                 if (o.label != e.label) add("label \"${o.label}\"→\"${e.label}\"")
                 if (o.color != e.color || o.textColor != e.textColor || o.fs != e.fs || o.r != e.r || o.icon != e.icon) add("style")
+                if (o.alpha != e.alpha) add("opacity ${(o.alpha * 100).toInt()}%→${(e.alpha * 100).toInt()}%")
             }.takeIf { it.isNotEmpty() }?.let { "${e.label}: ${it.joinToString(", ")}" }
         } + (old.keys - after.elements.map { it.id }.toSet()).map { "${old[it]!!.label}: removed" }
         return if (lines.isEmpty()) "hand: no change" else "hand: " + lines.joinToString("; ")

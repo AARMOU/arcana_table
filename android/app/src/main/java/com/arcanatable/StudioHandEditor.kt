@@ -237,8 +237,8 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
-                    StudioInspectorTab.Layout->HandLayoutTab(layout,e,change)
-                    StudioInspectorTab.Style->HandStyleTab(e,palette,change,single=group.isEmpty())
+                    StudioInspectorTab.Layout->HandLayoutTab(runtime,layout,e,change)
+                    StudioInspectorTab.Style->HandStyleTab(runtime,e,palette,change,single=group.isEmpty())
                     // A label or an action belongs to one item, so they are never copied to several (as for buttons).
                     StudioInspectorTab.Action->if(group.isEmpty())HandActionTab(e,change)
                         else Text("Pick one item to change what it does.",color=darkTableColors.muted,fontSize=12.sp)
@@ -250,7 +250,7 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
 }
 
 @Composable
-private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioElement)->StudioElement)->Unit) {
+private fun HandLayoutTab(runtime:StudioControlsRuntime,layout:StudioLayout,e:StudioElement,change:((StudioElement)->StudioElement)->Unit) {
     var step by remember{mutableFloatStateOf(layout.snap.toFloat().coerceAtLeast(1f))}
     fun move(dx:Float,dy:Float)=change{it.copy(x=(it.x+dx).coerceIn(0f,(layout.canvasWidth-it.w).coerceAtLeast(0f)),y=(it.y+dy).coerceAtLeast(layout.originY))}
     val pad=@Composable {
@@ -267,8 +267,10 @@ private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioEle
         }
     }
     val sizes=@Composable {
-        StudioStepper("Width","${e.w.toInt()}","studio-width",{change{StudioHandEditing.widen(it,-step,layout.canvasWidth)}},{change{StudioHandEditing.widen(it,step,layout.canvasWidth)}})
-        StudioStepper("Height","${e.h.toInt()}","studio-height",{change{it.copy(h=(it.h-step).coerceAtLeast(24f))}},{change{it.copy(h=it.h+step)}})
+        StudioStepper("Width","${e.w.toInt()}","studio-width",{change{StudioHandEditing.widen(it,-step,layout.canvasWidth)}},{change{StudioHandEditing.widen(it,step,layout.canvasWidth)}},
+            StudioSlide(e.w,24f..layout.canvasWidth.coerceAtLeast(48f),runtime){v->change{StudioHandEditing.widen(it,v-it.w,layout.canvasWidth)}})
+        StudioStepper("Height","${e.h.toInt()}","studio-height",{change{it.copy(h=(it.h-step).coerceAtLeast(24f))}},{change{it.copy(h=it.h+step)}},
+            StudioSlide(e.h,24f..maxOf(400f,e.h*2f),runtime){v->change{it.copy(h=v.coerceAtLeast(24f))}})
     }
     val position=@Composable {Text("X ${e.x.toInt()} · Y ${e.y.toInt()}",color=darkTableColors.muted,fontSize=11.sp)}
     BoxWithConstraints {
@@ -282,7 +284,7 @@ private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioEle
 }
 
 @Composable
-private fun HandStyleTab(e:StudioElement,palette:List<Pair<String,Color>>,change:((StudioElement)->StudioElement)->Unit,single:Boolean=true) {
+private fun HandStyleTab(runtime:StudioControlsRuntime,e:StudioElement,palette:List<Pair<String,Color>>,change:((StudioElement)->StudioElement)->Unit,single:Boolean=true) {
     val card=e.kind=="card"
     if(!single) Text("Colours, text size and corners go to all selected. Pick one to rename it.",color=darkTableColors.muted,fontSize=12.sp)
     else if(!card && e.binding!="pass") {
@@ -293,9 +295,14 @@ private fun HandStyleTab(e:StudioElement,palette:List<Pair<String,Color>>,change
     if(!card) {
         StudioColorField("Fill",e.color,palette,{v->change{it.copy(color=v)}},"studio-fill")
         StudioColorField("Text",e.textColor,palette,{v->change{it.copy(textColor=v)}},"studio-ink")
-        StudioStepper("Text size","${e.fs.toInt()}sp","studio-font",{change{it.copy(fs=(it.fs-1f).coerceIn(8f,32f))}},{change{it.copy(fs=(it.fs+1f).coerceIn(8f,32f))}})
+        StudioStepper("Text size","${e.fs.toInt()}sp","studio-font",{change{it.copy(fs=(it.fs-1f).coerceIn(8f,32f))}},{change{it.copy(fs=(it.fs+1f).coerceIn(8f,32f))}},
+            StudioSlide(e.fs,8f..32f,runtime,{"${it.toInt()}sp"}){v->change{it.copy(fs=v)}})
     }
-    StudioStepper("Corners","${e.r.toInt()}","studio-radius",{change{it.copy(r=(it.r-2f).coerceIn(0f,64f))}},{change{it.copy(r=(it.r+2f).coerceIn(0f,64f))}})
+    StudioStepper("Opacity","${(e.alpha*100).toInt()}%","studio-opacity",
+        {change{it.copy(alpha=StudioOpacity.step(it.alpha,-1) ?: 1f)}},{change{it.copy(alpha=StudioOpacity.step(it.alpha,1) ?: 1f)}},
+        StudioSlide(e.alpha*100f,20f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=(v/100f).coerceIn(0.2f,1f))}})
+    StudioStepper("Corners","${e.r.toInt()}","studio-radius",{change{it.copy(r=(it.r-2f).coerceIn(0f,64f))}},{change{it.copy(r=(it.r+2f).coerceIn(0f,64f))}},
+        StudioSlide(e.r,0f..64f,runtime){v->change{it.copy(r=v)}})
     if(!card) {
         Row(Modifier.fillMaxWidth().heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Emphasis",color=darkTableColors.text,modifier=Modifier.weight(1f));Switch(e.strong,{v->change{it.copy(strong=v)}},modifier=Modifier.testTag("studio-strong"))

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -160,6 +161,12 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
         // through style(); everything else is shown exactly as designed (owner note 36).
         widget.runtime.bounds(widget.id,coordinates.boundsInRoot(),System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
+    }
+    // Owner, Nov 7: opacity fades the whole item (box, words and pictures). Pass and the way back stay at least half
+    // visible, so they can never be faded out of reach.
+    s.alpha?.takeIf{it.isFinite() && it<0.999f}?.let{a->
+        val floor=if(widget.runtime.controls[widget.id]?.requiredNativeAction==true)0.5f else 0.2f
+        result=result.graphicsLayer{alpha=a.coerceIn(floor,1f)}
     }
     result=result.then(this)
     // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its

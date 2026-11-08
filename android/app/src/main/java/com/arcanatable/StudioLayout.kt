@@ -12,6 +12,8 @@ internal data class StudioElement(
     val strong: Boolean = false, val visible: Boolean = true,
     val binding: String = id, val color: String? = null, val textColor: String? = null,
     val icon: String = "None",
+    /** Owner, Nov 7: opacity, 0.2–1. Pass never draws below 0.5. */
+    val alpha: Float = 1f,
 )
 
 internal data class StudioLayout(val elements: List<StudioElement>, val snap: Int = 8,
@@ -50,6 +52,7 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
                 .put("locked", e.locked).put("strong", e.strong).put("visible", e.visible)
                 .put("binding", e.binding).put("icon",e.icon).apply {
                     e.color?.let { put("color", it) }; e.textColor?.let {put("textColor",it)}
+                    if (e.alpha < 1f) put("alpha", e.alpha.toDouble())
                 }) }
         })).toString()
 
@@ -77,6 +80,7 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
             if (e.color != null && parseTableColorHex(e.color) == null) add("${e.id}: invalid color.")
             if (e.textColor != null && parseTableColorHex(e.textColor) == null) add("${e.id}: invalid text color.")
             if(e.icon !in icons) add("${e.id}: unknown icon.")
+            if(!e.alpha.isFinite() || e.alpha !in 0.2f..1f) add("${e.id}: opacity must be 20–100%.")
         }
         // Lock-outs (owner: Pass and the way back can't be hidden). Without a visible card slot the hand can't be played.
         if (elements.none { it.kind != "card" && it.binding == "pass" && it.visible }) add("Keep Pass visible.")
@@ -115,7 +119,8 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
                     e.getDouble("x").toFloat(), e.getDouble("y").toFloat(), e.getDouble("w").toFloat(), e.getDouble("h").toFloat(),
                     e.optDouble("fs",11.0).toFloat(), e.optDouble("r",10.0).toFloat(), e.optBoolean("locked"),
                     e.optBoolean("strong"), e.optBoolean("visible",true), e.optString("binding",e.getString("id")),
-                    e.optString("color").takeIf { it.isNotEmpty() },e.optString("textColor").takeIf {it.isNotEmpty()},e.optString("icon","None"))
+                    e.optString("color").takeIf { it.isNotEmpty() },e.optString("textColor").takeIf {it.isNotEmpty()},e.optString("icon","None"),
+                    e.optDouble("alpha",1.0).toFloat())
             }, obj.optInt("snap",8), obj.optJSONObject("theme")?.let { theme ->
                 themeRoles.filter {theme.has(it)}.associateWith {theme.getString(it)}
             }.orEmpty(),canvas?.getDouble("width")?.toFloat() ?: 412f,

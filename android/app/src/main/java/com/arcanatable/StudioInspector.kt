@@ -3,6 +3,7 @@ package com.arcanatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -97,8 +98,8 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
             }}
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
-                    StudioInspectorTab.Layout->LayoutTab(style,widthDp,heightDp,change)
-                    StudioInspectorTab.Style->StyleTab(style,caps,palette,change)
+                    StudioInspectorTab.Layout->LayoutTab(runtime,style,widthDp,heightDp,change)
+                    StudioInspectorTab.Style->StyleTab(runtime,style,caps,palette,change)
                     StudioInspectorTab.Action->ActionTab(runtime,control,style,caps,change)
                     StudioInspectorTab.Arrange->ArrangeTab(runtime,control,style,caps,density,change,onMessage)
                 }
@@ -119,7 +120,7 @@ private fun StudioParentButton(runtime:StudioControlsRuntime,control:StudioLiveC
 }
 
 @Composable
-private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,change:((StudioControlStyle)->StudioControlStyle)->Unit) {
+private fun LayoutTab(runtime:StudioControlsRuntime,style:StudioControlStyle,widthDp:Float,heightDp:Float,change:((StudioControlStyle)->StudioControlStyle)->Unit) {
     var step by remember{mutableFloatStateOf(4f)}
     val pad=@Composable {
         // Directional pad: one tap moves by the chosen step; the centre chip cycles 4 → 16 → 1 dp.
@@ -135,8 +136,11 @@ private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,chan
         }
     }
     val sizes=@Composable {
-        StudioStepper("Width","${(style.width ?: widthDp).toInt()}","studio-width",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,-step,0f)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,step,0f)}})
-        StudioStepper("Height","${(style.height ?: heightDp).toInt()}","studio-height",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,-step)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,step)}})
+        val w=style.width ?: widthDp;val h=style.height ?: heightDp
+        StudioStepper("Width","${w.toInt()}","studio-width",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,-step,0f)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,step,0f)}},
+            StudioSlide(w,StudioEditorGeometry.FLOOR_DP..maxOf(600f,w*2f),runtime){v->change{StudioEditorGeometry.resize(it,widthDp,heightDp,v-(it.width ?: widthDp),0f)}})
+        StudioStepper("Height","${h.toInt()}","studio-height",{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,-step)}},{change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,step)}},
+            StudioSlide(h,StudioEditorGeometry.FLOOR_DP..maxOf(600f,h*2f),runtime){v->change{StudioEditorGeometry.resize(it,widthDp,heightDp,0f,v-(it.height ?: heightDp))}})
     }
     val resets=@Composable {
         Text("Offset ${style.dx.toInt()}, ${style.dy.toInt()} dp",color=darkTableColors.muted,fontSize=11.sp)
@@ -156,7 +160,7 @@ private fun LayoutTab(style:StudioControlStyle,widthDp:Float,heightDp:Float,chan
 }
 
 @Composable
-private fun StyleTab(style:StudioControlStyle,caps:StudioCapabilities,palette:List<Pair<String,Color>>,change:((StudioControlStyle)->StudioControlStyle)->Unit) {
+private fun StyleTab(runtime:StudioControlsRuntime,style:StudioControlStyle,caps:StudioCapabilities,palette:List<Pair<String,Color>>,change:((StudioControlStyle)->StudioControlStyle)->Unit) {
     if(caps.label) {
         var text by remember(style.label){mutableStateOf(style.label.orEmpty())}
         OutlinedTextField(text,{t->text=t.take(120);change{it.copy(label=text.takeIf(String::isNotBlank))}},singleLine=true,
@@ -173,9 +177,14 @@ private fun StyleTab(style:StudioControlStyle,caps:StudioCapabilities,palette:Li
     StudioColorField("Fill",style.fill,palette,{v->change{it.copy(fill=v)}},"studio-fill")
     if(caps.ink)StudioColorField("Text",style.ink,palette,{v->change{it.copy(ink=v)}},"studio-ink")
     if(caps.font)StudioStepper("Text size",style.font?.let{"${it.toInt()}sp"} ?: "Auto","studio-font",
-        {change{it.copy(font=((it.font ?: 14f)-1f).coerceIn(8f,64f))}},{change{it.copy(font=((it.font ?: 14f)+1f).coerceIn(8f,64f))}})
+        {change{it.copy(font=((it.font ?: 14f)-1f).coerceIn(8f,64f))}},{change{it.copy(font=((it.font ?: 14f)+1f).coerceIn(8f,64f))}},
+        StudioSlide(style.font ?: 14f,8f..64f,runtime,{"${it.toInt()}sp"}){v->change{it.copy(font=v)}})
+    StudioStepper("Opacity","${((style.alpha ?: 1f)*100).toInt()}%","studio-opacity",
+        {change{it.copy(alpha=StudioOpacity.step(it.alpha,-1))}},{change{it.copy(alpha=StudioOpacity.step(it.alpha,1))}},
+        StudioSlide((style.alpha ?: 1f)*100f,20f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=if(v>=100f)null else v/100f)}})
     if(caps.radius)StudioStepper("Corners",style.radius?.let{"${it.toInt()}dp"} ?: "Auto","studio-radius",
-        {change{it.copy(radius=((it.radius ?: 12f)-2f).coerceIn(0f,100f))}},{change{it.copy(radius=((it.radius ?: 12f)+2f).coerceIn(0f,100f))}})
+        {change{it.copy(radius=((it.radius ?: 12f)-2f).coerceIn(0f,100f))}},{change{it.copy(radius=((it.radius ?: 12f)+2f).coerceIn(0f,100f))}},
+        StudioSlide(style.radius ?: 12f,0f..100f,runtime,{"${it.toInt()}dp"}){v->change{it.copy(radius=v)}})
     if(caps.icon) {
         Text("Icon",color=darkTableColors.muted,fontSize=12.sp)
         Row(Modifier.horizontalScroll(rememberScrollState())) {StudioLayout.icons.forEach {(name,glyph)->
@@ -231,15 +240,46 @@ internal fun StudioPadButton(icon:androidx.compose.ui.graphics.vector.ImageVecto
     IconButton(onClick=onClick,modifier=Modifier.size(48.dp).testTag(tag)){Icon(icon,description,tint=darkTableColors.text)}
 }
 
+/**
+ * Owner, Nov 7: "a tap-hold slider for the +/- buttons". Holding + or − (when the setting has a range) swaps the row for a
+ * slider; the item changes live while dragging, the whole drag is one Undo step, and ✓ goes back to the buttons.
+ */
+internal class StudioSlide(val value:Float,val range:ClosedFloatingPointRange<Float>,val runtime:StudioControlsRuntime,
+    val format:(Float)->String={"${it.toInt()}"},val set:(Float)->Unit)
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-internal fun StudioStepper(label:String,value:String,tag:String,onMinus:()->Unit,onPlus:()->Unit) {
+internal fun StudioStepper(label:String,value:String,tag:String,onMinus:()->Unit,onPlus:()->Unit,slide:StudioSlide?=null) {
+    var sliding by remember(tag){mutableStateOf(false)}
+    if(sliding && slide!=null) {
+        var local by remember(tag){mutableFloatStateOf(slide.value.coerceIn(slide.range))}
+        var dragging by remember(tag){mutableStateOf(false)}
+        Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("$tag-slider-row")) {
+            Text(label,color=darkTableColors.muted,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=88.dp))
+            Slider(local,{v->if(!dragging){dragging=true;slide.runtime.beginGesture()};local=v;slide.set(kotlin.math.round(v))},
+                Modifier.weight(1f).padding(horizontal=4.dp).testTag("$tag-slider"),valueRange=slide.range,
+                onValueChangeFinished={if(dragging){dragging=false;slide.runtime.endGesture()}})
+            Text(slide.format(kotlin.math.round(local)),color=darkTableColors.text,fontSize=13.sp,modifier=Modifier.widthIn(min=44.dp),textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            IconButton(onClick={if(dragging){dragging=false;slide.runtime.endGesture()};sliding=false},modifier=Modifier.size(48.dp).testTag("$tag-slider-done")){
+                Icon(Icons.Default.Check,"Done",tint=StudioEditorRequests.chromeGold)}
+        }
+        DisposableEffect(tag){onDispose{if(dragging)slide.runtime.endGesture()}}
+        return
+    }
+    val hold:()->Unit={if(slide!=null){StudioLog.add("Slider $label (was $value)");sliding=true}}
     Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
         Text(label,color=darkTableColors.muted,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
         // Studio log: every stepper tap is recorded with the value it started from, so "tap once and it stops" can be
         // traced on the owner's phone (owner, Nov 7).
-        IconButton(onClick={StudioLog.add("Tap − $label (was $value)");onMinus()},modifier=Modifier.size(48.dp).testTag("$tag-minus")){Icon(Icons.Default.Remove,"Decrease $label",tint=darkTableColors.text)}
+        Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .combinedClickable(onClickLabel="Decrease $label",onLongClickLabel=if(slide!=null)"Slide $label" else null,
+                onLongClick=if(slide!=null)hold else null){StudioLog.add("Tap − $label (was $value)");onMinus()}
+            .testTag("$tag-minus"),contentAlignment=Alignment.Center){Icon(Icons.Default.Remove,"Decrease $label",tint=darkTableColors.text)}
         Text(value,color=darkTableColors.text,fontSize=13.sp,modifier=Modifier.widthIn(min=44.dp).testTag("$tag-value"),textAlign=androidx.compose.ui.text.style.TextAlign.Center)
-        IconButton(onClick={StudioLog.add("Tap + $label (was $value)");onPlus()},modifier=Modifier.size(48.dp).testTag("$tag-plus")){Icon(Icons.Default.Add,"Increase $label",tint=darkTableColors.text)}
+        Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .combinedClickable(onClickLabel="Increase $label",onLongClickLabel=if(slide!=null)"Slide $label" else null,
+                onLongClick=if(slide!=null)hold else null){StudioLog.add("Tap + $label (was $value)");onPlus()}
+            .testTag("$tag-plus"),contentAlignment=Alignment.Center){Icon(Icons.Default.Add,"Increase $label",tint=darkTableColors.text)}
     }
 }
 

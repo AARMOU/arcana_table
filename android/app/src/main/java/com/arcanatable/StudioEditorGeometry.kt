@@ -177,7 +177,7 @@ internal object StudioEditorGeometry {
             width=size(lead.width,next.width,member.width,leadW,memW,2000f),height=size(lead.height,next.height,member.height,leadH,memH,4000f),
             font=pick(lead.font,next.font,member.font),radius=pick(lead.radius,next.radius,member.radius),fill=pick(lead.fill,next.fill,member.fill),
             ink=pick(lead.ink,next.ink,member.ink),type=pick(lead.type,next.type,member.type),visible=pick(lead.visible,next.visible,member.visible),icon=pick(lead.icon,next.icon,member.icon),
-            layer=pick(lead.layer,next.layer,member.layer))
+            layer=pick(lead.layer,next.layer,member.layer),alpha=pick(lead.alpha,next.alpha,member.alpha))
     }
 
     /** One way to line items up. Labels are what the owner sees. */
