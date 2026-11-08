@@ -735,10 +735,37 @@ internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: ()
     }
 }
 
+/**
+ * A transient image failure must not strand a visible card on text-only art.
+ * Bound network work to three attempts; stagger retries by URL to avoid synchronizing the board.
+ * A disposed card or changed URL cancels the calling LaunchedEffect and its retry pauses.
+ */
+internal suspend fun <T : Any> loadCardArtWithRetry(
+    url: String,
+    pause: suspend (Long) -> Unit = { delay(it) },
+    load: suspend (CardArtRetryContext) -> CardArtLoadResult<T>
+): T? {
+    val retryContext = CardArtRetryContext()
+    val jitterMs = url.hashCode().toLong() and 1023L
+    repeat(3) { attempt ->
+        when (val result = load(retryContext)) {
+            is CardArtLoadResult.Loaded -> return result.value
+            CardArtLoadResult.PermanentFailure -> return null
+            CardArtLoadResult.RetryableFailure -> {
+                if (attempt == 2) return null
+                pause((if (attempt == 0) 2_000L else 8_000L) + jitterMs)
+            }
+        }
+    }
+    return null
+}
+
 @Composable
 internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null, label: String? = null) {
     var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
-    LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url, fallbackName) } catch (_: Exception) { null } }
+    LaunchedEffect(url, fallbackName) {
+        if (bitmap == null) bitmap = loadCardArtWithRetry(url) { retryContext -> CardImages.loadForCardArt(url, fallbackName, retryContext) }
+    }
     // Loaded art is named after the card, so screen readers (and tests) can still tell cards apart.
     if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = cardArtDescription(label, fallbackName), modifier = modifier, contentScale = contentScale)
     // While art loads (or if it cannot load), keep the card identifiable.
