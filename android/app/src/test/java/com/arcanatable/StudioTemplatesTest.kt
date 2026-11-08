@@ -18,7 +18,9 @@ class StudioTemplatesTest {
 
     @Test fun everyTemplateImportsAndApplies() {
         StudioTemplates.all.forEach {(name,text)->
-            assertEquals("$name is out of date: rerun StudioTemplates.main",text,File(dir,name).readText())
+            // Compared as Studio data, not text: Android's JSON writer orders keys differently from desktop org.json.
+            fun parts(t:String)=JSONObject(t).let{StudioControlProject.parse(it.getJSONObject("controls").toString()) to StudioLayout.parse(it.getJSONObject("hand").toString())}
+            assertEquals("$name is out of date: rerun StudioTemplates.main",parts(text),parts(File(dir,name).readText()))
             val prefs=ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("tpl-${System.nanoTime()}",0)
             val runtime=StudioControlsRuntime(prefs,STUDIO_LAYOUT_KEY);runtime.begin()
             runtime.importProject(text)
