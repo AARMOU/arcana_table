@@ -161,6 +161,22 @@ class StudioEditorShellUiTest {
         assertNotNull("Decks resized",runtime.style(decks).width)
     }
 
+    /** Owner, Nov 7: "hold does nothing on some tabs". On Hand, hold picks every button; + Width grows them all. */
+    @Test fun holdOnTheHandTabPicksEveryButtonAndEditsThemTogether() {
+        render()
+        openHandScreen()
+        val buttons=hand().elements.filter{it.kind=="button" && it.visible}.map{it.id}
+        val before=buttons.associateWith{id->hand().elements.single{it.id==id}.w}
+        val cardWidths=hand().elements.filter{it.kind=="card"}.map{it.w}
+        rule.onNodeWithTag("studio-hand-canvas-overlay").performTouchInput{longClick(handPoint("undo"))};rule.waitForIdle()
+        rule.onNodeWithTag("studio-hand-inspector-title").assertTextEquals("${buttons.size} selected")
+        rule.onNodeWithTag("studio-width-minus").performScrollTo().performClick();rule.waitForIdle()
+        buttons.forEach{id->assertTrue("$id narrower",hand().elements.single{it.id==id}.w<before.getValue(id))}
+        assertEquals("card slots untouched",cardWidths,hand().elements.filter{it.kind=="card"}.map{it.w})
+        rule.onNodeWithTag("studio-undo").performClick();rule.waitForIdle()
+        buttons.forEach{id->assertEquals("one Undo",before.getValue(id),hand().elements.single{it.id==id}.w,0f)}
+    }
+
     @Test fun directDragMovesTheRealControlAndIsOneUndoStep() {
         render()
         val before=bounds("play")

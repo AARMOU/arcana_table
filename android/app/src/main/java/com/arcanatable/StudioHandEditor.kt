@@ -63,6 +63,12 @@ internal object StudioHandEditing {
         runtime.changeHand(current.copy(elements=current.elements.map{if(it.id==id)update(it) else it}))
     }
 
+    /** The same edit for several items at once, as one Undo step (hand multi-select). */
+    fun editMany(runtime:StudioControlsRuntime,layout:StudioLayout,ids:Set<String>,update:(StudioElement)->StudioElement) {
+        val current=runtime.handDraft() ?: layout
+        runtime.changeHand(current.copy(elements=current.elements.map{if(it.id in ids)update(it) else it}))
+    }
+
     /**
      * Width stepper. Owner's Studio log (Nov 7): "+ Width" tapped 9 times on a button against the right edge did
      * nothing, because the width was capped at the space left to its right. Now + always grows: when the right edge
@@ -84,7 +90,11 @@ internal object StudioHandEditing {
 
 @Composable
 internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayout,cards:List<GameCard>,selected:String?,onSelect:(String?)->Unit,
-    intercept:Boolean,snap:Boolean,outlines:Boolean,bottomPad:androidx.compose.ui.unit.Dp,scroll:ScrollState=rememberScrollState(),drawerFraction:Float=0.5f) {
+    intercept:Boolean,snap:Boolean,outlines:Boolean,group:Set<String> = emptySet(),onHold:(String)->Unit={},onToggle:(String)->Unit={},
+    bottomPad:androidx.compose.ui.unit.Dp,scroll:ScrollState=rememberScrollState(),drawerFraction:Float=0.5f) {
+    val currentGroup by rememberUpdatedState(group)
+    val hold by rememberUpdatedState(onHold)
+    val toggle by rememberUpdatedState(onToggle)
     val currentLayout by rememberUpdatedState(layout)
     val currentSnap by rememberUpdatedState(snap)
     val currentSelected by rememberUpdatedState(selected)
@@ -124,11 +134,11 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                         val l=currentLayout
                         val sel=l.elements.firstOrNull{it.id==currentSelected && it.visible}
                         val grabbed=sel?.takeIf{!it.locked}?.let{StudioEditorGeometry.handleAt(StudioHandEditing.frame(it,l,unit),down.position,reach)}
-                        var total=Offset.Zero;var dragging=false;var scrolling=false
+                        var total=Offset.Zero;var dragging=false;var scrolling=false;var upAt=down.uptimeMillis
                         while(true) {
                             val event=awaitPointerEvent()
                             val change=event.changes.firstOrNull{it.id==down.id} ?: break
-                            if(!change.pressed){change.consume();break}
+                            if(!change.pressed){upAt=change.uptimeMillis;change.consume();break}
                             val step=change.positionChange();total+=step;change.consume()
                             if(!dragging && !scrolling && StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop)) {
                                 if(grabbed!=null)dragging=true else scrolling=true
@@ -140,8 +150,23 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                         if(dragging && grabbed!=null && sel!=null) {
                             val r=StudioEditorGeometry.commitAbsolute(sel.x,sel.y,sel.w,sel.h,grabbed,total.x/unit,total.y/unit,
                                 if(currentSnap)l.snap else 1,24f,l.canvasWidth,l.originY)
-                            StudioHandEditing.edit(runtime,l,sel.id){it.copy(x=r[0],y=r[1],w=r[2],h=r[3])}
-                        } else if(!dragging && !scrolling) select(StudioHandEditing.hitTest(l,down.position,unit)?.id)
+                            if(currentGroup.isEmpty())StudioHandEditing.edit(runtime,l,sel.id){it.copy(x=r[0],y=r[1],w=r[2],h=r[3])}
+                            else {
+                                // Several picked: the others move and grow by the same amounts as the one dragged.
+                                val dx=r[0]-sel.x;val dy=r[1]-sel.y;val dw=r[2]-sel.w;val dh=r[3]-sel.h
+                                StudioHandEditing.editMany(runtime,l,currentGroup+sel.id){
+                                    if(it.id==sel.id)it.copy(x=r[0],y=r[1],w=r[2],h=r[3])
+                                    else it.copy(x=it.x+dx,y=it.y+dy,w=(it.w+dw).coerceAtLeast(24f),h=(it.h+dh).coerceAtLeast(24f))
+                                }
+                            }
+                        } else if(!dragging && !scrolling) {
+                            val hit=StudioHandEditing.hitTest(l,down.position,unit)?.id
+                            when {
+                                hit!=null && upAt-down.uptimeMillis>=viewConfiguration.longPressTimeoutMillis->hold(hit)
+                                hit!=null && currentGroup.isNotEmpty()->toggle(hit)
+                                else->select(hit)
+                            }
+                        }
                         handle=null;drag=Offset.Zero
                     }
                 }
@@ -149,6 +174,10 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
                     if(outlines)layout.elements.filter{it.visible && it.id!=selected}.forEach {e->
                         val f=StudioHandEditing.frame(e,layout,unit)
                         drawRect(accent.copy(alpha=0.35f),f.topLeft,f.size,style=Stroke(1.dp.toPx(),pathEffect=PathEffect.dashPathEffect(floatArrayOf(6f,6f))))
+                    }
+                    layout.elements.filter{it.id in group && it.visible}.forEach {e->
+                        val f=StudioHandEditing.frame(e,layout,unit)
+                        drawRect(accent.copy(alpha=0.12f),f.topLeft,f.size);drawRect(accent,f.topLeft,f.size,style=Stroke(2.dp.toPx()))
                     }
                     layout.elements.firstOrNull{it.id==selected && it.visible}?.let {e->
                         val base=StudioHandEditing.frame(e,layout,unit)
@@ -174,21 +203,23 @@ internal fun StudioHandWorkspace(runtime:StudioControlsRuntime,layout:StudioLayo
 
 @Composable
 internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayout,e:StudioElement,collapsed:Boolean,onCollapse:(Boolean)->Unit,
-    onSelect:(String?)->Unit,modifier:Modifier=Modifier) {
+    onSelect:(String?)->Unit,modifier:Modifier=Modifier,group:Set<String> = emptySet()) {
     val card=e.kind=="card"
     val tabs=StudioInspectorTab.entries
     var tab by remember(e.id){mutableStateOf(StudioInspectorTab.Layout)}
     // Owner's Studio log, Nov 7 (lines 324-349): with UNDO picked, "−" still shrank PASS. A function reference (::change)
     // to this local function counted as equal to the old one, so Compose kept the one holding PASS. A lambda is renewed
     // whenever the picked item changes.
-    val change:((StudioElement)->StudioElement)->Unit={update->StudioHandEditing.edit(runtime,layout,e.id,update)}
+    val change:((StudioElement)->StudioElement)->Unit={update->StudioHandEditing.editMany(runtime,layout,group+e.id,update)}
     val palette=layout.colors(runtime.project().colors(darkTableColors)).let {c->listOf("Surface" to c.panel,"Raised" to c.raised,"Accent" to c.accent,
         "Text" to c.text,"Muted" to c.muted,"Gold" to c.counter,"Canvas" to c.background)}
     Surface(modifier.fillMaxWidth().testTag("studio-inspector"),color=darkTableColors.panel,shape=RoundedCornerShape(16.dp),shadowElevation=8.dp) {
         Column(Modifier.padding(horizontal=8.dp,vertical=4.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start=4.dp)) {
-                    Text(if(card)"Hand card slot ${(e.binding.removePrefix("card").toIntOrNull() ?: 0)+1}" else e.label.ifBlank{e.id},color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp)
+                    Text(if(group.isNotEmpty())"${group.size+1} selected" else if(card)"Hand card slot ${(e.binding.removePrefix("card").toIntOrNull() ?: 0)+1}" else e.label.ifBlank{e.id},
+                        color=darkTableColors.text,maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=15.sp,modifier=Modifier.testTag("studio-hand-inspector-title"))
+                    if(group.isNotEmpty())Text("Tap items to add or remove · hold to go back to one",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
                     Text("Hand · ${if(card)"Card" else if(e.kind=="metric")"Live info" else "Button"} · ${e.w.toInt()}×${e.h.toInt()}",color=darkTableColors.muted,fontSize=11.sp,maxLines=1)
                 }
                 IconButton(onClick={onCollapse(!collapsed)},modifier=Modifier.testTag("studio-inspector-collapse")) {
@@ -207,8 +238,10 @@ internal fun StudioHandInspector(runtime:StudioControlsRuntime,layout:StudioLayo
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
                     StudioInspectorTab.Layout->HandLayoutTab(layout,e,change)
-                    StudioInspectorTab.Style->HandStyleTab(e,palette,change)
-                    StudioInspectorTab.Action->HandActionTab(e,change)
+                    StudioInspectorTab.Style->HandStyleTab(e,palette,change,single=group.isEmpty())
+                    // A label or an action belongs to one item, so they are never copied to several (as for buttons).
+                    StudioInspectorTab.Action->if(group.isEmpty())HandActionTab(e,change)
+                        else Text("Pick one item to change what it does.",color=darkTableColors.muted,fontSize=12.sp)
                     StudioInspectorTab.Arrange->HandArrangeTab(runtime,layout,e,onSelect,change)
                 }
             }
@@ -249,9 +282,10 @@ private fun HandLayoutTab(layout:StudioLayout,e:StudioElement,change:((StudioEle
 }
 
 @Composable
-private fun HandStyleTab(e:StudioElement,palette:List<Pair<String,Color>>,change:((StudioElement)->StudioElement)->Unit) {
+private fun HandStyleTab(e:StudioElement,palette:List<Pair<String,Color>>,change:((StudioElement)->StudioElement)->Unit,single:Boolean=true) {
     val card=e.kind=="card"
-    if(!card && e.binding!="pass") {
+    if(!single) Text("Colours, text size and corners go to all selected. Pick one to rename it.",color=darkTableColors.muted,fontSize=12.sp)
+    else if(!card && e.binding!="pass") {
         var text by remember(e.id,e.label){mutableStateOf(e.label)}
         OutlinedTextField(text,{t->text=t.take(80);change{it.copy(label=text)}},singleLine=true,
             label={Text(if(e.kind=="metric")"Label (count stays live)" else "Label")},modifier=Modifier.fillMaxWidth().testTag("studio-label"))

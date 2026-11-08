@@ -279,4 +279,18 @@ class StudioControlsTest {
         runtime.selected=other
         assertTrue("a plain selection goes back to one item",runtime.group.isEmpty())
     }
+    /** Owner, Nov 7: "hold does nothing on some tabs" — alike items there are built by different code. */
+    @Test fun holdFindsAlikeItemsBuiltByDifferentCodeInTheSameBox() {
+        val runtime=StudioControlsRuntime(prefs(),"portrait")
+        fun r(l:Float,t:Float,w:Float,h:Float)=androidx.compose.ui.geometry.Rect(l,t,l+w,t+h)
+        val row="native:TableHelpers.combinedClickable.1/s1:0"
+        runtime.record(StudioLiveControl(row,"Player","container-action","Zones",true,r(0f,0f,400f,60f)),{})
+        val buttons=listOf("TableBoardViews.TextButton.1","TableBoardViews.TextButton.2","TableBoardViews.TextButton.3")
+            .mapIndexed{i,site->"native:$site/s1:0".also{id->runtime.record(StudioLiveControl(id,"Player","action","B$i",true,r(10f+120f*i,10f,100f,40f)),{})}}
+        val outside="native:TableBoardViews.TextButton.4/s1:0"
+        runtime.record(StudioLiveControl(outside,"Player","action","Elsewhere",true,r(10f,200f,100f,40f)),{})
+        runtime.begin()
+        runtime.holdSelect(buttons[1])
+        assertEquals("the buttons in the same row, not the one elsewhere",buttons.toSet(),runtime.members().toSet())
+    }
 }

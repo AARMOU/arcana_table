@@ -321,8 +321,16 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         if(selected==id && group.isNotEmpty()){group=emptySet();return}
         val site=StudioEditorGeometry.siteOf(id)
         lead=id;panelOpen=true
-        group=controls.values.filter{it.id!=id && it.screen==c.screen && it.window==c.window && it.bounds.width>0f &&
-            StudioEditorGeometry.siteOf(it.id)==site && style(it.id).visible}.map{it.id}.toSet()
+        val shown=controls.values.filter{it.id!=id && it.window==c.window && it.bounds.width>0f && style(it.id).visible}
+        // Owner, Nov 7: "hold does nothing on some tabs". Items that look alike there are often built by different code,
+        // so "same code on the same screen" found nothing. Hold now widens step by step until it finds company:
+        // same code on this screen → same code anywhere in this window → the same kind of item side by side in the
+        // same box (a row of buttons, a list of entries).
+        val sameSite=shown.filter{StudioEditorGeometry.siteOf(it.id)==site}
+        val parent=StudioEditorGeometry.parentOf(controls.values,c)?.id
+        group=(sameSite.filter{it.screen==c.screen}.ifEmpty{sameSite}.ifEmpty{
+            shown.filter{it.kind==c.kind && it.screen==c.screen && StudioEditorGeometry.parentOf(controls.values,it)?.id==parent}
+        }).map{it.id}.toSet()
         StudioLog.add("Selected ${members().size} like ${title(id)}")
     }
     /** While several are selected, a tap adds or removes one item instead of replacing the selection. */

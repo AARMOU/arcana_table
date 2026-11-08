@@ -77,8 +77,24 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     val tabs=destinations.keys.toList().let{k->k.take(2)+"Hand"+k.drop(2)}
     var tab by remember{mutableStateOf("Table")}  // outside a game, Table shows the practice card
     val handMode=tab=="Hand"
-    var handSelected by remember{mutableStateOf<String?>(null)}
     val configuration=androidx.compose.ui.platform.LocalConfiguration.current
+    var handSelected by remember{mutableStateOf<String?>(null)}
+    // Owner, Nov 7: "hold does nothing on some tabs". On the Hand tab, hold an item to pick every item of its kind
+    // (all buttons, all counters or all card slots); then a tap adds or removes one. Edits go to all of them.
+    var handGroup by remember{mutableStateOf(emptySet<String>())}
+    val pickHand:(String?)->Unit={handSelected=it;handGroup=emptySet()}
+    val holdHand:(String)->Unit={id->
+        val l=StudioHandEditing.layout(runtime,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat())
+        val kind=l.elements.firstOrNull{it.id==id}?.kind
+        if(handSelected==id && handGroup.isNotEmpty())handGroup=emptySet()
+        else {handSelected=id;handGroup=l.elements.filter{it.id!=id && it.kind==kind && it.visible}.map{it.id}.toSet()}
+        StudioLog.add("Hand: selected ${handGroup.size+1} like $id")
+    }
+    val toggleHand:(String)->Unit={id->
+        val members=(listOfNotNull(handSelected)+handGroup).toMutableList()
+        if(id in members)members.remove(id) else members.add(id)
+        handSelected=members.firstOrNull();handGroup=members.drop(1).toSet()
+    }
     val handLayout=if(handMode)StudioHandEditing.layout(runtime,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat()) else null
     val handElement=handLayout?.elements?.firstOrNull{it.id==handSelected}
     val popups=StudioEditorRequests.popups
@@ -91,9 +107,9 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
     val apply:()->Unit={runCatching{runtime.apply()}.onSuccess{onApplied()}.onFailure{message=it.message ?: "Fix the listed problems before applying."}}
     val close:()->Unit={if(runtime.canUndo || runtime.hasDraft())confirmClose=true else runtime.cancel()}
     val pick:(String)->Unit={name->
-        if(name=="Hand"){onLeaveScreen();tab="Hand";runtime.selected=null;handSelected=null}
+        if(name=="Hand"){onLeaveScreen();tab="Hand";runtime.selected=null;pickHand(null)}
         else destinations[name]?.let{(available,open)->
-            if(available){tab=name;handSelected=null;runtime.selected=null;runtime.tablePicked=false;open()}
+            if(available){tab=name;pickHand(null);runtime.selected=null;runtime.tablePicked=false;open()}
             else message=if(name=="Combat")"Combat can be edited during combat in a practice game." else "Start a practice game to edit $name."
         }
     }
@@ -115,14 +131,14 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
         }
     }
     val inspector:@Composable (Modifier)->Unit={mod->
-        if(handLayout!=null)handElement?.let {StudioHandInspector(runtime,handLayout,it,collapsed,{v->collapsed=v},{id->handSelected=id},mod)}
+        if(handLayout!=null)handElement?.let {StudioHandInspector(runtime,handLayout,it,collapsed,{v->collapsed=v},{id->pickHand(id)},mod,group=handGroup)}
         else if(selected!=null)StudioInspector(runtime,selected,density,collapsed,{v->collapsed=v},{m->message=m},mod)
         else if(runtime.tablePicked)StudioTableInspector(runtime,collapsed,{v->collapsed=v},{m->message=m},mod)
     }
     val sheets=@Composable {
         Box(Modifier.fillMaxSize()) {
             val layersModifier=Modifier.align(Alignment.CenterEnd).statusBarsPadding().padding(top=56.dp)
-            if(layersOpen)if(handLayout!=null)StudioHandLayersPanel(runtime,handLayout,handSelected,{handSelected=it},{layersOpen=false},layersModifier)
+            if(layersOpen)if(handLayout!=null)StudioHandLayersPanel(runtime,handLayout,handSelected,pickHand,{layersOpen=false},layersModifier)
                 else StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},layersModifier,popupScreens)
             if(moreOpen)StudioMorePanel(runtime,screen,snap,setSnap,outlines,setOutlines,onApplied,onClassic,
                 if(handMode)null else ({moreOpen=false;pick("Hand")}),{message=it},{moreOpen=false},
@@ -143,7 +159,8 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
                 Box(Modifier.fillMaxSize().padding(top=top)) {popups.forEach{p->key(p.key){p.content()}}}
             }
             when {
-                handLayout!=null->StudioHandWorkspace(runtime,handLayout,handCards,handSelected,{handSelected=it},tool==StudioEditorTool.Select,snap,outlines,
+                handLayout!=null->StudioHandWorkspace(runtime,handLayout,handCards,handSelected,pickHand,tool==StudioEditorTool.Select,snap,outlines,
+                    group=handGroup,onHold=holdHand,onToggle=toggleHand,
                     bottomPad=if(handElement!=null && !collapsed)360.dp else 96.dp)
                 noGame->StudioPracticeCard(onPractice,{pick("Hand")},Modifier.align(Alignment.Center))
                 else->StudioSelectionCanvas(runtime,window,origin,tool==StudioEditorTool.Select,snap,outlines,density,popupScreens)
