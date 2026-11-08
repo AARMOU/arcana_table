@@ -803,7 +803,8 @@ internal fun OptionsPage(
                     StudioIconButton("TableDialogs.IconButton.4", "Dialogs and overlays", onClick = onDismiss, modifier = Modifier.size(44.dp)) { StudioIcon("TableDialogs.Icon.4", "Dialogs and overlays", Icons.Filled.Close, "Close options", tint = Muted) }
                 }
                 Section("APPEARANCE", top = 8.dp)
-                StudioTextButton("TableDialogs.TextButton.25", "Dialogs and overlays", onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { StudioText("TableDialogs.Text.123", "Dialogs and overlays", true, "Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
+                // Owner, Nov 6: Studio builds drop the Light/Dark switch; Light is a palette in Arcana Studio.
+                if (!BuildConfig.STUDIO_ENABLED) StudioTextButton("TableDialogs.TextButton.25", "Dialogs and overlays", onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { StudioText("TableDialogs.Text.123", "Dialogs and overlays", true, "Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
                 SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, Modifier)
                 StudioText("TableDialogs.Text.124", "Dialogs and overlays", false, "CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.tutorialTarget("setting-card-size").padding(top = 6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

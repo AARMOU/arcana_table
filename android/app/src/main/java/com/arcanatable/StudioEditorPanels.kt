@@ -43,7 +43,7 @@ internal fun StudioTopBar(runtime:StudioControlsRuntime,screen:String,onClose:()
             }
             StudioBarIcon(Icons.AutoMirrored.Filled.Undo,"Undo","studio-undo",enabled=runtime.canUndo){runtime.undo()}
             StudioBarIcon(Icons.AutoMirrored.Filled.Redo,"Redo","studio-redo",enabled=runtime.canRedo){runtime.redo()}
-            if(scrollMode!=null)StudioBarIcon(Icons.Default.PanTool,if(scrollMode)"Scroll mode: tap to edit" else "Scroll the screen",
+            if(scrollMode!=null)StudioBarIcon(Icons.Default.PanTool,if(scrollMode)"Scroll mode: tap to edit" else "Scroll the screen (or drag with two fingers)",
                 if(scrollMode)"studio-tool-Select" else "studio-tool-Scroll",active=scrollMode,onClick=onToggleScroll)
             StudioBarIcon(Icons.Default.Layers,"Layers","studio-layers",active=layersOpen,onClick=onLayers)
             StudioBarIcon(Icons.Default.MoreVert,"More options","studio-more",onClick=onMore)
@@ -119,7 +119,7 @@ internal fun StudioLayersPanel(runtime:StudioControlsRuntime,window:Int,onDismis
 @Composable
 internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Boolean,onSnap:(Boolean)->Unit,outlines:Boolean,onOutlines:(Boolean)->Unit,
     onApplied:()->Unit,onClassic:(()->Unit)?,onHand:(()->Unit)?,onMessage:(String)->Unit,onDismiss:()->Unit,
-    hand:(@Composable ((String,()->Unit)->Unit)->Unit)?=null) {
+    hand:(@Composable ((String,()->Unit)->Unit)->Unit)?=null,onGameOptions:(()->Unit)?=null,look:StudioLookHost?=null) {
     val context=androidx.compose.ui.platform.LocalContext.current
     val saveFile=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")) {uri->
         if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.use{it.write(runtime.exportProject().toByteArray(Charsets.UTF_8))} ?: error("Could not write the file.")}
@@ -139,6 +139,9 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
     var json by remember{mutableStateOf<String?>(null)}
     var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
     var page by remember{mutableStateOf(if(hand!=null)"Hand" else "Layout")}
+    var trying by remember{mutableStateOf<Pair<StudioControlProject,StudioLook>?>(null)}
+    var tryingPreset by remember{mutableStateOf<String?>(null)}
+    var keepColours by remember{mutableStateOf(false)}
     val pages=listOfNotNull("Hand".takeIf{hand!=null},"Layout","Palette","Project")
     StudioSheet("Studio options",onDismiss,"studio-more-panel") {
         // Three short pages instead of one long form.
@@ -150,6 +153,32 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         }}
         if(page=="Hand")hand?.invoke{q,a->confirm=q to a}
         if(page=="Layout") {
+        // Owner, Nov 6 (batch 4): presets that make really noticeable changes, with Keep / Back.
+        if(look!=null) {
+            StudioSection("Presets")
+            Row(Modifier.hintedHorizontalScroll()) {
+                StudioPresets.all.forEach {preset->
+                    StudioChip(preset.name,true,"studio-preset-${preset.name}",selected=tryingPreset==preset.name){
+                        if(trying==null)trying=runtime.draft to look.read()
+                        tryingPreset=preset.name
+                        look.write(preset.look)
+                        runtime.change(StudioPresets.project(trying!!.first,preset,keepColours))
+                        StudioLog.add("Preset tried: ${preset.name}${if(keepColours)" (kept my colours)" else ""}")
+                    }
+                }
+            }
+            StudioPresets.all.firstOrNull{it.name==tryingPreset}?.let{Text(it.description,color=darkTableColors.muted,fontSize=12.sp)}
+            StudioToggleRow("Keep my colours",keepColours,"studio-preset-keep-colours"){keepColours=it}
+            trying?.let{(project,before)->
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button(onClick={trying=null;StudioLog.add("Preset kept: $tryingPreset");tryingPreset=null},modifier=Modifier.heightIn(min=44.dp).testTag("studio-preset-keep"),
+                        shape=RoundedCornerShape(6.dp),colors=ButtonDefaults.buttonColors(containerColor=StudioEditorRequests.chromeAction,contentColor=darkTableColors.background)){Text("Keep")}
+                    OutlinedButton(onClick={look.write(before);runtime.change(project);trying=null;StudioLog.add("Preset undone: $tryingPreset");tryingPreset=null},
+                        modifier=Modifier.heightIn(min=44.dp).testTag("studio-preset-back"),shape=RoundedCornerShape(6.dp)){Text("Back",color=darkTableColors.text)}
+                }
+                Text("Card and button sizes change right away; Back puts them and the layout back.",color=darkTableColors.muted,fontSize=11.sp)
+            }
+        }
         StudioSection("Layout profile")
         Row(Modifier.hintedHorizontalScroll()) {
             StudioProfiles(runtime.prefs,runtime.orientation).names().forEach {name->
@@ -169,6 +198,11 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
                 Switch(shown,{on->runtime.change(runtime.draft.copy(hiddenPieces=if(on)runtime.draft.hiddenPieces-key else runtime.draft.hiddenPieces+key))},
                     modifier=Modifier.testTag("studio-piece-$key"))
             }
+        }
+        // Owner, Nov 6: Adjust UI's options live in Studio now (its old entry points open Studio in these builds).
+        onGameOptions?.let{open->
+            StudioSection("Game options")
+            Row(Modifier.hintedHorizontalScroll()){StudioChip("Card sizes, Quick Actions, pop-ups…",true,"studio-game-options",onClick=open)}
         }
         StudioSection("Turn label")
         Row(Modifier.hintedHorizontalScroll()) {
@@ -190,6 +224,9 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         StudioSection("Palette")
         Row(Modifier.hintedHorizontalScroll()) {
             StudioChip("Table default",runtime.draft.theme.isNotEmpty(),"studio-palette-default",selected=runtime.draft.theme.isEmpty()){runtime.change(runtime.draft.copy(theme=emptyMap()))}
+            // Owner, Nov 6: Light is a palette here (the Light/Dark switch is gone from Studio builds).
+            val lightTheme=StudioLayout.themeRoles.associateWith{role->tableColorHex(lightTableColors.colorRole(if(role=="gold")"counter" else role))}
+            StudioChip("Light",true,"studio-palette-Light",selected=runtime.draft.theme==lightTheme){runtime.change(runtime.draft.copy(theme=lightTheme))}
             tablePalettePresets.forEach {preset->
                 val presetTheme=StudioLayout.themeRoles.associateWith{role->tableColorHex(preset.colors.colorRole(if(role=="gold")"counter" else role))}
                 StudioChip(preset.name,true,"studio-palette-${preset.name}",selected=runtime.draft.theme==presetTheme){

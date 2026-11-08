@@ -165,7 +165,8 @@ fun TableScreen() = TableScreen(onControllerReady = {})
 internal fun TableScreen(onControllerReady: (TableController) -> Unit) {
     val context = LocalContext.current
     val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
-    var darkMode by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("dark_mode", true)) }
+    // Studio builds have no Light/Dark switch (owner, Nov 6), so they always start from the dark table; Light is a Studio palette.
+    var darkMode by rememberSaveable { mutableStateOf(BuildConfig.STUDIO_ENABLED || optionPrefs.getBoolean("dark_mode", true)) }
     var paletteName by rememberSaveable {
         mutableStateOf(optionPrefs.getString(TABLE_PALETTE_PREF, "Arcana Original") ?: "Arcana Original")
     }
@@ -353,7 +354,16 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                     onApplied={nativeStudioRevision++},
                     onClassic={studioClassic=true;studio.panelOpen=true},
                     handCards=players.getOrNull(localSeat)?.hand.orEmpty(),
-                    onPractice=studioPractice,onLeaveScreen={studioCloseAll()})
+                    onPractice=studioPractice,onLeaveScreen={studioCloseAll()},onGameOptions={layoutLabOpen=true},
+                    // Presets set the same values (and saved preferences) as Game options / the old Adjust UI.
+                    look=StudioLookHost({StudioLook(cardSizeScale,boardSpacingScale,footerButtonScale,handCardScale)}) {l->
+                        cardSizeScale=l.cardSize.coerceIn(.75f,1.4f);boardSpacingScale=l.spacing.coerceIn(.5f,2f)
+                        footerButtonScale=l.buttons.coerceIn(.78f,1.3f);handCardScale=l.handCards.coerceIn(.7f,1.4f)
+                        optionPrefs.edit().putFloat("card_size_scale",cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix",cardSizeScale)
+                            .putFloat("layout_board_spacing_$layoutOrientationSuffix",boardSpacingScale)
+                            .putFloat("layout_footer_button_scale_$layoutOrientationSuffix",footerButtonScale)
+                            .putFloat("layout_hand_card_scale_$layoutOrientationSuffix",handCardScale).apply()
+                    })
                 else {
                 if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
                     onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()

@@ -80,27 +80,36 @@ class StudioShowMeUiTest {
             val changed=ConcurrentHashMap<String,Int>()
             val observer=Snapshot.registerApplyObserver{objs,_->objs.forEach{o->val k=o.toString().take(160);changed.merge(k,1,Int::plus)}}
             val done=AtomicBoolean(false);val hung=AtomicBoolean(false)
+            val testThread=Thread.currentThread()
+            val report=File(System.getProperty("arcana.screenshots") ?: "build/screenshots","studio-showme-hang-${tab.replace(' ','-')}.txt")
+            fun write(stage:String)=runCatching {
+                report.parentFile?.mkdirs()
+                report.appendText(buildString {
+                    appendLine("[$stage] Most-changed state while the '$tab' sample was open:")
+                    changed.entries.sortedByDescending{it.value}.take(40).forEach{appendLine("${it.value}× ${it.key}")}
+                    appendLine("Test thread ${testThread.name} (${testThread.state}):")
+                    testThread.stackTrace.take(120).forEach{appendLine("  at $it")}
+                    appendLine()
+                })
+            }
             val dog=Thread {
-                val until=System.currentTimeMillis()+60_000
-                while(!done.get() && System.currentTimeMillis()<until)Thread.sleep(250)
-                if(!done.get()) {
-                    hung.set(true)
-                    val main=Thread.getAllStackTraces().entries.firstOrNull{it.key.name.contains("main",ignoreCase=true) || it.key.name.startsWith("SDK")}
-                    File("build/screenshots").mkdirs()
-                    File("build/screenshots/studio-showme-hang-$tab.txt").writeText(buildString {
-                        appendLine("Most-changed state while the '$tab' sample was open:")
-                        changed.entries.sortedByDescending{it.value}.take(40).forEach{appendLine("${it.value}× ${it.key}")}
-                        appendLine();appendLine("Thread ${main?.key?.name}:")
-                        main?.value?.take(80)?.forEach{appendLine("  at $it")}
-                    })
-                    Snapshot.withMutableSnapshot{controller?.studioPreview=null}
-                }
+                fun waitFor(ms:Long):Boolean{val until=System.currentTimeMillis()+ms;while(!done.get() && System.currentTimeMillis()<until)Thread.sleep(250);return done.get()}
+                if(waitFor(60_000))return@Thread
+                hung.set(true);write("60 s");Snapshot.withMutableSnapshot{controller?.studioPreview=null}
+                if(waitFor(20_000))return@Thread
+                write("80 s, after closing the sample");testThread.interrupt()
+                if(waitFor(20_000))return@Thread
+                // Still stuck: stop this test JVM now (CI prints the report) rather than hold CI for 25 minutes.
+                write("100 s, still stuck: stopping");Runtime.getRuntime().halt(3)
             }.apply{isDaemon=true;start()}
             try {
                 rule.onNodeWithTag("studio-tab-screen-$tab").performScrollTo().performClick();UiTestSupport.settle(rule)
                 if(!hung.get())check(s)
+            } catch(t:Throwable) {
+                if(hung.get())throw AssertionError("The '$tab' sample kept the screen busy: ${runCatching{report.readText()}.getOrDefault("")}",t)
+                throw t
             } finally {done.set(true);dog.join(2_000);observer.dispose()}
-            assertFalse("The '$tab' sample kept the screen busy; see build/screenshots/studio-showme-hang-$tab.txt",hung.get())
+            assertFalse("The '$tab' sample kept the screen busy: ${runCatching{report.readText()}.getOrDefault("")}",hung.get())
             s.onActivity{a->a.tableController!!.studioControlsRuntime!!.cancel()};UiTestSupport.settle(rule)
             s.onActivity{assertNull("samples close with Studio",it.tableController!!.studioPreview)}
         } finally {s.close()}

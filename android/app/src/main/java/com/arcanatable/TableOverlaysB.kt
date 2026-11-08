@@ -1054,7 +1054,9 @@ internal fun TableController.TableOverlaysB() {
                 .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_stack_pile", true).putBoolean("adjust_ai_recap", true)
                 .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putBoolean("adjust_auto_open_hand", true).putFloat("adjust_notice_seconds", 4f).putFloat("adjust_combat_card_scale", 1f).apply()
         },
-        onDismiss = { layoutLabOpen = false; optionsOpen = true }
+        // From Studio, closing goes back to Studio (not to Settings).
+        inStudio = studioControlsRuntime?.editing == true,
+        onDismiss = { layoutLabOpen = false; if (studioControlsRuntime?.editing != true) optionsOpen = true }
     )
 
     if (resetConfirmOpen) StudioAlertDialog("Game dialog 7",

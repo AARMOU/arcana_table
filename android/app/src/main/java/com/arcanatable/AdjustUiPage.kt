@@ -47,6 +47,8 @@ internal fun AdjustUiPage(
     onReset: () -> Unit, onDismiss: () -> Unit,
     stackPile: Boolean = true, onStackPile: (Boolean) -> Unit = {},
     autoOpenHand: Boolean = true, onAutoOpenHand: (Boolean) -> Unit = {},
+    /** Owner, Nov 6: opened from Arcana Studio (Adjust UI's options moved into Studio). Studio's hand editor owns the tray height. */
+    inStudio: Boolean = false,
 ) {
     val catalog = listOf(
         AdjustableAction("GRAVEYARD", "Graveyard"), AdjustableAction("EXILE", "Exile"),
@@ -62,7 +64,7 @@ internal fun AdjustUiPage(
             Column(Modifier.fillMaxSize().padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("ADJUST UI · $orientationName", color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                        Text(if (inStudio) "STUDIO · GAME OPTIONS" else "ADJUST UI · $orientationName", color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
                         Text("Changes save as you make them", color = Muted, fontSize = 10.sp)
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close", tint = Muted) }
@@ -109,7 +111,7 @@ internal fun AdjustUiPage(
                     Box(Modifier.tutorialTarget("layout-sizes")) { AdjustSection("TABLE SIZE") }
                     AdjustSlider("Card size", cardSize, .75f..1.4f, { "${(it * 100).toInt()}%" }, onCardSize)
                     AdjustSlider("Board spacing", spacing, .5f..2f, { "${(it * 100).toInt()}%" }, onSpacing)
-                    AdjustSlider("Hand tray height", handHeight, .38f.. .95f, { "${(it * 100).toInt()}%" }, onHandHeight)
+                    if (!inStudio) AdjustSlider("Hand tray height", handHeight, .38f.. .95f, { "${(it * 100).toInt()}%" }, onHandHeight)
                     AdjustSlider("Bottom button size", footerScale, .78f..1.3f, { "${(it * 100).toInt()}%" }, onFooterScale)
                     AdjustSlider("Hand card size", handScale, .7f..1.4f, { "${(it * 100).toInt()}%" }, onHandScale)
                     Text("Hand arrangement", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))

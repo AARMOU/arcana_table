@@ -62,7 +62,13 @@ jobs:
             --tests 'com.arcanatable.ReadableNotificationDurationTest'
       - name: Run custom-card scenario tests and Build 131 Android unit tests
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+        # A test that would hang writes a *-hang-*.txt report before stopping (StudioShowMeUiTest); print it here,
+        # because the uploaded artifact isn't readable from every agent's network.
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest || {
+            for f in app/build/screenshots/*-hang-*.txt; do [ -f "$f" ] && { echo "== $f"; cat "$f"; }; done
+            exit 1
+          }
       # Debug-only test scenarios (PR #110) must never ship: release compiles the empty
       # src/release stub. Only this test runs in the release variant, because the Compose UI
       # tests need the debug-only ui-test-manifest and can't launch there.

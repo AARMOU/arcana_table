@@ -615,6 +615,7 @@ internal fun PlayerBoard(
             LazyColumn(
                 state = battlefieldListState,
                 modifier = Modifier.fillMaxWidth().weight(1f).studioPanel("TableBoardViews.Panel.1", "Table and player", "Battlefield", RoundedCornerShape(12.dp), Panel).tutorialTarget("battlefield-row").tutorialTarget("table-zoom")
+                    .studioScrollTarget(battlefieldListState, horizontal = false)
                     .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
@@ -986,7 +987,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
             }
             val rows = cards.chunked(grid.columns.coerceAtLeast(1))
             val container = if (grid.rows == 1) Modifier.fillMaxWidth().hintedHorizontalScroll(handScrollState)
-                else Modifier.fillMaxWidth().heightIn(max = areaHeight).verticalScroll(handScrollState)
+                else Modifier.fillMaxWidth().heightIn(max = areaHeight).studioScrollTarget(handScrollState, horizontal = false).verticalScroll(handScrollState)
             Column(container.testTag("hand-grid").tutorialTarget("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
             rows.forEach { rowCards -> Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             rowCards.forEach { card ->

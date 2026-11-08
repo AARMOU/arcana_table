@@ -374,7 +374,7 @@ internal fun TableController.TableMainLayout() {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(overviewColumns.coerceAtLeast(1)),
                 state = overviewGridState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f).studioScrollTarget(overviewGridState, horizontal = false),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 4.dp)

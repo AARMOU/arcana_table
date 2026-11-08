@@ -41,7 +41,7 @@ internal fun Modifier.hintedHorizontalScroll(state: ScrollState = rememberScroll
             val x = 10.dp.toPx()
             drawPath(Path().apply { moveTo(x + a, cy - a); lineTo(x, cy); lineTo(x + a, cy + a); close() }, arrow.copy(alpha = 0.85f))
         }
-    }.horizontalScroll(state)
+    }.studioScrollTarget(state, horizontal = true).horizontalScroll(state)
 }
 
 /**
@@ -77,7 +77,7 @@ internal fun Modifier.studioRowScroll(): Modifier {
             val x = 10.dp.toPx()
             drawPath(Path().apply { moveTo(x + a, cy - a); lineTo(x, cy); lineTo(x + a, cy + a); close() }, arrow.copy(alpha = 0.85f))
         }
-    }.scrollable(state, androidx.compose.foundation.gestures.Orientation.Horizontal)
+    }.studioScrollTarget(state, horizontal = true, dragDelta = true).scrollable(state, androidx.compose.foundation.gestures.Orientation.Horizontal)
         .layout { measurable, constraints ->
             val p = measurable.measure(constraints.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
             val w = p.width.coerceIn(constraints.minWidth, constraints.maxWidth)

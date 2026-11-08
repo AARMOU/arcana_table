@@ -54,7 +54,8 @@ internal enum class StudioEditorTool {Select,Scroll}
  */
 @Composable
 internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<String,Pair<Boolean,()->Unit>>,onApplied:()->Unit,
-    onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList(),onPractice:(()->Unit)?=null,onLeaveScreen:()->Unit={}) {
+    onClassic:(()->Unit)?,handCards:List<GameCard> = emptyList(),onPractice:(()->Unit)?=null,onLeaveScreen:()->Unit={},
+    onGameOptions:(()->Unit)?=null,look:StudioLookHost?=null) {
     val window=System.identityHashCode(LocalView.current.rootView)
     val density=LocalDensity.current.density
     var tool by StudioEditorRequests::tool
@@ -142,7 +143,8 @@ internal fun StudioEditorShell(runtime:StudioControlsRuntime,destinations:Map<St
                 else StudioLayersPanel(runtime,if(foreign)0 else window,{layersOpen=false},layersModifier,popupScreens)
             if(moreOpen)StudioMorePanel(runtime,screen,snap,setSnap,outlines,setOutlines,onApplied,onClassic,
                 if(handMode)null else ({moreOpen=false;pick("Hand")}),{message=it},{moreOpen=false},
-                hand=handLayout?.let{l->{confirm->StudioHandOptions(runtime,l,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat(),onApplied,{message=it},confirm)}})
+                hand=handLayout?.let{l->{confirm->StudioHandOptions(runtime,l,configuration.screenWidthDp.toFloat(),configuration.screenHeightDp.toFloat(),onApplied,{message=it},confirm)}},
+                onGameOptions=onGameOptions?.let{open->{moreOpen=false;open()}},look=look)
         }
     }
     val palette=runtime.project().colors(darkTableColors)
@@ -288,15 +290,32 @@ internal fun StudioSelectionCanvas(runtime:StudioControlsRuntime,window:Int,orig
             val selection=runtime.selected?.let{runtime.controls[it]}?.takeIf{it.window==window && it.bounds.width>0f}
             val grabbed=selection?.let{StudioEditorGeometry.handleAt(it.bounds,point,reach)}
             var total=Offset.Zero;var dragging=false;var upAt=down.uptimeMillis
+            // Owner note 5: two fingers scroll the row or list under them instead of editing.
+            var twoFinger=false;var scrollTargets:Pair<StudioScrollTargets.Target?,StudioScrollTargets.Target?>?=null
+            var lastCentre:Offset?=null;var lastCount=0
             while(true) {
                 val event=awaitPointerEvent()
+                val pressed=event.changes.filter{it.pressed}
+                if(pressed.size>=2 || twoFinger) {
+                    if(pressed.isEmpty())break
+                    val centre=pressed.fold(Offset.Zero){a,c->a+c.position}/pressed.size.toFloat()
+                    if(!twoFinger){twoFinger=true;dragging=false;handle=null;drag=Offset.Zero
+                        scrollTargets=StudioScrollTargets.under(centre+currentOrigin,window)}
+                    // A finger added or lifted moves the centre without any scrolling.
+                    if(pressed.size>=2 && pressed.size==lastCount)lastCentre?.let{scrollTargets?.let{(h,v)->StudioScrollTargets.scroll(h,v,centre-it)}}
+                    lastCentre=centre;lastCount=pressed.size
+                    event.changes.forEach{it.consume()}
+                    continue
+                }
                 val change=event.changes.firstOrNull{it.id==down.id} ?: break
                 if(!change.pressed){upAt=change.uptimeMillis;change.consume();break}
                 total+=change.positionChange();change.consume()
                 if(!dragging && grabbed!=null && StudioEditorGeometry.isMeaningfulDrag(total,viewConfiguration.touchSlop))dragging=true
                 if(dragging){handle=grabbed;drag=total}
             }
-            if(dragging && grabbed!=null && selection!=null) {
+            if(twoFinger) {
+                StudioLog.add("Two-finger scroll")
+            } else if(dragging && grabbed!=null && selection!=null) {
                 val style=runtime.style(selection.id)
                 val next=StudioEditorGeometry.commit(style,grabbed,selection.bounds.width/density,selection.bounds.height/density,
                     Offset(total.x/density,total.y/density),currentSnap)
