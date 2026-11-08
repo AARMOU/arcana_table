@@ -2,6 +2,19 @@
 
 _Written Nov 6, 2026, 23:05 MT, after batch 1. Read this first, then #995 (plan), #883 (owner decisions), #1016 (GPT index)._
 
+## Update: Nov 8, ~10:30 MT (owner: "Finish the studio project")
+- **Landed** (`a49cbe6`, `220c84f`, `4af8d38`):
+  - **Per-player IDs (note 28 / J8).** `LocalStudioSeat` / `StudioSeat(index, localSeat, count)` wraps seat chips, overview tiles and player boards. IDs inside become `native:<site>/s<screen>@<you|opp1|opp2…>:<n>`, with opponents counted from your seat. The screen-order ID is still claimed and aliased (`runtime.alias`): an old edit shows until the item is next edited, then moves to the player's ID (`withStyle`). Test: `StudioSeatIdsTest`.
+  - **Fill it up (note 29).** Studio ⋮ > Layout > Editing switch (`runtime.fillItUp`, never saved). MainActivity keeps the real players in `TableController.studioRealPlayers` and shows `StudioBusyPreview.fill(...)`. A new engine state refills from it. Off puts back `argentumSnapshot.players ?: saved`. `savePlayers` is skipped while filling. Tests: `StudioBusyPreviewTest`, `StudioFillItUpUiTest`.
+  - **Two-finger scroll (note 5).** `studioScrollTarget(state, horizontal, dragDelta)` registers scrollers in `StudioScrollTargets` while the shell is open. It covers `hintedHorizontalScroll`, `studioRowScroll`, the battlefield LazyColumn, the hand grid and the overview grid. Two pointers on `StudioSelectionCanvas` scroll the innermost target under them and edit nothing. The toolbar Scroll toggle stays for any list not registered.
+  - **Presets (batch 4).** `StudioPresets`: Classic, Big Table, Big & Clear, Command Center, Pocket, Spread Out. Each sets card/board/button/hand sizes (`StudioLookHost`, the same prefs Adjust UI wrote), density, Show on screen, turn label and palette. Keep / Back and "Keep my colours" are offered. Left-Handed was not done: it needs per-item moves, and presets deliberately never move single items.
+  - **Light/Dark switch** hidden in Studio builds (`TableDialogs`), which always start dark; **Light** is a Studio palette chip.
+  - **Game options.** Studio ⋮ > Layout > Game options opens `AdjustUiPage(inStudio = true)`, which has no tray-height slider because the hand editor owns that. Before this, Adjust UI was unreachable in Studio builds.
+  - **J11 (Red Bull, 272 vs 320 px).** In Studio builds, `tutorialTarget` uses the full unclipped bounds of a visible target.
+  - **Show me is back on.** The CI "hang" was the test: an animated `performScrollTo` to an off-screen tab under the frozen test clock. `StudioShowMeUiTest` runs one test per sample with a watchdog that writes a `*-hang-*.txt` report, and CI prints `app/build/screenshots/*-hang-*.txt` on failure.
+- **Local tests:** Maven Central rate-limits this container. Robolectric needs `android-all-instrumented-14-robolectric-10818077-i7.jar`; curl it into a dir and pass `-Parcana.robolectricJarDir=<dir>`. `nativeruntime-dist-compat` can go in `~/.m2` with an init script that puts `mavenLocal()` first. The CI artifact zip is unreadable from here (Azure blob 403), so read the job log instead.
+- **Still open:** chip reflow inside the scrolling seat row, Left-Handed preset, real preset thumbnails, and device (Fold) acceptance of everything above.
+
 ## Update: Nov 7, ~15:00 MT (owner: "No I want you to finish studio")
 - **CI hang found:** `StudioCoverageAuditTest.showMeSamplesOpenWithoutTheRealMoment` (not J10). The Show me samples were rebuilt on every recomposition; now `remember`ed (`bfbf49f`). Claude B's per-test names and 25-min timeout made this visible.
 - **Still hung with remembered samples** (run 42417032930), so "Show me" is switched off (`StudioPreviews.ENABLED=false`, `b99666d`) and the test is `@Ignore`d. Next: bisect by tab (Combat / Opening hand / Actions); note the test deals a real opening hand (`fake.dealOpeningHand=true`), so a real mulligan pop-up may be up underneath. Test APK `b99666d` built.
