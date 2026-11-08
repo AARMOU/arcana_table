@@ -150,7 +150,18 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     // only the words moved. The move used to be applied inside the call site's own background/clip/padding. It is now
     // outside them, so the whole visible item (box and words) moves together.
     var result=sized.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
-        s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp).then(this)
+        s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
+    // Owner's screenshot, Nov 7: the red selection frame sat off to one side of the gold player chip and was smaller
+    // than the size in the panel (196×160 vs 220×168). Bounds were measured inside the call site's own padding and
+    // border; they are now measured on the whole visible box, the same box the Width/Height numbers describe.
+    // Owner note 32: in play, nothing is measured per frame. Positions are only tracked while Studio is open.
+    if(widget.runtime.editing)result=result.onGloballyPositioned {coordinates->
+        // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
+        // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
+        // through style(); everything else is shown exactly as designed (owner note 36).
+        widget.runtime.bounds(widget.id,coordinates.boundsInRoot(),System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
+    }
+    result=result.then(this)
     // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its
     // own edges (previously only when a corner radius was set, hence "hit and miss"), and contents that don't fit
     // the new size are scaled down to fit, never below a readable 60%; below that the editor marks it red.
@@ -184,16 +195,7 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),topLeft=Offset(size.width-16.dp.toPx(),size.height-16.dp.toPx()),size=androidx.compose.ui.geometry.Size(16.dp.toPx(),16.dp.toPx()))
             }
         }
-    result=result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f)
-    // Owner note 32: in play, nothing is measured per frame. Positions are only tracked while Studio is open.
-    if(!widget.runtime.editing)return result
-    return result.onGloballyPositioned {coordinates->
-        val rect=coordinates.boundsInRoot()
-        // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
-        // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
-        // through style(); everything else is shown exactly as designed (owner note 36).
-        widget.runtime.bounds(widget.id,rect,System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
-    }
+    return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f)
 }
 
 @Composable

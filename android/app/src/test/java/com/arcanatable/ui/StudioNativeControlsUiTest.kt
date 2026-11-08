@@ -2,6 +2,7 @@ package com.arcanatable.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -65,6 +66,28 @@ class StudioNativeControlsUiTest {
         assertEquals(before.top+12f*d,after.top,2f)
         assertEquals(narrow*d,after.width,2f)
         assertTrue("one line, shrunk, not a column of letters: ${after.height} vs ${before.height}",after.height<=before.height*1.05f)
+    }
+
+    /** Owner's screenshot, Nov 7: the selection frame was smaller than, and off to the side of, a resized player chip. */
+    @Test fun theSelectionFrameIsTheWholeResizedChip() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-chip",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column(Modifier.padding(20.dp)) {
+            Row(Modifier.testTag("chip").height(44.dp).background(androidx.compose.ui.graphics.Color.DarkGray)
+                .border(2.dp,androidx.compose.ui.graphics.Color.Yellow).studioClickable("ArgentumUi.clickable.1","Table and player"){}.padding(end=9.dp)) {
+                Box(Modifier.width(40.dp).fillMaxHeight())
+                StudioText("ArgentumUi.Text.2","Table and player",true,"YOU")
+            }
+        }}}}
+        rule.waitForIdle()
+        val id=runtime.controls.values.single{it.isAction}.id
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=24f,dy=-8f,width=220f,height=168f))}
+        rule.waitForIdle()
+        val d=rule.density.density
+        val chip=rule.onNodeWithTag("chip").fetchSemanticsNode().boundsInRoot
+        val frame=runtime.controls[id]!!.bounds
+        assertEquals(220f*d,chip.width,2f);assertEquals(168f*d,chip.height,2f)
+        assertEquals("frame left = chip left",chip.left,frame.left,2f);assertEquals(chip.top,frame.top,2f)
+        assertEquals("frame size = the size in the panel",chip.width,frame.width,2f);assertEquals(chip.height,frame.height,2f)
     }
 
     /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
