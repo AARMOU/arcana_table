@@ -91,7 +91,7 @@ internal fun StudioHandCanvas(layout: StudioLayout, state: StudioHandState,
                 Box(Modifier.offset((e.x*scale-(drawW-e.w*scale)/2).dp,((e.y-origin)*scale-(drawH-e.h*scale)/2).dp)
                     .offset { androidx.compose.ui.unit.IntOffset(delta.x.roundToInt(),delta.y.roundToInt()) }
                     .size(drawW.dp,drawH.dp)
-                    .then(if (e.alpha < 0.999f) Modifier.graphicsLayer { alpha = e.alpha.coerceIn(if (e.binding == "pass") 0.5f else 0.2f, 1f) } else Modifier)
+                    .then(if (e.alpha < 0.999f) Modifier.graphicsLayer { alpha = e.alpha.coerceIn(if (e.binding == "pass") 0.5f else 0f, 1f) } else Modifier)
                     .testTag("studio-bounds-${e.id}").then(gesture)
                     .border(if (editing && (selectedElement==e.id || e.id in advice)) 2.dp else 0.dp,
                         if (e.id in advice) androidx.compose.ui.graphics.Color(0xFFE5534B) else StudioEditorRequests.chromeGold,shape)) {

@@ -165,7 +165,8 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     // Owner, Nov 7: opacity fades the whole item (box, words and pictures). Pass and the way back stay at least half
     // visible, so they can never be faded out of reach.
     s.alpha?.takeIf{it.isFinite() && it<0.999f}?.let{a->
-        val floor=if(widget.runtime.controls[widget.id]?.requiredNativeAction==true)0.5f else 0.2f
+        // 0% is allowed (owner, Nov 7): invisible, but the item keeps its space and still works when tapped.
+        val floor=if(widget.runtime.controls[widget.id]?.requiredNativeAction==true)0.5f else 0f
         result=result.graphicsLayer{alpha=a.coerceIn(floor,1f)}
     }
     result=result.then(this)
@@ -323,4 +324,17 @@ internal fun StudioText(site:String,screen:String,protectedLabel:Boolean,text:St
         color=s?.ink?.let(::parseTableColorHex) ?: color,fontSize=s?.font?.coerceIn(8f,64f)?.sp ?: fontSize,fontStyle=fontStyle,fontWeight=fontWeight,
         fontFamily=fontFamily,letterSpacing=letterSpacing,textDecoration=textDecoration,textAlign=textAlign,lineHeight=s?.font?.coerceIn(8f,64f)?.let{(it*1.2f).sp} ?: lineHeight,
         overflow=overflow,softWrap=softWrap,maxLines=maxLines,minLines=minLines,onTextLayout=onTextLayout,style=style)
+}
+
+/**
+ * Owner, Nov 7: the table areas themselves (battlefield, mana pool, revealed cards, commander row) are Studio items, so
+ * they get opacity, colour, corners, size and position like everything else. Use in place of the call site's own
+ * clip + background; with Studio off it is exactly that clip + background.
+ */
+@Composable
+internal fun Modifier.studioPanel(site:String,screen:String,title:String,shape:androidx.compose.ui.graphics.Shape,color:Color):Modifier {
+    val w=studioWidget(site,screen,"panel",title)
+    val s=w?.style
+    return this.studioWidget(w).clip(s?.radius?.takeIf{it.isFinite()}?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape)
+        .background(s?.fill?.let(::parseTableColorHex) ?: color)
 }

@@ -92,6 +92,30 @@ class StudioNativeControlsUiTest {
         assertEquals("frame size = the size in the panel",chip.width,frame.width,2f);assertEquals(chip.height,frame.height,2f)
     }
 
+    /** Owner, Nov 7: the table areas (battlefield…) are Studio items, and opacity goes all the way to 0%. */
+    @Test fun theBattlefieldIsAnItemThatFadesToNothing() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-panel",0),"portrait").also{it.enableCatalog()}
+        val page=androidx.compose.ui.graphics.Color(0xFF000000);val panel=androidx.compose.ui.graphics.Color(0xFF3060A0)
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column(Modifier.fillMaxSize().background(page)) {
+            Box(Modifier.fillMaxWidth().height(200.dp).studioPanel("TableBoardViews.Panel.1","Table and player","Battlefield",
+                androidx.compose.foundation.shape.RoundedCornerShape(12.dp),panel).testTag("bf"))
+        }}}}
+        rule.waitForIdle();rule.runOnIdle{runtime.begin()};rule.waitForIdle()
+        val bf=runtime.controls.values.single{it.kind=="panel"}
+        assertEquals("Battlefield",bf.title)
+        assertTrue(StudioSites.contains(bf.id))
+        assertEquals("tapping empty battlefield picks it",bf.id,StudioEditorGeometry.hitTest(runtime.controls.values,bf.bounds.center,bf.window){true}?.id)
+        fun pixel():Int{val root=rule.activity.window.decorView.rootView
+            val b=android.graphics.Bitmap.createBitmap(root.width,root.height,android.graphics.Bitmap.Config.ARGB_8888);root.draw(android.graphics.Canvas(b))
+            return b.getPixel(bf.bounds.center.x.toInt(),bf.bounds.center.y.toInt())}
+        assertEquals(android.graphics.Color.rgb(0x30,0x60,0xA0),pixel())
+        rule.runOnIdle{runtime.begin(bf.id);runtime.edit(bf.id,StudioControlStyle(alpha=0f));runtime.apply()};rule.waitForIdle()
+        assertEquals("0%: the page shows through",android.graphics.Color.BLACK,pixel())
+        rule.runOnIdle{runtime.begin(bf.id);runtime.edit(bf.id,StudioControlStyle(alpha=0.5f,fill="#FF0000"));runtime.apply()};rule.waitForIdle()
+        val half=pixel()
+        assertTrue("50% red over black: ${Integer.toHexString(half)}",android.graphics.Color.red(half) in 110..145 && android.graphics.Color.green(half)<10)
+    }
+
     /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
     @Test fun resizedButtonKeepsItsTextInsideItsEdges() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-fit",0),"portrait").also{it.enableCatalog()}

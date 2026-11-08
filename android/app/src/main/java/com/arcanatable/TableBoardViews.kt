@@ -444,7 +444,7 @@ internal fun PlayerBoard(
             "COMMANDER" to {
         val commander = player.commanderCard
         if (engineGame) Unit else if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().studioPanel("TableBoardViews.Panel.3", "Table and player", "Commander row", RoundedCornerShape(9.dp), Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (commander != null) {
                     CardFace(commander, Modifier.width(30.dp), glow = commander.id in playableIds, onClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, onLongClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, showCounters = false)
                     Column(Modifier.weight(1f).padding(start = 6.dp)) {
@@ -484,8 +484,8 @@ internal fun PlayerBoard(
                 val floating = player.manaPool.filterValues { it > 0 }
                 val readyLands = player.battlefield.count { it.type.contains("Land", ignoreCase = true) && !it.tapped }
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
-                        .background(PanelLight).padding(horizontal = 10.dp, vertical = 7.dp)
+                    Modifier.fillMaxWidth().studioPanel("TableBoardViews.Panel.4", "Table and player", "Mana pool", RoundedCornerShape(9.dp), PanelLight)
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                         .testTag("argentum-mana-summary").tutorialTarget("argentum-mana-summary"),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
@@ -582,7 +582,7 @@ internal fun PlayerBoard(
             },
             "REVEALED" to {
         if (player.revealed.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().studioPanel("TableBoardViews.Panel.2", "Table and player", "Revealed cards", RoundedCornerShape(10.dp), Panel).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 StudioText("TableBoardViews.Text.45", "Table and player", false, "PUBLIC REVEALS", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 7.dp))
                 Row(Modifier.hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     player.revealed.take(10).forEach { card -> CardFace(card, Modifier.width(40.dp), onClick = {}, onLongClick = { onPublicPreview(card) }, showCounters = false) }
@@ -594,7 +594,7 @@ internal fun PlayerBoard(
             "BATTLEFIELD" to {
         if (!engineGame) StudioText("TableBoardViews.Text.46", "Table and player", false, "BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).studioPanel("TableBoardViews.Panel.1", "Table and player", "Battlefield", RoundedCornerShape(12.dp), Panel).tutorialTarget("battlefield-row"), contentAlignment = Alignment.Center) {
                 StudioText("TableBoardViews.Text.47", "Table and player", false, "Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
@@ -614,7 +614,7 @@ internal fun PlayerBoard(
             }
             LazyColumn(
                 state = battlefieldListState,
-                modifier = Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").tutorialTarget("table-zoom").clip(RoundedCornerShape(12.dp)).background(Panel)
+                modifier = Modifier.fillMaxWidth().weight(1f).studioPanel("TableBoardViews.Panel.1", "Table and player", "Battlefield", RoundedCornerShape(12.dp), Panel).tutorialTarget("battlefield-row").tutorialTarget("table-zoom")
                     .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)

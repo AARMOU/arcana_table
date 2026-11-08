@@ -300,7 +300,7 @@ private fun HandStyleTab(runtime:StudioControlsRuntime,e:StudioElement,palette:L
     }
     StudioStepper("Opacity","${(e.alpha*100).toInt()}%","studio-opacity",
         {change{it.copy(alpha=StudioOpacity.step(it.alpha,-1) ?: 1f)}},{change{it.copy(alpha=StudioOpacity.step(it.alpha,1) ?: 1f)}},
-        StudioSlide(e.alpha*100f,20f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=(v/100f).coerceIn(0.2f,1f))}})
+        StudioSlide(e.alpha*100f,0f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=(v/100f).coerceIn(0f,1f))}})
     StudioStepper("Corners","${e.r.toInt()}","studio-radius",{change{it.copy(r=(it.r-2f).coerceIn(0f,64f))}},{change{it.copy(r=(it.r+2f).coerceIn(0f,64f))}},
         StudioSlide(e.r,0f..64f,runtime){v->change{it.copy(r=v)}})
     if(!card) {

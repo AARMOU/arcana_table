@@ -13,7 +13,7 @@ internal data class StudioControlStyle(
     val label:String?=null,val visible:Boolean=true,val binding:String?=null,val icon:String="None",val layer:Float=0f,
     /** Owner note 26: one of [StudioButtonTypes] names, or null for the button's own look. */
     val type:String?=null,
-    /** Owner, Nov 7: opacity for every editable item, 0.2–1 (null = solid). Pass and the way back never go below 0.5. */
+    /** Owner, Nov 7: opacity for every editable item, 0–1 (null = solid). Pass and the way back never go below 0.5. */
     val alpha:Float?=null,
 ) {
     fun problems()=buildList {
@@ -27,7 +27,7 @@ internal data class StudioControlStyle(
         if(icon !in StudioLayout.icons)add("Unknown icon.")
         if(layer !in -100f..100f)add("Layer must be between -100 and 100.")
         if(type!=null && type !in StudioButtonTypes.names)add("Unknown button type.")
-        if(alpha!=null && (!alpha.isFinite() || alpha !in 0.2f..1f))add("Opacity must be 20–100%.")
+        if(alpha!=null && (!alpha.isFinite() || alpha !in 0f..1f))add("Opacity must be 0–100%.")
     }
     /** Owner note 14: soft advice only. It marks the control red in the editor and never blocks Apply. */
     fun advice():String?=if(width!=null && width<44f || height!=null && height<44f)"Hard to tap: smaller than 44." else null
@@ -641,10 +641,10 @@ internal object StudioNames {
     fun orFallback(id:String,title:String):String=if(title=="Control")fallbacks[StudioEditorGeometry.siteOf(id)] ?: title else title
 }
 
-/** Opacity steps of 10% from 20% to solid. Solid is stored as null so untouched items stay exactly as they were. */
+/** Opacity steps of 10% from 0% (invisible but still there and tappable) to solid. Solid is stored as null so untouched items stay exactly as they were. */
 internal object StudioOpacity {
     fun step(current:Float?,dir:Int):Float? {
-        val pct=(((current ?: 1f)*100).let{kotlin.math.round(it/10f)*10f}+dir*10f).coerceIn(20f,100f)
+        val pct=(((current ?: 1f)*100).let{kotlin.math.round(it/10f)*10f}+dir*10f).coerceIn(0f,100f)
         return if(pct>=100f)null else pct/100f
     }
 }

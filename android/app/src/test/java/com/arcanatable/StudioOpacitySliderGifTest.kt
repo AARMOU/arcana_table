@@ -23,13 +23,16 @@ class StudioOpacitySliderGifTest {
         val s=StudioControlStyle(alpha=0.4f)
         assertEquals(0.4f,StudioControlStyle.parse(s.json()).alpha!!,0.001f)
         assertNull("solid is not stored",StudioControlStyle.parse(StudioControlStyle().json()).alpha)
-        assertTrue(StudioControlStyle(alpha=0.1f).problems().isNotEmpty())
+        assertTrue("0% is allowed",StudioControlStyle(alpha=0f).problems().isEmpty())
+        assertTrue(StudioControlStyle(alpha=-0.1f).problems().isNotEmpty());assertTrue(StudioControlStyle(alpha=1.5f).problems().isNotEmpty())
         assertEquals(0.9f,StudioOpacity.step(null,-1)!!,0.001f)
         assertNull("back to solid",StudioOpacity.step(0.9f,1))
-        assertEquals("never below 20%",0.2f,StudioOpacity.step(0.2f,-1)!!,0.001f)
+        assertEquals("down to 0%",0f,StudioOpacity.step(0.1f,-1)!!,0.001f)
+        assertEquals("never below 0%",0f,StudioOpacity.step(0f,-1)!!,0.001f)
         val hand=StudioLayout.reference().let{l->l.copy(elements=l.elements.map{if(it.id=="undo")it.copy(alpha=0.5f) else it})}
         assertEquals(0.5f,StudioLayout.parse(hand.json()).elements.single{it.id=="undo"}.alpha,0.001f)
-        assertTrue(hand.copy(elements=hand.elements.map{if(it.id=="undo")it.copy(alpha=0.05f) else it}).problems().isNotEmpty())
+        assertTrue(hand.copy(elements=hand.elements.map{if(it.id=="undo")it.copy(alpha=-0.05f) else it}).problems().isNotEmpty())
+        assertTrue(hand.copy(elements=hand.elements.map{if(it.id=="undo")it.copy(alpha=0f) else it}).problems().isEmpty())
         assertTrue(StudioLog.diff(StudioControlStyle(),s).contains("opacity solid→40%"))
     }
 

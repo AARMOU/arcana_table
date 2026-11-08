@@ -12,7 +12,7 @@ internal data class StudioElement(
     val strong: Boolean = false, val visible: Boolean = true,
     val binding: String = id, val color: String? = null, val textColor: String? = null,
     val icon: String = "None",
-    /** Owner, Nov 7: opacity, 0.2–1. Pass never draws below 0.5. */
+    /** Owner, Nov 7: opacity, 0–1. Pass never draws below 0.5. */
     val alpha: Float = 1f,
 )
 
@@ -80,7 +80,7 @@ internal data class StudioLayout(val elements: List<StudioElement>, val snap: In
             if (e.color != null && parseTableColorHex(e.color) == null) add("${e.id}: invalid color.")
             if (e.textColor != null && parseTableColorHex(e.textColor) == null) add("${e.id}: invalid text color.")
             if(e.icon !in icons) add("${e.id}: unknown icon.")
-            if(!e.alpha.isFinite() || e.alpha !in 0.2f..1f) add("${e.id}: opacity must be 20–100%.")
+            if(!e.alpha.isFinite() || e.alpha !in 0f..1f) add("${e.id}: opacity must be 0–100%.")
         }
         // Lock-outs (owner: Pass and the way back can't be hidden). Without a visible card slot the hand can't be played.
         if (elements.none { it.kind != "card" && it.binding == "pass" && it.visible }) add("Keep Pass visible.")

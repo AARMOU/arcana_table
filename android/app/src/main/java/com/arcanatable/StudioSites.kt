@@ -2106,6 +2106,11 @@ internal object StudioSites {
         "TableBoardViews.combinedClickable.5" to "Table and player",
         "TableBoardViews.combinedClickable.6" to "Table and player",
         "TableBoardViews.combinedClickable.7" to "Table and player",
+        // Owner, Nov 7: table areas as Studio items (studioPanel).
+        "TableBoardViews.Panel.1" to "Table and player",
+        "TableBoardViews.Panel.2" to "Table and player",
+        "TableBoardViews.Panel.3" to "Table and player",
+        "TableBoardViews.Panel.4" to "Table and player",
         "TableBoardViews.combinedClickable.8" to "Table and player",
         "TableBoardViews.combinedClickable.9" to "Table and player",
         "TableBoardViews.combinedClickable.10" to "Table and player",

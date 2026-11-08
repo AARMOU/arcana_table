@@ -31,8 +31,8 @@ internal data class StudioCapabilities(val label:Boolean,val font:Boolean,val ra
     companion object {
         fun of(c:StudioLiveControl)=StudioCapabilities(
             label=!c.protectedLabel && c.captionEditable && c.kind in listOf("action","container-action","icon-action","label","input","icon"),
-            font=!(c.kind in listOf("range","toggle","icon","icon-action","card-action") || !c.captionEditable),
-            radius=c.kind!="container-action",ink=c.kind!="card-action",icon=c.kind in listOf("action","icon-action"),
+            font=!(c.kind in listOf("range","toggle","icon","icon-action","card-action","panel") || !c.captionEditable),
+            radius=c.kind!="container-action",ink=c.kind!="card-action" && c.kind!="panel",icon=c.kind in listOf("action","icon-action"),
             rebind=c.isAction && c.kind!="card-action" && (c.kind!="container-action" || c.captionEditable),
             information=c.kind in listOf("data","label"),duplicate=c.isAction || c.kind in listOf("data","label"),type=c.kind=="action")
     }
@@ -109,7 +109,7 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
 }
 
 private fun kindName(kind:String)=when(kind){"action"->"Button";"icon-action"->"Icon button";"container-action"->"Group";"card-action"->"Card";
-    "data"->"Live info";"label"->"Label";"input"->"Input";"toggle"->"Toggle";"range"->"Slider";"icon"->"Icon";else->kind}
+    "data"->"Live info";"label"->"Label";"input"->"Input";"toggle"->"Toggle";"range"->"Slider";"icon"->"Icon";"panel"->"Table area";else->kind}
 
 @Composable
 private fun StudioParentButton(runtime:StudioControlsRuntime,control:StudioLiveControl) {
@@ -181,7 +181,7 @@ private fun StyleTab(runtime:StudioControlsRuntime,style:StudioControlStyle,caps
         StudioSlide(style.font ?: 14f,8f..64f,runtime,{"${it.toInt()}sp"}){v->change{it.copy(font=v)}})
     StudioStepper("Opacity","${((style.alpha ?: 1f)*100).toInt()}%","studio-opacity",
         {change{it.copy(alpha=StudioOpacity.step(it.alpha,-1))}},{change{it.copy(alpha=StudioOpacity.step(it.alpha,1))}},
-        StudioSlide((style.alpha ?: 1f)*100f,20f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=if(v>=100f)null else v/100f)}})
+        StudioSlide((style.alpha ?: 1f)*100f,0f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=if(v>=100f)null else v/100f)}})
     if(caps.radius)StudioStepper("Corners",style.radius?.let{"${it.toInt()}dp"} ?: "Auto","studio-radius",
         {change{it.copy(radius=((it.radius ?: 12f)-2f).coerceIn(0f,100f))}},{change{it.copy(radius=((it.radius ?: 12f)+2f).coerceIn(0f,100f))}},
         StudioSlide(style.radius ?: 12f,0f..100f,runtime,{"${it.toInt()}dp"}){v->change{it.copy(radius=v)}})
@@ -230,6 +230,10 @@ private fun ArrangeTab(runtime:StudioControlsRuntime,control:StudioLiveControl,s
         else StudioChip("Reset element",control.id in runtime.draft.controls,"studio-reset-element") {
             runtime.change(runtime.draft.copy(controls=runtime.draft.controls-control.id))
         }
+    }
+    // The battlefield can cover most of the table, so the table's own background (picture, dim) is one tap away here.
+    if(control.kind=="panel")Row(Modifier.horizontalScroll(rememberScrollState())) {
+        StudioChip("Table background…",true,"studio-open-table"){runtime.selected=null;runtime.tablePicked=true}
     }
     if(control.requiredNativeAction)Text("Can't be hidden: the game needs it (or it's your way back). A visible duplicate can stand in for it.",
         color=Color(0xFFE5534B),fontSize=11.sp,modifier=Modifier.testTag("studio-required-note"))
