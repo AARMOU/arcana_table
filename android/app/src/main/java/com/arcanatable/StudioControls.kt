@@ -245,15 +245,26 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     }
     fun remove(id:String){controls.remove(id);callbacks.remove(id);captions.remove(id);liveText.remove(id)}
     fun bounds(id:String,rect:Rect,window:Int,width:Float=0f,height:Float=0f){controls[id]?.let {
-        // Owner's Studio log, Nov 7: "Open hand tray" grew to 648 tall and its edits were then logged as "40", because the
-        // caption was re-picked from whatever now sat inside the grown panel. A panel keeps the first caption it found
-        // while that caption is still on screen; only a panel without one looks again.
-        val kept=captions[id]?.let{c->controls[c]}?.takeIf{c->c.window==window && c.bounds.width>0}
-        val child=if(it.kind=="container-action" && !it.captionEditable) kept ?: controls.values.filter {c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}.minByOrNull{c->c.bounds.top} else null
-        child?.let{c->captions[id]=c.id}
+        val child=caption(id,it,rect,window)
         val next=it.copy(title=StudioNames.of(id) ?: child?.title ?: StudioNames.orFallback(id,it.title),bounds=rect,window=window,viewportWidth=width,viewportHeight=height)
         if(next!=it)controls[id]=next
+        // A word inside a panel reports its new place after the panel does, so the panel's name is picked again here
+        // (local check, Nov 7: after a move the YOU chip was named "40", the only word whose old spot was still inside).
+        if(!next.isAction)controls.values.filter{c->c.kind=="container-action" && !c.captionEditable && c.window==window && c.bounds.contains(rect.center)}
+            .forEach{c->val pick=caption(c.id,c,c.bounds,window)?.title;val t=StudioNames.of(c.id) ?: pick ?: c.title;if(t!=c.title)controls[c.id]=c.copy(title=t)}
     }}
+    /**
+     * The words that name a panel: the top-left words inside it. Owner's Studio log, Nov 7: "Open hand tray" grew to 648
+     * tall and was then named "40" (what it grew over), so a resized panel keeps the caption it had.
+     */
+    private fun caption(id:String,control:StudioLiveControl,rect:Rect,window:Int):StudioLiveControl? {
+        if(control.kind!="container-action" || control.captionEditable)return null
+        val resized=project().controls[id]?.let{s->s.width!=null || s.height!=null}==true
+        val kept=if(!resized)null else captions[id]?.let{c->controls[c]}?.takeIf{c->c.window==window && c.bounds.width>0}
+        return (kept ?: controls.values.filter{c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}
+            .minWithOrNull(compareBy<StudioLiveControl>{c->kotlin.math.round(c.bounds.top/8f)}.thenBy{c->c.bounds.left}))
+            ?.also{c->captions[id]=c.id}
+    }
     fun project()=if(editing)draft else applied
     fun style(id:String,screen:String?=null,kind:String?=null):StudioControlStyle {
         if(!editing && id in recovered)return StudioControlStyle()

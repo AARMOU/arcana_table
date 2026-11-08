@@ -152,7 +152,7 @@ internal fun TableController.TableMainLayout() {
         val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
-            Row(rowModifier.tutorialTarget("player-tabs").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(rowModifier.tutorialTarget("player-tabs").studioRowScroll(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 if (studioPieceShown("tableButton")) Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = if (studioPieceShown("playerChips")) players.indices.sortedBy { if (it == localSeat) -1 else it } else emptyList()
@@ -177,7 +177,10 @@ internal fun TableController.TableMainLayout() {
         }
         val tabsInTopBar = compactArgentumTable && isLandscape
         val sideBySideBoards = compactArgentumTable && !isLandscape && screenWidthDp >= 600 && configuration.screenHeightDp >= 600 && players.size >= 2 && localSeat in players.indices
-        Row(Modifier.fillMaxWidth().heightIn(min = if (compactArgentumTable) 44.dp else 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Studio: the top rows draw above the boards, so a chip or button moved down onto the battlefield stays visible
+        // (it was drawn underneath the boards, which come later on screen). Nothing overlaps here unless moved.
+        val studioOnTop = if (BuildConfig.STUDIO_ENABLED) Modifier.zIndex(1f) else Modifier
+        Row(Modifier.fillMaxWidth().heightIn(min = if (compactArgentumTable) 44.dp else 48.dp).then(studioOnTop), verticalAlignment = Alignment.CenterVertically) {
             if (compactArgentumTable) {
                 val dotColor = when { argentumStatus != ArgentumConnectionStatus.CONNECTED -> Color(0xFFE9978B); argentumAwaitingUpdate -> CounterGold; else -> Mint }
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
@@ -329,7 +332,7 @@ internal fun TableController.TableMainLayout() {
             onLeave = { argentumLeaveConfirm = true },
             compact = true,
         )
-        if (!tabsInTopBar && (studioPieceShown("playerChips") || studioPieceShown("tableButton"))) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!tabsInTopBar && (studioPieceShown("playerChips") || studioPieceShown("tableButton"))) Row(Modifier.fillMaxWidth().then(studioOnTop).padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
             seatTabs(Modifier.weight(1f))
         }
 

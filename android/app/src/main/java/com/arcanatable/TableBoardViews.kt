@@ -504,7 +504,7 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            if (studioPieceShown("buttonRow")) Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (studioPieceShown("buttonRow")) Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").studioRowScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
@@ -935,7 +935,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 }
             }
         } else {
-        Row(Modifier.fillMaxWidth().hintedHorizontalScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().studioRowScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             actionOrder.forEach { action ->
                 when (action) {
                     "DRAW" -> if (canControl) HeaderButton("DRAW", onDraw)
