@@ -33,6 +33,20 @@ class StudioEditorGeometryTest {
         assertEquals("a button in a big panel is picked directly","native:pass",StudioEditorGeometry.hitTest(all,Offset(20f,120f),1){true}?.id)
     }
 
+    /** Owner's screenshots, Nov 7: "YOU" and "40" were dragged out of the player chip (the name is >12× smaller). */
+    @Test fun aSmallChipOnABigScreenIsPickedWholeEvenWhenItsNameIsTiny() {
+        val screen=androidx.compose.ui.geometry.Size(1840f,2200f)
+        fun v(c:StudioLiveControl)=c.copy(viewportWidth=screen.width,viewportHeight=screen.height)
+        val chip=v(c("native:seat",Rect(190f,150f,490f,265f),"container-action"))
+        val you=v(c("native:you",Rect(310f,170f,360f,195f),"data"))
+        val board=v(c("native:board",Rect(30f,400f,910f,1830f),"container-action"))
+        val card=v(c("native:card",Rect(50f,500f,180f,680f),"card-action"))
+        val all=listOf(chip,you,board,card)
+        assertEquals("native:seat",StudioEditorGeometry.hitTest(all,Offset(330f,180f),1){true}?.id)
+        assertEquals("tap again to get the name","native:you",StudioEditorGeometry.hitTest(all,Offset(330f,180f),1,"native:seat"){true}?.id)
+        assertEquals("a card on the big battlefield is still picked directly","native:card",StudioEditorGeometry.hitTest(all,Offset(100f,600f),1){true}?.id)
+    }
+
     @Test fun overlayScreensBeatTheTableAndFullScreenPagesHideIt() {
         fun s(id:String,screen:String,r:Rect)=StudioLiveControl(id,screen,"action",id,true,r,1)
         val board=s("native:board","Table",Rect(0f,0f,400f,400f))

@@ -55,7 +55,11 @@ internal object StudioEditorGeometry {
         // Something inside a big panel (the battlefield, the hand tray) is picked directly; inside a small group such as
         // a chip (at most ~12× its own area) the group comes first.
         val area={c:StudioLiveControl->c.bounds.width*c.bounds.height}
-        if(area(group)>12f*area(deepest))return deepest
+        // Owner's screenshots, Nov 7: "YOU", "40" and "OFFLINE AI" were dragged out of the player chips, because a name
+        // is more than 12× smaller than its chip. A group that is small on the screen (≤5% of it) is always picked first.
+        val screenArea=group.viewportWidth*group.viewportHeight
+        val smallOnScreen=screenArea>0f && area(group)<=0.05f*screenArea
+        if(!smallOnScreen && area(group)>12f*area(deepest))return deepest
         return if(current==group.id)deepest else group
     }
 

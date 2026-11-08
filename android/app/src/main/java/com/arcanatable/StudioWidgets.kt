@@ -130,8 +130,11 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     var sized:Modifier=if(s.width!=null || s.height!=null)Modifier.then(StudioFixedSlotElement) else Modifier
     s.width?.takeIf{it.isFinite()}?.let{sized=sized.requiredWidth(it.coerceIn(1f,2000f).dp)}
     s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
-    var result=sized.then(this).offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
-        s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
+    // Owner's screenshots, Nov 7: moving the phase tabs (BEGIN, MAIN 1…) or a chip's name left an empty box behind and
+    // only the words moved. The move used to be applied inside the call site's own background/clip/padding. It is now
+    // outside them, so the whole visible item (box and words) moves together.
+    var result=sized.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
+        s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp).then(this)
     // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its
     // own edges (previously only when a corner radius was set, hence "hit and miss"), and contents that don't fit
     // the new size are scaled down to fit, never below a readable 60%; below that the editor marks it red.

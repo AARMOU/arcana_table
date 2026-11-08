@@ -30,7 +30,9 @@ internal object StudioBackdrop {
     /** Copies the picked picture in, shrunk to at most [MAX_SIDE] pixels a side. Returns its stored name. */
     fun import(context: Context, uri: Uri): String {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: error("Can't open that picture.")
+        // Owner's screenshot, Nov 7: every pick said "Can't open that picture." A bounds-only decode always returns null
+        // (it fills [bounds] instead), so the null check fired every time. Only a missing stream means it can't open.
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds); Unit } ?: error("Can't open that picture.")
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "That file isn't a picture Studio can read." }
         var sample = 1
         while (max(bounds.outWidth, bounds.outHeight) / sample > MAX_SIDE) sample *= 2
