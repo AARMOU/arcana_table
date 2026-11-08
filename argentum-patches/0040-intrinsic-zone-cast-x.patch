@@ -1,0 +1,148 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
+index 78ae420307..24bf1b678f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/CastFromZoneEnumerator.kt
+@@ -872,8 +872,8 @@ class CastFromZoneEnumerator(
+                                         action = castAction(),
+                                         manaCostString = costString,
+                                         manaCostByTargetCount = costByTargetCount,
+-                                        hasXCost = hasXCost,
+-                                        maxAffordableX = maxAffordableX,
++                                    hasXCost = hasXCost,
++                                    maxAffordableX = maxAffordableX,
+                                         sourceZone = sourceZoneLabel,
+                                         additionalCostInfo = exileAdditionalCostInfo
+                                     )
+@@ -1298,7 +1298,27 @@ class CastFromZoneEnumerator(
+                     val effectiveCost = pricing.min
+                     val costString = effectiveCost.toString()
+                     val costByTargetCount = pricing.byCountStrings()
+-                    val canAfford = context.manaSolver.canPay(state, playerId, effectiveCost, precomputedSources = context.availableManaSources)
++                    val spellContext = spellPaymentContextFor(
++                        cardComponent, colors = state.projectedState.colorSetOf(cardId),
++                        isFromHand = false, isFromGraveyard = zone == Zone.GRAVEYARD,
++                    )
++                    val canAfford = context.manaSolver.canPay(
++                        state, playerId, effectiveCost, precomputedSources = context.availableManaSources,
++                        spellContext = spellContext,
++                    )
++                    // Intrinsic zone permission changes where a spell may be cast, not how X is
++                    // announced. Surface the same picker metadata as a normal hand cast.
++                    val hasXCost = effectiveCost.hasX
++                    val maxAffordableX = if (hasXCost) {
++                        val available = context.manaSolver.getAvailableManaCount(
++                            state, playerId, precomputedSources = context.availableManaSources,
++                            spellContext = spellContext,
++                        )
++                        context.costCalculator.maxAffordableX(
++                            state, cardDef, playerId, cardId, payable = available - effectiveCost.cmc,
++                            xCount = effectiveCost.xCount, fromZone = zone,
++                        )
++                    } else null
+ 
+                     if (hasCorrectTiming && meetsRestrictions && canAfford && canPayZoneAdditionalCost) {
+                         val targetReqs = buildList {
+@@ -1330,6 +1350,8 @@ class CastFromZoneEnumerator(
+                                         xConstrainsTargetCountExactly = firstInfo.xConstrainsCountExactly,
+                                         manaCostString = costString,
+                                         manaCostByTargetCount = costByTargetCount,
++                                        hasXCost = hasXCost,
++                                        maxAffordableX = maxAffordableX,
+                                         sourceZone = sourceZoneName,
+                                         additionalCostInfo = zoneAdditionalCostInfo
+                                     )
+@@ -1343,6 +1365,8 @@ class CastFromZoneEnumerator(
+                                     action = zoneCast,
+                                     manaCostString = costString,
+                                     manaCostByTargetCount = costByTargetCount,
++                                    hasXCost = hasXCost,
++                                    maxAffordableX = maxAffordableX,
+                                     sourceZone = sourceZoneName,
+                                     additionalCostInfo = zoneAdditionalCostInfo
+                                 )
+@@ -1357,6 +1381,8 @@ class CastFromZoneEnumerator(
+                                 affordable = false,
+                                 manaCostString = costString,
+                                 manaCostByTargetCount = costByTargetCount,
++                                hasXCost = hasXCost,
++                                maxAffordableX = maxAffordableX,
+                                 sourceZone = sourceZoneName,
+                                 additionalCostInfo = zoneAdditionalCostInfo
+                             )
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/IntrinsicZoneCastXTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/IntrinsicZoneCastXTest.kt
+new file mode 100644
+index 0000000000..2a34abe68c
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/IntrinsicZoneCastXTest.kt
+@@ -0,0 +1,71 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.CastSpell
++import com.wingedsheep.engine.core.PaymentStrategy
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.*
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.scripting.MayCastSelfFromZones
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++class IntrinsicZoneCastXTest : FunSpec({
++    val spell = card("Intrinsic X Test") {
++        manaCost = "{X}{2}"
++        typeLine = "Sorcery"
++        staticAbility { ability = MayCastSelfFromZones(zones = listOf(Zone.GRAVEYARD, Zone.EXILE)) }
++        spell { effect = Effects.GainLife(DynamicAmounts.xValue()) }
++    }
++    fun game(): GameTestDriver = GameTestDriver().apply {
++        registerCards(TestCards.all + spell)
++        initMirrorMatch(deck = Deck.of("Mountain" to 40), skipMulligans = true, startingPlayer = 0)
++        passPriorityUntil(Step.PRECOMBAT_MAIN)
++    }
++    test("graveyard cast advertises X and charges the selected amount") {
++        val d = game(); val p = d.activePlayer!!
++        val id = d.putCardInGraveyard(p, spell.name)
++        d.giveColorlessMana(p, 5)
++        val offered = d.legalActions(p).single { (it.action as? CastSpell)?.cardId == id }
++        offered.hasXCost shouldBe true
++        offered.maxAffordableX shouldBe 3
++        val life = d.getLifeTotal(p)
++        d.submit(CastSpell(p, id, xValue = 3, paymentStrategy = PaymentStrategy.FromPool)).error shouldBe null
++        repeat(10) { if (d.state.stack.isNotEmpty()) d.bothPass() }
++        d.getLifeTotal(p) shouldBe life + 3
++    }
++    test("the same intrinsic X permission works from exile") {
++        val d = game(); val p = d.activePlayer!!
++        val id = d.putCardInExile(p, spell.name)
++        d.giveColorlessMana(p, 4)
++        val offered = d.legalActions(p).single { (it.action as? CastSpell)?.cardId == id }
++        offered.hasXCost shouldBe true
++        offered.maxAffordableX shouldBe 2
++    }
++    test("zero X remains a legal cast") {
++        val d = game(); val p = d.activePlayer!!
++        val id = d.putCardInGraveyard(p, spell.name)
++        d.giveColorlessMana(p, 2)
++        val offered = d.legalActions(p).single { (it.action as? CastSpell)?.cardId == id }
++        offered.hasXCost shouldBe true
++        offered.maxAffordableX shouldBe 0
++        d.submit(CastSpell(p, id, xValue = 0, paymentStrategy = PaymentStrategy.FromPool)).error shouldBe null
++    }
++    test("unaffordable X is refused without moving the card") {
++        val d = game(); val p = d.activePlayer!!
++        val id = d.putCardInGraveyard(p, spell.name)
++        d.giveColorlessMana(p, 4)
++        (d.submit(CastSpell(p, id, xValue = 3, paymentStrategy = PaymentStrategy.FromPool)).error != null) shouldBe true
++        d.getGraveyard(p).contains(id) shouldBe true
++        d.state.stack.isEmpty() shouldBe true
++    }
++    test("opponent graveyard is not authorized") {
++        val d = game(); val p = d.activePlayer!!
++        val id = d.putCardInGraveyard(d.getOpponent(p), spell.name)
++        d.giveColorlessMana(p, 5)
++        d.legalActions(p).none { (it.action as? CastSpell)?.cardId == id } shouldBe true
++        (d.submit(CastSpell(p, id, xValue = 1, paymentStrategy = PaymentStrategy.FromPool)).error != null) shouldBe true
++    }
++})
