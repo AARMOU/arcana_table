@@ -2,15 +2,31 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.ImotekhTheStormlord
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.identity.TokenComponent
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.*
 import org.junit.Test
 
 class ImotekhTheStormlordIndependentCertificationTest {
+    private fun GameTestDriver.activateCrypt(
+        player: EntityId,
+        crypt: EntityId,
+        target: EntityId,
+    ) = submit(
+        ActivateAbility(
+            player,
+            crypt,
+            cardRegistry.getCard("Tormod's Crypt")!!.script.activatedAbilities.single().id,
+            targets = listOf(ChosenTarget.Player(target)),
+        ),
+    )
+
     @Test
     fun castsForTwoGenericAndTwoBlackAndEntersAsAThreeThreeArtifactNecron() {
         val d = customScenario(ImotekhTheStormlord)
@@ -60,8 +76,8 @@ class ImotekhTheStormlordIndependentCertificationTest {
         d.putCardInGraveyard(player, "Ornithopter")
         d.putCardInGraveyard(player, "Grizzly Bears")
 
-        assertNull(d.activate(player, crypt).error)
-        d.resolveAll(Choices(targets = listOf(player)))
+        assertNull(d.activateCrypt(player, crypt, player).error)
+        d.resolveAll()
 
         assertTrue(d.getGraveyardCardNames(player).isEmpty())
         assertEquals(
@@ -93,7 +109,13 @@ class ImotekhTheStormlordIndependentCertificationTest {
         val cremate = d.putCardInHand(player, "Cremate")
         d.giveMana(player, Color.BLACK)
 
-        assertNull(d.castSpell(player, cremate, listOf(bear)).error)
+        assertNull(
+            d.castSpellWithTargets(
+                player,
+                cremate,
+                listOf(ChosenTarget.Card(bear, player, Zone.GRAVEYARD)),
+            ).error,
+        )
         d.resolveAll()
 
         assertEquals(listOf("Grizzly Bears"), d.zoneNames(player, Zone.EXILE))
@@ -111,8 +133,8 @@ class ImotekhTheStormlordIndependentCertificationTest {
         val crypt = d.putPermanentOnBattlefield(player, "Tormod's Crypt")
         d.putCardInGraveyard(opponent, "Sol Ring")
 
-        assertNull(d.activate(player, crypt).error)
-        d.resolveAll(Choices(targets = listOf(opponent)))
+        assertNull(d.activateCrypt(player, crypt, opponent).error)
+        d.resolveAll()
 
         assertEquals(listOf("Sol Ring"), d.zoneNames(opponent, Zone.EXILE))
         assertTrue(d.getPermanents(player).none {
@@ -127,7 +149,8 @@ class ImotekhTheStormlordIndependentCertificationTest {
         val imotekh = d.putCreatureOnBattlefield(player, "Imotekh the Stormlord")
         val ornithopter = d.putCreatureOnBattlefield(player, "Ornithopter")
 
-        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+        d.passPriorityUntil(Step.BEGIN_COMBAT, activePlayer = player)
+        d.resolveAll(Choices(targets = listOf(ornithopter)))
 
         assertEquals(2, d.projected.getPower(ornithopter))
         assertEquals(4, d.projected.getToughness(ornithopter))
@@ -154,7 +177,8 @@ class ImotekhTheStormlordIndependentCertificationTest {
         d.putCreatureOnBattlefield(player, "Imotekh the Stormlord")
         val ornithopter = d.putCreatureOnBattlefield(player, "Ornithopter")
 
-        d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
+        d.passPriorityUntil(Step.BEGIN_COMBAT, activePlayer = opponent)
+        d.resolveAll()
 
         assertEquals(0, d.projected.getPower(ornithopter))
         assertEquals(2, d.projected.getToughness(ornithopter))
@@ -168,9 +192,11 @@ class ImotekhTheStormlordIndependentCertificationTest {
         val opponent = d.player2
         val imotekh = d.putCreatureOnBattlefield(player, "Imotekh the Stormlord")
         val bear = d.putCreatureOnBattlefield(player, "Grizzly Bears")
+        val ownOrnithopter = d.putCreatureOnBattlefield(player, "Ornithopter")
         val opposingOrnithopter = d.putCreatureOnBattlefield(opponent, "Ornithopter")
 
-        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+        d.passPriorityUntil(Step.BEGIN_COMBAT, activePlayer = player)
+        d.resolveAll(Choices(targets = listOf(ownOrnithopter)))
 
         assertEquals(3, d.projected.getPower(imotekh))
         assertEquals(3, d.projected.getToughness(imotekh))
@@ -178,6 +204,9 @@ class ImotekhTheStormlordIndependentCertificationTest {
         assertEquals(2, d.projected.getPower(bear))
         assertEquals(2, d.projected.getToughness(bear))
         assertFalse(d.projected.hasKeyword(bear, Keyword.MENACE))
+        assertEquals(2, d.projected.getPower(ownOrnithopter))
+        assertEquals(4, d.projected.getToughness(ownOrnithopter))
+        assertTrue(d.projected.hasKeyword(ownOrnithopter, Keyword.MENACE))
         assertEquals(0, d.projected.getPower(opposingOrnithopter))
         assertEquals(2, d.projected.getToughness(opposingOrnithopter))
         assertFalse(d.projected.hasKeyword(opposingOrnithopter, Keyword.MENACE))
