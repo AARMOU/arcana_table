@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Hang guard: if a sample keeps the screen busy for 60 s, a watchdog writes what kept changing to
  * build/screenshots/studio-showme-hang-<sample>.txt, closes the sample (so the test can finish) and the test fails.
+ * (The Nov 7 hang was the test, not the app: an animated scroll to an off-screen tab under a frozen test clock.)
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -103,6 +104,9 @@ class StudioShowMeUiTest {
                 write("100 s, still stuck: stopping");Runtime.getRuntime().halt(3)
             }.apply{isDaemon=true;start()}
             try {
+                // The cause of the old CI hang: these tabs sit past the screen edge, and performScrollTo's scroll is
+                // animated. With the test clock frozen (UiTestSupport.settle) it never finished and was retried forever.
+                rule.mainClock.autoAdvance=true
                 rule.onNodeWithTag("studio-tab-screen-$tab").performScrollTo().performClick();UiTestSupport.settle(rule)
                 if(!hung.get())check(s)
             } catch(t:Throwable) {
