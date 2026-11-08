@@ -1,0 +1,9 @@
+{
+  "key": "hull-breach",
+  "name": "Hull Breach",
+  "issue": 1038,
+  "source": "certification/HullBreachIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HullBreachIndependentCertificationTest",
+  "tests": 13,
+  "target": "build"
+}
