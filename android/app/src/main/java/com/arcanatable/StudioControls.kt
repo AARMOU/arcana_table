@@ -392,7 +392,9 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     fun inspectNativeScreen(){editing=true;panelOpen=false}
     private fun saveDraft() {
         store().saveDraft(draft)
-        pendingHand?.let{StudioStore(prefs,orientation,profile).saveDraft(it)}
+        // Undoing back past the first hand edit leaves no pending hand: the stored draft must go too, or the hand
+        // kept showing the undone edit (found by the hand multi-select test: Undo didn't restore the widths).
+        StudioStore(prefs,orientation,profile).let{store->pendingHand?.let{store.saveDraft(it)} ?: store.clearDraft()}
         prefs.edit().putBoolean(pendingHandKey,pendingHand!=null).apply()
     }
     /**
