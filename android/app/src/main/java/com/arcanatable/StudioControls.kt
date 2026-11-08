@@ -211,8 +211,15 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         val index=owners[token] ?: generateSequence(0){it+1}.first{it !in owners.values}.also{owners[token]=it}
         return "$base:$index"
     }
+    /** Player-tied ID → the screen-order ID it had before (see [LocalStudioSeat]). */
+    private val legacy=mutableMapOf<String,String>()
+    fun alias(id:String,old:String){if(id!=old)legacy[id]=old}
+    /** The saved style for [id], or for its old screen-order ID until it is edited under its own. */
+    private fun saved(project:StudioControlProject,id:String)=project.controls[id] ?: legacy[id]?.let{project.controls[it]}
     fun release(base:String,token:Any){claims[base]?.let{it.remove(token);if(it.isEmpty())claims.remove(base)}}
     var editing by mutableStateOf(false);private set
+    /** Owner note 29: "Fill it up" shows a busy table while editing. Never saved; off whenever Studio closes. */
+    var fillItUp by mutableStateOf(false)
     private var capturing by mutableStateOf(false)
     var panelOpen by mutableStateOf(false)
     private var lead by mutableStateOf<String?>(null)
@@ -262,7 +269,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
      */
     private fun caption(id:String,control:StudioLiveControl,rect:Rect,window:Int):StudioLiveControl? {
         if(control.kind!="container-action" || control.captionEditable)return null
-        val resized=project().controls[id]?.let{s->s.width!=null || s.height!=null}==true
+        val resized=saved(project(),id)?.let{s->s.width!=null || s.height!=null}==true
         val kept=if(!resized)null else captions[id]?.let{c->controls[c]}?.takeIf{c->c.window==window && c.bounds.width>0}
         return (kept ?: controls.values.filter{c->c.id!=id && !c.isAction && c.window==window && c.bounds.width>0 && rect.contains(c.bounds.center)}
             .minWithOrNull(compareBy<StudioLiveControl>{c->kotlin.math.round(c.bounds.top/8f)}.thenBy{c->c.bounds.left}))
@@ -281,7 +288,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
             val site=id.substringAfter("native:").substringBefore("/")
             project.controls.entries.firstOrNull{(k,_)->k!=id && k.substringAfter("native:").substringBefore("/")==site}?.value
         } else null
-        val style=project.controls[id] ?: shared ?: project.copies.firstOrNull{it.id==id}?.style ?: StudioControlStyle(
+        val style=saved(project,id) ?: shared ?: project.copies.firstOrNull{it.id==id}?.style ?: StudioControlStyle(
             visible=!((project.screenDensity[onScreen] ?: project.density)=="Minimal" && (kind ?: controls[id]?.kind)=="data" &&
                 onScreen?.contains("log",ignoreCase=true)!=true))
         // Owner note 33: a running tutorial needs what it points at, so hidden items show again until it ends. Moved and
@@ -358,7 +365,12 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
     }
     private fun withStyle(p:StudioControlProject,id:String,style:StudioControlStyle)=
         if(id.startsWith("copy:"))p.copy(copies=p.copies.map{if(it.id==id)it.copy(style=style) else it})
-        else p.copy(controls=p.controls+(id to style),owners=controls[id]?.screen?.let{p.owners+(id to it)} ?: p.owners)
+        else legacy[id].let{old->
+            // An edit to a player-tied item moves its old screen-order edit to the player's own ID.
+            val c=if(old!=null && id !in p.controls)p.controls-old else p.controls
+            val o=if(old!=null && id !in p.controls)p.owners-old else p.owners
+            p.copy(controls=c+(id to style),owners=controls[id]?.screen?.let{o+(id to it)} ?: o)
+        }
     /** Edits every selected control in one step (one Undo), as the lead's change applied to each. */
     fun editGroup(next:StudioControlStyle,density:Float) {
         val first=selected ?: return
@@ -527,7 +539,7 @@ internal class StudioControlsRuntime(val prefs:SharedPreferences,val orientation
         // There is no floating Studio button in play (owner D33), so no window may lose its last visible button:
         // a pop-up that can't be dismissed would otherwise become a dead end.
         controls.values.filter{it.isAction && it.window!=0}.groupBy{it.window to it.screen}.values.forEach {group->
-            if(group.none{this@StudioControlsRuntime.style(it.id).visible} && group.any{draft.controls[it.id]?.visible==false})
+            if(group.none{this@StudioControlsRuntime.style(it.id).visible} && group.any{saved(draft,it.id)?.visible==false})
                 add("Keep at least one button visible on ${group.first().screen}.")
         }
         if(draft.theme.keys.any{it !in StudioLayout.themeRoles} || draft.theme.values.any{parseTableColorHex(it)==null})add("Invalid palette roles or colors.")

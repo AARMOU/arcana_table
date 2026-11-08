@@ -181,6 +181,8 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         Row {listOf("Minimal","Balanced","Detailed").forEach {v->StudioChip(v,true,"studio-density-$v",selected=v==current){runtime.density(screen,v)}}}
         Row {listOf("Minimal","Balanced","Detailed").forEach {v->StudioChip("All: $v",true,"studio-density-all-$v",selected=v==runtime.draft.density && runtime.draft.screenDensity.isEmpty()){runtime.density(null,v)}}}
         StudioSection("Editing")
+        // Owner note 29: edit against a crowded late-game table (example cards only; the game is untouched).
+        StudioToggleRow("Fill it up (busy example table)",runtime.fillItUp,"studio-fill-it-up"){runtime.fillItUp=it}
         StudioToggleRow("Snap to 4dp grid",snap,"studio-snap",onSnap)
         StudioToggleRow("Outline editable elements",outlines,"studio-outlines",onOutlines)
         }

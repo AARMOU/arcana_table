@@ -652,6 +652,11 @@ internal class TableController(
      * apply to the real screen; nothing reaches the game. Cleared when Studio closes or another screen is picked.
      */
     var studioPreview by run { mutableStateOf<String?>(null) }
+    /**
+     * Owner note 29, "Fill it up": while Studio shows a busy table, the real players are kept here and the table shows
+     * [StudioBusyPreview.fill]. Nothing is saved or sent while it is set; see [StudioBusyPreview].
+     */
+    var studioRealPlayers by run { mutableStateOf<List<TablePlayer>?>(null) }
     var argentumBlockPlan by run { mutableStateOf<ArgentumBlockPlan?>(null) }
     val argentumBlockGuard = ArgentumBlockSubmissionGuard()
     var argentumDeferredDecisionId by run { mutableStateOf<String?>(null) }

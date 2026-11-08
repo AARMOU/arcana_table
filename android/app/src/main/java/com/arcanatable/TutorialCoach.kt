@@ -96,7 +96,15 @@ internal fun Modifier.tutorialTarget(id: String): Modifier = composed {
     }
     bringIntoViewRequester(requester).onGloballyPositioned {
         if (it.isAttached) {
-            val rect = it.boundsInWindow()
+            val clipped = it.boundsInWindow()
+            // Studio builds (Red Bull's J11 test, Nov 8): a button Studio made bigger than its parent row is drawn whole,
+            // but its window bounds are cut to the parent, so the highlight covered only part of it. A visible target
+            // is highlighted at its full size, kept inside the window.
+            val rect = if (BuildConfig.STUDIO_ENABLED && clipped.width > 1f && clipped.height > 1f) {
+                val p = it.positionInWindow()
+                Rect(p.x, p.y, p.x + it.size.width, p.y + it.size.height)
+                    .intersect(Rect(0f, 0f, root.width.toFloat().coerceAtLeast(1f), root.height.toFloat().coerceAtLeast(1f)))
+            } else clipped
             // An offscreen or collapsed copy never replaces a visible one.
             if (rect.width > 1f && rect.height > 1f || TutorialTargets.owners[id] == null || TutorialTargets.owners[id] === owner) {
                 TutorialTargets.bounds[id] = rect; TutorialTargets.windows[id] = root; TutorialTargets.owners[id] = owner

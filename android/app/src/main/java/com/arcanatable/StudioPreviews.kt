@@ -9,11 +9,8 @@ import org.json.JSONObject
  * sent to the engine: the sample screens' buttons do nothing.
  */
 internal object StudioPreviews {
-    /**
-     * Off for now: CI's test of these samples (`showMeSamplesOpenWithoutTheRealMoment`) never finishes, even with the
-     * samples remembered, so something in them may keep the screen busy forever. Kept off the owner's phone until found.
-     */
-    const val ENABLED = false
+    /** On again (Nov 8). StudioShowMeUiTest checks each sample on its own and fails, rather than hangs, if one never settles. */
+    const val ENABLED = true
     private val names = listOf("Grizzly Bears", "Llanowar Elves", "Serra Angel", "Shivan Dragon", "Forest", "Island", "Lightning Bolt", "Counterspell")
     private val colors = listOf(0xFF4E7A44, 0xFF4E7A44, 0xFFC9B98A, 0xFFA2483A, 0xFF4E7A44, 0xFF3F6A93, 0xFFA2483A, 0xFF3F6A93)
 

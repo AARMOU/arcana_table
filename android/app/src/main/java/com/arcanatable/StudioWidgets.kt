@@ -33,6 +33,24 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.text.InlineTextContent
 
+/**
+ * The player a repeated item belongs to (owner note 28, Goose J8): "you", or "opp1", "opp2"… counted from your seat in
+ * turn order. Items inside get IDs tied to that player, so edits stay with the right player when seats change.
+ */
+internal val LocalStudioSeat=compositionLocalOf<String?>{null}
+
+/** The Studio player key for seat [index]; see [LocalStudioSeat]. */
+internal fun studioSeatKey(index:Int,localSeat:Int,count:Int):String=when {
+    localSeat !in 0 until count -> "seat${index+1}"
+    index==localSeat -> "you"
+    else -> "opp${(index-localSeat+count)%count}"
+}
+
+/** Marks [content] as belonging to seat [index] for Studio IDs. */
+@Composable
+internal fun StudioSeat(index:Int,localSeat:Int,count:Int,content:@Composable ()->Unit)=
+    CompositionLocalProvider(LocalStudioSeat provides studioSeatKey(index,localSeat,count),content=content)
+
 internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String,val style:StudioControlStyle,
     val enabled:Boolean,val title:MutableState<String>,val titleSource:MutableState<String?>,
     /** The control's kind ("action", "data", "label", "container-action"…), so sizing knows what it is drawing. */
@@ -56,14 +74,20 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     val idScreen=LocalStudioScreen.current ?: screen
     val base=studioStableId(site,idScreen,0).substringBeforeLast(":")
     val token=remember{Any()}
-    val id=runtime.claim(base,token)
+    // Owner note 28 / J8: items repeated per player belong to that player (you, opponent 1…), not to their order on
+    // screen. The screen-order ID is still claimed, so an edit saved before this change keeps showing until it is next
+    // edited, when it moves to the player's own ID (StudioControlsRuntime.alias).
+    val seat=LocalStudioSeat.current
+    val legacy=runtime.claim(base,token)
+    val seatBase=seat?.let{"$base@$it"}
+    val id=if(seatBase==null)legacy else runtime.claim(seatBase,token).also{runtime.alias(it,legacy)}
     val caption=remember(id){mutableStateOf(title)}
     val source=remember(id){mutableStateOf<String?>(null)}
     val currentCaption=if(title in listOf("Action","Icon action","Menu action","Text input","Filter","Action chip","Control","Tab"))caption.value else title
     val captionEditable=kind!="container-action" || source.value!=null
     val action by rememberUpdatedState(onClick)
     val window=System.identityHashCode(LocalView.current.rootView)
-    DisposableEffect(runtime,id){onDispose{runtime.remove(id);runtime.release(base,token)}}
+    DisposableEffect(runtime,id){onDispose{runtime.remove(id);runtime.release(base,token);seatBase?.let{runtime.release(it,token)}}}
     val actualScreen=LocalStudioScreen.current ?: screen
     SideEffect {runtime.record(StudioLiveControl(id,actualScreen,kind,currentCaption,enabled,window=window,protectedLabel=protectedLabel,captionEditable=captionEditable),
         if(onClick==null)null else ({action?.invoke()}))}

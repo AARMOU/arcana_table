@@ -331,8 +331,8 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                         put("Stack",gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true})
                         put("Zones",gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"})
                         put("Log",gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true})
-                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up. Switched off
-                        // (StudioPreviews.ENABLED) until the hang its CI test found is understood; Combat is then editable in combat.
+                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up.
+                        // StudioPreviews.ENABLED switches them off; Combat is then editable only during real combat.
                         if(StudioPreviews.ENABLED) {
                             put("Combat",gameInProgress to {studioCloseAll();homeOpen=false;if(argentumAttackPlan==null && argentumBlockPlan==null)studioPreview="Combat"})
                             put("Opening hand",gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Opening hand"})
@@ -340,7 +340,15 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
                         } else put("Combat",(argentumAttackPlan!=null || argentumBlockPlan!=null) to {studioCloseAll();homeOpen=false})
                     }
                 val studioPractice:(()->Unit)?=if(gameInProgress) null else ({studioCloseAll();startOfflineGame()})
-                LaunchedEffect(studio.editing){if(!studio.editing)studioPreview=null}
+                LaunchedEffect(studio.editing){if(!studio.editing){studioPreview=null;studio.fillItUp=false}}
+                // Owner note 29, "Fill it up": a busy table while editing. The real players come back when it is switched
+                // off or Studio closes; in engine games they come from the engine's last state, which is always current.
+                val studioFilling=studio.fillItUp && studio.editing && gameInProgress
+                // A new engine state while filling (the AI keeps playing) refills from it, so the sample stays up.
+                LaunchedEffect(studioFilling,argentumSnapshot) {
+                    if(studioFilling){val real=argentumSnapshot?.players ?: studioRealPlayers ?: players;studioRealPlayers=real;players=StudioBusyPreview.fill(real,localSeat)}
+                    else studioRealPlayers?.let{saved->players=argentumSnapshot?.players ?: saved;studioRealPlayers=null}
+                }
                 if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
                     onApplied={nativeStudioRevision++},
                     onClassic={studioClassic=true;studio.panelOpen=true},

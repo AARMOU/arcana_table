@@ -157,7 +157,7 @@ internal fun TableController.TableMainLayout() {
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = if (studioPieceShown("playerChips")) players.indices.sortedBy { if (it == localSeat) -1 else it } else emptyList()
                 tabOrder.forEach { index -> val player = players[index]
-                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) {
+                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) { StudioSeat(index, localSeat, players.size) {
                         val snap = argentumSnapshot
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
@@ -171,7 +171,7 @@ internal fun TableController.TableMainLayout() {
                             selected = !showOverview && selectedPlayer == index,
                             onClick = { run { selectedPlayer = index; showOverview = false; showHand = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         )
-                    }
+                    } }
                 }
             }
         }
@@ -381,7 +381,7 @@ internal fun TableController.TableMainLayout() {
             ) {
                 items(players.size) { index ->
                     val player = players[index]
-                    PlayerOverview(
+                    StudioSeat(index, localSeat, players.size) { PlayerOverview(
                         player.copy(name = if (onlineMode && index == localSeat) "YOU" else player.name), index,
                         Modifier.fillMaxWidth().then(if (index == selectedPlayer) Modifier else Modifier),
                         compact = compactOverview,
@@ -399,7 +399,7 @@ internal fun TableController.TableMainLayout() {
                         onZone = { zoneDialog = index to it },
                         onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = gameInProgress && (!onlineMode || index == localSeat) && !gameEndedOnline) },
                         onPublicPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) }
-                    )
+                    ) }
                 }
             }
         } else {
@@ -407,7 +407,7 @@ internal fun TableController.TableMainLayout() {
             @Composable
             fun BoardFor(boardIndex: Int, boardModifier: Modifier) {
                 val boardCanControl = gameInProgress && !argentumEnabled && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
-                StudioScreen("Player") { PlayerBoard(
+                StudioScreen("Player") { StudioSeat(boardIndex, localSeat, players.size) { PlayerBoard(
                     player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
                     boardSpacingScale = boardSpacingScale,
                     playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
@@ -497,7 +497,7 @@ internal fun TableController.TableMainLayout() {
                         }
                     },
                     onShuffle = { if (boardCanControl) { updatePlayer(boardIndex) { it.copy(library = it.library.shuffled()) }; logAction(boardIndex, "shuffled their library") } }
-                ) }
+                ) } }
             }
             val shownIndex = showingView.coerceIn(players.indices)
             if (sideBySideBoards) {
