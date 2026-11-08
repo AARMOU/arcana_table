@@ -33,7 +33,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.text.InlineTextContent
 
 internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String,val style:StudioControlStyle,
-    val enabled:Boolean,val title:MutableState<String>,val titleSource:MutableState<String?>) {
+    val enabled:Boolean,val title:MutableState<String>,val titleSource:MutableState<String?>,
+    /** The control's kind ("action", "data", "label", "container-action"…), so sizing knows what it is drawing. */
+    val kind:String="action") {
     fun click(){if(runtime.editing)runtime.select(id) else if(enabled)runtime.invokeFrom(id,style.binding ?: id)}
     fun parent(proxy:Boolean=false)=StudioControlParent(id,style,{source,text->
         if(titleSource.value==null)titleSource.value=source
@@ -67,7 +69,7 @@ internal fun studioWidget(site:String,screen:String,kind:String,title:String,ena
     StudioWindowCanvasHost(runtime,window)
     val style=runtime.style(id,actualScreen,kind)
     val available=enabled && (style.binding==null || if(kind.endsWith("action"))runtime.canInvoke(id,style.binding) else runtime.canDisplay(id,style.binding))
-    return StudioWidget(runtime,id,style,available,caption,source)
+    return StudioWidget(runtime,id,style,available,caption,source,kind)
 }
 
 
@@ -87,24 +89,38 @@ private class StudioFixedSlotNode:Modifier.Node(),androidx.compose.ui.node.Paren
 }
 
 /**
- * Scales a resized control's contents down so they fit its Studio size. The control is measured at the size it
- * needs (from its intrinsic sizes) and drawn scaled into the box, so text, icons and pictures shrink together and stay
- * centred. Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
+ * Fits a resized control's contents into its Studio size (owner, Nov 7: "results look bad").
+ * - Words shrink on one line first (down to a readable 60%) instead of breaking letter by letter ("PASS TO MY TURN"
+ *   at 16 wide became a column of letters). Only if one line can't fit at 60% does the text wrap.
+ * - When [center] is set (text, labels and tappable boxes whose own background sits outside this), contents keep their
+ *   natural size and sit in the middle of a box made bigger, instead of being stretched to its top-left corner.
+ * Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
  */
-internal fun Modifier.studioFitContents():Modifier=this.layout {measurable,constraints->
+internal fun Modifier.studioFitContents(center:Boolean=false):Modifier=this.layout {measurable,constraints->
     if(!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
         val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
     }
     val w=constraints.maxWidth;val h=constraints.maxHeight
-    val needW=runCatching{measurable.minIntrinsicWidth(h)}.getOrNull() ?: w
-    val needH=runCatching{measurable.minIntrinsicHeight(w)}.getOrNull() ?: h
-    val scale=minOf(1f,w/needW.coerceAtLeast(1).toFloat(),h/needH.coerceAtLeast(1).toFloat()).coerceAtLeast(0.6f)
-    if(scale>=0.999f) {
+    fun fit(needW:Int,needH:Int)=minOf(1f,w/needW.coerceAtLeast(1).toFloat(),h/needH.coerceAtLeast(1).toFloat())
+    val wide=runCatching{measurable.maxIntrinsicWidth(h)}.getOrNull()
+    val wideH=wide?.let{runCatching{measurable.minIntrinsicHeight(it)}.getOrNull()}
+    val (needW,needH)=if(wide!=null && wideH!=null && fit(wide,wideH)>=0.6f)wide to wideH
+        else (runCatching{measurable.minIntrinsicWidth(h)}.getOrNull() ?: w) to (runCatching{measurable.minIntrinsicHeight(w)}.getOrNull() ?: h)
+    val scale=fit(needW,needH).coerceAtLeast(0.6f)
+    if(!center && scale>=0.999f) {
         val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
     }
-    val inner=androidx.compose.ui.unit.Constraints.fixed((w/scale).toInt().coerceAtLeast(1),(h/scale).toInt().coerceAtLeast(1))
+    val boxW=(w/scale).toInt().coerceAtLeast(1);val boxH=(h/scale).toInt().coerceAtLeast(1)
+    val inner=if(center)androidx.compose.ui.unit.Constraints(maxWidth=boxW,maxHeight=boxH)
+        else androidx.compose.ui.unit.Constraints.fixed(boxW,boxH)
     val p=measurable.measure(inner)
-    layout(w,h){p.placeWithLayer((w-p.width)/2,(h-p.height)/2){scaleX=scale;scaleY=scale}}
+    // A side Studio didn't size keeps following the contents (within what the parent allows).
+    val outW=if(!center || constraints.hasFixedWidth)w else (p.width*scale).toInt().coerceIn(constraints.minWidth,w)
+    val outH=if(!center || constraints.hasFixedHeight)h else (p.height*scale).toInt().coerceIn(constraints.minHeight,h)
+    layout(outW,outH){
+        val x=(outW-p.width)/2;val y=(outH-p.height)/2
+        if(scale>=0.999f)p.place(x,y) else p.placeWithLayer(x,y){scaleX=scale;scaleY=scale}
+    }
 }
 
 @Composable
@@ -141,8 +157,9 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
     val resized=s.width!=null || s.height!=null
     result=s.radius?.takeIf{it.isFinite()}?.let{result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
         ?: if(resized)result.clipToBounds() else result
-    if(resized)result=result.studioFitContents()
+    // The fill paints the whole box (it used to paint only behind the fitted contents).
     s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
+    if(resized)result=result.studioFitContents(center=widget.kind!="action" && widget.kind!="icon-action")
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
         .pointerInput(widget.id,true) {
             detectDragGesturesAfterLongPress(onDragStart={point->

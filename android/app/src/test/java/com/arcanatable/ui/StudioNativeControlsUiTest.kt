@@ -1,6 +1,7 @@
 package com.arcanatable.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -40,6 +41,30 @@ class StudioNativeControlsUiTest {
         rule.waitForIdle()
         assertEquals(280f*d,rule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.width,2f)
         assertEquals("the neighbour gives way",120f*d,rule.onNodeWithTag("b").fetchSemanticsNode().boundsInRoot.width,2f)
+    }
+
+    /**
+     * Owner, Nov 7: "results look bad". A label drawn as a box (a phase tab: background in its own modifier) moves as one
+     * piece, and narrowing it shrinks the words on one line instead of breaking them letter by letter.
+     */
+    @Test fun aBoxedLabelMovesWholeAndShrinksOnOneLine() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-label",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
+            StudioText("HomeScreen.Text.1","Player",true,"PASS TO MY TURN",
+                modifier=Modifier.testTag("tab").background(androidx.compose.ui.graphics.Color.DarkGray).padding(8.dp))
+        }}}}
+        rule.waitForIdle()
+        val d=rule.density.density
+        val before=rule.onNodeWithTag("tab").fetchSemanticsNode().boundsInRoot
+        val id=runtime.controls.values.single().id
+        val narrow=(before.width/d)*0.75f
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=30f,dy=12f,width=narrow));runtime.apply()}
+        rule.waitForIdle()
+        val after=rule.onNodeWithTag("tab").fetchSemanticsNode().boundsInRoot
+        assertEquals("the box moves with the words",before.left+30f*d,after.left,2f)
+        assertEquals(before.top+12f*d,after.top,2f)
+        assertEquals(narrow*d,after.width,2f)
+        assertTrue("one line, shrunk, not a column of letters: ${after.height} vs ${before.height}",after.height<=before.height*1.05f)
     }
 
     /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
