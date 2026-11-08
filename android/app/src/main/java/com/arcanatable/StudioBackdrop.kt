@@ -24,6 +24,7 @@ internal object StudioBackdrop {
     /** Owner, Nov 7: GIFs play behind the table. Kept as the original file (up to [MAX_GIF_BYTES]) so they still move. */
     const val MAX_GIF_BYTES = 25L * 1024 * 1024
     fun isGif(name: String) = name.endsWith(".gif")
+    fun isGifHeader(head: ByteArray) = String(head, Charsets.US_ASCII).startsWith("GIF8")
     const val MAX_SIDE = 2048
     val FITS = listOf("Fill", "Fit")
     fun validName(name: String) = NAME.matches(name)
@@ -33,7 +34,7 @@ internal object StudioBackdrop {
     /** Copies the picked picture in, shrunk to at most [MAX_SIDE] pixels a side. Returns its stored name. */
     fun import(context: Context, uri: Uri): String {
         val head = context.contentResolver.openInputStream(uri)?.use { s -> ByteArray(6).also { s.read(it) } } ?: error("Can't open that picture.")
-        if (String(head, Charsets.US_ASCII).startsWith("GIF8")) return importGif(context, uri)
+        if (isGifHeader(head)) return importGif(context, uri)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         // Owner's screenshot, Nov 7: every pick said "Can't open that picture." A bounds-only decode always returns null
         // (it fills [bounds] instead), so the null check fired every time. Only a missing stream means it can't open.
