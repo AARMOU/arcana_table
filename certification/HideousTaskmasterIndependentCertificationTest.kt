@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.HideousTaskmaster
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ChooseTargetsDecision
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -81,6 +82,13 @@ class HideousTaskmasterIndependentCertificationTest {
         d.resolveAll()
         assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Sol Ring"))
 
+        d.passPriorityUntil(Step.END, activePlayer = player)
+        for (creature in listOf(borrowed, otherBorrowed)) {
+            assertEquals(player, d.projected.getController(creature))
+            assertTrue(d.projected.hasKeyword(creature, Keyword.TRAMPLE))
+            assertTrue(d.projected.hasKeyword(creature, Keyword.HASTE))
+        }
+
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertEquals(opponent, d.projected.getController(borrowed))
         assertEquals(otherOpponent, d.projected.getController(otherBorrowed))
@@ -96,15 +104,23 @@ class HideousTaskmasterIndependentCertificationTest {
         val player = d.player1
         val opponent = d.player2
         val ownCreature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
+        val validTarget = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
         val opposingArtifact = d.putPermanentOnBattlefield(opponent, "Sol Ring")
         val taskmaster = d.putCardInHand(player, name)
         d.giveColorlessMana(player, 6)
         d.giveMana(player, Color.RED)
 
         assertNull(d.castSpell(player, taskmaster).error)
-        d.resolveAll()
+        val decision = d.state.pendingDecision as? ChooseTargetsDecision
+        assertNotNull("the cast trigger must expose only legal creature targets", decision)
+        val legalTargets = decision!!.legalTargets.values.flatten()
+        assertTrue("an opponent's creature is a legal target", legalTargets.contains(validTarget))
+        assertFalse("your own creature is not a legal target", legalTargets.contains(ownCreature))
+        assertFalse("an opponent's noncreature is not a legal target", legalTargets.contains(opposingArtifact))
+        d.resolveAll(Choices(targets = listOf(validTarget)))
 
         assertEquals(player, d.projected.getController(ownCreature))
+        assertEquals(player, d.projected.getController(validTarget))
         assertEquals(opponent, d.projected.getController(opposingArtifact))
     }
 
