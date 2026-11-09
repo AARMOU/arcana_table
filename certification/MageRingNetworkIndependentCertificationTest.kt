@@ -60,7 +60,7 @@ class MageRingNetworkIndependentCertificationTest {
             assertNull(d.activate(p, land, index = 1).error)
             d.resolveAll()
             assertEquals(index + 1, d.storageCounters(land))
-            if (index == 0) d.untapPermanent(land)
+            d.untapPermanent(land)
         }
 
         assertNull(d.activate(p, land, index = 2).error)
