@@ -80,7 +80,7 @@ class KozileksReturnIndependentCertificationTest {
         assertEquals(
             mapOf(bear to 5, dreadmaw to 5),
             d.events.filterIsInstance<DamageDealtEvent>()
-                .filter { it.sourceId == returnCard }
+                .filter { it.targetId == bear || it.targetId == dreadmaw }
                 .associate { it.targetId to it.amount },
         )
         assertFalse(d.getPermanents(p).contains(bear))
@@ -128,13 +128,12 @@ class KozileksReturnIndependentCertificationTest {
 
     @Test
     fun anEldraziCreatureWithManaValueBelowSevenDoesNotTriggerTheGraveyardAbility() {
-        val d = customScenario(KozileksReturn, "Eldrazi Skyspawner", "Grizzly Bears")
+        val d = customScenario(KozileksReturn, "Blisterpod", "Grizzly Bears")
         val p = d.player1
         val returnCard = d.putCardInGraveyard(p, "Kozilek's Return")
         val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
-        val eldrazi = d.putCardInHand(p, "Eldrazi Skyspawner")
-        d.giveColorlessMana(p, 2)
-        d.giveMana(p, Color.BLUE)
+        val eldrazi = d.putCardInHand(p, "Blisterpod")
+        d.giveMana(p, Color.GREEN)
 
         assertNull(d.castSpell(p, eldrazi).error)
         assertEquals(1, d.stackSize)
@@ -142,7 +141,7 @@ class KozileksReturnIndependentCertificationTest {
 
         assertTrue(d.getGraveyard(p).contains(returnCard))
         assertTrue(d.getPermanents(d.player2).contains(bear))
-        assertTrue(d.permanentsNamed(p, "Eldrazi Skyspawner").isNotEmpty())
+        assertTrue(d.permanentsNamed(p, "Blisterpod").isNotEmpty())
         assertTrue(d.events.filterIsInstance<DamageDealtEvent>().none { it.sourceId == returnCard })
     }
 
