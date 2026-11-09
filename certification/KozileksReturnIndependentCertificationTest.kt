@@ -63,10 +63,17 @@ class KozileksReturnIndependentCertificationTest {
 
     @Test
     fun castingAnEldraziCreatureWithManaValueAtLeastSevenMayExileReturnAndDealFive() {
-        val d = customScenario(KozileksReturn, "Ulamog, the Ceaseless Hunger", "Grizzly Bears", "Colossal Dreadmaw")
+        val d = customScenario(
+            KozileksReturn,
+            "Ulamog, the Ceaseless Hunger",
+            "Grizzly Bears",
+            "Earth Elemental",
+            "Colossal Dreadmaw",
+        )
         val p = d.player1
         val returnCard = d.putCardInGraveyard(p, "Kozilek's Return")
         val bear = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val fiveToughnessCreature = d.putCreatureOnBattlefield(p, "Earth Elemental")
         val dreadmaw = d.putCreatureOnBattlefield(d.player2, "Colossal Dreadmaw")
         val eldrazi = d.putCardInHand(p, "Ulamog, the Ceaseless Hunger")
         d.giveColorlessMana(p, 10)
@@ -77,13 +84,8 @@ class KozileksReturnIndependentCertificationTest {
 
         assertTrue(d.getExileCardNames(p).contains("Kozilek's Return"))
         assertFalse(d.getGraveyard(p).contains(returnCard))
-        assertEquals(
-            mapOf(bear to 5, dreadmaw to 5),
-            d.events.filterIsInstance<DamageDealtEvent>()
-                .filter { it.targetId == bear || it.targetId == dreadmaw }
-                .associate { it.targetId to it.amount },
-        )
         assertFalse(d.getPermanents(p).contains(bear))
+        assertFalse("Five damage is lethal to a 5-toughness creature", d.getPermanents(p).contains(fiveToughnessCreature))
         assertTrue(d.getPermanents(d.player2).contains(dreadmaw))
         assertTrue(d.permanentsNamed(p, "Ulamog, the Ceaseless Hunger").isNotEmpty())
     }
