@@ -1,0 +1,9 @@
+{
+  "key": "lord-of-change",
+  "name": "Lord of Change",
+  "issue": 1054,
+  "source": "certification/LordOfChangeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.LordOfChangeIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
