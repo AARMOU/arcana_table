@@ -2112,6 +2112,7 @@ internal object StudioSites {
         "TableBoardViews.Panel.3" to "Table and player",
         "TableBoardViews.Panel.4" to "Table and player",
         "TableBoardViews.Panel.5" to "Table and player",
+        "ArgentumUi.Panel.1" to "Table and player",
         "TableBoardViews.combinedClickable.8" to "Table and player",
         "TableBoardViews.combinedClickable.9" to "Table and player",
         "TableBoardViews.combinedClickable.10" to "Table and player",

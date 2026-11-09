@@ -188,7 +188,7 @@ internal fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean
     val artUrl = commander?.artCropUrl ?: commander?.imageUrl
     Box(
         Modifier.studioWidget(studio).width(96.dp).height(50.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (shape))
-            .background(studio?.style?.fill?.let(::parseTableColorHex) ?: (PanelLight))
+            .background((studio?.style?.fill?.let(::parseTableColorHex) ?: (PanelLight)).studioBackdrop(studio?.style?.backdrop))
             .border(if (selected) 2.dp else 1.dp, if (selected) Mint else Color(0xFF33423D), shape)
             .studioCombinedClickable("TableHelpers.combinedClickable.3", "Table and player", onClick = studioClick)
     ) {

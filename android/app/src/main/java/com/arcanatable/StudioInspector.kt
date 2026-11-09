@@ -99,7 +99,7 @@ internal fun StudioInspector(runtime:StudioControlsRuntime,control:StudioLiveCon
             Column(Modifier.heightIn(max=260.dp).testTag("studio-inspector-body").verticalScroll(rememberScrollState()).padding(vertical=4.dp)) {
                 when(tab) {
                     StudioInspectorTab.Layout->LayoutTab(runtime,style,widthDp,heightDp,change)
-                    StudioInspectorTab.Style->StyleTab(runtime,style,caps,palette,change,backdrop=control.kind=="panel" || style.fill!=null)
+                    StudioInspectorTab.Style->StyleTab(runtime,style,caps,palette,change,backdrop=studioBackdropTarget(runtime,control,style))
                     StudioInspectorTab.Action->ActionTab(runtime,control,style,caps,change)
                     StudioInspectorTab.Arrange->ArrangeTab(runtime,control,style,caps,density,change,onMessage)
                 }
@@ -160,7 +160,7 @@ private fun LayoutTab(runtime:StudioControlsRuntime,style:StudioControlStyle,wid
 }
 
 @Composable
-private fun StyleTab(runtime:StudioControlsRuntime,style:StudioControlStyle,caps:StudioCapabilities,palette:List<Pair<String,Color>>,change:((StudioControlStyle)->StudioControlStyle)->Unit,backdrop:Boolean=false) {
+private fun StyleTab(runtime:StudioControlsRuntime,style:StudioControlStyle,caps:StudioCapabilities,palette:List<Pair<String,Color>>,change:((StudioControlStyle)->StudioControlStyle)->Unit,backdrop:String?=null) {
     if(caps.label) {
         var text by remember(style.label){mutableStateOf(style.label.orEmpty())}
         OutlinedTextField(text,{t->text=t.take(120);change{it.copy(label=text.takeIf(String::isNotBlank))}},singleLine=true,
@@ -180,10 +180,16 @@ private fun StyleTab(runtime:StudioControlsRuntime,style:StudioControlStyle,caps
         {change{it.copy(font=((it.font ?: 14f)-1f).coerceIn(8f,64f))}},{change{it.copy(font=((it.font ?: 14f)+1f).coerceIn(8f,64f))}},
         StudioSlide(style.font ?: 14f,8f..64f,runtime,{"${it.toInt()}sp"}){v->change{it.copy(font=v)}})
     // Owner, Nov 8: boards and player cards can go clear behind while their words and cards stay solid.
-    if(backdrop)StudioStepper("Background","${((style.backdrop ?: 1f)*100).toInt()}%","studio-backdrop",
-        {change{it.copy(backdrop=StudioOpacity.step(it.backdrop,-1))}},{change{it.copy(backdrop=StudioOpacity.step(it.backdrop,1))}},
-        StudioSlide((style.backdrop ?: 1f)*100f,0f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(backdrop=if(v>=100f)null else v/100f)}})
-    StudioStepper(if(backdrop)"Whole item" else "Opacity","${((style.alpha ?: 1f)*100).toInt()}%","studio-opacity",
+    // Owner, Nov 8: "the player cards in the table view don't look fixed". Tapping a player card picks the card's
+    // tappable item, while its background belongs to the panel of the same size; the slider edits that panel.
+    backdrop?.let{target->
+        val bd=runtime.style(target).backdrop
+        val set:(Float?)->Unit={v->runtime.edit(target,runtime.style(target).copy(backdrop=v))}
+        StudioStepper("Background","${((bd ?: 1f)*100).toInt()}%","studio-backdrop",
+            {set(StudioOpacity.step(runtime.style(target).backdrop,-1))},{set(StudioOpacity.step(runtime.style(target).backdrop,1))},
+            StudioSlide((bd ?: 1f)*100f,0f..100f,runtime,{"${it.toInt()}%"}){v->set(if(v>=100f)null else v/100f)})
+    }
+    StudioStepper(if(backdrop!=null)"Whole item" else "Opacity","${((style.alpha ?: 1f)*100).toInt()}%","studio-opacity",
         {change{it.copy(alpha=StudioOpacity.step(it.alpha,-1))}},{change{it.copy(alpha=StudioOpacity.step(it.alpha,1))}},
         StudioSlide((style.alpha ?: 1f)*100f,0f..100f,runtime,{"${it.toInt()}%"}){v->change{it.copy(alpha=if(v>=100f)null else v/100f)}})
     if(caps.radius)StudioStepper("Corners",style.radius?.let{"${it.toInt()}dp"} ?: "Auto","studio-radius",
@@ -309,3 +315,19 @@ internal fun StudioListRow(text:String,selected:Boolean,tag:String,trailing:(@Co
         trailing?.invoke()
     }
 }
+
+/**
+ * Which item's Background the inspector edits for [control]: the item itself if it is a panel or has its own fill,
+ * otherwise a panel exactly behind it (a player card's tappable area sits on the card's panel), else none.
+ */
+internal fun studioBackdropTarget(runtime:StudioControlsRuntime,control:StudioLiveControl,style:StudioControlStyle):String? {
+    if(control.kind=="panel" || style.fill!=null || StudioSites.site(control.id) in SELF_BACKGROUND_SITES)return control.id
+    val b=control.bounds
+    if(b.width<=0f)return null
+    return runtime.controls.values.firstOrNull{p->p.kind=="panel" && p.window==control.window && p.id!=control.id &&
+        kotlin.math.abs(p.bounds.left-b.left)<=2f && kotlin.math.abs(p.bounds.top-b.top)<=2f &&
+        kotlin.math.abs(p.bounds.right-b.right)<=2f && kotlin.math.abs(p.bounds.bottom-b.bottom)<=2f}?.id
+}
+
+/** Items that paint their own background from their Studio style (so their own Background applies). */
+private val SELF_BACKGROUND_SITES=setOf("TableHelpers.PlayerViewTab")

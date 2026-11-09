@@ -116,7 +116,8 @@ fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, 
     }
     val shape = RoundedCornerShape(9.dp)
     Row(
-        modifier.height(44.dp).clip(shape).background(if (selected) Mint.copy(alpha = 0.18f) else PanelLight).background(flash.value)
+        // Owner, Nov 8: the chip's background is a Studio panel so it can go clear with its name and life still solid.
+        modifier.height(44.dp).studioPanel("ArgentumUi.Panel.1", "Table and player", "Player chip", shape, if (selected) Mint.copy(alpha = 0.18f) else PanelLight).background(flash.value)
             .border(if (selected || seat.isActive) 2.dp else 1.dp, if (seat.isActive) TurnColors.forSeat(seat.isYou) else if (selected) Mint else Color(0xFF33423D), shape)
             .studioClickable("ArgentumUi.clickable.1", "Table and player", onClick = onClick).padding(end = 9.dp),
         verticalAlignment = Alignment.CenterVertically
