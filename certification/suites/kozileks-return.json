@@ -1,0 +1,9 @@
+{
+  "key": "kozileks-return",
+  "name": "Kozilek's Return",
+  "issue": 1050,
+  "source": "certification/KozileksReturnIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.KozileksReturnIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
