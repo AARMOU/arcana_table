@@ -89,9 +89,9 @@ class LychguardIndependentCertificationTest {
         val opponent = d.player2
         val lychguard = d.putCreatureOnBattlefield(player, "Lychguard")
         d.putCardInGraveyard(player, "Isamaru, Hound of Konda")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         d.giveColorlessMana(player, 3)
         d.giveMana(player, Color.BLACK)
-        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
         assertNull(d.passPriority(opponent).error)
 
         assertNull(d.activate(player, lychguard).error)
