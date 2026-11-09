@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.MageRingNetwork
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Step
@@ -63,7 +64,8 @@ class MageRingNetworkIndependentCertificationTest {
             d.untapPermanent(land)
         }
 
-        assertNull(d.activate(p, land, index = 2).error)
+        val manaAbility = d.cardRegistry.getCard("Mage-Ring Network")!!.script.activatedAbilities[2].id
+        assertNull(d.submit(ActivateAbility(p, land, manaAbility, xValue = 2)).error)
         d.resolveAll()
 
         assertEquals(0, d.storageCounters(land))
