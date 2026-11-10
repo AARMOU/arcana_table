@@ -83,7 +83,7 @@ private val xpDarkBlue=Color(0xFF062B83)
 private val xpBeige=Color(0xFFECE9D8)
 
 @Composable
-internal fun XpDesktopHost(hasPriority:Boolean,content:@Composable ()->Unit) {
+internal fun XpDesktopHost(hasPriority:Boolean,onStack:()->Unit,content:@Composable ()->Unit) {
     val context=LocalContext.current
     val prefs=remember {context.getSharedPreferences("arcana_xp_desktop",Context.MODE_PRIVATE)}
     BoxWithConstraints(Modifier.fillMaxSize().testTag("xp-desktop")) {
@@ -109,6 +109,11 @@ internal fun XpDesktopHost(hasPriority:Boolean,content:@Composable ()->Unit) {
         var beforeMax by remember(screenClass){mutableStateOf(game)}
         var alert by remember{mutableStateOf<String?>(null)}
         var firstPriority by remember{mutableStateOf<Boolean?>(null)}
+        // Re-clamp saved positions if a size change stays in the same Fold size class.
+        LaunchedEffect(screenW,screenH) {
+            game=game.bounded(screenW,screenH,minGameW,minGameH)
+            goose=goose.bounded(screenW,screenH,minGooseW,minGooseH)
+        }
         var gooseText by remember{mutableStateOf("It looks like you're playing Commander. Need some glue?")}
         // Use a real game transition only; never invent mana errors, counterspells, or card actions.
         LaunchedEffect(hasPriority) {
@@ -121,11 +126,15 @@ internal fun XpDesktopHost(hasPriority:Boolean,content:@Composable ()->Unit) {
 
         XpHills(Modifier.fillMaxSize())
         Column(Modifier.align(Alignment.TopStart).padding(start=12.dp,top=12.dp)) {
-            Text("🖥️",fontSize=25.sp)
-            Text("My Commander",fontSize=11.sp,color=Color.White)
+            Column(Modifier.clickable { minimized=false }.testTag("xp-open-table")) {
+                Text("🖥️",fontSize=25.sp)
+                Text("My Commander",fontSize=11.sp,color=Color.White)
+            }
             Spacer(Modifier.height(14.dp))
-            Text("📁",fontSize=25.sp)
-            Text("The Stack",fontSize=11.sp,color=Color.White)
+            Column(Modifier.clickable { minimized=false;onStack() }.testTag("xp-open-stack")) {
+                Text("📁",fontSize=25.sp)
+                Text("The Stack",fontSize=11.sp,color=Color.White)
+            }
         }
 
         if(!minimized) {
@@ -152,7 +161,7 @@ internal fun XpDesktopHost(hasPriority:Boolean,content:@Composable ()->Unit) {
                 onMinimize={gooseOpen=false}) {
                 Row(Modifier.fillMaxSize().background(Color(0xFFFFFFF1)).padding(8.dp),
                     verticalAlignment=Alignment.CenterVertically) {
-                    GooseClippy(Modifier.size(64.dp))
+                    GooseClippy(Modifier.size(64.dp).clickable { gooseText="I am GooseClippy. Drag this window, resize it, or let me watch you misplay." })
                     Spacer(Modifier.width(6.dp))
                     Text(gooseText,color=Color(0xFF171717),fontSize=12.sp,lineHeight=15.sp)
                 }
