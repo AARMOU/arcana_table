@@ -2,6 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.MoltenSlagheap
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.core.ChooseNumberDecision
+import com.wingedsheep.engine.core.NumberChosenResponse
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.CounterType
@@ -19,6 +22,19 @@ class MoltenSlagheapIndependentCertificationTest {
 
     private fun GameTestDriver.storageCounters(slagheap: EntityId): Int =
         state.getEntity(slagheap)?.get<CountersComponent>()?.getCount(CounterType.STORAGE) ?: 0
+
+    private fun GameTestDriver.activateManaConversion(
+        player: EntityId,
+        slagheap: EntityId,
+        xValue: Int,
+    ) = submit(
+        ActivateAbility(
+            player,
+            slagheap,
+            cardRegistry.getCard("Molten Slagheap")!!.script.activatedAbilities[2].id,
+            xValue = xValue,
+        ),
+    )
 
     private fun GameTestDriver.addStorageCounters(player: EntityId, slagheap: EntityId, count: Int) {
         repeat(count) {
@@ -87,7 +103,12 @@ class MoltenSlagheapIndependentCertificationTest {
         assertEquals(2, d.storageCounters(slagheap))
         d.giveColorlessMana(p, 1)
 
-        assertNull(d.activate(p, slagheap, index = 2).error)
+        assertNull(d.activateManaConversion(p, slagheap, xValue = 2).error)
+        val colorSplit = d.state.pendingDecision as? ChooseNumberDecision
+        assertNotNull("choose how much of X becomes black mana", colorSplit)
+        assertEquals(2, colorSplit!!.maxValue)
+        assertEquals(0, d.storageCounters(slagheap))
+        assertNull(d.submitDecision(p, NumberChosenResponse(colorSplit.id, 1)).error)
         d.resolveAll()
 
         assertEquals(0, d.storageCounters(slagheap))
@@ -111,7 +132,7 @@ class MoltenSlagheapIndependentCertificationTest {
         assertNull(d.castSpell(p, solRing).error)
         d.resolveAll()
 
-        assertNotNull(d.activate(p, slagheap, index = 2).error)
+        assertNotNull(d.activateManaConversion(p, slagheap, xValue = 2).error)
 
         assertEquals(2, d.storageCounters(slagheap))
         assertEquals(0, d.manaPool(p).colorless)
