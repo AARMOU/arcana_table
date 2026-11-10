@@ -67,6 +67,7 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
                 Text("Arcana.exe — $screen",modifier=Modifier.fillMaxWidth()
                     .background(Color(0xFF0C3DBD)).padding(6.dp),color=Color.White)
                 title?.invoke()
+                Unit
             }} else title,
             text=text,shape=if(xp) androidx.compose.foundation.shape.RoundedCornerShape(2.dp) else shape,
             containerColor=if(xp)Color(0xFFECE9D8) else containerColor,
