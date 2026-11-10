@@ -141,7 +141,19 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableMainLayout() {
     if(xpSkinEnabled()) {
-        XpDesktopHost(hasPriority=argentumSnapshot?.priorityPlayer == localSeat,onStack={stackOpen=true}) {
+        // Read only the live state already delivered by the active game engine.
+        // Snapshot changes never drive rules or actions from GooseClippy.
+        val snap=argentumSnapshot
+        val observation=snap?.let {state->
+            GooseObservation(
+                turn=state.turnNumber,activeSeat=state.activePlayer,localSeat=localSeat,
+                prioritySeat=state.priorityPlayer,stepKey=state.stepKey,
+                stackSize=state.stack.size,
+                handSize=players.getOrNull(localSeat)?.hand?.size,
+                life=players.getOrNull(localSeat)?.life,gameOver=state.gameOver
+            )
+        }
+        XpDesktopHost(observation=observation,onStack={stackOpen=true}) {
             TableMainLayoutBody()
         }
     } else {
