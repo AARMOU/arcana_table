@@ -6,7 +6,7 @@ package com.arcanatable.customcards
 // otherwise put it into your hand." A declined optional placement also puts the card in hand.
 import com.arcanatable.customcards.cards.MatterReshaper
 import com.arcanatable.customcards.support.*
-import com.wingedsheep.engine.core.ChosenTarget
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.model.EntityId
