@@ -88,20 +88,8 @@ class MoltenSlagheapIndependentCertificationTest {
         d.giveColorlessMana(p, 1)
 
         assertNull(d.activate(p, slagheap, index = 2).error)
-        var choicesMade = 0
-        var stepsRemaining = 60
-        while (d.state.pendingDecision != null || d.state.stack.isNotEmpty()) {
-            assertTrue("mana ability did not finish resolving", stepsRemaining-- > 0)
-            if (d.state.pendingDecision != null) {
-                assertTrue("unexpected extra mana color choice", choicesMade < 2)
-                val color = if (choicesMade++ == 0) Color.BLACK else Color.RED
-                d.decide(Choices(color = color))
-            } else {
-                d.bothPass()
-            }
-        }
+        d.resolveAll()
 
-        assertEquals(2, choicesMade)
         assertEquals(0, d.storageCounters(slagheap))
         assertEquals(1, d.manaPool(p).black)
         assertEquals(1, d.manaPool(p).red)
@@ -111,16 +99,24 @@ class MoltenSlagheapIndependentCertificationTest {
 
     @Test
     fun storageCountersCannotBeConvertedWithoutPayingTheGenericManaCost() {
-        val d = customScenario(MoltenSlagheap)
+        val d = customScenario(MoltenSlagheap, "Sol Ring")
         val p = d.player1
         val slagheap = d.playSlagheap(p)
         d.addStorageCounters(p, slagheap, 2)
+        val solRing = d.putCardInHand(p, "Sol Ring")
+        assertNull(d.activate(p, slagheap, index = 0).error)
+        d.resolveAll()
+        assertEquals(1, d.manaPool(p).colorless)
+        assertTrue(d.isTapped(slagheap))
+        assertNull(d.castSpell(p, solRing).error)
+        d.resolveAll()
 
         assertNotNull(d.activate(p, slagheap, index = 2).error)
 
         assertEquals(2, d.storageCounters(slagheap))
+        assertEquals(0, d.manaPool(p).colorless)
         assertEquals(0, d.manaPool(p).black)
         assertEquals(0, d.manaPool(p).red)
-        assertFalse(d.isTapped(slagheap))
+        assertTrue(d.isTapped(slagheap))
     }
 }
