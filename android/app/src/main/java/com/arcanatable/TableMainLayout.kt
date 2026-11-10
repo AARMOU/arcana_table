@@ -140,6 +140,17 @@ import kotlinx.coroutines.CoroutineScope
 /** The table itself: top strip, player tabs, boards and the footer controls. */
 @Composable
 internal fun TableController.TableMainLayout() {
+    if(xpSkinEnabled()) {
+        XpDesktopHost(hasPriority=argentumSnapshot?.priorityPlayer == localSeat) {
+            TableMainLayoutBody()
+        }
+    } else {
+        TableMainLayoutBody()
+    }
+}
+
+@Composable
+private fun TableController.TableMainLayoutBody() {
     Column(
         Modifier.fillMaxSize().background(if (studioBackdropShown()) Color.Transparent else Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
