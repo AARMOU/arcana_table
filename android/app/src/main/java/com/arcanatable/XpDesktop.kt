@@ -316,3 +316,12 @@ internal fun GooseClippy(modifier:Modifier=Modifier) {
         drawPath(beak,Color(0xFFBB5400),style=Stroke(width=2f))
     }
 }
+
+/** Classic XP framing for existing real game dialog content; callbacks remain owned by Arcana. */
+@Composable
+internal fun XpGameDialogFrame(title:String,content:@Composable ()->Unit) {
+    Column(Modifier.fillMaxWidth().border(2.dp,xpDarkBlue).background(xpBeige).testTag("xp-game-dialog")) {
+        XpTitle("Arcana.exe — ${title.ifBlank { "Dialog" }}")
+        Box(Modifier.fillMaxWidth().padding(3.dp)) {content()}
+    }
+}
