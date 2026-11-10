@@ -141,7 +141,7 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableMainLayout() {
     if(xpSkinEnabled()) {
-        XpDesktopHost(hasPriority=argentumSnapshot?.priorityPlayer == localSeat) {
+        XpDesktopHost(hasPriority=argentumSnapshot?.priorityPlayer == localSeat,onStack={stackOpen=true}) {
             TableMainLayoutBody()
         }
     } else {
