@@ -59,7 +59,7 @@ internal fun rememberGooseClippySwitch():Pair<Boolean,(Boolean)->Unit> {
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose {prefs.unregisterOnSharedPreferenceChangeListener(listener)}
     }
-    val onChange: (Boolean)->Unit=remember(prefs) { { next->
+    val onChange: (Boolean)->Unit=remember(prefs) { { next:Boolean->
         enabled=next
         GooseClippyPreferences.write(prefs,next)
     }}
