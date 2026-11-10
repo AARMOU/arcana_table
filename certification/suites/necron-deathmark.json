@@ -1,0 +1,9 @@
+{
+  "key": "necron-deathmark",
+  "name": "Necron Deathmark",
+  "issue": 1070,
+  "source": "certification/NecronDeathmarkIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.NecronDeathmarkIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
