@@ -83,7 +83,7 @@ private val xpDarkBlue=Color(0xFF062B83)
 private val xpBeige=Color(0xFFECE9D8)
 
 @Composable
-internal fun XpDesktopHost(hasPriority:Boolean,onStack:()->Unit,content:@Composable ()->Unit) {
+internal fun XpDesktopHost(observation:GooseObservation?,onStack:()->Unit,content:@Composable ()->Unit) {
     val context=LocalContext.current
     val prefs=remember {context.getSharedPreferences("arcana_xp_desktop",Context.MODE_PRIVATE)}
     BoxWithConstraints(Modifier.fillMaxSize().testTag("xp-desktop")) {
@@ -107,21 +107,29 @@ internal fun XpDesktopHost(hasPriority:Boolean,onStack:()->Unit,content:@Composa
         var startOpen by remember{mutableStateOf(false)}
         var maximized by remember(screenClass){mutableStateOf(false)}
         var beforeMax by remember(screenClass){mutableStateOf(game)}
-        var alert by remember{mutableStateOf<String?>(null)}
-        var firstPriority by remember{mutableStateOf<Boolean?>(null)}
+        val quips=remember {GooseQuipDeck()}
+        var lastObservation by remember {mutableStateOf<GooseObservation?>(null)}
+        var gooseText by remember {mutableStateOf(quips.next(GooseMoment.WELCOME))}
+        var lastQuipAt by remember {mutableLongStateOf(0L)}
         // Re-clamp saved positions if a size change stays in the same Fold size class.
         LaunchedEffect(screenW,screenH) {
             game=game.bounded(screenW,screenH,minGameW,minGameH)
             goose=goose.bounded(screenW,screenH,minGooseW,minGooseH)
         }
-        var gooseText by remember{mutableStateOf("It looks like you're playing Commander. Need some glue?")}
-        // Use a real game transition only; never invent mana errors, counterspells, or card actions.
-        LaunchedEffect(hasPriority) {
-            if(firstPriority==false && hasPriority) {
-                gooseText="It looks like you have priority. Please use it irresponsibly."
-                alert="Your opponents have passed priority to you. Arcana.exe requires your attention."
+        // A purely observational quip engine: no game actions, fabricated card outcomes or network calls.
+        // Keep the message stable across unrelated recompositions, and don't flood the screen with every
+        // intermediate state in a rapid batch of engine snapshots.
+        LaunchedEffect(observation) {
+            if(observation!=null) {
+                val moment=GooseMomentDetector.change(lastObservation,observation)
+                val now=android.os.SystemClock.elapsedRealtime()
+                val urgent=moment==GooseMoment.LOW_LIFE || moment==GooseMoment.GAME_OVER
+                if(moment!=null && moment!=GooseMoment.WELCOME && (urgent || now-lastQuipAt>=2500L)) {
+                    gooseText=quips.next(moment)
+                    lastQuipAt=now
+                }
+                lastObservation=observation
             }
-            firstPriority=hasPriority
         }
 
         XpHills(Modifier.fillMaxSize())
@@ -161,29 +169,14 @@ internal fun XpDesktopHost(hasPriority:Boolean,onStack:()->Unit,content:@Composa
                 onMinimize={gooseOpen=false}) {
                 Row(Modifier.fillMaxSize().background(Color(0xFFFFFFF1)).padding(8.dp),
                     verticalAlignment=Alignment.CenterVertically) {
-                    GooseClippy(Modifier.size(64.dp).clickable { gooseText="I am GooseClippy. Drag this window, resize it, or let me watch you misplay." })
+                    GooseClippy(Modifier.size(64.dp).clickable { gooseText=quips.next(GooseMoment.GENERAL) })
                     Spacer(Modifier.width(6.dp))
                     Text(gooseText,color=Color(0xFF171717),fontSize=12.sp,lineHeight=15.sp)
                 }
             }
         }
-        if(alert!=null) {
-            Box(Modifier.fillMaxSize().zIndex(3f).background(Color.Black.copy(alpha=0.18f)),
-                contentAlignment=Alignment.Center) {
-                Column(Modifier.fillMaxWidth(0.86f).border(2.dp,xpDarkBlue).background(xpBeige).testTag("xp-alert")) {
-                    XpTitle("Arcana.exe — Priority Alert")
-                    Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Text("❌",fontSize=25.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(alert!!,fontSize=13.sp,color=Color.Black)
-                    }
-                    Row(Modifier.fillMaxWidth().padding(bottom=12.dp,end=12.dp),
-                        horizontalArrangement=Arrangement.End) {
-                        XpButton("OK"){alert=null}
-                    }
-                }
-            }
-        }
+        // Actual Arcana dialogs receive XP chrome from StudioDialogGuards; GooseClippy never
+        // blocks the battlefield with an invented alert just because priority changed.
         if(startOpen) {
             Column(Modifier.align(Alignment.BottomStart).padding(bottom=50.dp)
                 .widthIn(max=260.dp).border(2.dp,xpDarkBlue).background(xpBeige).zIndex(4f).padding(8.dp)) {
