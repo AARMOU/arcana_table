@@ -156,6 +156,8 @@ internal fun StudioMorePanel(runtime:StudioControlsRuntime,screen:String,snap:Bo
         // Owner, Nov 6 (batch 4): presets that make really noticeable changes, with Keep / Back.
         if(look!=null) {
             StudioSection("Presets")
+            // Optional assistant; independent of the selected Studio preset.
+            GooseClippySettingsToggle(Modifier.padding(vertical=5.dp))
             Row(Modifier.hintedHorizontalScroll()) {
                 StudioPresets.all.forEach {preset->
                     StudioChip(preset.name,true,"studio-preset-${preset.name}",selected=tryingPreset==preset.name){
