@@ -9,6 +9,7 @@ import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,9 +60,20 @@ internal fun StudioAlertDialog(screen:String="Dialog",onDismissRequest:()->Unit,
         return
     }
     StudioScreen(screen) {
+        val xp=xpSkinEnabled()
         AlertDialog(onDismissRequest=onDismissRequest,confirmButton=confirmButton,
-            modifier=modifier,dismissButton=dismissButton,icon=icon,title=title,text=text,shape=shape,containerColor=containerColor,
-            iconContentColor=iconContentColor,titleContentColor=titleContentColor,textContentColor=textContentColor,tonalElevation=tonalElevation,properties=properties)
+            modifier=modifier,dismissButton=dismissButton,icon=icon,
+            title=if(xp) {{ 
+                Text("Arcana.exe — $screen",modifier=Modifier.fillMaxWidth()
+                    .background(Color(0xFF0C3DBD)).padding(6.dp),color=Color.White)
+                title?.invoke()
+            }} else title,
+            text=text,shape=if(xp) androidx.compose.foundation.shape.RoundedCornerShape(2.dp) else shape,
+            containerColor=if(xp)Color(0xFFECE9D8) else containerColor,
+            iconContentColor=iconContentColor,
+            titleContentColor=if(xp)Color.Black else titleContentColor,
+            textContentColor=if(xp)Color.Black else textContentColor,
+            tonalElevation=tonalElevation,properties=properties)
     }
 }
 
