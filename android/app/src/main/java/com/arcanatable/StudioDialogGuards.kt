@@ -32,7 +32,7 @@ internal fun StudioDialog(screen:String="Dialog",onDismissRequest:()->Unit,prope
         StudioInlinePopup(screen,onDismissRequest,fullWidth=!properties.usePlatformDefaultWidth) {content()}
         return
     }
-    Dialog(onDismissRequest=onDismissRequest,properties=properties) {StudioScreen(screen){content()}}
+    Dialog(onDismissRequest=onDismissRequest,properties=properties) {StudioScreen(screen){if(xpSkinEnabled()) XpGameDialogFrame(screen) {content()} else content()}}
 }
 
 @Composable
