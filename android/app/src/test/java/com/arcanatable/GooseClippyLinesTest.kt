@@ -25,7 +25,7 @@ class GooseClippyLinesTest {
             val cycle2=List(count){chooser.next(moment)}
             assertEquals("No repeats during first cycle of $moment",count,cycle1.toSet().size)
             assertEquals("No repeats during second cycle of $moment",count,cycle2.toSet().size)
-            assertEquals("No recent replay across cycles of $moment",count,
+            assertEquals("No recent replay across the five-line cycle boundary of $moment",10,
                 (cycle1.takeLast(5)+cycle2.take(5)).toSet().size)
         }
     }
