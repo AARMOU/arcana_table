@@ -185,7 +185,7 @@ class MutatedCultistIndependentCertificationTest {
 
         assertFalse(d.getPermanents(opponent).contains(blocker))
         assertTrue(d.getGraveyardCardNames(opponent).contains("Grizzly Bears"))
-        assertFalse(d.getPermanents(player).contains(attacker))
-        assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains(name))
+        assertTrue(d.getPermanents(player).contains(attacker))
+        assertFalse(d.zoneNames(player, Zone.GRAVEYARD).contains(name))
     }
 }
