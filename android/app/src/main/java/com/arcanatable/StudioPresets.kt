@@ -18,6 +18,8 @@ internal data class StudioPreset(
     val turnLabel:String,
     /** A palette name from [tablePalettePresets], "Light", "Table default", or null to leave the colours alone. */
     val palette:String?,
+    /** Native presentation layer; Arcana is the ordinary live table. */
+    val skin:String="Arcana",
 )
 
 /** Reads and writes the live look values (TableController state plus their saved preferences). */
@@ -37,6 +39,8 @@ internal object StudioPresets {
             setOf("fullTableLabel","engineThinking","timer","manaBar"),"hidden",null),
         StudioPreset("Spread Out","Room to breathe between cards",StudioLook(1.05f,1.9f,1.05f,1.05f),"Balanced",
             setOf("fullTableLabel"),"both","Deep Ocean"),
+        StudioPreset("Windows XP","Resizable desktop windows, system alerts and GooseClippy",
+            StudioLook(0.9f,0.75f,1.1f,1f),"Balanced",emptySet(),"both","Light","Windows XP"),
     )
 
     fun theme(palette:String?):Map<String,String>? {
@@ -53,6 +57,6 @@ internal object StudioPresets {
     fun project(draft:StudioControlProject,preset:StudioPreset,keepColours:Boolean):StudioControlProject {
         val pieces=preset.hiddenPieces.filter{it in SCREEN_PIECES}.toSet()
         return draft.copy(density=preset.density,screenDensity=emptyMap(),hiddenPieces=pieces,turnLabel=preset.turnLabel,
-            theme=if(keepColours)draft.theme else theme(preset.palette) ?: draft.theme)
+            theme=if(keepColours)draft.theme else theme(preset.palette) ?: draft.theme,skin=preset.skin)
     }
 }
