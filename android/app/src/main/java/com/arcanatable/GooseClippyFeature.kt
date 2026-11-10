@@ -106,9 +106,9 @@ internal fun TableController.gooseClippyObservation():GooseObservation? {
 @Composable
 internal fun GooseClippyAnimatedSprite(talking:Boolean,modifier:Modifier=Modifier) {
     val context=LocalContext.current
-    val filename=if(talking)"gooseclippy_react.gif" else "gooseclippy_idle.gif"
-    val drawable=remember(context,filename) {
-        runCatching {
+    // Decode both small animations once; event transitions must not decode GIFs on the UI thread.
+    val animations=remember(context) {
+        fun load(filename:String)=runCatching {
             if(Build.VERSION.SDK_INT>=28) {
                 ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets,filename))
             } else {
@@ -117,7 +117,9 @@ internal fun GooseClippyAnimatedSprite(talking:Boolean,modifier:Modifier=Modifie
                 }
             }
         }.getOrNull()
+        load("gooseclippy_idle.gif") to load("gooseclippy_react.gif")
     }
+    val drawable=if(talking) animations.second ?: animations.first else animations.first
     DisposableEffect(drawable) {
         (drawable as? AnimatedImageDrawable)?.start()
         onDispose {(drawable as? AnimatedImageDrawable)?.stop()}
