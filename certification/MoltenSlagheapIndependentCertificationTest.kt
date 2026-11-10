@@ -131,6 +131,8 @@ class MoltenSlagheapIndependentCertificationTest {
         assertTrue(d.isTapped(slagheap))
         assertNull(d.castSpell(p, solRing).error)
         d.resolveAll()
+        assertEquals(0, d.manaPool(p).colorless)
+        assertTrue(d.isTapped(slagheap))
 
         assertNotNull(d.activateManaConversion(p, slagheap, xValue = 2).error)
 
