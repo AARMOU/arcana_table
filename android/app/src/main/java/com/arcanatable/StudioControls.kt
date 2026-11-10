@@ -97,7 +97,9 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
     /** Owner, Nov 7: main-screen pieces switched off in Studio ⋮ > Layout > Show on screen (see [SCREEN_PIECES]). */
     val hiddenPieces:Set<String> = emptySet(),
     /** Owner notes 16/17: the table's background picture (a name from [StudioBackdrop]), how it fits, and how dimmed. */
-    val backdrop:String?=null,val backdropFit:String="Fill",val backdropDim:Float=0.35f) {
+    val backdrop:String?=null,val backdropFit:String="Fill",val backdropDim:Float=0.35f,
+    /** Optional native presentation skin. Never changes game rules or controller actions. */
+    val skin:String="Arcana") {
     fun colors(base:TableColors)=StudioLayout(emptyList(),theme=theme).colors(base)
     /**
      * Moves old position-based IDs (`native:<site>/<compose key hash>:<n>`) to stable ones (`native:<site>/s<screen>:<n>`).
@@ -117,7 +119,7 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
         fun m(id:String)=map[id] ?: id
         return copy(controls=controls.mapKeys{m(it.key)},copies=copies.map{it.copy(source=m(it.source))},owners=owners.mapKeys{m(it.key)})
     }
-    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("backdropFit",backdropFit).put("backdropDim",backdropDim.toDouble()).apply{backdrop?.let{put("backdrop",it)}}.put("controls",JSONObject().apply {
+    fun json()=JSONObject().put("version",1).put("renderer","native-flow").put("density",density).put("theme",JSONObject(theme)).put("owners",JSONObject(owners)).put("screenDensity",JSONObject(screenDensity)).put("turnLabel",turnLabel).put("hiddenPieces",JSONArray(hiddenPieces.sorted())).put("backdropFit",backdropFit).put("backdropDim",backdropDim.toDouble()).put("skin",skin).apply{backdrop?.let{put("backdrop",it)}}.put("controls",JSONObject().apply {
         controls.forEach {(id,style)->put(id,style.json())}
     }).put("copies",JSONArray().apply {copies.forEach {put(JSONObject().put("id",it.id).put("source",it.source).put("style",it.style.json()))}}).toString()
     companion object {
@@ -158,10 +160,11 @@ internal data class StudioControlProject(val controls:Map<String,StudioControlSt
             require(backdrop==null || StudioBackdrop.validName(backdrop)){"Unknown background picture."}
             val fit=root.optString("backdropFit","Fill");require(fit in StudioBackdrop.FITS){"Unknown background fit."}
             val dim=root.optDouble("backdropDim",0.35).toFloat();require(dim in 0f..0.9f){"Background dimming out of range."}
+            val skin=root.optString("skin","Arcana");require(skin in setOf("Arcana","Windows XP")){"Unknown Studio skin."}
             return StudioControlProject(controls.keys().asSequence().associateWith {id->
                 require(id.startsWith("native:") && id.length<=180 && StudioSites.contains(id)){"Unknown control ID."}
                 StudioControlStyle.parse(controls.getJSONObject(id))
-            },parsedCopies,density,theme,owners,densities,turnLabel,hiddenPieces,backdrop,fit,dim)
+            },parsedCopies,density,theme,owners,densities,turnLabel,hiddenPieces,backdrop,fit,dim,skin)
         }
     }
 }
