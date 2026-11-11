@@ -112,7 +112,8 @@ class NecronMonolithIndependentCertificationTest {
             assertTrue(card.typeLine.isCreature)
             assertEquals(2, d.projected.getPower(warrior))
             assertEquals(2, d.projected.getToughness(warrior))
-            assertEquals(setOf(Color.BLACK), d.projected.getColors(warrior))
+            assertEquals(1, d.projected.getColors(warrior).size)
+            assertTrue(d.projected.hasColor(warrior, Color.BLACK))
         }
         d.assertLifeTotal(d.player2, 13)
     }
