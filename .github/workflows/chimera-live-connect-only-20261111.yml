@@ -1,0 +1,52 @@
+name: Chimera live connect only (no gameplay or deploy)
+on:
+  push:
+    branches: [gluece/chimera-cloudflare-credential-check-20261111]
+    paths: ['.github/workflows/chimera-live-connect-only-20261111.yml']
+permissions:
+  contents: read
+jobs:
+  connect:
+    if: >-
+      github.repository == 'AARMOU/arcana_table' &&
+      github.ref == 'refs/heads/gluece/chimera-cloudflare-credential-check-20261111' &&
+      github.event.head_commit.message == 'VERIFY: CHIMERA LIVE CONNECTION ONLY 2026-11-11'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify HTTPS health and a real WebSocket welcome (no game play)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 https://arcana-table-rooms.arcanamtg.workers.dev/health > /dev/null
+          echo "PASS: production HTTPS health"
+          node --input-type=module <<'NODE'
+          import { randomUUID } from 'node:crypto';
+          const room = ('L' + randomUUID().replaceAll('-', '').slice(0,7)).toUpperCase();
+          const ws = new WebSocket('wss://arcana-table-rooms.arcanamtg.workers.dev/room/' + room);
+          try {
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error('WebSocket open timeout')), 10000);
+              ws.addEventListener('open', () => { clearTimeout(timer); resolve(); }, {once:true});
+              ws.addEventListener('error', () => { clearTimeout(timer); reject(new Error('WebSocket open failed')); }, {once:true});
+            });
+            console.log('PASS: production WebSocket connected');
+            ws.send(JSON.stringify({type:'create',code:room,password:'arcana-argentum-'+room,name:'Connection test'}));
+            const welcome = await new Promise((resolve,reject) => {
+              const timer=setTimeout(()=>reject(new Error('Room welcome timeout')),10000);
+              ws.addEventListener('message', e=> {
+                const packet=JSON.parse(e.data);
+                if(packet.type==='welcome') { clearTimeout(timer); resolve(packet); }
+                else if(packet.type==='rejected') { clearTimeout(timer); reject(new Error('Room rejected test connection')); }
+              });
+            });
+            if(welcome.seat !== 0 || !welcome.seatToken) throw new Error('Invalid room host welcome');
+            console.log('PASS: server accepted temporary host seat and issued private seat credential');
+            ws.send(JSON.stringify({type:'leave'}));
+          } finally {
+            ws.close();
+          }
+          NODE
