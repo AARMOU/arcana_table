@@ -1,0 +1,93 @@
+name: One-shot Chimera room recovery via existing Arcana Cloudflare credentials
+on:
+  push:
+    branches:
+      - gluece/chimera-cloudflare-credential-check-20261111
+    paths:
+      - '.github/workflows/owner-approved-chimera-room-recovery-deploy.yml'
+permissions:
+  contents: read
+concurrency:
+  group: arcana-chimera-directed-room-production-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'AARMOU/arcana_table' &&
+      github.ref == 'refs/heads/gluece/chimera-cloudflare-credential-check-20261111' &&
+      github.event.head_commit.message == 'OWNER APPROVED: DEPLOY CHIMERA ROOM LOCK RECOVERY 2026-11-11 via Arcana credentials'
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Cloudflare credentials without exposing them
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$TOKEN" || { echo "::error::Missing original Arcana CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$ACCOUNT" || { echo "::error::Missing original Arcana CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+      - name: Fetch immutable approved Arcana and Chimera source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/AARMOU/arcana_table.git third_party/arcana
+          git -C third_party/arcana checkout --quiet --detach a5c428ad3da42b7325adf6630238ec992fee3113
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/AARMOU/arcana-chimera.git third_party/chimera
+          git -C third_party/chimera checkout --quiet --detach 9e12dfc9e24ab1289f64fce0f63ffc15a5011a75
+      - name: Apply reviewed fail-closed room recovery patch
+        run: python3 third_party/chimera/scripts/patch_directed_room_resumption.py third_party/arcana/android/cloud-room/src/index.ts
+      - name: Compile isolated patched Worker
+        working-directory: third_party/arcana/android/cloud-room
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run typecheck
+      - name: Verify private-seat and all-disconnected recovery on local WebSockets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd third_party/arcana/android/cloud-room
+          npx wrangler dev --local --port 8787 > "$RUNNER_TEMP/chimera-worker-test.log" 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          healthy=0
+          for attempt in $(seq 1 50); do
+            if curl --silent --fail http://127.0.0.1:8787/health > /dev/null; then healthy=1; break; fi
+            sleep 1
+          done
+          if [ "$healthy" -ne 1 ]; then tail -80 "$RUNNER_TEMP/chimera-worker-test.log"; exit 1; fi
+          node scripts/verify-directed-relay.mjs
+          node "$GITHUB_WORKSPACE/third_party/chimera/tests/verify-directed-room-all-offline.mjs"
+      - name: Require existing Worker and exact durable-object binding
+        shell: bash
+        working-directory: third_party/arcana/android/cloud-room
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          grep -Fxq 'name = "arcana-table-rooms"' wrangler.toml
+          grep -Fxq 'new_sqlite_classes = ["GameRoom"]' wrangler.toml
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/arcana-table-rooms")"
+          if [ "$code" != "200" ]; then echo "::error::Existing arcana-table-rooms could not be verified (HTTP $code). Refusing to create a Worker."; exit 1; fi
+          echo 'Exact existing Worker confirmed.'
+      - name: Deploy ONLY arcana-table-rooms after all checks pass
+        working-directory: third_party/arcana/android/cloud-room
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npm run deploy
+          echo 'Reviewed Cloudflare room recovery deployment completed.'
