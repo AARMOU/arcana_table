@@ -2,7 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.NecronMonolith
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CrewVehicle
 import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -22,8 +24,8 @@ class NecronMonolithIndependentCertificationTest {
         val card = d.state.getEntity(permanent)!!.get<CardComponent>()!!
         assertTrue(card.typeLine.isArtifact)
         assertFalse(card.typeLine.isCreature)
-        assertEquals(7, card.baseStats!!.power)
-        assertEquals(7, card.baseStats!!.toughness)
+        assertEquals(7, d.projected.getPower(permanent))
+        assertEquals(7, d.projected.getToughness(permanent))
     }
 
     @Test fun sixManaCannotCastNecronMonolith() {
@@ -42,7 +44,8 @@ class NecronMonolithIndependentCertificationTest {
         val p = d.player1
         val monolith = d.putPermanentOnBattlefield(p, "Necron Monolith")
         val bear = d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        assertNotNull(d.activate(p, monolith).error)
+        d.removeSummoningSickness(bear)
+        assertNotNull(d.submit(CrewVehicle(p, monolith, listOf(bear))).error)
 
         assertFalse(d.isTapped(bear))
         assertTrue(d.getGraveyardCardNames(p).isEmpty())
@@ -53,7 +56,8 @@ class NecronMonolithIndependentCertificationTest {
         val monolith = d.putPermanentOnBattlefield(d.player1, "Necron Monolith")
         val bear1 = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
         val bear2 = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
-        assertNotNull(d.activate(d.player1, monolith).error)
+        listOf(bear1, bear2).forEach(d::removeSummoningSickness)
+        assertNotNull(d.submit(CrewVehicle(d.player1, monolith, listOf(bear1, bear2))).error)
 
         assertFalse(d.isTapped(bear1))
         assertFalse(d.isTapped(bear2))
@@ -63,13 +67,15 @@ class NecronMonolithIndependentCertificationTest {
         val d = customScenario(NecronMonolith, "Grizzly Bears")
         val p = d.player1
         val monolith = d.putPermanentOnBattlefield(p, "Necron Monolith")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        assertNull(d.activate(p, monolith).error)
+        val bears = List(2) { d.putCreatureOnBattlefield(p, "Grizzly Bears") }
+        bears.forEach(d::removeSummoningSickness)
+        assertNull(d.submit(CrewVehicle(p, monolith, bears)).error)
         d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertTrue(d.projected.isCreature(monolith))
 
         d.passPriorityUntil(Step.END)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, p)
+        assertFalse(d.projected.isCreature(monolith))
         assertNotNull(d.declareAttackers(p, listOf(monolith), d.player2).error)
     }
 
@@ -79,10 +85,11 @@ class NecronMonolithIndependentCertificationTest {
         val monolith = d.putPermanentOnBattlefield(p, "Necron Monolith")
         val bear1 = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val bear2 = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        listOf(bear1, bear2).forEach(d::removeSummoningSickness)
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
         d.putCardOnTopOfLibrary(p, "Sol Ring")
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
-        assertNull(d.activate(p, monolith).error)
+        assertNull(d.submit(CrewVehicle(p, monolith, listOf(bear1, bear2))).error)
         d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
         assertTrue(d.isTapped(bear1))
         assertTrue(d.isTapped(bear2))
@@ -100,11 +107,12 @@ class NecronMonolithIndependentCertificationTest {
         assertEquals(2, warriors.size)
         warriors.forEach { warrior ->
             val card = d.state.getEntity(warrior)!!.get<CardComponent>()!!
+            assertTrue(d.state.getEntity(warrior)!!.has<TokenComponent>())
             assertTrue(card.typeLine.isArtifact)
             assertTrue(card.typeLine.isCreature)
-            assertEquals(2, card.baseStats!!.power)
-            assertEquals(2, card.baseStats!!.toughness)
-            assertEquals(setOf(Color.BLACK), card.colors)
+            assertEquals(2, d.projected.getPower(warrior))
+            assertEquals(2, d.projected.getToughness(warrior))
+            assertEquals(setOf(Color.BLACK), d.projected.getColors(warrior))
         }
         d.assertLifeTotal(d.player2, 13)
     }
@@ -113,13 +121,13 @@ class NecronMonolithIndependentCertificationTest {
         val d = customScenario(NecronMonolith, "Grizzly Bears", "Sol Ring")
         val p = d.player1
         val monolith = d.putPermanentOnBattlefield(p, "Necron Monolith")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val bears = List(2) { d.putCreatureOnBattlefield(p, "Grizzly Bears") }
+        bears.forEach(d::removeSummoningSickness)
         d.putCardOnTopOfLibrary(p, "Plains")
         d.putCardOnTopOfLibrary(p, "Sol Ring")
         d.putCardOnTopOfLibrary(p, "Plains")
-        assertNull(d.activate(p, monolith).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertNull(d.submit(CrewVehicle(p, monolith, bears)).error)
+        d.resolveAll()
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(monolith), d.player2).error)
         d.passPriorityUntil(Step.END)
@@ -132,11 +140,11 @@ class NecronMonolithIndependentCertificationTest {
         val d = customScenario(NecronMonolith, "Grizzly Bears")
         val p = d.player1
         val monolith = d.putPermanentOnBattlefield(p, "Necron Monolith")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val bears = List(2) { d.putCreatureOnBattlefield(p, "Grizzly Bears") }
+        bears.forEach(d::removeSummoningSickness)
         val blocker = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
-        assertNull(d.activate(p, monolith).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertNull(d.submit(CrewVehicle(p, monolith, bears)).error)
+        d.resolveAll()
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(monolith), d.player2).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
@@ -148,13 +156,13 @@ class NecronMonolithIndependentCertificationTest {
     @Test fun indestructibleVehicleSurvivesADestroyEffect() {
         val d = customScenario(NecronMonolith, "Murder", "Grizzly Bears")
         val monolith = d.putPermanentOnBattlefield(d.player1, "Necron Monolith")
-        d.putCreatureOnBattlefield(d.player1, "Grizzly Bears")
-        d.putCreatureOnBattlefield(d.player1, "Grizzly Bears")
+        val bears = List(2) { d.putCreatureOnBattlefield(d.player1, "Grizzly Bears") }
+        bears.forEach(d::removeSummoningSickness)
         d.putCardInHand(d.player2, "Murder")
         d.giveMana(d.player2, Color.BLACK, 2)
         d.giveColorlessMana(d.player2, 1)
-        assertNull(d.activate(d.player1, monolith).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        assertNull(d.submit(CrewVehicle(d.player1, monolith, bears)).error)
+        d.resolveAll()
         d.passPriority(d.player1)
         assertNull(d.castSpell(d.player2, d.findCardInHand(d.player2, "Murder")!!, listOf(monolith)).error)
         d.resolveAll()
