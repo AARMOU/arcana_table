@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.NoiseMarine
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ChooseTargetsDecision
 import com.wingedsheep.engine.core.DamageDealtEvent
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -105,6 +106,45 @@ class NoiseMarineIndependentCertificationTest {
         assertTrue(d.permanentsNamed(p, "Grizzly Bears").isEmpty())
         assertEquals("Grizzly Bears", d.zoneNames(p, Zone.LIBRARY).last())
         assertTrue(d.zoneNames(p, Zone.EXILE).isEmpty())
+        assertEquals(listOf(d.player2 to 1), d.marineDamage(marine).map { it.targetId to it.amount })
+    }
+
+    @Test fun cascadeWithoutALowerNonlandReturnsEveryExiledCard() {
+        val d = customScenario(NoiseMarine, "Forest", "Serra Angel", "Colossal Dreadmaw")
+        val p = d.player1
+        val marine = d.putCardInHand(p, "Noise Marine")
+        val size = d.zoneNames(p, Zone.LIBRARY).size
+        d.putCardOnTopOfLibrary(p, "Colossal Dreadmaw")
+        d.putCardOnTopOfLibrary(p, "Serra Angel")
+        d.putCardOnTopOfLibrary(p, "Forest")
+        d.payMarine(p)
+        assertNull(d.castSpell(p, marine).error)
+        d.resolveAll(Choices(targets = listOf(d.player2)))
+
+        val library = d.zoneNames(p, Zone.LIBRARY)
+        assertEquals(size + 3, library.size)
+        assertEquals(1, library.count { it == "Forest" })
+        assertEquals(1, library.count { it == "Serra Angel" })
+        assertEquals(1, library.count { it == "Colossal Dreadmaw" })
+        assertTrue(d.zoneNames(p, Zone.EXILE).isEmpty())
+        assertTrue(d.permanentsNamed(p, "Serra Angel").isEmpty())
+        assertTrue(d.permanentsNamed(p, "Colossal Dreadmaw").isEmpty())
+        assertEquals(listOf(d.player2 to 1), d.marineDamage(marine).map { it.targetId to it.amount })
+    }
+
+    @Test fun enteringFromTheGraveyardTriggersSonicBlasterButNotCascade() {
+        val d = customScenario(NoiseMarine, "Reanimate", "Grizzly Bears")
+        val p = d.player1
+        val marine = d.putCardInGraveyard(p, "Noise Marine")
+        val reanimate = d.putCardInHand(p, "Reanimate")
+        d.putCardOnTopOfLibrary(p, "Grizzly Bears")
+        d.giveMana(p, Color.BLACK)
+        assertNull(d.castSpellWithTargets(p, reanimate, listOf(ChosenTarget.Card(marine, p, Zone.GRAVEYARD))).error)
+        d.resolveAll(Choices(targets = listOf(d.player2)))
+
+        assertTrue(d.getPermanents(p).contains(marine))
+        assertEquals("Grizzly Bears", d.zoneNames(p, Zone.LIBRARY).first())
+        assertTrue(d.permanentsNamed(p, "Grizzly Bears").isEmpty())
         assertEquals(listOf(d.player2 to 1), d.marineDamage(marine).map { it.targetId to it.amount })
     }
 
