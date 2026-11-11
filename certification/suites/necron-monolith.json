@@ -1,0 +1,9 @@
+{
+  "key": "necron-monolith",
+  "name": "Necron Monolith",
+  "issue": 1074,
+  "source": "certification/NecronMonolithIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.NecronMonolithIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
