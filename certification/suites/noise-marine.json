@@ -1,0 +1,9 @@
+{
+  "key": "noise-marine",
+  "name": "Noise Marine",
+  "issue": 1078,
+  "source": "certification/NoiseMarineIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.NoiseMarineIndependentCertificationTest",
+  "tests": 12,
+  "target": "build"
+}
