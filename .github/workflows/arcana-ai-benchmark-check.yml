@@ -1,0 +1,174 @@
+name: Arcana AI Benchmark Validation
+
+# Read-only PR validation: small, bounded real-game smoke; never runs the 400-game baseline automatically.
+on:
+  pull_request:
+    paths:
+      - 'android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt'
+      - 'docs/agents/AI-STRENGTH-BENCHMARK.md'
+      - '.github/workflows/arcana-ai-benchmark-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-ai-benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  headless-harness-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify benchmark compiles and pure statistical assertions pass
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Verify Android regex compatibility
+        run: |
+          python3 tools/check_android_regex.py
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+
+  headless-harness-smoke:
+    needs: headless-harness-compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_MAX_ACTIONS: '800'
+      ARCANA_AI_MAX_GAME_MS: '30000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Play paired 1v1 and 4-player smoke games with current AI in both seats
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 --rerun-tasks :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Require actual benchmark JSON and all four smoke runs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path("android/app/build/reports/ai-strength/comparison.json")
+          assert p.is_file(), "Benchmark produced no comparison.json"
+          report=json.loads(p.read_text())
+          assert report["candidateIdenticalToBaseline"] is True
+          games=report["games"]
+          assert len(games)==4, f"Expected four real games, got {len(games)}"
+          assert sorted(g["mode"] for g in games)==[2,2,4,4]
+          assert all(g["actions"]>0 for g in games), "A game did not execute any valid action"
+          assert all(g["status"] not in {"invalid-action","missing-actor"} for g in games), "Engine/AI action failure"
+          print("PASS: four seeded, profile-swapped, real-engine smoke games")
+          for g in games:
+              print(g["mode"],"players:",g["status"],"turns",g["turns"],"actions",g["actions"],"wall ms",g["wallMs"])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-benchmark-smoke
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
+
+  baseline-shard:
+    needs: headless-harness-smoke
+    name: "Baseline ${{ matrix.mode }}p pairs ${{ matrix.pair_start }}–${{ matrix.pair_end }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { mode: 2, pair_start: 0, pair_end: 24 }
+          - { mode: 2, pair_start: 25, pair_end: 49 }
+          - { mode: 2, pair_start: 50, pair_end: 74 }
+          - { mode: 2, pair_start: 75, pair_end: 99 }
+          - { mode: 4, pair_start: 0, pair_end: 24 }
+          - { mode: 4, pair_start: 25, pair_end: 49 }
+          - { mode: 4, pair_start: 50, pair_end: 74 }
+          - { mode: 4, pair_start: 75, pair_end: 99 }
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_GAMES_PER_MODE: '50'
+      ARCANA_AI_GAME_MODE: ${{ matrix.mode }}
+      ARCANA_AI_PAIR_START: ${{ matrix.pair_start }}
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+      ARCANA_AI_REPORT_DIR: ${{ github.workspace }}/ai-benchmark-reports
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Play 50 control-versus-control games on real bundled Argentum
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Verify shard produced its complete paired games
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads((Path(os.environ["ARCANA_AI_REPORT_DIR"]) / "comparison.json").read_text())
+          games=r["games"]
+          assert len(games)==50, f"Expected 50 real games, got {len(games)}"
+          mode=int(os.environ["ARCANA_AI_GAME_MODE"])
+          start=int(os.environ["ARCANA_AI_PAIR_START"])
+          assert all(g["mode"]==mode and start<=g["pair"]<start+25 for g in games)
+          assert all(g["actions"]>0 for g in games)
+          print(f"PASS: 50 games, {mode} seats, pairs {start}-{start+24}")
+          from collections import Counter
+          print("Statuses:",dict(Counter(g["status"] for g in games)))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-baseline-${{ matrix.mode }}p-${{ matrix.pair_start }}
+          retention-days: 14
+          path: |
+            ai-benchmark-reports/
+            android/app/build/test-results/testDebugUnitTest/
+
+  baseline-aggregate:
+    name: Aggregate 400 baseline games
+    needs: baseline-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arcana-ai-baseline-*
+          path: baseline-shards
+      - name: Validate every paired matchup and aggregate control baseline
+        run: python3 tools/ai/aggregate_benchmark.py --input baseline-shards --output baseline-summary
+      - name: Publish summary for reviewers
+        if: success()
+        run: cat baseline-summary/comparison.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-baseline-400-aggregate
+          retention-days: 14
+          path: baseline-summary/
