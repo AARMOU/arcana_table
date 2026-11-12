@@ -804,6 +804,12 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
+    if (tutorialHubOpen) TutorialHubDialog(
+        onDismiss = { tutorialHubOpen = false },
+        onPractice = { startTutorialPractice(it) },
+        onCoach = { id, index -> startTutorialCoach(id, index) },
+        practiceEnabled = !argentumEnabled && !offlineStarting
+    )
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
         backgroundAlertsEnabled = backgroundAlertsEnabled,
@@ -834,6 +840,7 @@ internal fun TableController.TableOverlaysB() {
         onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
         onExportDiagnostics = { exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        onTutorials = { optionsOpen = false; tutorialHubOpen = true },
         engineTrialResult = engineTrialResult,
         onEngineSelfTest = {
             engineTrialResult = "Running an AI-vs-AI game on this phone…"
@@ -855,14 +862,16 @@ internal fun TableController.TableOverlaysB() {
         quietOpponentTurns = quietOpponentTurns,
         onQuietOpponentTurns = { value -> quietOpponentTurns = value; optionPrefs.edit().putBoolean("quiet_opponent_turns", value).apply(); if (argentumOffline) argentumSocket.send("setQuietOpponentTurns", JSONObject().put("enabled", value)) },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
-        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true } },
+        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true; TutorialActions.tap("setting-adjust-ui") } },
         onToggleTheme = { run { onToggleTheme() } },
         onToggleTimerVisibility = { run { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> run { setBackgroundAlerts(enabled) } },
         onReducedMotion = { value -> run { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
-        onDismiss = { run { optionsOpen = false } }
+        onDismiss = { run { optionsOpen = false } },
+        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() }
     )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
@@ -1025,6 +1034,13 @@ internal fun TableController.TableOverlaysB() {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val stackItems = argentumSnapshot?.stack.orEmpty()
                 Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
+                tutorialStep?.takeIf { tutorialPracticeActive || tutorialChapterId != null }?.let { step ->
+                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { stopTutorial(); stackOpen = false }) { Text("EXIT LESSON") }
+                        if (step.actionKind == "next") TextButton(onClick = { tutorialAdvance() }) { Text("NEXT") }
+                    }
+                }
                 StackCardList(stackItems)
                 Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
                 TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
@@ -1037,7 +1053,7 @@ internal fun TableController.TableOverlaysB() {
                 Text("PASS PRIORITY", color = Mint)
             }
         },
-        dismissButton = { TextButton(onClick = { stackOpen = false }) { Text("CLOSE") } }
+        dismissButton = { TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }) { Text("CLOSE") } }
     ) else if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },

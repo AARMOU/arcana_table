@@ -181,7 +181,10 @@ internal fun TableController.submitArgentumAction(action: JSONObject, epoch: Str
             .put("response", JSONObject().put("type", "PlayCardResponse").put("decisionId", decision.optString("id")).put("action", JSONObject(action.toString())))
     } else action
     val sent = argentumSocket.submitLegalAction(outbound, epoch)
-    if (sent) argentumAwaitingUpdate = true
+    if (sent) {
+        argentumAwaitingUpdate = true
+        if (tutorialPracticeActive && type == "PassPriority") tutorialPassPending = true
+    }
     argentumStackUse?.let { use -> if (sent && !use.started) argentumStackUse = use.copy(started = true, manaColor = use.manaColor ?: action.optString("manaColorChoice").takeIf { it.isNotBlank() && it != "null" }) }
     return sent
 }
@@ -306,7 +309,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
     when (incoming.optString("type")) {
         "offlineCheckpoint" -> {
-            if (argentumOffline && wifiRole == null) {
+            if (argentumOffline && !tutorialPracticeActive && wifiRole == null) {
                 val data = incoming.optJSONObject("checkpoint")
                 if (data != null) scope.launch {
                     val outcome = withContext(Dispatchers.IO) {
@@ -360,7 +363,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             }
         }
         "gameStarted" -> {
-            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {
+            if (argentumOffline && !offlineRestoreRequested && !tutorialPracticeActive && wifiRole == null) {
                 OfflineCheckpointStore.clear(context)
                 offlineResumeAvailable = false
             }
@@ -413,8 +416,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumPendingDecision = nextDecision
                 argentumNextStop = incoming.optString("nextStopPoint").takeUnless { it.isBlank() || it == "null" }
                 argentumUndoAvailable = incoming.optBoolean("undoAvailable", false)
+                val previousTutorialSnapshot = argentumSnapshot
                 val firstSnapshot = argentumSnapshot == null
                 argentumSnapshot = snapshot
+                tutorialSnapshot(previousTutorialSnapshot, snapshot)
                 // Keep an open action sheet in step with the new state so it never offers stale actions.
                 if (argentumActionChoices.isNotEmpty()) {
                     val sheetCard = argentumActionCard?.let { old -> snapshot.players.flatMap { it.hand + it.battlefield + it.graveyard + it.exile + listOfNotNull(it.commanderCard) }.firstOrNull { it.id == old.id } }
@@ -430,7 +435,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
                 gameEndedOnline = snapshot.gameOver
-                if (snapshot.gameOver && argentumOffline && wifiRole == null) {
+                if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null) {
                     OfflineCheckpointStore.clear(context)
                     offlineResumeAvailable = false
                 }
@@ -467,6 +472,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumAwaitingUpdate = false
             argentumMulliganPrompt = true
             argentumMulliganInfo = Triple(incoming.optInt("mulliganCount"), incoming.optBoolean("isOnThePlay"), incoming.optInt("cardsToPutOnBottom"))
+            if (tutorialMulliganPending) {
+                tutorialMulliganPending = false
+                tutorialSignal("event", "HandMulliganed")
+            }
             val handIds = incoming.optJSONArray("hand") ?: JSONArray()
             val cardInfo = incoming.optJSONObject("cards") ?: JSONObject()
             val hand = (0 until handIds.length()).mapNotNull { index ->

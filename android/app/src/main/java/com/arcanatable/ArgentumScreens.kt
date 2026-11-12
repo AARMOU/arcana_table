@@ -137,9 +137,10 @@ import org.json.JSONObject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
+internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}, tutorialCue: Pair<String, String>? = null) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
+            tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
             if (card != null) Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
                     val url = card.imageUrl
@@ -220,6 +221,7 @@ internal fun ArgentumOpeningHandScreen(
     selectable: Boolean, selection: Set<Int>, onToggle: (GameCard) -> Unit,
     primaryLabel: String, primaryEnabled: Boolean, onPrimary: () -> Unit,
     secondaryLabel: String?, secondaryEnabled: Boolean, onSecondary: () -> Unit,
+    tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {},
 ) {
     // The hand gets its own zoom, drawn inside this dialog, so a preview can never outlive the
     // opening hand (it used to stay up on the table after Keep Hand).
@@ -233,6 +235,15 @@ internal fun ArgentumOpeningHandScreen(
                 Text("ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
                 Text(title, color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black)
                 Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                tutorialStep?.let { step ->
+                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                        if (step.actionKind == "next") TextButton(onClick = onTutorialNext) {
+                            Text("NEXT", color = Mint)
+                        }
+                    }
+                }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val grid = HandLayout.compute(cards.size, maxWidth.value, maxHeight.value, HandArrangement.AUTO_FIT, 1.25f)
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(HandLayout.GAP.dp)) {

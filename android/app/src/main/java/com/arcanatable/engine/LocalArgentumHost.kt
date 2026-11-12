@@ -99,6 +99,7 @@ class LocalArgentumHost(
     private val resumeCheckpoint: String? = null,
     /** Optional reproducible shuffle for scenario tests; normal games keep the engine's randomness. */
     private val gameSeed: Long? = null,
+    private val tutorialPassiveOpponent: Boolean = false,
     private val emit: (JSONObject) -> Unit,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
@@ -638,7 +639,8 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
+                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)
+                    else timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
                 countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
