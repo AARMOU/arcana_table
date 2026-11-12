@@ -105,9 +105,14 @@ internal fun Modifier.tutorialTarget(id: String): Modifier = composed {
                 Rect(p.x, p.y, p.x + it.size.width, p.y + it.size.height)
                     .intersect(Rect(0f, 0f, root.width.toFloat().coerceAtLeast(1f), root.height.toFloat().coerceAtLeast(1f)))
             } else clipped
-            // An offscreen or collapsed copy never replaces a visible one.
-            if (rect.width > 1f && rect.height > 1f || TutorialTargets.owners[id] == null || TutorialTargets.owners[id] === owner) {
+            // Only a visible region can own a tutorial highlight. A collapsed duplicate
+            // must neither claim an unowned target nor replace a visible copy with Rect.Zero.
+            if (rect.width > 1f && rect.height > 1f) {
                 TutorialTargets.bounds[id] = rect; TutorialTargets.windows[id] = root; TutorialTargets.owners[id] = owner
+            } else if (TutorialTargets.owners[id] === owner) {
+                // If the current owner shrinks/disappears, remove its stale highlight.
+                // Another visible copy may register itself on its next layout pass.
+                TutorialTargets.owners.remove(id); TutorialTargets.bounds.remove(id); TutorialTargets.windows.remove(id)
             }
         }
     }
