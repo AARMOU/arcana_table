@@ -255,7 +255,7 @@ internal class TableController(
     var autoOpenHand by run { mutableStateOf(optionPrefs.getBoolean("adjust_auto_open_hand", true)) }
     var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
     var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
-    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
+    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", BuildConfig.DEBUG)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
     var nextId by run { mutableIntStateOf(20) }
     // Seat indexes always stay inside the current player list. Ending a 3–4 player game swaps the
@@ -381,7 +381,194 @@ internal class TableController(
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
-    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("quick_ui_tips_disabled", false))
+    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("tutorial_offer_seen", false))
+    var tutorialHubOpen by mutableStateOf(false)
+    var tutorialChapterId by mutableStateOf<String?>(null)
+    var tutorialStepIndex by mutableStateOf(0)
+    var tutorialPracticeActive by mutableStateOf(false)
+    var tutorialLoading by mutableStateOf(false)
+    var tutorialStartTurn by mutableStateOf(0)
+    var tutorialPassPending by mutableStateOf(false)
+    var tutorialMulliganPending by mutableStateOf(false)
+    var tutorialKeepPending by mutableStateOf(false)
+    private val tutorialMilestones = TutorialMilestones()
+    internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
+    internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
+    internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+
+    fun tutorialAdvance() {
+        val lesson = tutorialLesson ?: return
+        if (tutorialStepIndex < lesson.steps.lastIndex) {
+            tutorialStepIndex++
+            tutorialRouteScreen()
+            // Combat and stack resolution can finish while an explanation is open.
+            // Consume only confirmed milestones, preserving all informational steps.
+            if (tutorialPracticeActive && tutorialMilestones.completes(tutorialStep)) tutorialAdvance()
+        } else {
+            val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
+            val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
+            if (tutorialPracticeActive) completed.add(lesson.id)
+            preferences.edit().putStringSet("practiced_chapters", completed).apply()
+            stopTutorial()
+        }
+    }
+
+    fun tutorialSignal(kind: String, key: String) {
+        if (tutorialPracticeActive && kind == "event") tutorialMilestones.observe(key)
+        val step = tutorialStep ?: return
+        if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
+    }
+
+    fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
+        if (!tutorialPracticeActive) return
+        if (tutorialStartTurn == 0) tutorialStartTurn = current.turnNumber
+        val old = previous?.players?.getOrNull(previous.viewingPlayer)
+        val now = current.players.getOrNull(current.viewingPlayer) ?: return
+        if (old != null) {
+            fun wasInHand(name: String) = old.hand.any { it.name == name }
+            fun isInHand(name: String) = now.hand.any { it.name == name }
+            fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
+            val oldForests = old.battlefield.filter { it.name == "Forest" }.map { it.id }.toSet()
+            if (old.hand.count { it.name == "Forest" } > now.hand.count { it.name == "Forest" } &&
+                now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
+                tutorialSignal("event", "LandPlayed")
+            if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
+            val spellName = tutorialStep?.takeIf { it.event == "SpellCast" }
+                ?.target?.removePrefix("hand-card:")
+            if (!spellName.isNullOrBlank() && wasInHand(spellName) && !isInHand(spellName) &&
+                (current.stack.any { it.name == spellName } || nowInPlay(spellName) ||
+                    now.graveyard.any { it.name == spellName }))
+                tutorialSignal("event", "SpellCast")
+            if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
+            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
+            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
+            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
+            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) tutorialSignal("event", "CombatDamageDealt")
+        }
+        if (tutorialPassPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
+            tutorialPassPending = false
+            tutorialSignal("event", "PriorityPassed")
+        }
+        if (current.turnNumber > tutorialStartTurn || current.activePlayer != current.viewingPlayer && previous?.activePlayer == previous?.viewingPlayer) {
+            tutorialSignal("event", "TurnAdvanced")
+        }
+        if (tutorialKeepPending) {
+            tutorialKeepPending = false
+            tutorialSignal("event", "HandKept")
+        }
+    }
+
+    fun stopTutorial() {
+        val wasPractice = tutorialPracticeActive
+        tutorialPracticeActive = false
+        tutorialMilestones.clear()
+        stackOpen = false
+        tutorialChapterId = null
+        tutorialStepIndex = 0
+        tutorialLoading = false
+        tutorialPassPending = false
+        tutorialMulliganPending = false
+        tutorialKeepPending = false
+        if (wasPractice && argentumEnabled) closeArgentumSession(false)
+        tutorialHubOpen = true
+    }
+
+    fun tutorialRouteScreen() {
+        if (tutorialPracticeActive) {
+            val step = tutorialStep
+            if (step?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) {
+                showHand = false
+                stackOpen = true
+            } else if (step?.screen == "board") {
+                stackOpen = false
+                showHand = step.target?.startsWith("hand-card:") == true
+            }
+            return
+        }
+        when (tutorialStep?.screen) {
+            "home" -> { homeOpen = true; optionsOpen = false; playSheetOpen = false; deckPickerOpen = false }
+            "setup" -> { homeOpen = true; optionsOpen = false; playSheetOpen = true }
+            "settings", "diagnostics", "layout" -> { homeOpen = true; playSheetOpen = false; optionsOpen = true }
+            "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
+            "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
+            "stack" -> if (argentumEnabled) stackOpen = true
+            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = tutorialStep?.target != "game-menu" }
+        }
+    }
+
+    fun startTutorialCoach(id: String, startingIndex: Int = 0) {
+        val lesson = tutorialChapters.firstOrNull { it.id == id } ?: return
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
+        tutorialPracticeActive = false
+        tutorialRouteScreen()
+    }
+
+    fun startTutorialPractice(id: String) {
+        if (argentumEnabled || offlineStarting) {
+            message = "Finish your current game before opening a practice match. Your save will be preserved."
+            return
+        }
+        if (id !in TutorialPracticeScenarios.supported) {
+            message = "This activity is not yet available as a practice game."
+            return
+        }
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = 0
+        tutorialStartTurn = 0
+        tutorialMilestones.clear()
+        tutorialPracticeActive = true
+        tutorialLoading = true
+        offlineStarting = true
+        argentumLastError = null
+        scope.launch {
+            try {
+                if (id == TutorialPracticeScenarios.MULLIGAN) {
+                    val (seats, registry) = withContext(Dispatchers.IO) { TutorialPracticeScenarios.openingHand(offlineLibrary()) }
+                    argentumSocket.localHostFactory = { emit ->
+                        com.arcanatable.engine.LocalArgentumHost(
+                            registry, seats[0], seats[1], gameSeed = 12025L,
+                            tutorialPassiveOpponent = true, emit = emit
+                        )
+                    }
+                    offlineRestoreRequested = true
+                    argentumOffline = true
+                    argentumLobbySubmitted = true
+                    argentumLocalPlayersBackup = players.toList()
+                    argentumEnabled = true
+                    homeOpen = false
+                    lobbyOpen = false
+                    argentumSocket.connect(seats[0].name)
+                    var tries = 0
+                    while (argentumStatus != ArgentumConnectionStatus.CONNECTED && tries++ < 30) delay(100)
+                    check(argentumStatus == ArgentumConnectionStatus.CONNECTED &&
+                        argentumSocket.createCommanderPracticeLobby(vsAi = true)) { "Tutorial engine connection failed." }
+                } else {
+                    val scenario = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(id, offlineLibrary()) }
+                    launchOfflineCheckpoint(scenario.seats, scenario.registry, scenario.checkpoint.toString())
+                }
+                recordDiagnostic("Tutorial practice started: $id", DiagnosticCategory.ENGINE)
+            } catch (failed: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                tutorialChapterId = null
+                tutorialPracticeActive = false
+                tutorialHubOpen = true
+                message = "Tutorial could not start: ${failed.message ?: failed.javaClass.simpleName}"
+                recordDiagnostic("Tutorial preparation failed: ${failed.message}", DiagnosticCategory.ERROR)
+            } finally {
+                offlineStarting = false
+                tutorialLoading = false
+            }
+        }
+    }
+
     var lobbyCreated by run { mutableStateOf(false) }
     var lobbyJoinMode by run { mutableStateOf(false) }
     var lobbyReadyPlayers by run { mutableStateOf(emptySet<Int>()) }
@@ -1685,6 +1872,10 @@ internal class TableController(
 
     /** Request a full, unmasked engine checkpoint at the next action boundary. */
     fun saveOfflineGame() {
+        if (tutorialPracticeActive) {
+            message = "Tutorial games are temporary and cannot overwrite your saved match."
+            return
+        }
         if (!argentumOffline || wifiRole != null || argentumSocket.runningLocalHost == null ||
             argentumSnapshot?.gameOver != false) {
             message = "Only active offline vs AI games can be saved."
@@ -1743,7 +1934,8 @@ internal class TableController(
         argentumSocket.localHostFactory = { emit ->
             com.arcanatable.engine.LocalArgentumHost(
                 registry, seats[0], seats[1], emit = emit,
-                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint
+                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint,
+                tutorialPassiveOpponent = tutorialPracticeActive
             )
         }
         offlineRestoreRequested = true
