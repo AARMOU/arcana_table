@@ -1,6 +1,13 @@
 package com.arcanatable.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import org.junit.Assert.assertEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.arcanatable.AdjustUiPage
@@ -31,20 +38,38 @@ class AdjustUiScreensTest {
         UiTestSupport.screenshot(rule.activity, "adjust-ui-$name")
     }
 
-    private fun options(name: String) {
+    private fun options(name: String, exerciseControls: Boolean = false) {
+        val showNotice = mutableStateOf(false)
+        val actions = mutableListOf<String>()
         rule.setContent {
             OptionsPage(
-                darkMode = true, timerVisible = true, backgroundAlertsEnabled = false, followActivePlayer = true,
+                darkMode = true, timerVisible = true, backgroundAlertsEnabled = false, showEngineStatus = showNotice.value, followActivePlayer = true,
                 connectionLabel = "Argentum · Connected", pingResult = null, versionLabel = "build 99", diagnosticCount = 12,
                 reducedSwipeMotion = false, cardSizeScale = 1f,
-                onOpenLayoutLab = {}, onToggleTheme = {}, onToggleTimerVisibility = {}, onToggleBackgroundAlerts = {},
+                onOpenLayoutLab = {}, onToggleTheme = {}, onToggleTimerVisibility = {}, onToggleBackgroundAlerts = {}, onShowEngineStatus = { showNotice.value = it },
                 onFollowActivePlayer = {}, onReducedMotion = {}, onCardSizeScale = {},
-                quietOpponentTurns = false, onQuietOpponentTurns = {}, onTestConnection = {}, onReconnect = null,
+                quietOpponentTurns = false, onQuietOpponentTurns = {}, onTestConnection = { actions += "test" }, onReconnect = if (exerciseControls) ({ actions += "reconnect" }) else null,
                 onViewDiagnostics = {}, onExportDiagnostics = {}, onWhatsNew = {}, onClearAllData = {}, onDismiss = {}
             )
         }
         UiTestSupport.settle(rule, 300)
         UiTestSupport.screenshot(rule.activity, "options-$name")
+        if (exerciseControls) {
+            // This isolated settings dialog has no perpetual game clock. The shared settle()
+            // helper disables autoAdvance for gameplay; leaving it off during semantics
+            // interactions can make Robolectric/Espresso spin until it exhausts the heap.
+            rule.mainClock.autoAdvance = true
+            val switch = rule.onNodeWithTag("engine-processing-toggle")
+            switch.performScrollTo()
+            switch.assertIsOff()
+            switch.performClick()
+            // Let the Switch animation finish and the hoisted state recompose before asserting.
+            rule.waitForIdle()
+            switch.assertIsOn()
+            rule.onNodeWithTag("diagnostics-test-connection").performScrollTo().performClick()
+            rule.onNodeWithTag("diagnostics-reconnect").performScrollTo().performClick()
+            assertEquals(listOf("test", "reconnect"), actions)
+        }
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi") fun phonePortraitAdjust() = adjust("phone-portrait")
@@ -52,4 +77,6 @@ class AdjustUiScreensTest {
     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldCoverAdjust() = adjust("fold-cover")
     @Test @Config(sdk = [34], qualifiers = "w673dp-h841dp-port-xhdpi") fun foldUnfoldedAdjust() = adjust("fold-unfolded")
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi") fun phonePortraitOptions() = options("phone-portrait")
+    @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldCoverOptions() = options("fold-cover", exerciseControls = true)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi") fun landscapeOptions() = options("landscape")
 }

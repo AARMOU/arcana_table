@@ -806,7 +806,7 @@ internal fun TableController.TableOverlaysB() {
 
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
-        backgroundAlertsEnabled = backgroundAlertsEnabled,
+        backgroundAlertsEnabled = backgroundAlertsEnabled, showEngineStatus = showEngineStatus,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
             argentumEnabled && wifiRole == "online-host" -> "Online game with a friend · you are hosting"
@@ -859,6 +859,7 @@ internal fun TableController.TableOverlaysB() {
         onToggleTheme = { run { onToggleTheme() } },
         onToggleTimerVisibility = { run { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> run { setBackgroundAlerts(enabled) } },
+        onShowEngineStatus = { value -> showEngineStatus = value; optionPrefs.edit().putBoolean("show_engine_status", value).apply() },
         onReducedMotion = { value -> run { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
