@@ -1,0 +1,112 @@
+name: Eldrazi Temple exact mana restriction (upgraded Argentum)
+# #152 / #150: source-only compatibility lane; no app runtime JAR, deck, worker or release writes.
+on:
+  push:
+    branches: [gpt/eldrazi-temple-exact-mana-source-20261024]
+    paths:
+      - 'engine-upgrade/eldrazi-temple/**'
+      - '.github/workflows/eldrazi-temple-upgraded-source-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: eldrazi-temple-upgraded-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upgraded-restricted-mana:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout isolated Temple source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact current upgraded Argentum source
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          path: argentum-engine
+          persist-credentials: false
+      - name: Checkout frozen existing GPT-owned Temple land candidate (#161)
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          path: temple-candidate
+          persist-credentials: false
+      - name: Port restriction and existing land candidate without touching shipped runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C argentum-engine rev-parse HEAD)" = "7fb073337e4389cfabe2ebf4c6416633a7fc63d2"
+          python3 engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          test "$(git -C temple-candidate rev-parse HEAD)" = "c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9"
+          test "$(git -C temple-candidate hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = "7cc5bfb19f004f0503047192c1ff34d6ab10e020"
+          test "$(git -C temple-candidate hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = "f2b88843a34bf39dd5c54370f21c6bc85bb02426"
+          mkdir -p argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards
+          cp temple-candidate/engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/
+          cp temple-candidate/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          git -C argentum-engine diff --check
+          git diff --quiet && git diff --cached --quiet  # upstream checkout is intentionally untracked in parent
+          echo "Verified upgraded source SHA and isolated source-only modifications"
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Upgraded SDK tests and serialization compatibility
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
+      - name: Primitive and real-land gameplay scenarios on upgraded source
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTemple*'
+      - name: Require upgraded SDK, seven primitive and seven real-land JUnit successes
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          base = Path("argentum-engine")
+          sdk = list((base/"mtg-sdk/build/test-results/test").glob("TEST-*.xml"))
+          engine = list((base/"rules-engine/build/test-results/test").glob("TEST-*.xml"))
+          if not sdk or not engine:
+              raise SystemExit("FAIL: upgraded SDK/engine XML absent")
+          counts = dict(tests=0, failures=0, errors=0, skipped=0)
+          temple = []
+          for p in sdk + engine:
+              root = ET.parse(p).getroot()
+              for key in counts:
+                  counts[key] += int(root.get(key, 0))
+              if p.name.startswith("TEST-com.wingedsheep.engine.scenarios.EldraziTemple"):
+                  temple.append((p.name, {k:int(root.get(k,0)) for k in counts}))
+          print("Upgraded source SDK/engine:", counts, "Temple:", temple)
+          if counts["tests"] < 100 or counts["failures"] or counts["errors"]:
+              raise SystemExit("FAIL: missing or failing upgraded SDK/engine cases")
+          expected = {
+              "TEST-com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest.xml": 7,
+              "TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml": 7,
+          }
+          actual = {name: stats for name, stats in temple}
+          if len(temple) != len(expected) or set(actual) != set(expected):
+              raise SystemExit(f"FAIL: missing/duplicate Temple suite XML: {sorted(actual)}")
+          for name, count in expected.items():
+              if actual[name] != dict(tests=count, failures=0, errors=0, skipped=0):
+                  raise SystemExit(f"FAIL: Temple real-engine suite incomplete: {name}: {actual[name]}")
+          PY
+      - name: Preserve read-only provenance and upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eldrazi-temple-upgraded-source-evidence
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            argentum-engine/mtg-sdk/build/test-results/test/TEST-*.xml
+            argentum-engine/rules-engine/build/test-results/test/TEST-*.xml
