@@ -68,7 +68,20 @@ internal data class ArcanaLesson(
 
 internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
     parseTutorialLessons(context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() })
+        .let { if (BuildConfig.STUDIO_ENABLED) studioTutorialLessons(it) else it }
 }.getOrDefault(emptyList())
+
+/**
+ * Builds where Arcana Studio replaces Adjust UI (the single STUDIO_ENABLED switch, owner D33): the Settings step points at
+ * the Arcana Studio button (same anchor), advances with Next instead of opening the editor mid-lesson, and the steps
+ * inside the old Adjust UI page, which these builds no longer open, are left out. The catalog itself is unchanged.
+ */
+internal fun studioTutorialLessons(lessons: List<ArcanaLesson>): List<ArcanaLesson> = lessons.map { lesson ->
+    lesson.copy(description = lesson.description.replace("Adjust UI", "Arcana Studio"), steps = lesson.steps.filter { it.screen != "layout" }.map { step ->
+        if (step.target == "setting-adjust-ui") step.copy(title = "Arcana Studio", actionKind = "next", hint = "Next",
+            body = "Arcana Studio lets you move, resize, recolour and hide game controls, and design your hand. Open it from here, the ⋮ menu or Home.")
+        else step.copy(title = step.title.replace("Adjust UI", "Arcana Studio"), body = step.body.replace("Adjust UI", "Arcana Studio"), hint = step.hint.replace("Adjust UI", "Arcana Studio"))
+    }) }.filter { it.steps.isNotEmpty() }
 
 /** The bundled catalog as lessons; shared with the tests that walk each lesson. */
 internal fun parseTutorialLessons(json: String): List<ArcanaLesson> = run {

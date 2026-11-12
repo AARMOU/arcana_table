@@ -1,0 +1,140 @@
+package com.arcanatable
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import org.junit.Assert.*
+import org.junit.Test
+
+class StudioEditorGeometryTest {
+    private fun c(id:String,r:Rect,kind:String="action",window:Int=1)=StudioLiveControl(id,"Home",kind,id,true,r,window)
+
+    @Test fun hitTestPicksTheDeepestVisibleControlInThisWindowOnly() {
+        val group=c("native:group",Rect(0f,0f,400f,200f),"container-action")
+        val label=c("native:label",Rect(10f,10f,110f,60f),"data")
+        val dialog=c("native:dialog",Rect(0f,0f,50f,50f),window=2)
+        val hidden=c("native:hidden",Rect(12f,12f,40f,40f))
+        val all=listOf(group,label,dialog,hidden)
+        assertEquals("native:label",StudioEditorGeometry.hitTest(all,Offset(20f,20f),1){it!="native:hidden"}?.id)
+        assertEquals("native:group",StudioEditorGeometry.hitTest(all,Offset(300f,150f),1){true}?.id)
+        assertNull(StudioEditorGeometry.hitTest(all,Offset(500f,500f),1){true})
+        assertEquals("native:group",StudioEditorGeometry.parentOf(all,label)?.id)
+        assertNull(StudioEditorGeometry.parentOf(all,group))
+    }
+
+    /** Owner, Nov 7: "It drags the picture off the chip." A small group is picked first; tapping it again goes inside. */
+    @Test fun aChipIsPickedWholeFirstAndItsPictureOnASecondTap() {
+        val chip=c("native:chip",Rect(0f,0f,150f,60f),"container-action")
+        val art=c("native:art",Rect(4f,4f,64f,56f),"action")
+        val board=c("native:board",Rect(0f,100f,400f,500f),"container-action")
+        val pass=c("native:pass",Rect(10f,110f,110f,154f))
+        val all=listOf(chip,art,board,pass)
+        assertEquals("native:chip",StudioEditorGeometry.hitTest(all,Offset(20f,20f),1){true}?.id)
+        assertEquals("native:art",StudioEditorGeometry.hitTest(all,Offset(20f,20f),1,"native:chip"){true}?.id)
+        assertEquals("a button in a big panel is picked directly","native:pass",StudioEditorGeometry.hitTest(all,Offset(20f,120f),1){true}?.id)
+    }
+
+    /** Owner's screenshots, Nov 7: "YOU" and "40" were dragged out of the player chip (the name is >12× smaller). */
+    @Test fun aSmallChipOnABigScreenIsPickedWholeEvenWhenItsNameIsTiny() {
+        val screen=androidx.compose.ui.geometry.Size(1840f,2200f)
+        fun v(c:StudioLiveControl)=c.copy(viewportWidth=screen.width,viewportHeight=screen.height)
+        val chip=v(c("native:seat",Rect(190f,150f,490f,265f),"container-action"))
+        val you=v(c("native:you",Rect(310f,170f,360f,195f),"data"))
+        val board=v(c("native:board",Rect(30f,400f,910f,1830f),"container-action"))
+        val card=v(c("native:card",Rect(50f,500f,180f,680f),"card-action"))
+        val all=listOf(chip,you,board,card)
+        assertEquals("native:seat",StudioEditorGeometry.hitTest(all,Offset(330f,180f),1){true}?.id)
+        assertEquals("tap again to get the name","native:you",StudioEditorGeometry.hitTest(all,Offset(330f,180f),1,"native:seat"){true}?.id)
+        assertEquals("a card on the big battlefield is still picked directly","native:card",StudioEditorGeometry.hitTest(all,Offset(100f,600f),1){true}?.id)
+    }
+
+    @Test fun overlayScreensBeatTheTableAndFullScreenPagesHideIt() {
+        fun s(id:String,screen:String,r:Rect)=StudioLiveControl(id,screen,"action",id,true,r,1)
+        val board=s("native:board","Table",Rect(0f,0f,400f,400f))
+        val stackButton=s("native:stack","Stack",Rect(0f,0f,400f,400f).deflate(1f))
+        val tiny=s("native:tiny","Table",Rect(10f,10f,20f,20f))
+        assertEquals("an overlay beats a smaller table control under it","native:stack",StudioEditorGeometry.hitTest(listOf(board,stackButton,tiny),Offset(15f,15f),1){true}?.id)
+        assertEquals("native:tiny",StudioEditorGeometry.hitTest(listOf(board,tiny),Offset(15f,15f),1){true}?.id)
+        val home=s("native:play","Home",Rect(0f,500f,400f,560f))
+        assertNull("Home covers the table, so table controls behind it are not selectable",StudioEditorGeometry.hitTest(listOf(board,tiny,home),Offset(15f,15f),1){true})
+        assertEquals("native:play",StudioEditorGeometry.hitTest(listOf(board,home),Offset(20f,520f),1){true}?.id)
+    }
+
+    @Test fun smallControlsStillMoveFromTheirCentreAndCornersResize() {
+        val frame=Rect(100f,100f,188f,188f) // 44dp at 2x
+        assertEquals(StudioHandle.Move,StudioEditorGeometry.handleAt(frame,frame.center,48f))
+        assertEquals(StudioHandle.BottomRight,StudioEditorGeometry.handleAt(frame,Offset(190f,190f),48f))
+        assertEquals(StudioHandle.TopLeft,StudioEditorGeometry.handleAt(frame,Offset(95f,96f),48f))
+        assertEquals(StudioHandle.Left,StudioEditorGeometry.handleAt(Rect(0f,0f,400f,400f),Offset(2f,200f),48f))
+        assertNull(StudioEditorGeometry.handleAt(frame,Offset(400f,400f),48f))
+    }
+
+    @Test fun commitSnapsMovesAndAnchorsOppositeEdges() {
+        val moved=StudioEditorGeometry.commit(StudioControlStyle(dx=2f),StudioHandle.Move,100f,50f,Offset(9f,-7f))
+        assertEquals(12f,moved.dx,0f);assertEquals(-8f,moved.dy,0f)
+        val left=StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.Left,100f,50f,Offset(-20f,0f))
+        assertEquals(120f,left.width!!,0f);assertEquals(-20f,left.dx,0f);assertNull(left.height)
+        val top=StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.TopRight,100f,50f,Offset(10f,40f))
+        assertEquals("owner note 14: below 44 is allowed (marked red), never below the 16dp floor",StudioEditorGeometry.FLOOR_DP,top.height!!,0f);assertEquals(34f,top.dy,0f);assertEquals(112f,top.width!!,0f)
+        assertTrue(StudioEditorGeometry.commit(StudioControlStyle(),StudioHandle.BottomRight,100f,50f,Offset(-500f,-500f)).problems().isEmpty())
+    }
+
+    @Test fun absoluteHandCommitsSnapTravelAndStayOnTheCanvas() {
+        val moved=StudioEditorGeometry.commitAbsolute(113f,297f,63f,44f,StudioHandle.Move,3f,37f,8,24f,412f,296f)
+        assertEquals(113f,moved[0],0f);assertEquals(337f,moved[1],0f)
+        val clamped=StudioEditorGeometry.commitAbsolute(380f,300f,30f,30f,StudioHandle.Move,100f,-200f,8,24f,412f,296f)
+        assertEquals(382f,clamped[0],0f);assertEquals("never above the hand origin",296f,clamped[1],0f)
+        val left=StudioEditorGeometry.commitAbsolute(100f,300f,60f,44f,StudioHandle.Left,-17f,0f,8,24f,412f,296f)
+        assertEquals(84f,left[0],0f);assertEquals(76f,left[2],0f)
+        val tiny=StudioEditorGeometry.commitAbsolute(100f,300f,60f,44f,StudioHandle.BottomRight,-200f,-200f,1,24f,412f,296f)
+        assertEquals(24f,tiny[2],0f);assertEquals(24f,tiny[3],0f)
+    }
+
+    @Test fun previewNeverInvertsTheFrame() {
+        val p=StudioEditorGeometry.preview(Rect(0f,0f,100f,100f),StudioHandle.Right,Offset(-300f,0f),88f)
+        assertEquals(88f,p.width,0f)
+        assertEquals(Rect(10f,5f,110f,105f),StudioEditorGeometry.preview(Rect(0f,0f,100f,100f),StudioHandle.Move,Offset(10f,5f),88f))
+    }
+
+    /** Owner, Nov 7: several selected items change together; moves and size changes are added, not copied. */
+    @Test fun groupEditAddsMovesAndSizesToEachItem() {
+        val lead=StudioControlStyle()
+        val next=lead.copy(dx=4f,width=64f,fill="#112233",label="Lead")
+        val other=StudioControlStyle(dx=10f,width=80f,label="Mine")
+        val out=StudioEditorGeometry.groupEdit(lead,next,other,60f,44f,70f,44f)
+        assertEquals(14f,out.dx,0f)
+        assertEquals(84f,out.width!!,0f) // its own 80 + the lead's 4
+        assertEquals("#112233",out.fill)
+        assertEquals("Mine",out.label) // labels belong to each item
+        val native=StudioEditorGeometry.groupEdit(lead,next,StudioControlStyle(),60f,44f,70f,44f)
+        assertEquals(74f,native.width!!,0f) // native 70 + 4
+        assertNull(native.height)
+    }
+
+    @Test fun alignLinesItemsUpAgainstTheFirstPicked() {
+        val d=2f
+        val rects=mapOf("a" to Rect(100f,100f,200f,180f),"b" to Rect(300f,140f,360f,200f),"c" to Rect(150f,400f,250f,440f))
+        val left=StudioEditorGeometry.align(StudioEditorGeometry.Align.Left,rects,"a",d)
+        assertEquals(-100f,left["b"]!!.ddx,0f);assertEquals(0f,left["a"]!!.ddx,0f)
+        val top=StudioEditorGeometry.align(StudioEditorGeometry.Align.Top,rects,"a",d)
+        assertEquals(-20f,top["b"]!!.ddy,0f)
+        val size=StudioEditorGeometry.align(StudioEditorGeometry.Align.Size,rects,"a",d)
+        assertEquals(50f,size["c"]!!.width!!,0f);assertEquals(40f,size["c"]!!.height!!,0f)
+        // In a row: order a, c, b by left edge; span 100..360 = 260, widths 100+100+60 = 260, so they touch (gap 0).
+        val row=StudioEditorGeometry.align(StudioEditorGeometry.Align.Row,rects,"a",d)
+        assertEquals(0f,row["a"]!!.ddx,0f)
+        assertEquals((200f-150f)/d,row["c"]!!.ddx,0f)
+        assertEquals((300f-300f)/d,row["b"]!!.ddx,0f)
+        assertEquals((100f-400f)/d,row["c"]!!.ddy,0f) // tops line up with the first picked
+    }
+
+    @Test fun overlappingItemsGetAGapWhenPutInAColumn() {
+        val rects=mapOf("a" to Rect(0f,0f,50f,100f),"b" to Rect(0f,20f,50f,120f))
+        val col=StudioEditorGeometry.align(StudioEditorGeometry.Align.Column,rects,"a",1f)
+        assertEquals(0f,col["a"]!!.ddy,0f)
+        assertEquals(108f-20f,col["b"]!!.ddy,0f) // below a, 8dp apart
+    }
+
+    @Test fun sameKindMeansSameSite() {
+        assertEquals("TableMainLayout.Chip.1",StudioEditorGeometry.siteOf("native:TableMainLayout.Chip.1/s1a:2"))
+    }
+}

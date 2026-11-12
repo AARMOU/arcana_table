@@ -32,7 +32,9 @@ internal fun StudioNativeCopies(source:StudioWidget?,action:Boolean=true) {
         val available=if(action)runtime.canInvoke(source.id,binding) else runtime.canDisplay(source.id,binding)
         var anchor by remember(copy.id){mutableStateOf(Offset.Zero)}
         val callback by rememberUpdatedState<()->Unit>({runtime.invokeFrom(source.id,binding)})
-        SideEffect {runtime.record(StudioLiveControl(copy.id,target?.screen.orEmpty(),if(action)"action" else "data",title.take(100),available,protectedLabel=!action),if(action)({callback()}) else null)}
+        // The copy names its real window itself: positions are only tracked while editing (owner note 32).
+        val window=System.identityHashCode(androidx.compose.ui.platform.LocalView.current.rootView)
+        SideEffect {runtime.record(StudioLiveControl(copy.id,target?.screen.orEmpty(),if(action)"action" else "data",title.take(100),available,window=window,protectedLabel=!action),if(action)({callback()}) else null)}
         DisposableEffect(copy.id){onDispose{runtime.remove(copy.id)}}
         val widget=StudioWidget(runtime,copy.id,copy.style.copy(dx=0f,dy=0f),available,
             remember(copy.id){mutableStateOf(title)},remember(copy.id){mutableStateOf(null)})

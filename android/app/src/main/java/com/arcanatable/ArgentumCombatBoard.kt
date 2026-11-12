@@ -123,7 +123,7 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
                                 StudioText("ArgentumCombatBoard.Text.4", "Combat and targets", true, "${edges.maxOf { it.maximum }} dmg" + if (left > 0) " · $left left" else "", color = if (left > 0) CounterGold else Muted, fontSize = 9.sp)
                             }
                             StudioText("ArgentumCombatBoard.Text.5", "Combat and targets", false, "→", color = Mint, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 6.dp))
-                            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.weight(1f).hintedHorizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 edges.forEach { edge ->
                                     val value = amounts[edge.id] ?: edge.defaultAmount
                                     val target = pieceOf(edge.targetId)
@@ -185,7 +185,7 @@ internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>, c
     Column(Modifier.fillMaxWidth().padding(top = 4.dp).testTag("opponent-blockers")) {
         groups.forEach { (name, cards) ->
             StudioText("ArgentumCombatBoard.Text.15", "Combat and targets", true, "${name.uppercase()} CAN BLOCK WITH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 4.dp))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 cards.forEach { card ->
                     val shape = RoundedCornerShape(6.dp)
                     Column(Modifier.width(cardWidth)) {

@@ -386,7 +386,7 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         }
     }
 
-    LaunchedEffect(players, onlineMode) { if (!onlineMode) savePlayers(context, players) }
+    LaunchedEffect(players, onlineMode) { if (!onlineMode && studioRealPlayers == null) savePlayers(context, players) } // never save Studio's busy sample
     LaunchedEffect(players, activePlayer, turnNumber, phaseIndex, gameTurnOrder, lobbyReadyPlayers, lobbyTurnOrder, gameLog, chatMessages, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, triggerPrompts, roomHost, roomClient, cloudRoomClient, roomConnected, onlineStateReady) {
         delay(180)
         publishOnlineSnapshot()

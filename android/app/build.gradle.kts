@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -29,10 +31,14 @@ android {
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
+        // ONE switch for Arcana Studio (owner D33): replaces Adjust UI, removes the theme switch, adds Studio entries.
+        // Off for normal builds; flip this line (or the debug override below) to ship Studio.
+        buildConfigField("boolean", "STUDIO_ENABLED", "false")
     }
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "STUDIO_ENABLED", "true")
             // Separate package so this build installs beside the experimental/targeting test build.
             applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix").orElse(".b142studio").get()
             // The build number follows versionCode, so the installer never shows a stale one.
@@ -51,6 +57,13 @@ android {
             isIncludeAndroidResources = true
             all { test ->
                 test.maxHeapSize = "3g"
+                // Nov 7: a hung test held CI for over an hour with no name in the log. Log each test as it starts and
+                // fails, and stop the task after 25 minutes (a full green run takes about 10), so a hang shows its name.
+                test.testLogging {
+                    events("started", "failed", "skipped")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                }
+                test.timeout.set(Duration.ofMinutes(25))
                 // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
                 test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
                 // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.

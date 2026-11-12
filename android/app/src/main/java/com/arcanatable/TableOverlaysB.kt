@@ -1002,6 +1002,7 @@ internal fun TableController.TableOverlaysB() {
         onQuietOpponentTurns = { value -> quietOpponentTurns = value; optionPrefs.edit().putBoolean("quiet_opponent_turns", value).apply(); if (argentumOffline) argentumSocket.send("setQuietOpponentTurns", JSONObject().put("enabled", value)) },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
         onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true; TutorialActions.tap("setting-adjust-ui") } },
+        onOpenStudio = if (BuildConfig.STUDIO_ENABLED) ({ optionsOpen = false; nativeStudioOpen = true }) else null,
         onToggleTheme = { run { onToggleTheme() } },
         onToggleTimerVisibility = { run { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> run { setBackgroundAlerts(enabled) } },
@@ -1011,7 +1012,8 @@ internal fun TableController.TableOverlaysB() {
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } },
     ) }
-    if (nativeStudioOpen && BuildConfig.DEBUG) NativeStudioWorkspace(
+    // The editor shell in MainActivity owns the hand screen whenever the Studio runtime exists.
+    if (nativeStudioOpen && BuildConfig.STUDIO_ENABLED && studioControlsRuntime == null) NativeStudioWorkspace(
         prefs = optionPrefs, orientation=layoutOrientationSuffix,
         width=configuration.screenWidthDp,height=configuration.screenHeightDp,
         cards = players.getOrNull(localSeat)?.hand.orEmpty(),
@@ -1052,7 +1054,9 @@ internal fun TableController.TableOverlaysB() {
                 .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_stack_pile", true).putBoolean("adjust_ai_recap", true)
                 .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putBoolean("adjust_auto_open_hand", true).putFloat("adjust_notice_seconds", 4f).putFloat("adjust_combat_card_scale", 1f).apply()
         },
-        onDismiss = { layoutLabOpen = false; optionsOpen = true }
+        // From Studio, closing goes back to Studio (not to Settings).
+        inStudio = studioControlsRuntime?.editing == true,
+        onDismiss = { layoutLabOpen = false; if (studioControlsRuntime?.editing != true) optionsOpen = true }
     )
 
     if (resetConfirmOpen) StudioAlertDialog("Game dialog 7",

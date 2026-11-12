@@ -1,12 +1,15 @@
 package com.arcanatable.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.arcanatable.*
 import org.junit.Assert.*
@@ -22,12 +25,119 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk=[34],qualifiers="w412dp-h928dp-port-xhdpi")
 class StudioNativeControlsUiTest {
     @get:Rule val rule=createAndroidComposeRule<ComponentActivity>()
+    /** Owner, Nov 7, "neighbours make room": a resized control that shared its row takes its size; the neighbour gets the rest. */
+    @Test fun resizingAWeightedControlMakesItsNeighbourGiveWay() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-weight",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
+            Row(Modifier.width(400.dp).testTag("row")) {
+                StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.weight(1f).testTag("a")){StudioText("HomeScreen.Text.1","Player",false,"A")}
+                StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.weight(1f).testTag("b")){StudioText("HomeScreen.Text.1","Player",false,"B")}
+            }
+        }}}
+        rule.waitForIdle()
+        val d=rule.density.density
+        assertEquals(200f*d,rule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.width,2f)
+        val a=runtime.controls.values.single{it.title=="A"}.id
+        rule.runOnIdle{runtime.begin(a);runtime.edit(a,StudioControlStyle(width=280f));runtime.apply()}
+        rule.waitForIdle()
+        assertEquals(280f*d,rule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.width,2f)
+        assertEquals("the neighbour gives way",120f*d,rule.onNodeWithTag("b").fetchSemanticsNode().boundsInRoot.width,2f)
+    }
+
+    /**
+     * Owner, Nov 7: "results look bad". A label drawn as a box (a phase tab: background in its own modifier) moves as one
+     * piece, and narrowing it shrinks the words on one line instead of breaking them letter by letter.
+     */
+    @Test fun aBoxedLabelMovesWholeAndShrinksOnOneLine() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-label",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
+            StudioText("HomeScreen.Text.1","Player",true,"PASS TO MY TURN",
+                modifier=Modifier.testTag("tab").background(androidx.compose.ui.graphics.Color.DarkGray).padding(8.dp))
+        }}}}
+        rule.waitForIdle()
+        val d=rule.density.density
+        val before=rule.onNodeWithTag("tab").fetchSemanticsNode().boundsInRoot
+        val id=runtime.controls.values.single().id
+        val narrow=(before.width/d)*0.75f
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=30f,dy=12f,width=narrow));runtime.apply()}
+        rule.waitForIdle()
+        val after=rule.onNodeWithTag("tab").fetchSemanticsNode().boundsInRoot
+        assertEquals("the box moves with the words",before.left+30f*d,after.left,2f)
+        assertEquals(before.top+12f*d,after.top,2f)
+        assertEquals(narrow*d,after.width,2f)
+        assertTrue("one line, shrunk, not a column of letters: ${after.height} vs ${before.height}",after.height<=before.height*1.05f)
+    }
+
+    /** Owner's screenshot, Nov 7: the selection frame was smaller than, and off to the side of, a resized player chip. */
+    @Test fun theSelectionFrameIsTheWholeResizedChip() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-chip",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column(Modifier.padding(20.dp)) {
+            Row(Modifier.testTag("chip").height(44.dp).background(androidx.compose.ui.graphics.Color.DarkGray)
+                .border(2.dp,androidx.compose.ui.graphics.Color.Yellow).studioClickable("ArgentumUi.clickable.1","Table and player"){}.padding(end=9.dp)) {
+                Box(Modifier.width(40.dp).fillMaxHeight())
+                StudioText("ArgentumUi.Text.2","Table and player",true,"YOU")
+            }
+        }}}}
+        rule.waitForIdle()
+        val id=runtime.controls.values.single{it.isAction}.id
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(dx=24f,dy=-8f,width=220f,height=168f));runtime.apply()}
+        rule.waitForIdle()
+        rule.runOnIdle{runtime.begin(id)} // frames are only measured while Studio is open
+        rule.waitForIdle()
+        val d=rule.density.density
+        val chip=rule.onNodeWithTag("chip").fetchSemanticsNode().boundsInRoot
+        val frame=runtime.controls[id]!!.bounds
+        assertEquals(220f*d,chip.width,2f);assertEquals(168f*d,chip.height,2f)
+        assertEquals("frame left = chip left",chip.left,frame.left,2f);assertEquals(chip.top,frame.top,2f)
+        assertEquals("frame size = the size in the panel",chip.width,frame.width,2f);assertEquals(chip.height,frame.height,2f)
+    }
+
+    /** Owner, Nov 7: the table areas (battlefield…) are Studio items, and opacity goes all the way to 0%. */
+    @Test fun theBattlefieldIsAnItemThatFadesToNothing() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-panel",0),"portrait").also{it.enableCatalog()}
+        val page=androidx.compose.ui.graphics.Color(0xFF000000);val panel=androidx.compose.ui.graphics.Color(0xFF3060A0)
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column(Modifier.fillMaxSize().background(page)) {
+            Box(Modifier.fillMaxWidth().height(200.dp).studioPanel("TableBoardViews.Panel.1","Table and player","Battlefield",
+                androidx.compose.foundation.shape.RoundedCornerShape(12.dp),panel).testTag("bf"))
+        }}}}
+        rule.waitForIdle();rule.runOnIdle{runtime.begin()};rule.waitForIdle()
+        val bf=runtime.controls.values.single{it.kind=="panel"}
+        assertEquals("Battlefield",bf.title)
+        assertTrue(StudioSites.contains(bf.id))
+        assertEquals("tapping empty battlefield picks it",bf.id,StudioEditorGeometry.hitTest(runtime.controls.values,bf.bounds.center,bf.window){true}?.id)
+        fun pixel():Int{val root=rule.activity.window.decorView.rootView
+            val b=android.graphics.Bitmap.createBitmap(root.width,root.height,android.graphics.Bitmap.Config.ARGB_8888);root.draw(android.graphics.Canvas(b))
+            return b.getPixel(bf.bounds.center.x.toInt(),bf.bounds.center.y.toInt())}
+        assertEquals(android.graphics.Color.rgb(0x30,0x60,0xA0),pixel())
+        rule.runOnIdle{runtime.begin(bf.id);runtime.edit(bf.id,StudioControlStyle(alpha=0f));runtime.apply()};rule.waitForIdle()
+        assertEquals("0%: the page shows through",android.graphics.Color.BLACK,pixel())
+        rule.runOnIdle{runtime.begin(bf.id);runtime.edit(bf.id,StudioControlStyle(alpha=0.5f,fill="#FF0000"));runtime.apply()};rule.waitForIdle()
+        val half=pixel()
+        assertTrue("50% red over black: ${Integer.toHexString(half)}",android.graphics.Color.red(half) in 110..145 && android.graphics.Color.green(half)<10)
+    }
+
+    /** Owner, Nov 7: "the text/image goes outside the button". A resized button's contents shrink to fit inside it. */
+    @Test fun resizedButtonKeepsItsTextInsideItsEdges() {
+        val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-fit",0),"portrait").also{it.enableCatalog()}
+        rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{},Modifier.testTag("b")){
+                StudioText("HomeScreen.Text.1","Player",false,"PASS TO ATTACKERS",modifier=Modifier.testTag("t"))}
+        }}}}
+        rule.waitForIdle()
+        val id=runtime.controls.values.single{it.isAction}.id
+        rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(width=72f,height=31f));runtime.apply()}
+        rule.waitForIdle()
+        val b=rule.onNodeWithTag("b").fetchSemanticsNode().boundsInRoot
+        assertEquals(72f*rule.density.density,b.width,2f);assertEquals(31f*rule.density.density,b.height,2f)
+        rule.onNodeWithTag("t",useUnmergedTree=true).assertExists()
+    }
+
     @Test fun actualButtonMovesAndRebindsOnlyToAnAvailableNativeCallback() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-ui",0),"portrait").also{it.enableCatalog()}
         val enabled=mutableStateOf(true);val calls=mutableListOf<String>()
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="source"},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Home",false,"Source")}
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+="target"},Modifier.testTag("target"),enabled=enabled.value){StudioText("HomeScreen.Text.1","Home",false,"Target")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+="source"},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Player",false,"Source")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+="target"},Modifier.testTag("target"),enabled=enabled.value){StudioText("HomeScreen.Text.1","Player",false,"Target")}
         }}}}
         rule.waitForIdle()
         val source=runtime.controls.values.single{it.title=="Source"}
@@ -44,7 +154,7 @@ class StudioNativeControlsUiTest {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-inspect",0),"portrait")
         var actions=0
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{actions++},Modifier.testTag("action")){StudioText("HomeScreen.Text.1","Home",false,"Play")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{actions++},Modifier.testTag("action")){StudioText("HomeScreen.Text.1","Player",false,"Play")}
         }}}
         rule.waitForIdle();rule.runOnIdle{runtime.begin();runtime.inspectNativeScreen()};rule.waitForIdle()
         rule.onNodeWithTag("action").performClick();assertEquals(0,actions);assertNotNull(runtime.selected);assertTrue(runtime.panelOpen)
@@ -53,7 +163,7 @@ class StudioNativeControlsUiTest {
     @Test fun liveInformationCanBeHiddenWithoutSerializingItsCurrentValue() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-data",0),"portrait").also{it.enableCatalog()}
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){
-            StudioText("HomeScreen.Text.1","Home",true,"Live life 40",Modifier.testTag("life"))
+            StudioText("HomeScreen.Text.1","Player",true,"Live life 40",Modifier.testTag("life"))
         }}}
         rule.waitForIdle();val id=runtime.controls.values.single().id
         rule.runOnIdle{runtime.begin(id);runtime.edit(id,StudioControlStyle(visible=false));runtime.apply()};rule.waitForIdle()
@@ -65,8 +175,8 @@ class StudioNativeControlsUiTest {
         val state=mutableStateOf(StudioControlsRuntime(prefs,"portrait").also{it.enableCatalog()})
         val life=mutableStateOf(40);val mana=mutableStateOf(3)
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides state.value){Column(Modifier.fillMaxSize()){
-            StudioText("HomeScreen.Text.1","Home",true,"Life ${life.value}",Modifier.testTag("life"))
-            StudioText("HomeScreen.Text.2","Home",true,androidx.compose.ui.text.AnnotatedString("Mana ${mana.value}"),Modifier.testTag("mana"))
+            StudioText("HomeScreen.Text.1","Player",true,"Life ${life.value}",Modifier.testTag("life"))
+            StudioText("HomeScreen.Text.2","Player",true,androidx.compose.ui.text.AnnotatedString("Mana ${mana.value}"),Modifier.testTag("mana"))
         }}}}
         rule.waitForIdle();var runtime=state.value
         val source=runtime.controls.values.single{it.title=="Life 40"}.id
@@ -97,7 +207,11 @@ class StudioNativeControlsUiTest {
         rule.onNodeWithTag("studio-copy-${copy.id}").assertTextEquals("Mana 1")
 
     }
-    @Test fun nondismissableCustomizedDialogAlwaysKeepsStudioRecoveryReachable() {
+    /**
+     * Owner D33 removed the floating in-window Studio button. The guarantee it gave is now enforced at Apply instead:
+     * a non-dismissable window can never lose its last visible button, so it can't become a dead end.
+     */
+    @Test fun nondismissableCustomizedDialogCanNeverLoseItsLastButton() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-window-recovery",0),"portrait").also{it.enableCatalog()}
         var gameActions=0;var dismissed=0;val alert=mutableStateOf(false)
         @Composable fun Choice() {StudioButton("HomeScreen.OutlinedButton.1","Choice",{gameActions++},Modifier.testTag("only-choice")){
@@ -111,20 +225,21 @@ class StudioNativeControlsUiTest {
         listOf(false,true).forEach {useAlert->
             rule.runOnIdle{alert.value=useAlert};rule.waitForIdle()
             val source=runtime.controls.values.single{it.isAction}.id
-            rule.runOnIdle{runtime.begin(source);runtime.edit(source,StudioControlStyle(visible=false));runtime.apply()}
-            rule.waitForIdle();rule.onNodeWithTag("only-choice").assertIsNotDisplayed()
-            rule.onNodeWithTag("studio-window-escape").assertIsDisplayed().performClick()
-            assertTrue(runtime.editing);assertTrue(runtime.panelOpen)
+            rule.runOnIdle{runtime.begin(source);runtime.edit(source,StudioControlStyle(visible=false))}
+            assertTrue(runtime.problems().any{it.startsWith("Keep at least one button visible")})
+            assertTrue("Apply refuses the dead-end window",runCatching{runtime.apply()}.isFailure)
+            rule.runOnIdle{runtime.cancel();runtime.enableCatalog()};rule.waitForIdle()
+            rule.onNodeWithTag("studio-window-escape").assertDoesNotExist()
+            rule.onNodeWithTag("only-choice").assertIsDisplayed()
             assertEquals(0,gameActions);assertEquals(0,dismissed)
-            rule.runOnIdle{runtime.cancel()};rule.waitForIdle()
         }
     }
     @Test fun repeatedListControlsHaveDistinctCallbacksAndStableSlots() {
         val runtime=StudioControlsRuntime(rule.activity.getSharedPreferences("controls-repeat",0),"portrait").also{it.enableCatalog()}
         val calls=mutableListOf<Int>()
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides runtime){Column {
-            (0..9).forEach {i->StudioButton("HomeScreen.OutlinedButton.1","Home",{calls+=i},Modifier.testTag("repeat-$i")){
-                StudioText("HomeScreen.Text.1","Home",true,"Choice $i")
+            (0..9).forEach {i->StudioButton("HomeScreen.OutlinedButton.1","Player",{calls+=i},Modifier.testTag("repeat-$i")){
+                StudioText("HomeScreen.Text.1","Player",true,"Choice $i")
             }}
         }}}}
         rule.waitForIdle()
@@ -136,7 +251,7 @@ class StudioNativeControlsUiTest {
         val prefs=rule.activity.getSharedPreferences("controls-copy",0)
         val state=mutableStateOf(StudioControlsRuntime(prefs,"portrait").also{it.enableCatalog()});var calls=0
         rule.setContent{MaterialTheme{CompositionLocalProvider(LocalStudioControls provides state.value){Column(Modifier.fillMaxSize()){
-            StudioButton("HomeScreen.OutlinedButton.1","Home",{calls++},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Home",false,"Source")}
+            StudioButton("HomeScreen.OutlinedButton.1","Player",{calls++},Modifier.testTag("source")){StudioText("HomeScreen.Text.1","Player",false,"Source")}
         }}}}
         rule.waitForIdle();var runtime=state.value
         val source=runtime.controls.values.single{it.isAction}.id

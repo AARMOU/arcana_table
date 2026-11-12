@@ -1,5 +1,8 @@
 package com.arcanatable
 
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -10,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -29,8 +33,28 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.text.InlineTextContent
 
+/**
+ * The player a repeated item belongs to (owner note 28, Goose J8): "you", or "opp1", "opp2"… counted from your seat in
+ * turn order. Items inside get IDs tied to that player, so edits stay with the right player when seats change.
+ */
+internal val LocalStudioSeat=compositionLocalOf<String?>{null}
+
+/** The Studio player key for seat [index]; see [LocalStudioSeat]. */
+internal fun studioSeatKey(index:Int,localSeat:Int,count:Int):String=when {
+    localSeat !in 0 until count -> "seat${index+1}"
+    index==localSeat -> "you"
+    else -> "opp${(index-localSeat+count)%count}"
+}
+
+/** Marks [content] as belonging to seat [index] for Studio IDs. */
+@Composable
+internal fun StudioSeat(index:Int,localSeat:Int,count:Int,content:@Composable ()->Unit)=
+    CompositionLocalProvider(LocalStudioSeat provides studioSeatKey(index,localSeat,count),content=content)
+
 internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String,val style:StudioControlStyle,
-    val enabled:Boolean,val title:MutableState<String>,val titleSource:MutableState<String?>) {
+    val enabled:Boolean,val title:MutableState<String>,val titleSource:MutableState<String?>,
+    /** The control's kind ("action", "data", "label", "container-action"…), so sizing knows what it is drawing. */
+    val kind:String="action") {
     fun click(){if(runtime.editing)runtime.select(id) else if(enabled)runtime.invokeFrom(id,style.binding ?: id)}
     fun parent(proxy:Boolean=false)=StudioControlParent(id,style,{source,text->
         if(titleSource.value==null)titleSource.value=source
@@ -42,24 +66,86 @@ internal data class StudioWidget(val runtime:StudioControlsRuntime,val id:String
 internal fun studioWidget(site:String,screen:String,kind:String,title:String,enabled:Boolean=true,protectedLabel:Boolean=false,
     onClick:(()->Unit)?=null):StudioWidget? {
     val runtime=LocalStudioControls.current ?: return null
-    if(!runtime.active)return null
+    if(!runtime.active || LocalStudioExcluded.current)return null
     if(kind.endsWith("action") && LocalStudioControlParent.current?.proxy==true)return null
-    val base="native:$site/${currentCompositeKeyHash}"
+    // Owner, Nov 7 / Nov 6 note 27: permanent IDs. The ID is the code site, the screen and the control's order among
+    // same-site controls on that screen. It used to include the compose key hash, which changes whenever the app's code
+    // moves, so saved edits could detach between builds. Old saved IDs are moved by StudioControlProject.withStableIds.
+    val idScreen=LocalStudioScreen.current ?: screen
+    val base=studioStableId(site,idScreen,0).substringBeforeLast(":")
     val token=remember{Any()}
-    val id=runtime.claim(base,token)
+    // Owner note 28 / J8: items repeated per player belong to that player (you, opponent 1…), not to their order on
+    // screen. The screen-order ID is still claimed, so an edit saved before this change keeps showing until it is next
+    // edited, when it moves to the player's own ID (StudioControlsRuntime.alias).
+    val seat=LocalStudioSeat.current
+    val legacy=runtime.claim(base,token)
+    val seatBase=seat?.let{"$base@$it"}
+    val id=if(seatBase==null)legacy else runtime.claim(seatBase,token).also{runtime.alias(it,legacy)}
     val caption=remember(id){mutableStateOf(title)}
     val source=remember(id){mutableStateOf<String?>(null)}
     val currentCaption=if(title in listOf("Action","Icon action","Menu action","Text input","Filter","Action chip","Control","Tab"))caption.value else title
     val captionEditable=kind!="container-action" || source.value!=null
     val action by rememberUpdatedState(onClick)
     val window=System.identityHashCode(LocalView.current.rootView)
-    DisposableEffect(runtime,id){onDispose{runtime.remove(id);runtime.release(base,token)}}
+    DisposableEffect(runtime,id){onDispose{runtime.remove(id);runtime.release(base,token);seatBase?.let{runtime.release(it,token)}}}
     val actualScreen=LocalStudioScreen.current ?: screen
     SideEffect {runtime.record(StudioLiveControl(id,actualScreen,kind,currentCaption,enabled,window=window,protectedLabel=protectedLabel,captionEditable=captionEditable),
         if(onClick==null)null else ({action?.invoke()}))}
+    StudioWindowCanvasHost(runtime,window)
     val style=runtime.style(id,actualScreen,kind)
     val available=enabled && (style.binding==null || if(kind.endsWith("action"))runtime.canInvoke(id,style.binding) else runtime.canDisplay(id,style.binding))
-    return StudioWidget(runtime,id,style,available,caption,source)
+    return StudioWidget(runtime,id,style,available,caption,source,kind)
+}
+
+
+/** Marks a resized control as fixed-size for its Row/Column parent (see [studioWidget]). */
+private object StudioFixedSlot
+private object StudioFixedSlotElement:androidx.compose.ui.node.ModifierNodeElement<StudioFixedSlotNode>() {
+    override fun create()=StudioFixedSlotNode()
+    override fun update(node:StudioFixedSlotNode){}
+    override fun hashCode()=7
+    override fun equals(other:Any?)=other===this
+}
+private class StudioFixedSlotNode:Modifier.Node(),androidx.compose.ui.node.ParentDataModifierNode {
+    // Applied outermost, so it sees the weight set by the call site and replaces it. Other parent data (Box alignment,
+    // custom layouts) is left exactly as it was.
+    override fun androidx.compose.ui.unit.Density.modifyParentData(parentData:Any?):Any? =
+        if(parentData?.javaClass?.name?.endsWith("RowColumnParentData")==true)StudioFixedSlot else parentData
+}
+
+/**
+ * Fits a resized control's contents into its Studio size (owner, Nov 7: "results look bad").
+ * - Words shrink on one line first (down to a readable 60%) instead of breaking letter by letter ("PASS TO MY TURN"
+ *   at 16 wide became a column of letters). Only if one line can't fit at 60% does the text wrap.
+ * - When [center] is set (text and labels, whose own background sits outside this), contents keep their
+ *   natural size and sit in the middle of a box made bigger, instead of being stretched to its top-left corner.
+ * Layouts that can't report intrinsic sizes (lazy lists, subcompositions) are left unscaled.
+ */
+internal fun Modifier.studioFitContents(center:Boolean=false):Modifier=this.layout {measurable,constraints->
+    if(!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val w=constraints.maxWidth;val h=constraints.maxHeight
+    fun fit(needW:Int,needH:Int)=minOf(1f,w/needW.coerceAtLeast(1).toFloat(),h/needH.coerceAtLeast(1).toFloat())
+    val wide=runCatching{measurable.maxIntrinsicWidth(h)}.getOrNull()
+    val wideH=wide?.let{runCatching{measurable.minIntrinsicHeight(it)}.getOrNull()}
+    val (needW,needH)=if(wide!=null && wideH!=null && fit(wide,wideH)>=0.6f)wide to wideH
+        else (runCatching{measurable.minIntrinsicWidth(h)}.getOrNull() ?: w) to (runCatching{measurable.minIntrinsicHeight(w)}.getOrNull() ?: h)
+    val scale=fit(needW,needH).coerceAtLeast(0.6f)
+    if(!center && scale>=0.999f) {
+        val p=measurable.measure(constraints);return@layout layout(p.width,p.height){p.place(0,0)}
+    }
+    val boxW=(w/scale).toInt().coerceAtLeast(1);val boxH=(h/scale).toInt().coerceAtLeast(1)
+    val inner=if(center)androidx.compose.ui.unit.Constraints(maxWidth=boxW,maxHeight=boxH)
+        else androidx.compose.ui.unit.Constraints.fixed(boxW,boxH)
+    val p=measurable.measure(inner)
+    // A side Studio didn't size keeps following the contents (within what the parent allows).
+    val outW=if(!center || constraints.hasFixedWidth)w else (p.width*scale).toInt().coerceIn(constraints.minWidth,w)
+    val outH=if(!center || constraints.hasFixedHeight)h else (p.height*scale).toInt().coerceIn(constraints.minHeight,h)
+    layout(outW,outH){
+        val x=(outW-p.width)/2;val y=(outH-p.height)/2
+        if(scale>=0.999f)p.place(x,y) else p.placeWithLayer(x,y){scaleX=scale;scaleY=scale}
+    }
 }
 
 @Composable
@@ -76,12 +162,49 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
         layout(0,0){} // Compose captions and guards, but never place, draw or hit-test hidden controls.
     }
     // Native anchors and parent-data (weights) remain intact. Draft and applied use this same modifier.
-    var result=this.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
+    // Owner feedback #11/#12 (bug 22): Studio's size goes OUTSIDE the call site's own modifiers. Placed after them,
+    // the native width()/height()/heightIn() fixed the slot and the saved size never showed. Outermost, the native
+    // size modifiers are coerced into Studio's exact constraints, so the visible control is the size in the panel.
+    // Owner, Nov 7, "neighbours make room": a resized control that normally shares leftover space in its row or column
+    // (weight) is taken out of that sharing, so its parent gives it exactly the Studio size and the weighted neighbours
+    // split what's left. Before, the parent still gave it the old share and clipped the rest (Table panel height, hand tray).
+    var sized:Modifier=if(s.width!=null || s.height!=null)Modifier.then(StudioFixedSlotElement) else Modifier
+    s.width?.takeIf{it.isFinite()}?.let{sized=sized.requiredWidth(it.coerceIn(1f,2000f).dp)}
+    s.height?.takeIf{it.isFinite()}?.let{sized=sized.requiredHeight(it.coerceIn(1f,4000f).dp)}
+    // Owner's screenshots, Nov 7: moving the phase tabs (BEGIN, MAIN 1…) or a chip's name left an empty box behind and
+    // only the words moved. The move used to be applied inside the call site's own background/clip/padding. It is now
+    // outside them, so the whole visible item (box and words) moves together.
+    var result=sized.offset(s.dx.takeIf{it.isFinite()}?.coerceIn(-2000f,2000f)?.dp ?: 0.dp,
         s.dy.takeIf{it.isFinite()}?.coerceIn(-4000f,4000f)?.dp ?: 0.dp)
-    s.width?.takeIf{it.isFinite()}?.let{result=result.requiredWidth(it.coerceIn(1f,2000f).dp)}
-    s.height?.takeIf{it.isFinite()}?.let{result=result.requiredHeight(it.coerceIn(1f,4000f).dp)}
-    s.radius?.takeIf{it.isFinite()}?.let{result=result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
-    s.fill?.let(::parseTableColorHex)?.let {result=result.background(it)}
+    // Owner's screenshot, Nov 7: the red selection frame sat off to one side of the gold player chip and was smaller
+    // than the size in the panel (196×160 vs 220×168). Bounds were measured inside the call site's own padding and
+    // border; they are now measured on the whole visible box, the same box the Width/Height numbers describe.
+    // Owner note 32: in play, nothing is measured per frame. Positions are only tracked while Studio is open.
+    if(widget.runtime.editing)result=result.onGloballyPositioned {coordinates->
+        // Owner feedback bug 23: no in-game auto-revert. boundsInRoot is clipped by scrolling parents (e.g. the hand
+        // tray), so a size/position check here silently threw away the owner's layout. Required actions stay reachable
+        // through style(); everything else is shown exactly as designed (owner note 36).
+        widget.runtime.bounds(widget.id,coordinates.boundsInRoot(),System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
+    }
+    // Owner, Nov 7: opacity fades the whole item (box, words and pictures). Pass and the way back stay at least half
+    // visible, so they can never be faded out of reach.
+    s.alpha?.takeIf{it.isFinite() && it<0.999f}?.let{a->
+        // 0% is allowed (owner, Nov 7): invisible, but the item keeps its space and still works when tapped.
+        val floor=if(widget.runtime.controls[widget.id]?.requiredNativeAction==true)0.5f else 0f
+        result=result.graphicsLayer{alpha=a.coerceIn(floor,1f)}
+    }
+    result=result.then(this)
+    // Owner, Nov 7: "the text/image goes outside the button". A resized control always keeps its contents inside its
+    // own edges (previously only when a corner radius was set, hence "hit and miss"), and contents that don't fit
+    // the new size are scaled down to fit, never below a readable 60%; below that the editor marks it red.
+    val resized=s.width!=null || s.height!=null
+    result=s.radius?.takeIf{it.isFinite()}?.let{result.clip(RoundedCornerShape(it.coerceIn(0f,100f).dp))}
+        ?: if(resized)result.clipToBounds() else result
+    // The fill paints the whole box (it used to paint only behind the fitted contents).
+    s.fill?.let(::parseTableColorHex)?.let {result=result.background(it.studioBackdrop(s.backdrop))}
+    // Only words are centred at their natural size. Pictures and tappable boxes (a commander picture, a player chip)
+    // fill the box they were resized to, as before; centring them left a picture at its old size in a bigger frame.
+    if(resized)result=result.studioFitContents(center=widget.kind=="data" || widget.kind=="label")
     if(widget.runtime.editing) result=result.offset {IntOffset(drag.x.toInt(),drag.y.toInt())}
         .pointerInput(widget.id,true) {
             detectDragGesturesAfterLongPress(onDragStart={point->
@@ -93,26 +216,20 @@ internal fun Modifier.studioWidget(widget:StudioWidget?):Modifier {
                 val style=current.runtime.style(current.id)
                 val bounds=current.runtime.controls[current.id]?.bounds
                 current.runtime.edit(current.id,if(resizing)style.copy(
-                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(44f),
-                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(44f)
+                    width=((style.width ?: with(density){(bounds?.width ?: 88f).toDp().value})+dx).coerceAtLeast(StudioEditorGeometry.FLOOR_DP),
+                    height=((style.height ?: with(density){(bounds?.height ?: 88f).toDp().value})+dy).coerceAtLeast(StudioEditorGeometry.FLOOR_DP)
                 ) else style.copy(dx=style.dx+dx,dy=style.dy+dy));drag=Offset.Zero
             })
         }.drawWithContent {
             drawContent()
-            if(widget.runtime.selected==widget.id) {
+            // Owner, Nov 7: no stray mint grip. The editor draws the selection frame and handles itself; this older
+            // outline only remains for the classic panel.
+            if(widget.runtime.selected==widget.id && !StudioEditorRequests.shellActive) {
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),style=androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
                 drawRect(androidx.compose.ui.graphics.Color(0xFF89E3B0),topLeft=Offset(size.width-16.dp.toPx(),size.height-16.dp.toPx()),size=androidx.compose.ui.geometry.Size(16.dp.toPx(),16.dp.toPx()))
             }
         }
-    return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f).onGloballyPositioned {coordinates->
-        val rect=coordinates.boundsInRoot()
-        widget.runtime.bounds(widget.id,rect,System.identityHashCode(root),root.width.toFloat(),root.height.toFloat())
-        if(s!=StudioControlStyle() && !widget.runtime.editing && widget.runtime.controls[widget.id]?.isAction==true) {
-            val minimum=with(density){44.dp.toPx()}
-            if(s.width!=null && rect.width<minimum-1 || s.height!=null && rect.height<minimum-1 || rect.left< -1 || rect.top< -1 ||
-                rect.right>root.width+1 || rect.bottom>root.height+1)widget.runtime.recover(widget.id,"A control did not fit this viewport; its native layout was restored.")
-        }
-    }
+    return result.zIndex(s.layer.takeIf{it.isFinite()} ?: 0f)
 }
 
 @Composable
@@ -150,10 +267,9 @@ internal fun StudioButton(site:String,screen:String,onClick:()->Unit,modifier:Mo
     border:BorderStroke?=null,contentPadding:PaddingValues=ButtonDefaults.ContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.Button(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }
@@ -164,10 +280,9 @@ internal fun StudioTextButton(site:String,screen:String,onClick:()->Unit,modifie
     border:BorderStroke?=null,contentPadding:PaddingValues=ButtonDefaults.TextButtonContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.TextButton(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }
@@ -178,10 +293,9 @@ internal fun StudioOutlinedButton(site:String,screen:String,onClick:()->Unit,mod
     border:BorderStroke?=ButtonDefaults.outlinedButtonBorder(enabled),contentPadding:PaddingValues=ButtonDefaults.ContentPadding,interactionSource:MutableInteractionSource?=null,
     content:@Composable RowScope.()->Unit) {
     val w=studioWidget(site,screen,"action","Action",enabled,onClick=onClick)
-    val c=if(w==null)colors else colors.copy(containerColor=w.style.fill?.let(::parseTableColorHex) ?: colors.containerColor,
-        contentColor=w.style.ink?.let(::parseTableColorHex) ?: colors.contentColor)
+    val (sh,c,edge)=StudioButtonTypes.apply(w?.style,LocalTableColors.current,shape,colors,border)
     androidx.compose.material3.OutlinedButton(onClick={w?.click() ?: onClick()},modifier=modifier.studioWidget(w),enabled=w?.let{it.runtime.editing || it.enabled} ?: enabled,
-        shape=w?.style?.radius?.let {RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape,colors=c,elevation=elevation,border=border,
+        shape=sh,colors=c,elevation=elevation,border=edge,
         contentPadding=contentPadding,interactionSource=interactionSource) {StudioButtonContent(w,content)}
     StudioNativeCopies(w)
 }
@@ -235,3 +349,19 @@ internal fun StudioText(site:String,screen:String,protectedLabel:Boolean,text:St
         fontFamily=fontFamily,letterSpacing=letterSpacing,textDecoration=textDecoration,textAlign=textAlign,lineHeight=s?.font?.coerceIn(8f,64f)?.let{(it*1.2f).sp} ?: lineHeight,
         overflow=overflow,softWrap=softWrap,maxLines=maxLines,minLines=minLines,onTextLayout=onTextLayout,style=style)
 }
+
+/**
+ * Owner, Nov 7: the table areas themselves (battlefield, mana pool, revealed cards, commander row) are Studio items, so
+ * they get opacity, colour, corners, size and position like everything else. Use in place of the call site's own
+ * clip + background; with Studio off it is exactly that clip + background.
+ */
+@Composable
+internal fun Modifier.studioPanel(site:String,screen:String,title:String,shape:androidx.compose.ui.graphics.Shape,color:Color):Modifier {
+    val w=studioWidget(site,screen,"panel",title)
+    val s=w?.style
+    return this.studioWidget(w).clip(s?.radius?.takeIf{it.isFinite()}?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: shape)
+        .background((s?.fill?.let(::parseTableColorHex) ?: color).studioBackdrop(s?.backdrop))
+}
+
+/** Owner, Nov 8: the Background setting fades only the box's colour, so the board can be clear with its cards solid. */
+internal fun Color.studioBackdrop(backdrop:Float?)=backdrop?.takeIf{it.isFinite()}?.let{copy(alpha=alpha*it.coerceIn(0f,1f))} ?: this

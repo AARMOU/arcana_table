@@ -105,12 +105,12 @@ class NativeStudioUiTest {
         rule.waitForIdle()
         rule.onNodeWithTag("studio-element-pass").performScrollTo()
         UiTestSupport.screenshot(rule.activity,"studio-before-drag")
+        // Owner feedback bug 25: dragging starts immediately (no long press first), so the move must pass touch slop.
         rule.onNodeWithTag("studio-element-pass").performScrollTo().performTouchInput {
             down(center)
-            advanceEventTime(650)
-            moveBy(Offset(0f,8f))
+            moveBy(Offset(0f,40f))
             advanceEventTime(50)
-            moveBy(Offset(0f,8f))
+            moveBy(Offset(0f,40f))
             up()
         }
         rule.waitForIdle()

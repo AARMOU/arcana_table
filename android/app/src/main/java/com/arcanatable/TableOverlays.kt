@@ -257,6 +257,7 @@ internal fun TableController.TableOverlays() {
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
                 onSettings = { optionsOpen = true; TutorialActions.tap("home-settings") },
                 onReturnToTable = { run { homeOpen = false } },
+                onStudio = if (BuildConfig.STUDIO_ENABLED) ({ nativeStudioOpen = true }) else null,
             ) }
             if (playSheetOpen) StudioScreen("Setup") { PlaySheet(
                 deckName = activeDeck?.name,
@@ -713,7 +714,7 @@ internal fun TableController.TableOverlays() {
                                 var libraryChip by remember(decision) { mutableStateOf<LibraryChip?>(null) }
                                 var librarySort by remember(decision) { mutableStateOf(LibrarySort.TYPE) }
                                 val chips = remember(allLibraryItems) { LibraryChip.present(allLibraryItems.map { it.typeLine }) }
-                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().hintedHorizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
                                         StudioFilterChip("TableOverlays.FilterChip.1", "Dialogs and overlays", librarySort == sort, { librarySort = sort }, label = { StudioText("TableOverlays.Text.48", "Dialogs and overlays", true, sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
@@ -876,6 +877,23 @@ internal fun TableController.TableOverlays() {
         )
     }
 
+    // Studio "Show me…" samples (owner, Nov 7). Only while Studio is editing and the real screen isn't showing.
+    val previewing = studioPreview?.takeIf { StudioPreviews.ENABLED && studioControlsRuntime?.editing == true }
+    // Samples are built once: a fresh plan on every recomposition would reset the board's remembered state each frame.
+    if (previewing == "Combat" && argentumAttackPlan == null) {
+        val sample = remember { StudioPreviews.attackPlan() }
+        ArgentumAttackBoard(sample, StudioPreviews::piece, busy = false, onConfirm = {}, onDismiss = { studioPreview = null })
+    }
+    if (previewing == "Opening hand" && !argentumMulliganPrompt) StudioScreen("Opening hand") { ArgentumOpeningHandScreen(
+        cards = remember { StudioPreviews.cards(7) }, title = "Opening hand", subtitle = "You're on the play · Your first mulligan is FREE",
+        selectable = false, selection = emptySet(), onToggle = {},
+        primaryLabel = "KEEP 7", primaryEnabled = true, onPrimary = {},
+        secondaryLabel = "MULLIGAN", secondaryEnabled = true, onSecondary = {},
+    ) }
+    if (previewing == "Actions" && argentumActionChoices.isEmpty()) StudioScreen("Legal actions") { ArgentumActionSheet(
+        card = remember { StudioPreviews.cards(1).first() }, choices = remember { StudioPreviews.actions() }, hidManaAbilities = false, busy = false,
+        onChoose = {}, onDismiss = { studioPreview = null },
+    ) }
     argentumAttackPlan?.let { plan ->
         ArgentumAttackBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
             opponentBlockers = argentumSnapshot?.let { snap -> opponentBlockers(snap.players, snap.viewingPlayer) }.orEmpty(),
@@ -953,16 +971,16 @@ internal fun TableController.TableOverlays() {
     // While a combat board or another Argentum choice is open, the hand is for looking only.
     val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
 
-    val handActionsBusy = LocalStudioControls.current?.editing==true || handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
+    val handActionsBusy = handViewOnly || argentumMulliganPrompt || argentumAwaitingUpdate || gameEndedOnline || !gameInProgress || passToMyTurnFrom != null
     val handActions = handDrawerActions(argentumSnapshot?.legalActions.orEmpty(), handActionsBusy)
     val handCards = players.getOrNull(handSeat)?.hand.orEmpty()
     val handCastActions = handDrawerCastActions(handActions, handCards.mapNotNull { argentumSnapshot?.serverCardIds?.get(it.id) }.toSet())
     val handCastableIds = handCards.filter { card -> ArgentumActions.forCardServerId(handCastActions,
         argentumSnapshot?.serverCardIds?.get(card.id)).isNotEmpty() }.map { it.id }.toSet()
 
-    val studioStore = remember(layoutOrientationSuffix, nativeStudioRevision) { StudioProfiles(optionPrefs, layoutOrientationSuffix).activeStore() }
+    val studioStore = remember(nativeStudioRevision) { StudioProfiles(optionPrefs, STUDIO_LAYOUT_KEY).activeStore() }
     val studioLayout = remember(studioStore, nativeStudioRevision) {
-        if (BuildConfig.DEBUG && studioStore.enabled()) studioStore.load() else null
+        if (BuildConfig.STUDIO_ENABLED && studioStore.enabled()) studioStore.load() else null
     }
     val studioFrame = studioLayout != null && argentumEnabled && studioLayout.viewportProblems(
         configuration.screenWidthDp.toFloat(), LocalDensity.current.fontScale, configuration.screenHeightDp.toFloat()).isEmpty()
@@ -994,13 +1012,14 @@ internal fun TableController.TableOverlays() {
                         .fillMaxHeight(effectiveHandFraction)
                         .verticalScroll(rememberScrollState())
                         .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .background(Panel)
+                        // One colour from the drawer's top strip down: the saved hand design's surface when it has one.
+                        .background(if (studioFrame) studioLayout!!.colors(LocalTableColors.current).panel else Panel)
                         .navigationBarsPadding()
                         .onGloballyPositioned { handSheetBounds = it.boundsInRoot() }
                         .clickable { }
                 ) {
                     Box(
-                        Modifier.fillMaxWidth().height(36.dp).tutorialTarget("hand-drawer-grip")
+                        Modifier.fillMaxWidth().height(if (BuildConfig.STUDIO_ENABLED) 28.dp else 36.dp).tutorialTarget("hand-drawer-grip")
                             .pointerInput(configuration.screenHeightDp) {
                                 var dragDistance = 0f
                                 val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
@@ -1021,9 +1040,13 @@ internal fun TableController.TableOverlays() {
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        BottomSheetDefaults.DragHandle(color = Muted)
+                        // Owner, Nov 7: the grab handle must show. The stock handle needs ~48dp of height and vanished in the
+                        // shorter Studio grip strip, so draw the bar itself.
+                        if (BuildConfig.STUDIO_ENABLED) Box(Modifier.size(width = 40.dp, height = 5.dp).background(Muted, RoundedCornerShape(3.dp)).testTag("hand-drawer-handle"))
+                        else BottomSheetDefaults.DragHandle(color = Muted)
                     }
-                    if (!studioFrame) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
+                    // Owner note 9: no drag hint in Studio builds; the grip says it.
+                    if (!studioFrame && !BuildConfig.STUDIO_ENABLED) StudioText("TableOverlays.Text.82", "Dialogs and overlays", false, "DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     StudioScreen("Hand") { HandSheet(
                         studioLayout = studioLayout,
                         turnContext = argentumSnapshot?.let { snap ->

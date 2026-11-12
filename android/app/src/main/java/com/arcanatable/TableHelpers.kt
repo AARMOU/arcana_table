@@ -169,7 +169,10 @@ internal fun ViewChip(label: String, selected: Boolean, compact: Boolean = false
     if(studio?.style?.visible==false){StudioNativeCopies(studio);return}
     val studioClick:()->Unit={studio?.click() ?: onClick()}
     CompositionLocalProvider(LocalStudioControlParent provides studio?.parent(true)) {
-    StudioText("TableHelpers.Text.2", "Table and player", true, label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.studioWidget(studio).heightIn(min = if (compact) 44.dp else 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(8.dp))).background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (selected) Mint else PanelLight)).studioCombinedClickable("TableHelpers.combinedClickable.2", "Table and player", onClick = studioClick).padding(horizontal = 15.dp, vertical = 12.dp))
+    StudioText("TableHelpers.Text.2", "Table and player", true, label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.studioWidget(studio).heightIn(min = if (compact) 44.dp else 50.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (RoundedCornerShape(8.dp))).background(studio?.style?.fill?.let(::parseTableColorHex) ?: (if (selected) Mint else PanelLight)).studioCombinedClickable("TableHelpers.combinedClickable.2", "Table and player", onClick = studioClick)
+        // Owner's screenshot, Nov 7: a TABLE chip made taller stayed a thin bar in the middle of its frame. The chip now
+        // fills the size it was given and its word sits in the middle (centring used to happen before the background).
+        .wrapContentSize(Alignment.Center).padding(horizontal = 15.dp, vertical = 12.dp))
 
     }
     StudioNativeCopies(studio)
@@ -185,7 +188,7 @@ internal fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean
     val artUrl = commander?.artCropUrl ?: commander?.imageUrl
     Box(
         Modifier.studioWidget(studio).width(96.dp).height(50.dp).clip(studio?.style?.radius?.let{RoundedCornerShape(it.coerceIn(0f,100f).dp)} ?: (shape))
-            .background(studio?.style?.fill?.let(::parseTableColorHex) ?: (PanelLight))
+            .background((studio?.style?.fill?.let(::parseTableColorHex) ?: (PanelLight)).studioBackdrop(studio?.style?.backdrop))
             .border(if (selected) 2.dp else 1.dp, if (selected) Mint else Color(0xFF33423D), shape)
             .studioCombinedClickable("TableHelpers.combinedClickable.3", "Table and player", onClick = studioClick)
     ) {

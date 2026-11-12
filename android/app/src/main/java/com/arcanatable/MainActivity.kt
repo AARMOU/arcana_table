@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.STUDIO_ENABLED) StudioLog.init(filesDir)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching {
@@ -164,7 +165,8 @@ fun TableScreen() = TableScreen(onControllerReady = {})
 internal fun TableScreen(onControllerReady: (TableController) -> Unit) {
     val context = LocalContext.current
     val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
-    var darkMode by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("dark_mode", true)) }
+    // Studio builds have no Light/Dark switch (owner, Nov 6), so they always start from the dark table; Light is a Studio palette.
+    var darkMode by rememberSaveable { mutableStateOf(BuildConfig.STUDIO_ENABLED || optionPrefs.getBoolean("dark_mode", true)) }
     var paletteName by rememberSaveable {
         mutableStateOf(optionPrefs.getString(TABLE_PALETTE_PREF, "Arcana Original") ?: "Arcana Original")
     }
@@ -278,14 +280,18 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
         DisposableEffect(t) {
             onDispose { TutorialActions.onGesture = null }
         }
-        val studioRuntime = remember(layoutOrientationSuffix, nativeStudioRevision) {
-            if (BuildConfig.DEBUG) StudioControlsRuntime(optionPrefs,layoutOrientationSuffix) else null
+        // Owner feedback bug 24: one Studio layout that adapts, not one per orientation (folding/rotating the Fold
+        // used to swap in a different or default layout). The runtime survives rotation instead of being rebuilt.
+        val studioRuntime = remember(nativeStudioRevision) {
+            if (BuildConfig.STUDIO_ENABLED) StudioControlsRuntime(optionPrefs,STUDIO_LAYOUT_KEY) else null
         }
         SideEffect {studioControlsRuntime=studioRuntime}
         CompositionLocalProvider(LocalStudioControls provides studioRuntime,
             LocalStudioScreen provides "Table",
+            LocalStudioBaseColors provides LocalTableColors.current,
             LocalTableColors provides (studioRuntime?.project()?.colors(LocalTableColors.current) ?: LocalTableColors.current)) {
         Box(Modifier.fillMaxSize().background(Ink)) {
+            StudioBackdropLayer()
             TableMainLayout()
             TableOverlays()
             TableOverlaysB()
@@ -296,27 +302,77 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             SideEffect { TutorialCoachState.model = coachModel }
             TutorialLayer(base = true)
             studioRuntime?.let {studio ->
-                if(!studio.editing && (studio.active || studio.recoveryReasons().isNotEmpty()))androidx.compose.material3.TextButton(
-                    onClick={studio.begin()},colors=androidx.compose.material3.ButtonDefaults.textButtonColors(containerColor=darkTableColors.panel,contentColor=darkTableColors.text),modifier=Modifier.align(Alignment.BottomStart).navigationBarsPadding().testTag("studio-root-escape")
-                ){androidx.compose.material3.Text(if(studio.recoveryReasons().isEmpty())"Arcana Studio" else "Studio restored a control · Review",color=darkTableColors.text)}
+                // No floating Studio button during normal play (owner D33). A restored control is announced once,
+                // by name, in a short notice with a Review action.
+                val restored=studio.recoveredTitles()
+                LaunchedEffect(restored) {
+                    if(restored.isNotEmpty() && !studio.editing) {
+                        val result=automaticActionSnackbar.showSnackbar("Studio restored ${restored.joinToString(", ")} so it fits this screen",
+                            actionLabel="Review",duration=androidx.compose.material3.SnackbarDuration.Short)
+                        if(result==androidx.compose.material3.SnackbarResult.ActionPerformed)nativeStudioOpen=true
+                    }
+                }
+                var studioClassic by remember(studio) {mutableStateOf(false)}
+                LaunchedEffect(studio.editing) {if(!studio.editing)studioClassic=false}
+                // The hand is edited only on Studio's Hand screen; the in-game drawer stays closed while editing.
+                LaunchedEffect(studio.editing,showHand) {if(studio.editing && showHand)showHand=false}
+                // Studio never opens during games with other people (online, rooms, Wi-Fi): they would be kept waiting.
+                val studioLiveGame=gameInProgress && (wifiRole!=null || roomHost!=null || roomClient!=null || cloudRoomClient!=null ||
+                    (argentumEnabled && !argentumOffline && !argentumVsAiLobby))
+                LaunchedEffect(studioLiveGame) {if(studioLiveGame && studio.editing){studio.cancel();message="Arcana Studio closed for this game. Your draft is kept."}}
+                // Every entry point (⋮ menu, Settings, Home, classic panel) arrives here.
+                LaunchedEffect(nativeStudioOpen) {if(nativeStudioOpen){nativeStudioOpen=false;studioClassic=false
+                    if(studioLiveGame)message="Arcana Studio is available after this game."
+                    else {optionsOpen=false;if(gameInProgress)homeOpen=false;if(!studio.editing)studio.begin()}}}
+                // Switching screens in Studio closes whatever overlay was open first, so each pick shows exactly that screen.
+                val studioCloseAll={studioPreview=null;optionsOpen=false;stackOpen=false;zoneDialog=null;deckPickerOpen=false;playSheetOpen=false;wifiMultiConfigOpen=false;showHand=false;logOpen=false}
+                val studioDestinations=buildMap<String,Pair<Boolean,()->Unit>> {
+                        put("Table",gameInProgress to {studioCloseAll();homeOpen=false;showOverview=true})
+                        put("Player",gameInProgress to {studioCloseAll();homeOpen=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)})
+                        put("Stack",gameInProgress to {studioCloseAll();homeOpen=false;stackOpen=true})
+                        put("Zones",gameInProgress to {studioCloseAll();homeOpen=false;zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"})
+                        put("Log",gameInProgress to {studioCloseAll();homeOpen=false;logOpen=true})
+                        // Owner, Nov 7: moment-only screens open as samples ("Show me…") when the real one isn't up.
+                        // StudioPreviews.ENABLED switches them off; Combat is then editable only during real combat.
+                        if(StudioPreviews.ENABLED) {
+                            put("Combat",gameInProgress to {studioCloseAll();homeOpen=false;if(argentumAttackPlan==null && argentumBlockPlan==null)studioPreview="Combat"})
+                            put("Opening hand",gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Opening hand"})
+                            put("Actions",gameInProgress to {studioCloseAll();homeOpen=false;studioPreview="Actions"})
+                        } else put("Combat",(argentumAttackPlan!=null || argentumBlockPlan!=null) to {studioCloseAll();homeOpen=false})
+                    }
+                val studioPractice:(()->Unit)?=if(gameInProgress) null else ({studioCloseAll();startOfflineGame()})
+                LaunchedEffect(studio.editing){if(!studio.editing){studioPreview=null;studio.fillItUp=false}}
+                // Owner note 29, "Fill it up": a busy table while editing. The real players come back when it is switched
+                // off or Studio closes; in engine games they come from the engine's last state, which is always current.
+                val studioFilling=studio.fillItUp && studio.editing && gameInProgress
+                // A new engine state while filling (the AI keeps playing) refills from it, so the sample stays up.
+                LaunchedEffect(studioFilling,argentumSnapshot) {
+                    if(studioFilling){val real=argentumSnapshot?.players ?: studioRealPlayers ?: players;studioRealPlayers=real;players=StudioBusyPreview.fill(real,localSeat)}
+                    else studioRealPlayers?.let{saved->players=argentumSnapshot?.players ?: saved;studioRealPlayers=null}
+                }
+                if(studio.editing && !studioClassic) StudioEditorShell(studio,studioDestinations,
+                    onApplied={nativeStudioRevision++},
+                    onClassic={studioClassic=true;studio.panelOpen=true},
+                    handCards=players.getOrNull(localSeat)?.hand.orEmpty(),
+                    onPractice=studioPractice,onLeaveScreen={studioCloseAll()},onGameOptions={layoutLabOpen=true},
+                    // Presets set the same values (and saved preferences) as Game options / the old Adjust UI.
+                    look=StudioLookHost({StudioLook(cardSizeScale,boardSpacingScale,footerButtonScale,handCardScale)}) {l->
+                        cardSizeScale=l.cardSize.coerceIn(.75f,1.4f);boardSpacingScale=l.spacing.coerceIn(.5f,2f)
+                        footerButtonScale=l.buttons.coerceIn(.78f,1.3f);handCardScale=l.handCards.coerceIn(.7f,1.4f)
+                        optionPrefs.edit().putFloat("card_size_scale",cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix",cardSizeScale)
+                            .putFloat("layout_board_spacing_$layoutOrientationSuffix",boardSpacingScale)
+                            .putFloat("layout_footer_button_scale_$layoutOrientationSuffix",footerButtonScale)
+                            .putFloat("layout_hand_card_scale_$layoutOrientationSuffix",handCardScale).apply()
+                    })
+                else {
                 if(studio.editing && !studio.panelOpen) androidx.compose.material3.TextButton(
                     onClick={studio.panelOpen=true},modifier=Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
                 ) {androidx.compose.material3.Text("Arcana Studio · inspecting",color=Mint)}
                 if(studio.panelOpen) StudioControlsPage(studio,
                     onApplied={nativeStudioRevision++},
-                    onHand={studio.cancel();nativeStudioOpen=true},
-                    destinations=mapOf(
-                        "Home" to (true to {optionsOpen=false;showHand=false;homeOpen=true}),
-                        "Setup" to (!gameInProgress to {homeOpen=true;playSheetOpen=true}),
-                        "Table" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=true}),
-                        "Player" to (gameInProgress to {homeOpen=false;optionsOpen=false;showHand=false;showOverview=false;selectedPlayer=localSeat.coerceIn(players.indices)}),
-                        "Lobby" to (!gameInProgress to {wifiMultiConfigOpen=true}),
-                        "Decks" to (true to {homeOpen=true;optionsOpen=false;deckPickerOpen=true}),
-                        "Settings" to (true to {optionsOpen=true}),
-                        "Stack" to (gameInProgress to {stackOpen=true}),
-                        "Zones" to (gameInProgress to {zoneDialog=localSeat.coerceIn(players.indices) to "Graveyard"}),
-                        "Combat" to ((argentumAttackPlan!=null || argentumBlockPlan!=null) to {homeOpen=false;showHand=false}),
-                    ))
+                    onHand={studioClassic=false;StudioEditorRequests.openHand()},
+                    destinations=studioDestinations)
+                }
             }
             SnackbarHost(
                 hostState = automaticActionSnackbar,
