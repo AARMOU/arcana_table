@@ -64,11 +64,27 @@ internal fun TableController.startWifiHost(online: Boolean = false) {
                 onGuest = { hello -> scope.launch { acceptWifiGuest(server, hello, setup, registry) } },
                 onGuestMessage = onGuestMessage, onGuestLeft = onGuestLeft,
             )
-            server.start()
             wifiServer = server
+            server.start()
+            // Binding happens on a socket thread. Only display the waiting room
+            // after the port is actually listening; otherwise a bind failure
+            // strands the player in a lobby nobody can join.
+            if (!withContext(Dispatchers.IO) { server.awaitReady(8_000) }) {
+                val failure = when (val cause = server.bindError) {
+                    is java.net.BindException ->
+                        "Couldn't open the Wi-Fi room: the game port is already in use. Close the other host and try again."
+                    null -> "Couldn't open the Wi-Fi room. The host didn't start listening. Try again."
+                    else -> "Couldn't open the Wi-Fi room: ${cause.message ?: cause.javaClass.simpleName}"
+                }
+                stopWifi()
+                argentumLastError = failure
+                message = failure
+                recordDiagnostic("Wi-Fi host bind failed: ${server.bindError?.javaClass?.simpleName ?: "not-ready"}", DiagnosticCategory.ERROR)
+                return@launch
+            }
             wifiWaitingAddress = address
             setup.notes.forEach { recordDiagnostic("Wi-Fi host: $it", DiagnosticCategory.ENGINE) }
-            recordDiagnostic("Wi-Fi host waiting at $address", DiagnosticCategory.CONNECTION)
+            recordDiagnostic("Wi-Fi host listening at $address", DiagnosticCategory.CONNECTION)
         } catch (error: Throwable) {
             stopWifi()
             argentumLastError = "Couldn't start hosting: ${error.javaClass.simpleName}: ${error.message?.take(200)}"

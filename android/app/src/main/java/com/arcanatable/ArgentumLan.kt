@@ -133,6 +133,8 @@ class ArgentumLanServer(
     private val onGuest: (hello: JSONObject) -> Unit,
     private val onGuestMessage: (JSONObject) -> Unit,
     private val onGuestLeft: () -> Unit,
+    // Injectable so the close-during-bind race is reproducible in a JVM test.
+    private val createServerSocket: () -> ServerSocket = { ServerSocket() },
 ) : ArgentumHostLink {
     private val running = AtomicBoolean(false)
     @Volatile private var server: ServerSocket? = null
@@ -150,21 +152,30 @@ class ArgentumLanServer(
      * false if binding failed (see [bindError]), the server was closed, or [timeoutMs] passed.
      */
     fun awaitReady(timeoutMs: Long): Boolean =
-        bound.await(timeoutMs, TimeUnit.MILLISECONDS) && bindError == null && server != null
+        bound.await(timeoutMs, TimeUnit.MILLISECONDS) &&
+            running.get() && bindError == null && server?.isBound == true && server?.isClosed == false
 
     fun start() {
         if (running.getAndSet(true)) return
         Thread({
+            val socketServer = try {
+                createServerSocket()
+            } catch (e: Exception) {
+                if (running.get()) bindError = e
+                bound.countDown()
+                return@Thread
+            }
             try {
-                val socketServer = try {
-                    ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(ArgentumLan.GAME_PORT)) }
-                        .also { server = it }
-                } catch (e: Exception) {
-                    bindError = e
-                    throw e
-                } finally {
-                    bound.countDown()
+                socketServer.reuseAddress = true
+                // Publish the unbound socket before binding so close() can close
+                // an in-flight listener instead of letting it leak after cancel.
+                synchronized(this) {
+                    if (!running.get()) return@Thread
+                    server = socketServer
                 }
+                socketServer.bind(InetSocketAddress(ArgentumLan.GAME_PORT))
+                if (!running.get()) return@Thread
+                bound.countDown()
                 while (running.get()) {
                     val socket = socketServer.accept()
                     if (guest != null) { runCatching { socket.close() }; continue }
@@ -181,7 +192,12 @@ class ArgentumLanServer(
                     guest = link
                     link.start()
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (running.get()) bindError = e
+            } finally {
+                bound.countDown()
+                runCatching { socketServer.close() }
+                synchronized(this) { if (server === socketServer) server = null }
             }
         }, "argentum-lan-accept").apply { isDaemon = true }.start()
         Thread({
@@ -205,9 +221,12 @@ class ArgentumLanServer(
 
     override fun close() {
         running.set(false)
+        bound.countDown()
         guest?.close(); guest = null
-        runCatching { server?.close() }
-        server = null
+        synchronized(this) {
+            runCatching { server?.close() }
+            server = null
+        }
     }
 }
 
