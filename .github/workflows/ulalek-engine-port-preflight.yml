@@ -1,0 +1,62 @@
+name: Ulalek engine source-only forward-port preflight
+on:
+  push:
+    branches: [gpt/ulalek-engine-port-preflight-20261024]
+    paths:
+      - .github/workflows/ulalek-engine-port-preflight.yml
+      - engine-upgrade/ulalek/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ulalek-engine-source-preflight
+  cancel-in-progress: true
+
+jobs:
+  patch-applicability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Check out isolated Arcana development candidate
+        uses: actions/checkout@v4
+      - name: Check out exact B131 upstream engine source
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Check out PR 60 staged Ulalek engine patches at immutable commit
+        uses: actions/checkout@v4
+        with:
+          ref: f159deae81bf6d2f01507cdc745a3567978339ba
+          path: staged-ulalek
+          persist-credentials: false
+      - name: Audit and apply ALL mandatory Arcana engine baseline patches
+        run: python3 engine-upgrade/audit_patches.py
+      - name: Audit staged Ulalek patches cumulatively and fail on first conflict
+        run: python3 engine-upgrade/ulalek/port_preflight.py
+      - name: Set up Java for patched engine regression testing
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile and run engine SDK and rules regression tests if applicable
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test :rules-engine:test
+      - name: Preserve patch and regression evidence even when blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ulalek-engine-port-preflight
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            engine-upgrade/patch-report.json
+            engine-upgrade/ulalek/port-report.json
+            argentum-engine/mtg-sdk/build/test-results/
+            argentum-engine/rules-engine/build/test-results/
