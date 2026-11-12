@@ -1,0 +1,640 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Arcana Tutorial Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: phone prototype on the left acts as the "live" tutorial; right column inspects the current step and holds the design notes. Stacks on narrow screens. Single deliberate dark "card table" look. */
+:root{
+  color-scheme: dark;
+  --table:#0d1513;      /* page ground, dark felt */
+  --felt:#13201c;       /* app surface */
+  --felt-2:#1a2b26;     /* raised app surface */
+  --line:#2b3d37;
+  --ink:#ebe6d8;
+  --muted:#98a59e;
+  --silver:#c7d0d2;     /* Argentum accent */
+  --brass:#d9a94c;      /* tutorial highlight */
+  --shade:rgba(3,7,6,.74);
+  --g:#62ad70; --u:#5b8fd6; --r:#d0654c; --w:#e3dcc3; --c:#a8a8a0;
+  --font-display:'Alegreya SC', Georgia, 'Times New Roman', serif;
+  --font-body:'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+body{background:var(--table);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between;margin-bottom:24px}
+.top > div{min-width:0}
+.eyebrow{margin:0;font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--silver)}
+h1{margin:4px 0 6px;font-family:var(--font-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.1;text-wrap:balance}
+.lede{margin:0;color:var(--muted);max-width:58ch}
+.tracks{display:flex;flex-wrap:wrap;gap:6px;background:var(--felt);border:1px solid var(--line);padding:4px;border-radius:999px}
+.tracks button{border:0;background:transparent;padding:8px 14px;border-radius:999px;color:var(--muted);font-weight:700;font-size:14px}
+.tracks button[aria-pressed="true"]{background:var(--brass);color:#1b1408}
+.grid{display:grid;grid-template-columns:400px minmax(0,1fr);gap:32px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage{display:flex;justify-content:center;position:sticky;top:16px}
+@media (max-width:900px){.stage{position:static}}
+
+/* ---------- phone ---------- */
+.phone{width:min(100%,380px);height:740px;border-radius:36px;border:10px solid #050807;background:#050807;box-shadow:0 30px 60px -20px rgba(0,0,0,.7),0 0 0 1px var(--line)}
+@media (max-width:440px){.phone{height:690px;border-width:6px;border-radius:28px}}
+.screen{position:relative;width:100%;height:100%;overflow:hidden;border-radius:26px;background:var(--felt);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#view{position:absolute;inset:0;display:flex;flex-direction:column}
+.appbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 12px 10px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--font-display);font-size:20px;letter-spacing:.04em}
+.icon{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--felt-2);display:grid;place-items:center}
+.icon svg{width:18px;height:18px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round}
+.spacer{width:40px}
+
+/* home */
+.home{flex:1;display:flex;flex-direction:column;gap:14px;padding:18px 16px}
+.crest{text-align:center;padding:18px 0 8px}
+.crest .mark{font-family:var(--font-display);font-size:34px;line-height:1}
+.crest .sub{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--silver)}
+.cta{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:16px;border-radius:14px;border:1px solid var(--brass);background:linear-gradient(180deg,rgba(217,169,76,.16),rgba(217,169,76,.05));text-align:left}
+.cta b{font-size:18px}
+.cta small{color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{padding:16px 14px;border-radius:14px;border:1px solid var(--line);background:var(--felt-2);text-align:left;display:flex;flex-direction:column;gap:2px}
+.tile b{font-size:16px}
+.tile small{color:var(--muted);font-size:12px;line-height:1.3}
+
+/* drawer */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);border:0;z-index:5}
+.drawer{position:absolute;top:0;bottom:0;left:0;width:78%;background:var(--felt-2);border-right:1px solid var(--line);z-index:6;display:flex;flex-direction:column;padding:18px 10px;gap:4px;animation:slide .22s ease-out}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:none}}
+.drawer h3{margin:4px 10px 12px;font-family:var(--font-display);font-size:20px;font-weight:700}
+.dr{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:11px 10px;border:0;border-radius:10px;background:transparent;text-align:left}
+.dr b{font-size:15px}
+.dr small{color:var(--muted);font-size:12px}
+.dr:hover{background:rgba(255,255,255,.04)}
+
+/* generic sections */
+.pane{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.label{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--silver);margin:0 0 8px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--felt-2)}
+.seg button{border:0;background:transparent;padding:10px 0;border-radius:9px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--silver);color:#111}
+.seats{display:flex;flex-direction:column;gap:8px}
+.seat{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--felt-2);font-size:14px}
+.seat span:last-child{color:var(--muted);font-size:13px;text-align:right}
+.primary{margin-top:auto;padding:14px;border-radius:14px;border:0;background:var(--brass);color:#1b1408;font-weight:700;font-size:16px}
+.list{display:flex;flex-direction:column;gap:8px}
+.row-btn{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--felt-2);text-align:left;width:100%}
+.row-btn[aria-pressed="true"]{border-color:var(--silver);background:rgba(199,208,210,.08)}
+.row-btn b{display:block;font-size:15px}
+.row-btn small{color:var(--muted);font-size:12px}
+.pips{display:flex;gap:3px;flex-shrink:0}
+.pip{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.35)}
+.pip.g{background:var(--g)}.pip.u{background:var(--u)}.pip.r{background:var(--r)}.pip.w{background:var(--w)}.pip.c{background:var(--c)}
+.detail{padding:14px;border-radius:12px;border:1px dashed var(--line);font-size:14px;color:var(--muted)}
+.detail b{color:var(--ink)}
+.chap{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center}
+.check{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:13px;color:var(--muted);font-family:var(--font-mono)}
+.check.done{background:var(--g);border-color:var(--g);color:#0b1a10}
+.mins{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+
+/* board */
+.board{flex:1;display:flex;flex-direction:column;min-height:0}
+.opp{padding:10px 12px;background:rgba(0,0,0,.18);border-bottom:1px solid var(--line)}
+.opp-head{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+.opp-head b{color:var(--ink);font-family:var(--font-mono)}
+.cards{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:84px}
+.field{flex:1;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.field .hint{font-size:12px;color:var(--muted)}
+.zones{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 12px 8px}
+.zone{padding:7px 4px;border-radius:10px;border:1px solid var(--line);background:var(--felt-2);font-size:11px;line-height:1.2;text-align:center}
+.zone b{display:block;font-family:var(--font-mono);font-size:14px}
+.hand{display:flex;gap:6px;padding:10px 12px;background:rgba(0,0,0,.22);border-top:1px solid var(--line);overflow-x:auto;min-height:104px}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 12px 14px;border-top:1px solid var(--line)}
+.life{min-width:52px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--felt-2);font-family:var(--font-mono);font-size:20px;font-weight:500}
+.mana{flex:1;display:flex;gap:4px;align-items:center;min-width:0;font-size:12px;color:var(--muted);height:44px}
+.mana .pip{width:18px;height:18px}
+.chip{height:34px;padding:0 10px;border-radius:999px;border:1px solid var(--silver);background:transparent;color:var(--silver);font-size:12px;font-weight:700;white-space:nowrap}
+.pass{height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--silver);color:#111;font-weight:700}
+.card{position:relative;flex-shrink:0;width:56px;height:78px;border-radius:6px;border:2px solid var(--c);background:#1e2421;padding:4px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;transition:transform .2s ease}
+.card.g{border-color:var(--g)}.card.u{border-color:var(--u)}.card.r{border-color:var(--r)}.card.w{border-color:var(--w)}
+.card .nm{font-size:9.5px;line-height:1.15;font-weight:700}
+.card .cost{position:absolute;top:3px;right:4px;font-family:var(--font-mono);font-size:9px;color:var(--muted)}
+.card .pt{align-self:flex-end;font-family:var(--font-mono);font-size:10px}
+.card.tapped{transform:rotate(90deg);margin:0 11px}
+.card.sick::after{content:"zz";position:absolute;bottom:3px;left:4px;font-family:var(--font-mono);font-size:9px;color:var(--muted)}
+.hand .card{width:62px;height:88px}
+.sheet-scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:7}
+.sheet{position:absolute;left:12px;right:12px;bottom:12px;z-index:8;border-radius:18px;background:var(--felt-2);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:8px;animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+.sheet h4{margin:0;font-family:var(--font-display);font-size:22px;display:flex;justify-content:space-between;gap:8px}
+.sheet h4 span{font-family:var(--font-mono);font-size:14px;color:var(--muted)}
+.sheet .type{font-size:13px;color:var(--silver)}
+.sheet p{margin:0;font-size:14px}
+.sheet .ghost{align-self:flex-end;border:1px solid var(--line);background:transparent;padding:8px 14px;border-radius:10px;font-weight:700}
+
+/* toast */
+#toast{position:absolute;left:12px;right:12px;top:64px;z-index:20;padding:10px 12px;border-radius:12px;background:#0a100e;border:1px solid var(--line);font-size:13px;opacity:0;transform:translateY(-6px);transition:opacity .2s,transform .2s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+
+/* tutorial overlay */
+#spot{position:absolute;z-index:30;border-radius:12px;box-shadow:0 0 0 2000px var(--shade);pointer-events:none;transition:all .28s cubic-bezier(.3,.7,.3,1);opacity:0}
+#spot.on{opacity:1}
+#spot.gated{outline:2px solid var(--brass);outline-offset:2px;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{outline-offset:6px;outline-color:rgba(217,169,76,.35)}}
+#tip{position:absolute;left:12px;right:12px;z-index:31;background:#f3eedf;color:#1b1a16;border-radius:16px;padding:14px 14px 12px;box-shadow:0 18px 40px -10px rgba(0,0,0,.6);display:none;transition:top .28s,bottom .28s}
+#tip.on{display:block}
+#tip .prog{display:flex;justify-content:space-between;gap:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b665a}
+#tip .bar-p{height:3px;border-radius:2px;background:#ddd6c3;margin:6px 0 10px;overflow:hidden}
+#tip .bar-p i{display:block;height:100%;background:#a7781f}
+#tip h5{margin:0 0 4px;font-family:var(--font-display);font-size:19px;line-height:1.15}
+#tip p{margin:0;font-size:14px;line-height:1.45}
+#tip .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+#tip .skip{border:0;background:transparent;color:#6b665a;font-size:13px;padding:6px 0;text-decoration:underline;text-underline-offset:3px}
+#tip .next{border:0;background:#1b1a16;color:#f3eedf;padding:9px 16px;border-radius:10px;font-weight:700;font-size:14px}
+#tip .alt{border:1px solid #c9c1aa;background:transparent;color:#1b1a16;padding:8px 14px;border-radius:10px;font-weight:700;font-size:14px}
+#tip .doit{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#7a5410}
+#tip .doit::before{content:"";width:8px;height:8px;border-radius:50%;background:#c58b20;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.25}}
+#tip.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- notes ---------- */
+.notes{display:flex;flex-direction:column;gap:22px;min-width:0}
+.inspect{border:1px solid var(--line);border-radius:16px;background:var(--felt);padding:16px;display:flex;flex-direction:column;gap:10px}
+.inspect-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.inspect-head b{font-family:var(--font-display);font-size:18px}
+.inspect-head span{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+pre{margin:0;overflow-x:auto;background:#0a100e;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:var(--font-mono);font-size:12.5px;line-height:1.55;color:var(--silver)}
+pre .k{color:var(--brass)}
+.doc h2{font-family:var(--font-display);font-size:24px;margin:0 0 8px;text-wrap:balance}
+.doc h3{font-size:15px;margin:18px 0 6px}
+.doc p,.doc li{color:#cfd3cc;max-width:66ch}
+.doc p{margin:0 0 10px}
+.doc ul,.doc ol{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.doc code{font-family:var(--font-mono);font-size:13px;color:var(--silver);background:#0a100e;padding:1px 5px;border-radius:5px}
+.twocol{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:8px 0 6px}
+.trackcard{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--felt)}
+.trackcard h4{margin:0 0 2px;font-family:var(--font-display);font-size:19px}
+.trackcard .meta{font-family:var(--font-mono);font-size:12px;color:var(--brass);margin-bottom:8px}
+.trackcard p{font-size:14px;margin:0}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--silver);font-weight:500}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Arcana × Argentum · prototype</p>
+      <h1>Tutorial design</h1>
+      <p class="lede">Two tutorials that run on top of the real app screens. Try them in the phone: tap, or press and hold (right-click on desktop) when a step asks.</p>
+    </div>
+    <div class="tracks" role="group" aria-label="Choose a tutorial">
+      <button id="btn-quick" aria-pressed="true">Quick Start</button>
+      <button id="btn-guide" aria-pressed="false">Field Guide</button>
+      <button id="btn-free" aria-pressed="false">Explore freely</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="stage" aria-label="Phone prototype">
+      <div class="phone">
+        <div class="screen" id="screen">
+          <div id="view"></div>
+          <div id="toast" role="status"></div>
+          <div id="spot"></div>
+          <div id="tip" role="dialog" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="notes">
+      <div class="inspect">
+        <div class="inspect-head"><b id="ins-title">Current step</b><span id="ins-sub"></span></div>
+        <pre id="ins-json"></pre>
+      </div>
+
+      <div class="doc">
+        <h2>How the tutorial is laid out</h2>
+        <p>New players need to finish one real turn fast. Returning players need a reference they can dip into. One long tour serves neither, so the tutorial splits into two tracks that share one engine.</p>
+        <div class="twocol">
+          <div class="trackcard">
+            <h4>Quick Start</h4>
+            <div class="meta">~3 min · offered on first launch</div>
+            <p>One scripted turn against a passive opponent: play a land, make mana, cast a creature, read a card, pass priority. Every step waits for the player to do the thing.</p>
+          </div>
+          <div class="trackcard">
+            <h4>Field Guide</h4>
+            <div class="meta">7 chapters · Home → Tutorials</div>
+            <p>Covers every control on the home screen, main menu, game setup, board, cards, priority and deck library. Chapters are short, independent and tick off as you finish them.</p>
+          </div>
+        </div>
+
+        <h3>Principles</h3>
+        <ul>
+          <li><b>Coach marks on the real UI.</b> A spotlight dims everything but the control being taught. No separate slideshow screens that drift out of date.</li>
+          <li><b>Learn by doing.</b> Action steps only advance when the player performs the action. Taps elsewhere shake the tip instead of breaking the lesson.</li>
+          <li><b>One idea per step.</b> A title and at most two sentences. Long rules explanations go behind "hold to read".</li>
+          <li><b>Always escapable.</b> Skip on every step, replay from Tutorials, progress saved per chapter.</li>
+          <li><b>Deterministic sandbox.</b> Tutorial games use a fixed seed, fixed hands and an opponent that only passes, so Argentum's rules engine runs for real but nothing surprises the script.</li>
+        </ul>
+
+        <h3>Chapter map</h3>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Chapter</th><th>Screen</th><th>Teaches</th><th>Steps</th></tr></thead>
+            <tbody id="chap-table"></tbody>
+          </table>
+        </div>
+
+        <h3>How it maps to the Android code</h3>
+        <ol>
+          <li><code>TutorialStep</code> data: id, screen, target id, title, body, and how it advances (<code>next</code>, <code>tap</code>, <code>hold</code>, or an engine event). The box above shows the live step.</li>
+          <li>Steps live in JSON under <code>assets/tutorials/</code>, so new chapters are content edits that GPT can write and review without touching engine code.</li>
+          <li>A Compose modifier, <code>Modifier.tutorialTarget("hand-forest")</code>, registers each control's bounds so the overlay can find it.</li>
+          <li><code>TutorialController</code> is a small state machine. It listens to the UI for taps and to Argentum for events like land played, mana added and priority passed.</li>
+          <li><code>SpotlightOverlay</code> draws the dim layer with a cutout and the tip card, and swallows input outside the target.</li>
+          <li>Completed chapter ids are stored in DataStore. First launch checks it and offers Quick Start once.</li>
+        </ol>
+
+        <h3>Build order</h3>
+        <ol>
+          <li>Controller, overlay and target registry, plus the Quick Start script.</li>
+          <li>Tutorial sandbox game: fixed seed and a passive opponent in Argentum.</li>
+          <li>Field Guide hub and chapters, one at a time, checked against the real screens.</li>
+          <li>Optional later: small "?" hints that open the matching chapter from any screen.</li>
+        </ol>
+        <p>The screens in the phone are stand-ins. Labels like Saved games or Settings are placeholders until they're matched against the real menus in the repo.</p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const view = $('#view'), spot = $('#spot'), tip = $('#tip'), toastEl = $('#toast'), screenEl = $('#screen');
+const MENU_SVG = '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+const BACK_SVG = '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>';
+
+const CARDS = {
+  forest:{name:'Forest',type:'Basic Land — Forest',cost:'',cmc:0,color:'g',land:true,text:'Tap: Add one green mana.'},
+  island:{name:'Island',type:'Basic Land — Island',cost:'',cmc:0,color:'u',land:true,text:'Tap: Add one blue mana.'},
+  mystic:{name:'Elvish Mystic',type:'Creature — Elf Druid',cost:'G',cmc:1,color:'g',pt:'1/1',mana:true,text:'Tap: Add one green mana.'},
+  bears:{name:'Grizzly Bears',type:'Creature — Bear',cost:'1G',cmc:2,color:'g',pt:'2/2',text:'A plain 2/2 creature with no abilities.'},
+  bolt:{name:'Lightning Bolt',type:'Instant',cost:'R',cmc:1,color:'r',text:'Lightning Bolt deals 3 damage to any target.'},
+  goblin:{name:'Raging Goblin',type:'Creature — Goblin Berserker',cost:'R',cmc:1,color:'r',pt:'1/1',text:'Haste.'},
+  wall:{name:'Wall of Stone',type:'Creature — Wall',cost:'1RR',cmc:3,color:'r',pt:'0/8',text:'Defender.'}
+};
+const DECKS = [
+  {name:'Tokens Win 9/26',cmd:'Rocco, Cabaretti Caterer',pips:['r','g','w'],note:'Your deck · custom cards'},
+  {name:'Artificer v4',cmd:'Miles "Tails" Prower',pips:['c'],note:'Your deck · custom cards'},
+  {name:'Premade deck A',cmd:'Premade commander',pips:['g','u'],note:'Premade Commander deck'},
+  {name:'Premade deck B',cmd:'Premade commander',pips:['r','w'],note:'Premade Commander deck'}
+];
+const PRIO = ['Auto','Stops','Full control'];
+
+const S = {screen:'board',drawer:false,sheet:null,prio:0,players:2,deck:0,hand:[],field:[],opp:[],mana:0,landPlayed:false,complete:null};
+
+function boardFresh(){Object.assign(S,{hand:['forest','mystic','bears','bolt'],field:[],opp:['goblin'],mana:0,landPlayed:false,sheet:null,drawer:false});}
+function boardMid(){Object.assign(S,{hand:['bears','bolt','island'],field:[{k:'forest'},{k:'island'},{k:'mystic'}],opp:['goblin','wall'],mana:0,landPlayed:false,sheet:null,drawer:false});}
+
+/* ---------- tutorial content ---------- */
+const step = (id,screen,target,advance,title,body,extra) => Object.assign({id,screen,target,advance,title,body},extra||{});
+const QUICK = [{id:'first-turn',title:'Your first turn',mins:3,screen:'Board',teaches:'Land, mana, casting, reading cards, passing',setup:()=>{boardFresh();S.screen='board';},steps:[
+  step('welcome','board',null,'next','Welcome to Arcana','We’ll play one turn together. It takes about three minutes, and you can skip at any time.'),
+  step('hand','board','hand','next','Your hand','These are the cards only you can see. They sit along the bottom of the screen.'),
+  step('play-land','board','hand-forest','tap','Play a land','Lands make mana, and you can play one per turn. Tap the Forest to put it onto the battlefield.',{hint:'Tap the Forest'}),
+  step('tap-land','board','field-forest','tap','Tap for mana','Tap the Forest on the battlefield. It turns sideways and adds one green mana.',{hint:'Tap the Forest'}),
+  step('pool','board','mana','next','Your mana pool','Unspent mana empties at the end of each step, so use it now.'),
+  step('cast','board','hand-mystic','tap','Cast a creature','Elvish Mystic costs one green mana. Tap it to cast it.',{hint:'Tap Elvish Mystic'}),
+  step('inspect','board','field-mystic','hold','Read any card','Press and hold a card to see its full text. Try it on Elvish Mystic.',{hint:'Press and hold (or right-click)'}),
+  step('sick','board','sheet-close','tap','Summoning sickness','New creatures can’t attack or tap until your next turn. Argentum tracks that for you. Close the card.',{hint:'Tap Close'}),
+  step('pass','board','pass','tap','Pass priority','When you’re done, tap Pass. Argentum moves the game forward and stops when you can respond.',{hint:'Tap Pass'}),
+  step('opp','board','opp','next','Your opponent','Their life and battlefield are at the top. In a 4-player game, each opponent gets a panel.'),
+  step('done','board',null,'next','That’s a turn','You played a land, made mana, cast a creature and passed. The Field Guide covers every other control.')
+]}];
+
+const GUIDE = [
+ {id:'home',title:'The home screen',mins:1,screen:'Home',teaches:'Continue, Play, Decks, Online, Tutorials, menu button',setup:()=>{S.screen='home';S.drawer=false;},steps:[
+  step('continue','home','nav-continue','next','Continue','Picks up your last offline game exactly where you left it.'),
+  step('play','home','nav-play','next','Play','Starts a new game. You’ll choose the player count and a deck for each seat.'),
+  step('decks','home','nav-decks','next','Decks','Your deck library: premade Commander decks and your own.'),
+  step('online','home','nav-online','next','Online','Play with friends through Argentum’s server.'),
+  step('tutorials','home','nav-tutorials','next','Tutorials','Every chapter can be replayed from here.'),
+  step('menu','home','menu-btn','next','Menu button','Opens the main menu. The next chapter walks through it.')
+ ]},
+ {id:'menu',title:'The main menu',mins:1,screen:'Home + menu',teaches:'Every menu entry',setup:()=>{S.screen='home';S.drawer=false;},steps:[
+  step('open','home','menu-btn','tap','Open the menu','Tap the menu button in the top corner.',{hint:'Tap the menu button'}),
+  step('games','home','dr-games','next','Saved games','Resume or delete offline games you’ve saved.'),
+  step('decks','home','dr-decks','next','Deck library','Same as the Decks tile on the home screen.'),
+  step('priority','home','dr-priority','next','Priority & stops','Choose how often Argentum pauses for you. It has its own chapter.'),
+  step('settings','home','dr-settings','next','Settings','Sound, animations, card size and your display name.'),
+  step('help','home','dr-help','next','Help','Replay tutorials, read the rules glossary or send feedback.'),
+  step('close','home','drawer-close','tap','Close the menu','Tap anywhere outside the menu to close it.',{hint:'Tap the dimmed area'})
+ ]},
+ {id:'setup',title:'Starting a game',mins:1,screen:'Game setup',teaches:'Player count, seats, decks, start',setup:()=>{S.screen='setup';S.players=2;},steps:[
+  step('count','setup','players','next','Player count','Arcana plays 2 to 4 players offline on one device.'),
+  step('four','setup','seat-4','tap','Pick four players','Tap 4 to set up a full Commander pod.',{hint:'Tap 4'}),
+  step('seats','setup','decks-pick','next','Seats and decks','Each seat gets a deck. Tap a seat to change it.'),
+  step('start','setup','start-game','tap','Start the game','Tap Start. Argentum shuffles, deals and runs the mulligan step.',{hint:'Tap Start game'})
+ ]},
+ {id:'board',title:'Reading the board',mins:2,screen:'Board',teaches:'Opponents, battlefield, every zone, life, hand',setup:()=>{boardMid();S.screen='board';},steps:[
+  step('opp','board','opp','next','Opponents','Each opponent shows their name, life total and battlefield.'),
+  step('field','board','field','next','Your battlefield','Your lands and creatures. Tapped cards turn sideways.'),
+  step('cmd','board','zone-cmd','next','Command zone','Your commander starts here. Each time you recast it, it costs two more.'),
+  step('lib','board','zone-lib','next','Library','Your deck. The number is how many cards are left.'),
+  step('gy','board','zone-gy','next','Graveyard','Tap to look through it. Every graveyard is public.'),
+  step('exile','board','zone-exile','next','Exile','Cards removed from the game go here.'),
+  step('life','board','life','next','Life total','Commander starts at 40. Tap it to see commander damage.'),
+  step('hand','board','hand','next','Your hand','Scroll sideways when you hold more cards than fit.')
+ ]},
+ {id:'cards',title:'Card controls',mins:1,screen:'Board',teaches:'Tap, untap, inspect, cast',setup:()=>{boardMid();S.screen='board';},steps:[
+  step('tap','board','field-forest','tap','Tap a permanent','Tap a card on the battlefield to tap it for its ability or mana.',{hint:'Tap the Forest'}),
+  step('hold','board','field-mystic','hold','Inspect a card','Press and hold any card, yours or an opponent’s, to read it.',{hint:'Press and hold (or right-click)'}),
+  step('close','board','sheet-close','tap','Close the card','Tap Close, or tap outside the card.',{hint:'Tap Close'}),
+  step('cast','board','hand','next','Casting','Tap a card in your hand to cast it. If you can’t pay for it, Arcana says why.')
+ ]},
+ {id:'priority',title:'Priority & stops',mins:1,screen:'Board',teaches:'Pass, Auto / Stops / Full control',setup:()=>{boardMid();S.screen='board';S.prio=0;},steps:[
+  step('pass','board','pass','next','Pass','Passing means you’re done acting for now. When everyone passes, the top of the stack resolves or the game moves on.'),
+  step('chip','board','prio-chip','tap','Change mode','Tap the mode chip to cycle between modes.',{hint:'Tap the chip'}),
+  step('modes','board','prio-chip','next','What the modes do','Auto skips steps where you have nothing to do. Stops pauses at steps you choose. Full control pauses at every step.')
+ ]},
+ {id:'decks',title:'Deck library',mins:1,screen:'Decks',teaches:'Browse, select, deck details',setup:()=>{S.screen='decks';S.deck=-1;},steps:[
+  step('list','decks','deck-list','next','Your decks','Premade Commander decks and your own decks live together here.'),
+  step('pick','decks','deck-0','tap','Pick a deck','Tap Tokens Win 9/26 to see its details.',{hint:'Tap Tokens Win 9/26'}),
+  step('detail','decks','deck-detail','next','Deck details','Commander, colors and card count. The selected deck becomes the default for new games.')
+ ]}
+];
+const ALL = {quick:QUICK,guide:GUIDE};
+
+/* ---------- progress ---------- */
+let done = {};
+try{ done = JSON.parse(localStorage.getItem('arcana-tut-done')||'{}')||{}; }catch(e){ done = {}; }
+function markDone(id){ done[id]=true; try{ localStorage.setItem('arcana-tut-done',JSON.stringify(done)); }catch(e){} }
+
+/* ---------- tutorial controller ---------- */
+let T = null; // {track, ch, i}
+function startChapter(track,id){
+  const ch = ALL[track].find(c=>c.id===id);
+  S.complete = null; S.sheet = null;
+  T = {track,ch,i:0};
+  ch.setup && ch.setup();
+  enter();
+}
+function enter(){ const st = T.ch.steps[T.i]; if(st.screen && S.screen!==st.screen) S.screen = st.screen; render(); }
+function next(){ T.i++; if(T.i>=T.ch.steps.length){ markDone(T.ch.id); S.complete = {track:T.track,ch:T.ch}; T=null; render(); } else enter(); }
+function skip(){ T=null; S.complete=null; S.sheet=null; S.drawer=false; render(); toast('Tutorial closed. Replay it any time from Tutorials.'); }
+
+function act(kind,t){
+  if(T){
+    const st = T.ch.steps[T.i];
+    if(st.advance!==kind || st.target!==t){ nudge(); return; }
+    doAction(kind,t); next(); return;
+  }
+  if(S.complete) return;
+  doAction(kind,t); render();
+}
+
+/* ---------- app behaviour ---------- */
+function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(()=>toastEl.classList.remove('show'),2400); }
+function nudge(){ tip.classList.remove('shake'); void tip.offsetWidth; tip.classList.add('shake'); }
+function cardKey(t){ const m = /^(hand|field|opp)-(.+)$/.exec(t||''); return m ? m[2] : null; }
+
+function doAction(kind,t){
+  if(kind==='hold'){ const k = cardKey(t); if(k){ S.sheet = k; } return; }
+  if(t.startsWith('hand-')){
+    const k = cardKey(t), c = CARDS[k];
+    if(c.land){
+      if(S.landPlayed){ toast('You’ve already played a land this turn.'); return; }
+      S.hand = S.hand.filter(x=>x!==k); S.field.push({k}); S.landPlayed = true; toast('Played '+c.name+'.');
+    } else if(S.mana>=c.cmc){
+      S.mana -= c.cmc; S.hand = S.hand.filter(x=>x!==k); S.field.push({k,sick:!!c.pt}); toast('Cast '+c.name+'.');
+    } else toast('Not enough mana. '+c.name+' costs '+c.cost+'.');
+    return;
+  }
+  if(t.startsWith('field-')){
+    const k = cardKey(t), f = S.field.find(x=>x.k===k), c = CARDS[k];
+    if(f.sick){ toast(c.name+' has summoning sickness.'); return; }
+    f.tapped = !f.tapped;
+    if(f.tapped && (c.land||c.mana)) { S.mana++; toast(c.name+' adds one mana.'); }
+    return;
+  }
+  if(t.startsWith('opp-')) return;
+  if(t.startsWith('seat-')){ S.players = +t.slice(5); return; }
+  if(t.startsWith('deck-') && t!=='deck-list' && t!=='deck-detail'){ S.deck = +t.slice(5); return; }
+  if(t.startsWith('chap-')){ const id=t.slice(5); startChapter(id==='first-turn'?'quick':'guide',id); return; }
+  switch(t){
+    case 'menu-btn': S.drawer = true; break;
+    case 'drawer-close': S.drawer = false; break;
+    case 'nav-continue': boardMid(); S.screen='board'; break;
+    case 'nav-play': S.screen='setup'; break;
+    case 'nav-decks': case 'dr-decks': S.drawer=false; S.screen='decks'; break;
+    case 'nav-tutorials': case 'dr-help': S.drawer=false; S.screen='hub'; break;
+    case 'nav-online': toast('Online play connects through Argentum’s server. Not part of this prototype.'); break;
+    case 'dr-games': toast('Saved games list (placeholder).'); break;
+    case 'dr-priority': S.drawer=false; boardMid(); S.screen='board'; toast('Use the mode chip next to Pass.'); break;
+    case 'dr-settings': toast('Settings (placeholder).'); break;
+    case 'back': S.screen='home'; break;
+    case 'start-game': boardFresh(); S.screen='board'; toast('Game started with '+S.players+' players.'); break;
+    case 'pass': S.mana = 0; toast('Priority passed. Argentum moves to the next step.'); break;
+    case 'prio-chip': S.prio = (S.prio+1)%PRIO.length; toast('Mode: '+PRIO[S.prio]); break;
+    case 'life': toast('Commander damage: none taken yet.'); break;
+    case 'zone-cmd': toast('Command zone: your commander.'); break;
+    case 'zone-lib': toast('Library: 89 cards left.'); break;
+    case 'zone-gy': toast('Graveyard is empty.'); break;
+    case 'zone-exile': toast('Nothing in exile.'); break;
+    case 'sheet-close': S.sheet = null; break;
+  }
+}
+
+/* ---------- rendering ---------- */
+const appbar = (left,title) => `<div class="appbar">${left}<span class="brand">${title}</span><span class="spacer"></span></div>`;
+const menuBtn = `<button class="icon" data-t="menu-btn" aria-label="Open menu">${MENU_SVG}</button>`;
+const backBtn = `<button class="icon" data-t="back" aria-label="Back">${BACK_SVG}</button>`;
+function cardEl(prefix,k,f){
+  const c = CARDS[k], cls = ['card',c.color,f&&f.tapped?'tapped':'',f&&f.sick?'sick':''].join(' ');
+  return `<button class="${cls}" data-t="${prefix}-${k}" aria-label="${c.name}">${c.cost?`<span class="cost">${c.cost}</span>`:''}<span class="nm">${c.name}</span>${c.pt?`<span class="pt">${c.pt}</span>`:'<span></span>'}</button>`;
+}
+function renderHome(){
+  let h = appbar(menuBtn,'Arcana') + `<div class="home">
+    <div class="crest"><div class="mark">Arcana</div><div class="sub">with Argentum rules</div></div>
+    <button class="cta" data-t="nav-continue"><b>Continue</b><small>Turn 6 · 4 players · offline</small></button>
+    <div class="tiles">
+      <button class="tile" data-t="nav-play"><b>Play</b><small>New game, 2–4 players</small></button>
+      <button class="tile" data-t="nav-decks"><b>Decks</b><small>Your library</small></button>
+      <button class="tile" data-t="nav-online"><b>Online</b><small>Play with friends</small></button>
+      <button class="tile" data-t="nav-tutorials"><b>Tutorials</b><small>Quick Start, Field Guide</small></button>
+    </div></div>`;
+  if(S.drawer) h += `<button class="scrim" data-t="drawer-close" aria-label="Close menu"></button>
+    <nav class="drawer" aria-label="Main menu"><h3>Menu</h3>
+      <button class="dr" data-t="dr-games"><b>Saved games</b><small>Resume offline games</small></button>
+      <button class="dr" data-t="dr-decks"><b>Deck library</b><small>Browse and pick decks</small></button>
+      <button class="dr" data-t="dr-priority"><b>Priority &amp; stops</b><small>When Argentum pauses</small></button>
+      <button class="dr" data-t="dr-settings"><b>Settings</b><small>Sound, cards, name</small></button>
+      <button class="dr" data-t="dr-help"><b>Help &amp; tutorials</b><small>Guides, glossary, feedback</small></button>
+    </nav>`;
+  return h;
+}
+function renderSetup(){
+  const names = ['You','Player 2','Player 3','Player 4'];
+  let seats = ''; for(let i=0;i<S.players;i++) seats += `<div class="seat"><span>${names[i]}</span><span>${DECKS[i%DECKS.length].name}</span></div>`;
+  return appbar(backBtn,'New game') + `<div class="pane">
+    <div data-t="players"><p class="label">Players</p><div class="seg">${[2,3,4].map(n=>`<button data-t="seat-${n}" aria-pressed="${S.players===n}">${n}</button>`).join('')}</div></div>
+    <div data-t="decks-pick"><p class="label">Seats</p><div class="seats">${seats}</div></div>
+    <button class="primary" data-t="start-game">Start game</button></div>`;
+}
+function renderDecks(){
+  const d = DECKS[S.deck];
+  return appbar(backBtn,'Decks') + `<div class="pane">
+    <div class="list" data-t="deck-list">${DECKS.map((x,i)=>`<button class="row-btn" data-t="deck-${i}" aria-pressed="${S.deck===i}"><span><b>${x.name}</b><small>${x.note}</small></span><span class="pips">${x.pips.map(p=>`<i class="pip ${p}"></i>`).join('')}</span></button>`).join('')}</div>
+    <div class="detail" data-t="deck-detail">${d?`<b>${d.name}</b><br>Commander: ${d.cmd}<br>100 cards · default for new games`:'Select a deck to see its commander, colors and card count.'}</div></div>`;
+}
+function renderHub(){
+  const rows = GUIDE.map(c=>`<button class="row-btn chap" data-t="chap-${c.id}"><span class="check ${done[c.id]?'done':''}">${done[c.id]?'✓':GUIDE.indexOf(c)+1}</span><span><b>${c.title}</b></span><span class="mins">${c.mins} min</span></button>`).join('');
+  return appbar(backBtn,'Tutorials') + `<div class="pane">
+    <div><p class="label">New to Magic?</p><button class="row-btn chap" data-t="chap-first-turn"><span class="check ${done['first-turn']?'done':''}">${done['first-turn']?'✓':'Q'}</span><span><b>Quick Start</b><small>Play your first turn</small></span><span class="mins">3 min</span></button></div>
+    <div><p class="label">Field Guide · ${GUIDE.filter(c=>done[c.id]).length} of ${GUIDE.length} done</p><div class="list">${rows}</div></div></div>`;
+}
+function renderBoard(){
+  let h = `<div class="board">
+    <div class="opp" data-t="opp"><div class="opp-head"><span>Opponent · Premade deck A</span><b>40</b></div><div class="cards">${S.opp.map(k=>cardEl('opp',k)).join('')}</div></div>
+    <div class="field" data-t="field"><div class="cards">${S.field.map(f=>cardEl('field',f.k,f)).join('')}</div>${S.field.length?'':'<span class="hint">Your battlefield</span>'}</div>
+    <div class="zones">
+      <button class="zone" data-t="zone-cmd"><b>1</b>Command</button>
+      <button class="zone" data-t="zone-lib"><b>89</b>Library</button>
+      <button class="zone" data-t="zone-gy"><b>0</b>Graveyard</button>
+      <button class="zone" data-t="zone-exile"><b>0</b>Exile</button>
+    </div>
+    <div class="hand" data-t="hand">${S.hand.map(k=>cardEl('hand',k)).join('')}</div>
+    <div class="bar">
+      <button class="life" data-t="life" aria-label="Life total 40">40</button>
+      <div class="mana" data-t="mana">${S.mana?Array.from({length:S.mana},()=>'<i class="pip g"></i>').join(''):'Pool empty'}</div>
+      <button class="chip" data-t="prio-chip">${PRIO[S.prio]}</button>
+      <button class="pass" data-t="pass">Pass</button>
+    </div></div>`;
+  if(S.sheet){ const c = CARDS[S.sheet]; h += `<div class="sheet-scrim"></div><div class="sheet" role="dialog" aria-label="${c.name}"><h4>${c.name}<span>${c.cost||''}</span></h4><div class="type">${c.type}</div><p>${c.text}</p>${c.pt?`<p><b>${c.pt}</b></p>`:''}<button class="ghost" data-t="sheet-close">Close</button></div>`; }
+  return h;
+}
+
+function render(){
+  view.innerHTML = ({home:renderHome,setup:renderSetup,decks:renderDecks,hub:renderHub,board:renderBoard})[S.screen]();
+  requestAnimationFrame(place);
+  inspect();
+  syncTracks();
+}
+
+function place(){
+  const sr = screenEl.getBoundingClientRect();
+  if(T){
+    const st = T.ch.steps[T.i], n = T.ch.steps.length;
+    const el = st.target && view.querySelector(`[data-t="${st.target}"]`);
+    const pad = 6;
+    let r = null;
+    if(el){ const b = el.getBoundingClientRect(); r = {l:b.left-sr.left-pad,t:b.top-sr.top-pad,w:b.width+pad*2,h:b.height+pad*2}; }
+    else r = {l:sr.width/2,t:sr.height/2,w:0,h:0};
+    Object.assign(spot.style,{left:r.l+'px',top:r.t+'px',width:r.w+'px',height:r.h+'px'});
+    spot.className = 'on' + (st.advance!=='next'?' gated':'');
+    const gated = st.advance!=='next';
+    tip.innerHTML = `<div class="prog"><span>${T.ch.title}</span><span>${T.i+1} / ${n}</span></div>
+      <div class="bar-p"><i style="width:${((T.i+1)/n)*100}%"></i></div>
+      <h5>${st.title}</h5><p>${st.body}</p>
+      <div class="foot"><button class="skip" id="tip-skip">Skip tutorial</button>
+      ${gated?`<span class="doit">${st.hint||(st.advance==='hold'?'Press and hold':'Tap the highlighted area')}</span>`:`<button class="next" id="tip-next">${T.i===n-1?'Finish':'Next'}</button>`}</div>`;
+    tip.className = 'on';
+    positionTip(el ? r : null, sr);
+    const nb = $('#tip-next'); if(nb){ nb.onclick = next; nb.focus({preventScroll:true}); }
+    $('#tip-skip').onclick = skip;
+  } else if(S.complete){
+    const {track,ch} = S.complete;
+    const idx = GUIDE.indexOf(ch), nextCh = track==='guide' ? GUIDE[idx+1] : null;
+    Object.assign(spot.style,{left:sr.width/2+'px',top:sr.height/2+'px',width:'0px',height:'0px'});
+    spot.className = 'on';
+    tip.innerHTML = `<div class="prog"><span>${ch.title}</span><span>Complete</span></div><div class="bar-p"><i style="width:100%"></i></div>
+      <h5>${track==='quick'?'Nice first turn':'Chapter complete'}</h5>
+      <p>${track==='quick'?'Open the Field Guide when you want the full tour of every control.':(nextCh?'Up next: '+nextCh.title+'.':'You’ve finished the Field Guide.')}</p>
+      <div class="foot"><button class="alt" id="c-hub">All tutorials</button>
+      ${track==='quick'?'<button class="next" id="c-go">Open Field Guide</button>':(nextCh?'<button class="next" id="c-go">Next chapter</button>':'<button class="next" id="c-go">Back to home</button>')}</div>`;
+    tip.className = 'on';
+    positionTip(null, sr);
+    $('#c-hub').onclick = ()=>{ S.complete=null; S.screen='hub'; render(); };
+    $('#c-go').onclick = ()=>{ if(track==='quick'){ S.complete=null; S.screen='hub'; render(); } else if(nextCh) startChapter('guide',nextCh.id); else { S.complete=null; S.screen='home'; render(); } };
+  } else {
+    spot.className = ''; tip.className = '';
+  }
+}
+function positionTip(r, sr){
+  tip.style.top = ''; tip.style.bottom = '';
+  const th = tip.offsetHeight;
+  if(!r){ tip.style.top = Math.max(16,(sr.height-th)/2)+'px'; return; }
+  const below = r.t + r.h + 10, above = r.t - 10 - th;
+  const centerLow = (r.t + r.h/2) > sr.height*0.5;
+  if(centerLow && above >= 8) tip.style.top = above+'px';
+  else if(below + th <= sr.height - 8) tip.style.top = below+'px';
+  else if(above >= 8) tip.style.top = above+'px';
+  else tip.style.top = '12px';
+}
+
+function inspect(){
+  const t = $('#ins-title'), sub = $('#ins-sub'), pre = $('#ins-json');
+  if(T){
+    const st = T.ch.steps[T.i];
+    t.textContent = 'Current step';
+    sub.textContent = `${T.track==='quick'?'quick-start':'field-guide'}/${T.ch.id}.json · ${T.i+1} of ${T.ch.steps.length}`;
+    const obj = {id:st.id,screen:st.screen,target:st.target,advance:st.advance,title:st.title,body:st.body};
+    if(st.hint) obj.hint = st.hint;
+    pre.innerHTML = JSON.stringify(obj,null,2).replace(/"(\w+)":/g,'<span class="k">"$1"</span>:');
+  } else {
+    t.textContent = 'No step running';
+    sub.textContent = S.complete ? 'chapter finished' : 'free exploration';
+    pre.innerHTML = JSON.stringify({completed:Object.keys(done).filter(k=>done[k])},null,2).replace(/"(\w+)":/g,'<span class="k">"$1"</span>:');
+  }
+}
+function syncTracks(){
+  const mode = T ? T.track : (S.complete ? S.complete.track : (S.screen==='hub' ? 'guide' : 'free'));
+  $('#btn-quick').setAttribute('aria-pressed', mode==='quick');
+  $('#btn-guide').setAttribute('aria-pressed', mode==='guide');
+  $('#btn-free').setAttribute('aria-pressed', mode==='free');
+}
+
+/* chapter table */
+$('#chap-table').innerHTML = [...QUICK.map(c=>({...c,title:'Quick Start: '+c.title})),...GUIDE].map(c=>`<tr><td>${c.title}</td><td>${c.screen}</td><td>${c.teaches}</td><td class="n">${c.steps.length}</td></tr>`).join('');
+
+/* ---------- input: tap vs press-and-hold ---------- */
+let press = null;
+view.addEventListener('pointerdown', e=>{
+  const el = e.target.closest('[data-t]'); if(!el) return;
+  press = {el,x:e.clientX,y:e.clientY,held:false};
+  press.timer = setTimeout(()=>{ if(press){ press.held = true; act('hold', el.dataset.t); } }, 450);
+});
+view.addEventListener('pointermove', e=>{ if(press && Math.hypot(e.clientX-press.x,e.clientY-press.y)>10){ clearTimeout(press.timer); press = null; } });
+['pointerup','pointercancel','pointerleave'].forEach(ev=>view.addEventListener(ev,()=>{ if(press) clearTimeout(press.timer); }));
+view.addEventListener('click', e=>{
+  const el = e.target.closest('[data-t]');
+  if(press && press.held){ press = null; return; }
+  press = null;
+  if(el) act('tap', el.dataset.t); else if(T) nudge();
+});
+view.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  const el = e.target.closest('[data-t]');
+  if(press){ clearTimeout(press.timer); if(press.held){ press = {held:true}; return; } }
+  press = {held:true};
+  if(el) act('hold', el.dataset.t);
+});
+
+$('#btn-quick').onclick = ()=>startChapter('quick','first-turn');
+$('#btn-guide').onclick = ()=>{ T=null; S.complete=null; S.sheet=null; S.drawer=false; S.screen='hub'; render(); };
+$('#btn-free').onclick = ()=>{ T=null; S.complete=null; S.sheet=null; S.drawer=false; S.screen='home'; render(); };
+window.addEventListener('resize', ()=>requestAnimationFrame(place));
+
+startChapter('quick','first-turn');
+})();
+</script>
+
+</body></html>
