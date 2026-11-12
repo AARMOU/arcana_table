@@ -1,0 +1,28 @@
+name: Compose test API preflight (no Android build)
+on:
+  pull_request:
+    paths:
+      - 'android/app/src/test/**/*.kt'
+      - 'tools/check_compose_test_rules.py'
+      - 'tools/tests/test_check_compose_test_rules.py'
+      - '.github/workflows/compose-test-api-preflight.yml'
+  push:
+    branches: [gpt/compose-test-api-preflight-20261026]
+    paths:
+      - 'tools/check_compose_test_rules.py'
+      - 'tools/tests/test_check_compose_test_rules.py'
+      - '.github/workflows/compose-test-api-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate guard with unit tests
+        run: python3 -m unittest discover -s tools/tests -p test_check_compose_test_rules.py -v
+      - name: Reject invalid Compose test imports and empty-rule setContent
+        run: python3 tools/check_compose_test_rules.py
