@@ -157,6 +157,8 @@ class DeckBuilderUiTest {
         rule.waitUntil(120_000) { rule.onAllNodes(hasTestTag("open-filters")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("open-filters").performClick()
         rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("filter-oracle")).fetchSemanticsNodes().isNotEmpty() }
+        // Seeing the dialog field does not mean Robolectric has finished its pending measure/layout pass.
+        rule.waitForIdle()
         rule.onNodeWithTag("filter-oracle").performTextInput("flying")
         rule.onNodeWithTag("filter-oracle-add").performClick()
         rule.mainClock.advanceTimeBy(500)
