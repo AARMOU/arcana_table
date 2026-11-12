@@ -1,0 +1,145 @@
+name: AI Seed 8073 Replay Consistency
+
+# Isolated CI probe; never updates runtime JARs or release code.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-ai-replay-8073.yml'
+      - 'android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt'
+      - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AiFirstStrikeDecisionBaselineTest.kt'
+
+permissions:
+  contents: read
+
+jobs:
+  replay-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_REPEAT_REPLAY: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Play the exact 8073 pair twice for each seat arrangement
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Verify report is from seed 8073 and includes public action hashes
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=Path("android/app/build/reports/ai-strength/comparison.json")
+          assert report.is_file(), "Missing comparison output"
+          games=json.loads(report.read_text())["games"]
+          assert len(games)==2, len(games)
+          assert all(g["pair"]==80 and g["seed"]==8073 and g["mode"]==2 for g in games)
+          assert {tuple(g["candidateSeatsZeroBased"]) for g in games} == {(0,), (1,)}
+          for game in games:
+              h=game["actionSequenceSha256"]
+              assert len(h)==64 and all(c in "0123456789abcdef" for c in h), h
+              print("pair",game["pair"],"seed",game["seed"],"seats",game["candidateSeatsZeroBased"],
+                    "status",game["status"],"actions",game["actions"],"action_hash",h)
+          print("Within-run replay is checked by Kotlin assertions; report contains only hashes, not hidden action identities.")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-replay-8073-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
+
+  first-strike-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run real-Argentum first-strike rules oracle and measure three AI decisions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.AiFirstStrikeDecisionBaselineTest'
+      - name: Report scored AI tactical baseline (no strategy acceptance gate)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          tests=list(Path("android/custom-cards/build/test-results").rglob("TEST-com.arcanatable.customcards.AiFirstStrikeDecisionBaselineTest.xml"))
+          assert len(tests)==1, f"Expected one JUnit file: {tests}"
+          root=ET.parse(tests[0]).getroot()
+          assert int(root.get("failures",0))==0 and int(root.get("errors",0))==0, "Test setup or rules oracle failed"
+          output="\n".join(node.text or "" for node in root.iter("system-out"))
+          rows=[line for line in output.splitlines() if "AI_TACTICAL_BASELINE id=" in line]
+          assert len(rows)==3, f"Expected 3 AI decisions, got {rows}"
+          passed=sum("correct=true legal=true" in line for line in rows)
+          print(f"FIRST-STRIKE AI BASELINE: {passed}/{len(rows)} tactical decisions, rules oracle PASS")
+          for row in rows: print(row)
+          with open("/tmp/ai-first-strike-summary","w") as f:
+              f.write(f"FIRST-STRIKE AI BASELINE: {passed}/{len(rows)} (observational; rules oracle passed)\n")
+          PY
+          cat /tmp/ai-first-strike-summary >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-first-strike-baseline
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+
+  fixed-work-replay-probe:
+    name: Fixed-work seed 8073 replay (experimental, no app changes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_REPEAT_REPLAY: '1'
+      ARCANA_AI_FIXED_WORK: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Repeat the same game with fixed search-work counts, no AI search cutoff
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Upload exact evidence including first coarse mismatch on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-ai-replay-8073-fixed-work-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
