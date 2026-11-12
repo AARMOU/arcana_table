@@ -1,0 +1,91 @@
+name: B140 ShockFetch exact-source diagnostic (NO APK)
+# Isolated test-only probe: no app/runtime behavior changes or packaging.
+on:
+  push:
+    branches:
+      - gpt/b140-shockfetch-raw-trace-20261028
+    paths:
+      - android/app/src/test/java/com/arcanatable/ShockFetchTest.kt
+      - .github/workflows/b140-shockfetch-diagnostic-no-apk.yml
+permissions:
+  contents: read
+concurrency:
+  group: b140-shockfetch-no-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-shockfetch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact B140 ancestry and test-only diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base" HEAD > /tmp/changed
+          printf '.github/workflows/b140-shockfetch-diagnostic-no-apk.yml\nandroid/app/src/test/java/com/arcanatable/ShockFetchTest.kt\n' > /tmp/expected
+          diff -u /tmp/expected /tmp/changed
+          git diff --check "$base" HEAD
+          actual="$(git ls-remote https://github.com/AARMOU/arcana_table.git refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)"
+          test "$actual" = "$base" || { echo "::error::B140 source moved; re-evaluate diagnostic against newer owner-confirmed source"; exit 1; }
+          echo "PASS: exact B140 ancestry, test-only diff, no APK"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      # Independent executions probe the observed baseline failure that one
+      # successful focused run did not reproduce. Never retry away a red result.
+      - name: Reproduce ShockFetch across three fresh real-engine JUnit executions
+        working-directory: android
+        shell: bash
+        run: |
+          set -uo pipefail
+          failures=0
+          mkdir -p shockfetch-attempts
+          for attempt in 1 2 3; do
+            echo "::group::ShockFetch attempt $attempt/3"
+            ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.ShockFetchTest --rerun-tasks
+            status=$?
+            mkdir -p "shockfetch-attempts/attempt-$attempt"
+            cp app/build/test-results/testDebugUnitTest/TEST-*ShockFetchTest.xml "shockfetch-attempts/attempt-$attempt/" || true
+            printf '%s\n' "$status" > "shockfetch-attempts/attempt-$attempt/exit-code.txt"
+            echo "::endgroup::"
+            if (( status != 0 )); then failures=$((failures + 1)); fi
+          done
+          echo "ShockFetch attempts failed: $failures/3"
+          test "$failures" -eq 0
+      - name: Preserve exact JUnit failure and recent state/action trace
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files=sorted(Path('android/shockfetch-attempts').glob('attempt-*/TEST-*ShockFetchTest.xml'))
+          if not files:
+              print('No ShockFetch JUnit XML produced; inspect setup/compile logs.')
+          for path in files:
+              root=ET.parse(path).getroot()
+              print('ShockFetch JUnit:', path.parent.name, {key:root.get(key) for key in ('tests','failures','errors','skipped')})
+              for case in root.findall('.//testcase'):
+                  for kind in ('failure','error'):
+                      problem=case.find(kind)
+                      if problem is not None:
+                          print(kind.upper(),case.get('name'),(problem.get('message') or problem.text or '')[:5000])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-shockfetch-focused-junit-no-apk
+          retention-days: 14
+          if-no-files-found: warn
+          path: android/shockfetch-attempts/
