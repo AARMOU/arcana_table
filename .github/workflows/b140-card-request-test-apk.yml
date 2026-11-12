@@ -110,6 +110,7 @@ jobs:
           print("PASS: APK contains HTTPS Card Request endpoint, Arcana identity, and card assets")
           PY
           sha256sum "$APK" > card-request-b140-apk.sha256
+          python3 tools/verify_packaged_card_assets.py "$APK" > card-request-b140-card-assets.json
           printf 'TEST-ONLY Android debug APK from B140 branch. No full engine certification, Play release, production signing or AAB.\nSource: %s\nEndpoint: https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests\n' "$BUILD_SOURCE_SHA" > card-request-b140-scope.txt
       - name: Upload the verified test-only APK and signing/build evidence
         uses: actions/upload-artifact@v4
@@ -121,6 +122,7 @@ jobs:
             card-request-b140-signature.txt
             card-request-b140-badging.txt
             card-request-b140-scope.txt
+            card-request-b140-card-assets.json
           retention-days: 14
           if-no-files-found: error
       - name: Summarize test-only download
