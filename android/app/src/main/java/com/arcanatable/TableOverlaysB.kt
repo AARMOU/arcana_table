@@ -528,7 +528,7 @@ internal fun TableController.TableOverlaysB() {
                         Modifier.fillMaxWidth().clickable {
                             importText = deck.asImportText()
                             importError = null
-                            message = "${deck.name} loaded from Argentum. Review the 100-card list, then tap Import."
+                            // The list is now in the import box above; no pop-up needed.
                             argentumDeckPickerOpen = false
                         },
                         shape = RoundedCornerShape(12.dp), color = PanelLight, border = BorderStroke(1.dp, Muted.copy(alpha = 0.35f))

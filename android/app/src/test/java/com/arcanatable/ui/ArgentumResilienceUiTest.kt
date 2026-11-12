@@ -94,7 +94,7 @@ class ArgentumResilienceUiTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
         UiTestSupport.playWithArgentum(rule, scenario)
-        UiTestSupport.awaitReal(rule, 40_000, "deck-check error dialog") { shown("Argentum deck check") }
+        UiTestSupport.awaitReal(rule, 40_000, "start-up error dialog") { shown("Couldn't start the game") }
         shot(scenario, "01-unreachable")
         assertFalse("must not be stuck in a loading state", shown("CHECKING DECK WITH ARGENTUM"))
         rule.onNodeWithText("OK").performClick()
