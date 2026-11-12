@@ -1,0 +1,9 @@
+{
+  "key": "reverberate",
+  "name": "Reverberate",
+  "issue": 1092,
+  "source": "certification/ReverberateIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ReverberateIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
