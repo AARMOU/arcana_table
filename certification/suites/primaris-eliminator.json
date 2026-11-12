@@ -1,0 +1,9 @@
+{
+  "key": "primaris-eliminator",
+  "name": "Primaris Eliminator",
+  "issue": 1090,
+  "source": "certification/PrimarisEliminatorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PrimarisEliminatorIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
