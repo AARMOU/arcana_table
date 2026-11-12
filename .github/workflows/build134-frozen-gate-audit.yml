@@ -1,0 +1,37 @@
+name: Build 134 frozen gate audit (isolated tests)
+# Independent audit PR only. Never builds, signs, uploads or deploys an app.
+on:
+  push:
+    branches: [gpt/build134-device-acceptance-protocol-20261026]
+    paths:
+      - '.github/workflows/build134-frozen-gate-audit.yml'
+      - 'tools/build134_workflow_audit.py'
+      - 'tools/test_build134_workflow_audit.py'
+permissions:
+  contents: read
+concurrency:
+  group: build134-frozen-gate-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated audit source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run complete standard-library audit regressions
+        run: python3 -m unittest discover -s tools -p 'test_build134_workflow_audit.py' -v
+      - name: Verify exact frozen release and preview workflow blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          release=b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
+          preview=16e78fc042b6f2a681443558b24777e176106475
+          git fetch --no-tags --depth=1 origin "$release"
+          git fetch --no-tags --depth=1 origin "$preview"
+          git show "$release":.github/workflows/release-upgraded-source-validation.yml > "$RUNNER_TEMP/release.yml"
+          git show "$preview":.github/workflows/argentum-eldrazi-azlask94-build134.yml > "$RUNNER_TEMP/preview.yml"
+          python3 tools/build134_workflow_audit.py "$RUNNER_TEMP/release.yml" "$RUNNER_TEMP/preview.yml"
