@@ -57,12 +57,15 @@ internal object OfflineCheckpointStore {
         .put("name", seat.name)
         .put("deck", JSONArray(seat.deck))
         .put("commander", seat.commander ?: JSONObject.NULL)
+        .put("difficulty", seat.difficulty.name)
 
     fun seatFromJson(json: JSONObject): LocalSeat {
         val deck = json.getJSONArray("deck")
         return LocalSeat(json.getString("name"),
             (0 until deck.length()).map { deck.getString(it) },
-            json.optString("commander").takeUnless { it.isBlank() || it == "null" })
+            json.optString("commander").takeUnless { it.isBlank() || it == "null" },
+            // Games saved before difficulty existed resume at Normal, as they were played.
+            com.arcanatable.engine.ai.AiDifficulty.fromName(json.optString("difficulty").takeUnless { it.isBlank() }))
     }
 
     fun savedSeats(record: JSONObject): List<LocalSeat> {

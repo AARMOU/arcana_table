@@ -242,6 +242,8 @@ internal fun TableController.TableOverlays() {
                 onAiDeck = { offlineAiDeckId = it },
                 aiCount = offlineAiCount,
                 onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },
+                aiDifficulties = offlineAiDifficulties,
+                onAiDifficulty = { seat, level -> setOfflineAiDifficulty(seat, level) },
                 onOffline = { playSheetOpen = false; run { startOfflineGame() } },
                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },

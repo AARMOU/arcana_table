@@ -34,6 +34,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.arcanatable.engine.ai.AiDifficulty
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -223,6 +228,8 @@ fun PlaySheet(
     onOffline: () -> Unit,
     aiCount: Int = 1,
     onAiCount: (Int) -> Unit = {},
+    aiDifficulties: List<AiDifficulty> = List(3) { AiDifficulty.DEFAULT },
+    onAiDifficulty: (seat: Int, level: AiDifficulty) -> Unit = { _, _ -> },
     onOnline: () -> Unit,
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
@@ -254,6 +261,17 @@ fun PlaySheet(
                     shown.forEach { d -> DeckChip(d.name, aiDeckId == d.id) { onAiDeck(d.id) } }
                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
                 }
+                Text("AI DIFFICULTY", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                for (seat in 0 until aiCount.coerceIn(1, 3)) {
+                    AiDifficultySlider(
+                        label = if (aiCount > 1) "AI ${seat + 1}" else "AI",
+                        level = aiDifficulties.getOrElse(seat) { AiDifficulty.DEFAULT },
+                        onLevel = { onAiDifficulty(seat, it) },
+                        tag = "play-ai-difficulty-$seat",
+                    )
+                }
+                if (aiDifficulties.take(aiCount).any { it >= AiDifficulty.HARD })
+                    Text("Hard and Brutal think longer on each turn, especially in 4-player games.", color = Muted, fontSize = 12.sp)
             }
             PlayOption("Play with a friend", "Two phones. One hosts (runs the game), the other joins. Same Wi-Fi, or online with a room code. Commander decks.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 1 }, tag = "play-wifi-option") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -290,6 +308,27 @@ private fun PlayOption(title: String, subtitle: String, selected: Boolean, onCli
             }
         }
         if (selected) extra()
+    }
+}
+
+/** One AI seat's difficulty: a four-step slider (Easy to Brutal) with the level's name and what it means. */
+@Composable
+private fun AiDifficultySlider(label: String, level: AiDifficulty, onLevel: (AiDifficulty) -> Unit, tag: String) {
+    val levels = AiDifficulty.entries
+    Column(Modifier.fillMaxWidth().testTag(tag)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(level.label.uppercase(), color = Mint, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+        }
+        Slider(
+            value = level.ordinal.toFloat(),
+            onValueChange = { onLevel(AiDifficulty.fromIndex(kotlin.math.round(it).toInt())) },
+            valueRange = 0f..(levels.size - 1).toFloat(),
+            steps = levels.size - 2,
+            colors = SliderDefaults.colors(thumbColor = Mint, activeTrackColor = Mint, inactiveTrackColor = PanelLight, activeTickColor = Ink, inactiveTickColor = Muted),
+            modifier = Modifier.semantics { contentDescription = "$label difficulty: ${level.label}" },
+        )
+        Text(level.blurb, color = Muted, fontSize = 12.sp)
     }
 }
 
