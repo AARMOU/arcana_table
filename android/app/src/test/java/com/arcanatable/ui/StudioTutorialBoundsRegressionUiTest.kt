@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -120,6 +121,40 @@ class StudioTutorialBoundsRegressionUiTest {
         rule.runOnIdle {
             assertNull("hidden original left stale highlighted bounds", TutorialTargets.bounds[id])
             assertNull("only collapsed duplicate must not resolve", TutorialTargets.resolve(id, rule.activity.window.decorView.rootView))
+        }
+    }
+
+    /** An attached duplicate laid out beyond the window must neither win nor become a phantom. */
+    @Test fun offscreenDuplicateCannotStealVisibleTargetOrSurviveItsDisposal() {
+        val id = "j11-offscreen-duplicate"
+        val primary = mutableStateOf(true)
+        rule.setContent {
+            Box(Modifier.fillMaxSize()) {
+                if (primary.value)
+                    Box(Modifier.size(96.dp, 64.dp).testTag("j11-onscreen").tutorialTarget(id))
+                Box(
+                    Modifier.size(48.dp)
+                        .offset(y = 1200.dp)
+                        .testTag("j11-offscreen").tutorialTarget(id)
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("j11-onscreen").fetchSemanticsNode()
+
+        val original = rule.runOnIdle { TutorialTargets.bounds[id] }
+        assertNotNull(original)
+        assertTrue(original!!.width > 1f && original.height > 1f)
+        rule.runOnIdle {
+            assertEquals("offscreen duplicate replaced visible target", original, TutorialTargets.bounds[id])
+            assertEquals(id, TutorialTargets.resolve(id, rule.activity.window.decorView.rootView))
+        }
+
+        rule.runOnIdle { primary.value = false }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertNull("offscreen duplicate left phantom bounds", TutorialTargets.bounds[id])
+            assertNull("offscreen duplicate still resolves", TutorialTargets.resolve(id, rule.activity.window.decorView.rootView))
         }
     }
 
