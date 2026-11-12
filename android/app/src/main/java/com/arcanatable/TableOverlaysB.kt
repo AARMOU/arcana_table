@@ -694,6 +694,53 @@ internal fun TableController.TableOverlaysB() {
         })
     }
 
+    // The Lunar Whale (and other LookAtTopOfLibrary grants) do not use priority.
+    // Read only the viewer's individually authorized top card from the masked engine view;
+    // casting/land play, unlike looking, MUST be offered by Argentum as a legal action.
+    if (argentumTopLibraryOpen) {
+        val snap = argentumSnapshot?.takeIf { it.viewingPlayer == localSeat }
+        val top = snap?.topLibraryCard
+        val playChoices = if (snap != null && top != null)
+            ArgentumActions.forCardServerId(snap.legalActions, snap.serverCardIds[top.id])
+                .filter { it.optJSONObject("action")?.optString("type") in setOf("CastSpell", "PlayLand") }
+        else emptyList()
+        AlertDialog(
+            onDismissRequest = { argentumTopLibraryOpen = false },
+            title = { Text("Top of your library · private") },
+            text = {
+                if (top == null) Text("Argentum is not currently allowing you to look at the top card.", color = Muted)
+                else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(top.name, color = SoftWhite)
+                    Text(top.type, color = Muted)
+                    if (!top.manaCost.isNullOrBlank()) ManaCostPips(top.manaCost.orEmpty())
+                    Text(top.oracleText.orEmpty(), color = SoftWhite)
+                    Text(
+                        if (playChoices.isEmpty()) "You may look without priority. Playing or casting is not currently legal."
+                        else "Argentum controls timing, available land plays, targets, and mana payment.",
+                        color = Muted
+                    )
+                }
+            },
+            confirmButton = {
+                if (top != null && playChoices.isNotEmpty())
+                    TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        openArgentumActions(top)
+                    }) { Text("PLAY / CAST OPTIONS", color = Mint) }
+            },
+            dismissButton = {
+                Row {
+                    if (top != null) TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        preview = CardPreview(localSeat, top, fromHand = false, canManipulate = false)
+                    }) { Text("LARGE VIEW", color = Muted) }
+                    TextButton(onClick = { argentumTopLibraryOpen = false }) { Text("CLOSE", color = Muted) }
+                }
+            },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+
     preview?.let { item ->
         CardPreviewPopup(item = item, onDismiss = { preview = null })
     }
