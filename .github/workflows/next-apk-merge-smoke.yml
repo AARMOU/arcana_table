@@ -1,0 +1,104 @@
+name: Next APK source merge smoke (no build, no writes)
+on:
+  push:
+    branches: [gpt/next-apk-combined-preflight-20261026]
+    paths:
+      - '.github/workflows/next-apk-merge-smoke.yml'
+      - 'tools/next_apk_resolve_conflicts.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 1751f1893cc4706572d4f4382e6b0a137bf46536
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm final Build 134 release-source pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 1751f1893cc4706572d4f4382e6b0a137bf46536
+          git config user.name arcana-merge-smoke
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Check git-history source joins (strictly no APK or repository writes)
+        shell: bash
+        env:
+          WEEKLY: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+          NEW_ENGINE_DEV: f9bfdfdea4608839ad7e98ffda89de807bf5d077
+          TABLE: 44105eead435b0e3b759b7d631a659990b7388e3
+          AI: e99b4954ad80885af0e338f7df87b1b4587bc5df
+          ONLINE: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+        run: |
+          set -euo pipefail
+          for entry in "weekly:$WEEKLY" "new-engine:$NEW_ENGINE_DEV" "table:$TABLE" "ai:$AI" "online:$ONLINE"; do
+            name="${entry%%:*}"
+            sha="${entry#*:}"
+            echo "::group::Merge $name exact head $sha"
+            git fetch --no-tags origin "$sha"
+            test "$(git rev-parse FETCH_HEAD)" = "$sha"
+            if ! git merge --no-ff --no-edit -m "Temporary source smoke: $name" "$sha" >/tmp/next-apk-merge.log 2>&1; then
+              if [ "$name" = "table" ] || [ "$name" = "ai" ] || [ "$name" = "online" ]; then
+                # Source is an exact reviewed branch blob, NOT arbitrary incoming PR code.
+                git fetch --no-tags origin "$GITHUB_SHA"
+                test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+                git show "$GITHUB_SHA:tools/next_apk_resolve_conflicts.py" > /tmp/next-apk-resolver.py
+                if python3 /tmp/next-apk-resolver.py "$name" "$sha"; then
+                  git commit --no-gpg-sign -m "Runner-only: reconcile known table/source overlap"
+                  git merge-base --is-ancestor "$sha" HEAD
+                  echo "PASS: reviewed $name source conflict resolution"
+                  echo "::endgroup::"
+                  continue
+                fi
+              fi
+              echo "::error title=Source join blocked at $name::Conflicting files require reviewed reconciliation; the workflow did not compile an APK or change a remote branch."
+              cat /tmp/next-apk-merge.log
+              git diff --name-only --diff-filter=U
+              while IFS= read -r p; do
+                [ -z "$p" ] && continue
+                echo "::warning file=$p,title=Merge conflict::Review $name source integration"
+                echo "=== $p conflict content ==="
+                awk '/^<<<<<<< / {active=1} active {print} /^>>>>>>> / {active=0}' "$p" | head -180
+              done < <(git diff --name-only --diff-filter=U)
+              exit 1
+            fi
+            git merge-base --is-ancestor "$sha" HEAD
+            echo "$name merged into disposable runner worktree only"
+            echo "::endgroup::"
+          done
+          echo "PASS: latest upstream Argentum, weekly policy, UI, AI and online source branches merge cleanly on final Build 134 source (NOT compiled)"
+          git diff --check
+      - name: Export reproducible joined source diff (NO APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=1751f1893cc4706572d4f4382e6b0a137bf46536
+          mkdir -p next-apk-source
+          git diff --binary "$base" HEAD > next-apk-source/integrated-source.patch
+          test -s next-apk-source/integrated-source.patch
+          git diff --name-status "$base" HEAD > next-apk-source/changed-files.txt
+          cat > next-apk-source/SOURCE-PINS.txt <<'EOF'
+          Build134 release source: 1751f1893cc4706572d4f4382e6b0a137bf46536
+          Build134 upgraded engine + Eldrazi compatibility gate: b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
+          Weekly collision reconciliation PR273: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+          New green weekly engine development merge: f9bfdfdea4608839ad7e98ffda89de807bf5d077
+          New upstream Argentum pin: ffebf419be4d4bc0ead60548df474d0847619c4f
+          Correct table UI PR277: 44105eead435b0e3b759b7d631a659990b7388e3
+          AI difficulty PR270: e99b4954ad80885af0e338f7df87b1b4587bc5df
+          Four-player directed online PR268: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+          Source diff only. No engine binary replacement, APK build, Cloudflare deployment, signing or release.
+          EOF
+          sha256sum next-apk-source/integrated-source.patch > next-apk-source/integrated-source.sha256
+          git rev-parse HEAD > next-apk-source/temporary-join-commit.txt
+          cat next-apk-source/integrated-source.sha256
+      - name: Upload reviewed source-join patch (never executable artifact)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: next-apk-combined-source-patch-no-build
+          path: next-apk-source/
+          retention-days: 14
+          if-no-files-found: error
