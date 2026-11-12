@@ -1,0 +1,102 @@
+name: Eldrazi Incursion Cardkit exact gap audit
+on:
+  push:
+    branches: [gpt/eldrazi-incursion-cardkit-audit-20261024]
+    paths:
+      - 'investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py'
+      - 'investigation/argentum-six-precons/test_eldrazi_deck_identity.py'
+      - '.github/workflows/eldrazi-incursion-cardkit-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: eldrazi-incursion-cardkit-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact audit code (isolated GPT lane)
+        uses: actions/checkout@v4
+        with:
+          path: audit
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Checkout latest integrated cards and Cardkit (not stale PR base)
+        uses: actions/checkout@v4
+        with:
+          path: source
+          ref: gpt/arcana-integration-next
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove identity gate catches substitutions, quantity drift and duplicates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile audit/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+          python3 -m unittest discover -s audit/investigation/argentum-six-precons -p 'test_eldrazi_deck_identity.py' -v
+      - name: Run exact-original audit on current integration checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Audit code: $(git -C audit rev-parse HEAD)"
+          echo "Integration source: $(git -C source rev-parse HEAD)"
+          cp audit/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py source/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+          python3 source/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+      - name: Verify read-only source and report presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C source diff --exit-code
+          test -s source/investigation/argentum-six-precons/eldrazi-cardkit-report.json
+          test -s source/investigation/argentum-six-precons/eldrazi-cardkit-report.md
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          p = Path("source/investigation/argentum-six-precons/eldrazi-cardkit-report.json")
+          report = json.loads(p.read_text())
+          head = subprocess.check_output(["git", "-C", "source", "rev-parse", "HEAD"], text=True).strip()
+          assert report["integrationCommit"] == head, (report["integrationCommit"], head)
+          assert report["incursionIndexedSlots"] + report["incursionMissingSlots"] == 100
+          assert report["unboundIndexedSlots"] + report["unboundMissingSlots"] == 100
+          assert len(report["rows"]) == report["incursionMissingSlots"]
+          assert report["noPaidWorkerAuthorization"] is True
+          assert report["originalDeckIdentityVerified"] is True
+          assert report["allExportIndexParityVerified"] is True, "Ghost upstream index entries could inflate coverage"
+          assert report["sharedIndexKindsVerified"] is True, "Cross-library card/token conflict not checked"
+          assert report["sharedIndexNameCount"] >= 0
+          assert report["allExportCount"] > 0, "Missing upstream serialized definitions"
+          assert "android/app/src/main/assets/argentum/all-cards.jsonl" in report["inputSha256"]
+          assert report["customExportIndexParityVerified"] is True, "Ghost custom index entries could inflate coverage"
+          assert report["customExportCount"] > 0, "Missing custom card definitions"
+          assert "android/app/src/main/assets/argentum/custom-cards.jsonl" in report["inputSha256"]
+          assert report["originalDeckSha256"] == {
+              "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
+              "Eldrazi Unbound": "f4f98c4f0e2c22f89f8fa8bf92e65847cb94cb8739ad867bc061759bf70ccdcf",
+          }, "Original precon manifest substituted or changed"
+          monument = next((r for r in report["rows"] if r["name"] == "Forsaken Monument"), None)
+          if monument:
+              assert "CLAUDE SOURCE #171 / GPT VALIDATION #180" in monument["engineeringLane"], "Existing Monument implementation owner lost"
+              assert "Copilot #151 HOLD" in monument["engineeringLane"], "Unapproved duplicate Monument worker risk"
+              assert "NO duplicate paid dispatch" in monument["mandatoryReview"], "Existing Monument claim must block paid pickup"
+          displacer = next((r for r in report["rows"] if r["name"] == "Eldrazi Displacer"), None)
+          if displacer:
+              assert displacer["engineeringLane"].startswith("GPT #154 / existing draft #163"), "Duplicate Displacer worker risk"
+          spawnbed = next((r for r in report["rows"] if r["name"] == "Spawnbed Protector"), None)
+          if spawnbed:
+              assert spawnbed["engineeringLane"].startswith("GPT #170 / test-only draft #175"), "Duplicate Spawnbed worker risk"
+          print(f"Verified exact integration {head}: Incursion {report['incursionIndexedSlots']}/100, Unbound {report['unboundIndexedSlots']}/100")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eldrazi-incursion-cardkit-classification
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            source/investigation/argentum-six-precons/eldrazi-cardkit-report.json
+            source/investigation/argentum-six-precons/eldrazi-cardkit-report.md
