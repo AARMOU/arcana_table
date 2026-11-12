@@ -1,0 +1,14 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {MARKER,readLiability,encode}=require('./credit-reservation-comments.cjs');
+const bot=(body)=>({body,user:{login:'github-actions[bot]',type:'Bot'},created_at:'2026-10-24T10:00:00Z',updated_at:'2026-10-24T10:00:00Z'});
+const reserve={op:'reserve',id:'issue:54:run:1',credits:60,period:'2026-10'};
+test('trusted reservation persists across worker completion',()=>assert.equal(readLiability([bot(encode(reserve))],{period:'2026-10'}).outstanding,60));
+test('unknown inventory denies',()=>assert.equal(readLiability(null).ok,false));
+test('untrusted marker denies',()=>assert.equal(readLiability([{body:encode(reserve),user:{login:'attacker',type:'User'}}]).ok,false));
+test('edited bot event denies',()=>assert.equal(readLiability([{...bot(encode(reserve)),updated_at:'2026-10-24T10:01:00Z'}]).ok,false));
+test('malformed event denies',()=>assert.equal(readLiability([bot(MARKER+'\n{')]).ok,false));
+test('duplicate event denies',()=>assert.equal(readLiability([bot(encode(reserve)),bot(encode(reserve))]).ok,false));
+test('cross-period liability denies',()=>assert.equal(readLiability([bot(encode(reserve))],{period:'2026-11'}).ok,false));
+test('authorized settlement preserves remainder',()=>assert.equal(readLiability([bot(encode(reserve)),bot(encode({op:'settle',id:reserve.id,credits:25,authorized:true,evidence:'billing:invoice-25'}))]).outstanding,35));
+test('unapproved settlement cannot be encoded',()=>assert.throws(()=>encode({op:'settle',id:reserve.id,credits:60})));
