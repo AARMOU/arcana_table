@@ -194,22 +194,36 @@ class DeckSupportTest {
     }
 
     @Test fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects() {
-        val file = File(assets, "argentum/custom-cards.jsonl")
-        assumeTrue("custom-card JSONL present", file.isFile)
+        val customFile = File(assets, "argentum/custom-cards.jsonl")
+        val upstreamFile = File(assets, "argentum/all-cards.jsonl")
+        assumeTrue("custom-card JSONL present", customFile.isFile)
+        assertTrue("upstream Argentum library must be present", upstreamFile.isFile)
         val names = setOf(
             "Sai, Master Thopterist", "Celestial Colonnade", "Springleaf Parade",
             "Black Market Connections", "Tyranid Invasion",
         )
-        val rows = file.useLines { lines ->
+        // Upgraded Argentum adopts some former Arcana custom cards (e.g. Black
+        // Market Connections). Their printed keywords must remain correct in
+        // either source, and a migrated card must not disappear or be shadowed.
+        fun matchingRows(file: File): Map<String, String> = file.useLines { lines ->
             lines.mapNotNull { line ->
-                JSONObject(line).optString("name").takeIf { it in names }?.let { it to line }
+                val name = SupportedCardCatalog.jsonString(line, "name")
+                name?.takeIf { it in names }?.let { it to line }
             }.toMap()
         }
-        assertEquals(names, rows.keys)
-        rows.forEach { (name, line) ->
-            val preview = SupportedCardCatalog.parseLibraryLine(line, custom = true, kind = "card")!!.toScryfallCard()
-            assertEquals("$name must not inherit token or animation keyword labels", emptyList<String>(), preview.keywords)
-        }
+        val customRows = matchingRows(customFile)
+        val upstreamRows = matchingRows(upstreamFile)
+        assertEquals("every probed card must remain in the shipped library",
+            names, customRows.keys + upstreamRows.keys)
+        assertTrue("upstream cards must not retain shadowing custom definitions",
+            customRows.keys.intersect(upstreamRows.keys).isEmpty())
+        (customRows.mapValues { true to it.value } + upstreamRows.mapValues { false to it.value })
+            .forEach { (name, source) ->
+                val (custom, line) = source
+                val preview = SupportedCardCatalog.parseLibraryLine(line, custom = custom, kind = "card")!!.toScryfallCard()
+                assertEquals("$name must not inherit token or animation keyword labels",
+                    emptyList<String>(), preview.keywords)
+            }
     }
 
     @Test fun nestedEffectStatisticsAreNotOriginalCardStatistics() {
