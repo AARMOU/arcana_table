@@ -1,0 +1,9 @@
+{
+  "key": "rise-of-the-eldrazi",
+  "name": "Rise of the Eldrazi",
+  "issue": 1094,
+  "source": "certification/RiseOfTheEldraziIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.RiseOfTheEldraziIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
