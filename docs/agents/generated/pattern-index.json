@@ -404,7 +404,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -2358,7 +2358,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2371,6 +2371,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BeaconOfUnrest.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BeaconOfUnrestScenarioTest.kt"
+    },
+    {
+     "card": "Eldrazi Displacer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziDisplacer.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziDisplacerScenarioTest.kt"
     },
     {
      "card": "Continue?",
@@ -2838,7 +2844,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -2851,6 +2857,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SifterOfSkulls.kt",
      "lines": 34,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SifterOfSkullsScenarioTest.kt"
+    },
+    {
+     "card": "Eldrazi Displacer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziDisplacer.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziDisplacerScenarioTest.kt"
     },
     {
      "card": "Ulalek, Fused Atrocity",
@@ -2869,12 +2881,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SireOfStagnation.kt",
      "lines": 47,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SireOfStagnationScenarioTest.kt"
-    },
-    {
-     "card": "Matter Reshaper",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MatterReshaper.kt",
-     "lines": 81,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MatterReshaperScenarioTest.kt"
     }
    ]
   },
@@ -4154,7 +4160,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 53,
+   "count": 54,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4317,7 +4323,7 @@
    ]
   },
   "keywords()": {
-   "count": 80,
+   "count": 81,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -7152,6 +7158,17 @@
     }
    ]
   },
+  "TargetFilter.OtherCreature": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Eldrazi Displacer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziDisplacer.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziDisplacerScenarioTest.kt"
+    }
+   ]
+  },
   "TargetFilter.OtherCreatureYouControl": {
    "count": 1,
    "examples": [
@@ -7290,7 +7307,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",

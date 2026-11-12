@@ -67,7 +67,15 @@ internal object TestScenarios {
         description = "Own-stack responses start enabled. Cast Lightning Bolt at the AI, then cast Elder Deep-Fiend before Bolt resolves. Pay {C}{C}: Ulalek copies both spells and Beast Whisperer's trigger. Expect two Fiends and 6 damage from the two Bolts. Pass when you want the top object to resolve.",
     )
 
-    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD, ULALEK, ULALEK_RESPONSE)
+    val DISPLACER_BLINK = TestScenario(
+        id = "eldrazi-displacer-blink",
+        title = "Eldrazi Displacer — blink and reset",
+        description = "Eldrazi Displacer, Elvish Visionary with two +1/+1 counters, six Wastes, and an opposing " +
+            "Grizzly Bears. Pay {2}{C} to blink Visionary: it returns tapped, loses its counters, and draws a card. " +
+            "You can also blink the Bears; it returns tapped to the AI.",
+    )
+
+    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD, ULALEK, ULALEK_RESPONSE, DISPLACER_BLINK)
 
     private const val SPIDER = "Iron Spider, Stark Upgrade"
     private const val WHALE = "The Lunar Whale"
@@ -82,6 +90,7 @@ internal object TestScenarios {
         WHALE_HELD.id -> whaleHeld(library)
         ULALEK.id -> ulalek(library)
         ULALEK_RESPONSE.id -> ulalek(library, ownStack = true)
+        DISPLACER_BLINK.id -> displacerBlink(library)
         else -> error("Unknown test scenario ${scenario.id}")
     }
 
@@ -184,6 +193,26 @@ internal object TestScenarios {
      * Grizzly Bears on the AI's side for Elder Deep-Fiend's tap trigger. Needs the engine with
      * colorless-hybrid mana and stack copying (engine-upgrade/ulalek).
      */
+    private fun displacerBlink(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf("Eldrazi Displacer", "Elvish Visionary") + List(38) { "Wastes" }, null)
+        val ai = LocalSeat("Scenario AI", listOf("Grizzly Bears") + List(39) { "Island" }, null)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
+        val services = EngineServices(registry)
+        var state = mainPhaseOfYourFirstTurn(registry, services, you, ai)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        state = zones.moveToZone(state, yourCard(state, "Eldrazi Displacer"), Zone.BATTLEFIELD).state
+        val visionary = yourCard(state, "Elvish Visionary")
+        state = zones.moveToZone(state, visionary, Zone.BATTLEFIELD).state
+        state = withCounters(state, visionary, CounterType.PLUS_ONE_PLUS_ONE to 2)
+        repeat(6) { state = zones.moveToZone(state, yourCard(state, "Wastes"), Zone.BATTLEFIELD).state }
+        val bear = listOf(Zone.LIBRARY, Zone.HAND).asSequence()
+            .flatMap { state.getZone(LocalArgentumHost.AI_ID, it).asSequence() }
+            .single { state.getEntity(it)?.get<CardComponent>()?.name == "Grizzly Bears" }
+        state = zones.moveToZone(state, bear, Zone.BATTLEFIELD).state
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
+    }
+
+    /** A real two-player game started by the engine, passed forward to your first precombat main phase. */
     private fun ulalek(library: OfflineCardLibrary, ownStack: Boolean = false): TestScenarioGame {
         val extra = if (ownStack) listOf("Lightning Bolt", "Mountain") else emptyList()
         val you = LocalSeat("You", listOf(WHISPERER, ULALEK_CARD, FIEND) + extra + List(37 - extra.size) { "Wastes" }, null)
