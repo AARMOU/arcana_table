@@ -1,0 +1,68 @@
+name: Ugin Ineffable source candidate and private-exile tests
+# Only tests a staged source card in an isolated CI runner.
+# No committed assets/runtime jars, no paid workers, no game release.
+on:
+  push:
+    branches: [gpt/ugin-ineffable-token-candidate-20261024]
+    paths:
+      - 'engine-upgrade/ugin-ineffable/**'
+      - '.github/workflows/ugin-ineffable-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ugin-ineffable-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  real-engine-card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Install Ugin source, scenario and registration in runner only
+        run: |
+          set -euo pipefail
+          target=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          test ! -e "$target"
+          cp engine-upgrade/ugin-ineffable/candidate/UginTheIneffable.kt "$target"
+          cp engine-upgrade/ugin-ineffable/candidate/UginTheIneffableScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          src = path.read_text()
+          mark = "val entries: List<Entry> = listOf(\n"
+          assert src.count(mark) == 1
+          path.write_text(src.replace(mark, mark + '        Entry(UginTheIneffable, "M3C", "Six WotC precons"),\n', 1))
+          PY
+      - name: Export candidate only in ephemeral runner
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          grep -F '"name":"Ugin, the Ineffable"' app/src/main/assets/argentum/custom-cards.jsonl >/dev/null
+      - name: Executable Ugin controller-only look and linked-token regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UginTheIneffableScenarioTest'
+      - name: Verify candidate export is deterministic
+        working-directory: android
+        run: |
+          set -euo pipefail
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-first
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-second
+          diff -u /tmp/ugin-first /tmp/ugin-second
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ugin-private-exile-card-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            android/custom-cards/build/test-results/test/TEST-*UginTheIneffable*.xml
