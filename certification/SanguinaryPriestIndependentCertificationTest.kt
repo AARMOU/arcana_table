@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.SanguinaryPriest
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ChooseTargetsDecision
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.CounterType
@@ -18,7 +19,7 @@ class SanguinaryPriestIndependentCertificationTest {
     private fun triggerScenario(vararg extraCards: String) =
         customScenario(SanguinaryPriest, "Grizzly Bears", "Serra Angel", *extraCards)
 
-    private fun GameTestDriver.killAnotherCreatureWithCombat(): EntityId {
+    private fun GameTestDriver.killAnotherCreatureWithCombat(target: EntityId): EntityId {
         val priest = putCreatureOnBattlefield(player1, name)
         val bear = putCreatureOnBattlefield(player1, "Grizzly Bears")
         val blocker = putCreatureOnBattlefield(player2, "Serra Angel")
@@ -27,11 +28,28 @@ class SanguinaryPriestIndependentCertificationTest {
         assertNull(declareAttackers(player1, listOf(bear), player2).error)
         passPriorityUntil(Step.DECLARE_BLOCKERS)
         assertNull(declareBlockers(player2, mapOf(blocker to listOf(bear))).error)
-        passPriorityUntil(Step.POSTCOMBAT_MAIN)
+        chooseBloodChaliceTarget(target)
 
         assertTrue(getGraveyard(player1).contains(bear))
         assertTrue(getPermanents(player1).contains(priest))
         return priest
+    }
+
+    private fun GameTestDriver.chooseBloodChaliceTarget(target: EntityId) {
+        repeat(100) {
+            when (val decision = state.pendingDecision) {
+                is ChooseTargetsDecision -> {
+                    assertNull(submitTargetSelection(decision.playerId, listOf(target)).error)
+                    return
+                }
+                null -> state.priorityPlayerId?.let {
+                    autoSubmitCombatDeclarationIfNeeded()
+                    passPriority(it)
+                }
+                else -> autoResolveDecision()
+            }
+        }
+        error("Blood Chalice did not request a target after another creature died")
     }
 
     @Test
@@ -79,9 +97,9 @@ class SanguinaryPriestIndependentCertificationTest {
     @Test
     fun anotherCreatureYouControlDyingDealsOneToAnOpponentAndLifelinkGainsOne() {
         val d = triggerScenario()
-        d.killAnotherCreatureWithCombat()
+        d.killAnotherCreatureWithCombat(d.player2)
 
-        d.resolveAll(Choices(targets = listOf(d.player2)))
+        d.resolveAll()
 
         assertEquals(21, d.getLifeTotal(d.player1))
         assertEquals(19, d.getLifeTotal(d.player2))
@@ -91,9 +109,9 @@ class SanguinaryPriestIndependentCertificationTest {
     fun bloodChaliceCanTargetAndKillAnOpponentsCreature() {
         val d = triggerScenario("Savannah Lions")
         val lions = d.putCreatureOnBattlefield(d.player2, "Savannah Lions")
-        d.killAnotherCreatureWithCombat()
+        d.killAnotherCreatureWithCombat(lions)
 
-        d.resolveAll(Choices(targets = listOf(lions)))
+        d.resolveAll()
 
         assertTrue(d.getGraveyard(d.player2).contains(lions))
         assertEquals(21, d.getLifeTotal(d.player1))
@@ -105,9 +123,9 @@ class SanguinaryPriestIndependentCertificationTest {
         val d = triggerScenario("Jace Beleren")
         val jace = d.putPermanentOnBattlefield(d.player2, "Jace Beleren")
         d.addComponent(jace, CountersComponent(mapOf(CounterType.LOYALTY to 3)))
-        d.killAnotherCreatureWithCombat()
+        d.killAnotherCreatureWithCombat(jace)
 
-        d.resolveAll(Choices(targets = listOf(jace)))
+        d.resolveAll()
 
         val loyalty = d.state.getEntity(jace)?.get<CountersComponent>()?.getCount(CounterType.LOYALTY) ?: 0
         assertEquals(2, loyalty)
