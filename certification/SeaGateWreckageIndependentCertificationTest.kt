@@ -100,15 +100,14 @@ class SeaGateWreckageIndependentCertificationTest {
         val p = d.player1
         val land = d.putLandOnBattlefield(p, "Sea Gate Wreckage")
         d.emptyHand(p)
-        d.giveColorlessMana(p, 2)
-        d.giveMana(p, Color.RED)
+        d.giveMana(p, Color.RED, 3)
         val libraryBefore = d.zoneNames(p, Zone.LIBRARY).size
 
         assertNotNull(d.activate(p, land, index = 1).error)
 
         assertFalse(d.isTapped(land))
-        assertEquals(2, d.manaPool(p).colorless)
-        assertEquals(1, d.manaPool(p).red)
+        assertEquals(0, d.manaPool(p).colorless)
+        assertEquals(3, d.manaPool(p).red)
         assertEquals(0, d.getHandSize(p))
         assertEquals(libraryBefore, d.zoneNames(p, Zone.LIBRARY).size)
     }
