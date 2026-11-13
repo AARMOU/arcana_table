@@ -1,0 +1,9 @@
+{
+  "key": "scaretiller",
+  "name": "Scaretiller",
+  "issue": 1107,
+  "source": "certification/ScaretillerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ScaretillerIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
