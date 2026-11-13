@@ -6,6 +6,7 @@ import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComp
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -134,19 +135,19 @@ class ScreamerKillerIndependentCertificationTest {
     }
 
     @Test
-    fun aSixManaNoncreatureSpellDoesNotTriggerBioPlasmicScream() {
-        val d = customScenario(ScreamerKiller, "The Immortal Sun")
+    fun aSevenManaNoncreatureSpellDoesNotTriggerBioPlasmicScream() {
+        val d = customScenario(ScreamerKiller, "All Is Dust")
         val player = d.player1
         val opponent = d.player2
         val screamer = d.putCreatureOnBattlefield(player, "Screamer-Killer")
-        val spell = d.putCardInHand(player, "The Immortal Sun")
-        d.giveColorlessMana(player, 6)
+        val spell = d.putCardInHand(player, "All Is Dust")
+        d.giveColorlessMana(player, 7)
 
         assertNull(d.castSpell(player, spell).error)
         assertFalse(hasScreamTriggerOnStack(d, screamer))
         d.resolveAll()
 
         assertEquals(20, d.getLifeTotal(opponent))
-        assertTrue(d.permanentsNamed(player, "The Immortal Sun").contains(spell))
+        assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("All Is Dust"))
     }
 }
