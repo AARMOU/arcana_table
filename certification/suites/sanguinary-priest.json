@@ -1,0 +1,9 @@
+{
+  "key": "sanguinary-priest",
+  "name": "Sanguinary Priest",
+  "issue": 1103,
+  "source": "certification/SanguinaryPriestIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SanguinaryPriestIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
