@@ -1,0 +1,9 @@
+{
+  "key": "sautekh-immortal",
+  "name": "Sautekh Immortal",
+  "issue": 1105,
+  "source": "certification/SautekhImmortalIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SautekhImmortalIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
