@@ -1,0 +1,9 @@
+{
+  "key": "seeker-of-slaanesh",
+  "name": "Seeker of Slaanesh",
+  "issue": 1115,
+  "source": "certification/SeekerOfSlaaneshIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SeekerOfSlaaneshIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
