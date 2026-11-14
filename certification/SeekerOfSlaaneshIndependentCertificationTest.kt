@@ -81,6 +81,7 @@ class SeekerOfSlaaneshIndependentCertificationTest {
         assertTrue(d.isTapped(firstAttacker))
         assertFalse(d.isTapped(nextAttacker))
 
+        d.passPriorityUntil(Step.POSTCOMBAT_MAIN, activePlayer = opponent)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
         assertNotNull(d.declareAttackers(opponent, emptyList(), controller).error)
         assertNull(d.declareAttackers(opponent, listOf(nextAttacker), controller).error)
@@ -93,9 +94,9 @@ class SeekerOfSlaaneshIndependentCertificationTest {
         val opponent = d.player2
         d.putCreatureOnBattlefield(controller, "Seeker of Slaanesh")
         val tappedCreature = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
-        d.tapPermanent(tappedCreature)
 
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
+        d.tapPermanent(tappedCreature)
         assertNull(d.declareAttackers(opponent, emptyList(), controller).error)
         assertTrue(d.isTapped(tappedCreature))
     }
