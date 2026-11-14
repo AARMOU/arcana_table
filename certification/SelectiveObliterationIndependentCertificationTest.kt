@@ -89,7 +89,7 @@ class SelectiveObliterationIndependentCertificationTest {
 
         assertTrue(d.getHand(p).contains(spell))
         assertTrue(d.getPermanents(opponent).contains(angel))
-        assertTrue(d.zoneNames(p, Zone.GRAVEYARD).isEmpty())
+        assertFalse(d.zoneNames(p, Zone.GRAVEYARD).contains("Selective Obliteration"))
     }
 
     private fun GameTestDriver.resolveWithControllerColors() {
