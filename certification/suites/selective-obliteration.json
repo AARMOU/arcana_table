@@ -1,0 +1,9 @@
+{
+  "key": "selective-obliteration",
+  "name": "Selective Obliteration",
+  "issue": 1117,
+  "source": "certification/SelectiveObliterationIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SelectiveObliterationIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
