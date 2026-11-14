@@ -1,0 +1,9 @@
+{
+  "key": "shard-of-the-nightbringer",
+  "name": "Shard of the Nightbringer",
+  "issue": 1119,
+  "source": "certification/ShardOfTheNightbringerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ShardOfTheNightbringerIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
