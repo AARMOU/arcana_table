@@ -1,0 +1,9 @@
+{
+  "key": "darksteel-monolith",
+  "name": "Darksteel Monolith",
+  "issue": 924,
+  "source": "certification/DarksteelMonolithIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DarksteelMonolithIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
