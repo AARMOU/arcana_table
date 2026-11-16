@@ -1,0 +1,9 @@
+{
+  "key": "deny-the-witch",
+  "name": "Deny the Witch",
+  "issue": 849,
+  "source": "certification/DenyTheWitchIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DenyTheWitchIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
