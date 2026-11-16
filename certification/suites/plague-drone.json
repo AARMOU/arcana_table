@@ -1,0 +1,9 @@
+{
+  "key": "plague-drone",
+  "name": "Plague Drone",
+  "issue": 1082,
+  "source": "certification/PlagueDroneIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PlagueDroneIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
