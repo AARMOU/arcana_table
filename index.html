@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d1513">
-<meta name="description" content="Arcana Table is a four-player Android Commander game with offline AI, premade decks, local Wi-Fi multiplayer, and cross-network online play. Build 141 is in testing.">
-<meta property="og:title" content="Arcana Table — Four-player Commander on Android · Build 141 testing">
-<meta property="og:description" content="Build 141 testing: four-player Commander games, offline AI, premade decks, local Wi-Fi, and cross-network online play.">
+<meta name="description" content="Arcana Table is a four-player Android Commander game with official Commander precons, your own decks, offline AI, local Wi-Fi, and online play. Beta 0.35.0 is in Google Play testing.">
+<meta property="og:title" content="Arcana Table — Four-player Commander on Android · Beta 0.35.0">
+<meta property="og:description" content="Beta 0.35.0: four-player Commander with official precons, your own decks, offline AI, local Wi-Fi, and online play.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aarmou.github.io/arcana_table/">
 <meta property="og:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
@@ -14,7 +14,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
 <link rel="icon" type="image/png" href="./assets/arcana-logo.png">
-<title>Arcana Table — Four-player Commander · Build 141 testing</title>
+<title>Arcana Table — Four-player Commander · Beta 0.35.0</title>
 <style>
 :root{color-scheme:dark;--bg:#0c1412;--panel:#14221d;--panel2:#192c24;--ink:#edf8f1;--muted:#a2b6ab;--line:#2c4539;--mint:#90ebbe;--gold:#f2cc7d}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#294c35 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -45,73 +45,73 @@ section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-t
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
 </style>
 <style>
-.release-state{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 20px}.release-pill{display:inline-block;border:1px solid #60896b;background:#15372a;padding:6px 12px;border-radius:99px;color:var(--mint);font-size:12px;letter-spacing:.04em;font-weight:800}.release-state small{color:var(--muted);font-size:13px}.feature-grid,.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.feature-card{background:linear-gradient(155deg,#1a3026,#101d18);border:1px solid var(--line);border-radius:18px;padding:24px}.feature-card h3{font-size:20px;line-height:1.3;margin:7px 0}.feature-card p{color:var(--muted);font-size:15px;margin:8px 0 0}.feature-card .kicker{font-size:11px;letter-spacing:.16em;font-weight:850;text-transform:uppercase;color:var(--gold)}.notes-list{margin:0;padding:0;list-style:none;display:grid;gap:14px}.notes-list li{border:1px solid var(--line);background:#17251e;border-radius:14px;padding:20px 23px}.notes-list strong{display:block;color:var(--ink);margin-bottom:5px}.notes-list p{margin:0;color:var(--muted)}.source-note{font-size:13px;color:var(--muted);margin-top:22px}.source-note a{color:var(--mint)}.faq article{border-top:1px solid var(--line);padding:17px 0}.faq h3{font-size:17px;margin:0 0 7px}.faq p{color:var(--muted);margin:0}.testing-status{border:1px solid #476d54;background:#192a20;border-radius:15px;padding:18px 23px;margin-top:18px}.testing-status strong{color:var(--mint)}.testing-status p{color:var(--muted);margin:5px 0 0;font-size:14px}@media(max-width:760px){.feature-grid,.faq{grid-template-columns:1fr}.feature-card{padding:19px}.notes-list li{padding:17px}.release-state{align-items:flex-start}}
+.release-state{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 20px}.release-pill{display:inline-block;border:1px solid #60896b;background:#15372a;padding:6px 12px;border-radius:99px;color:var(--mint);font-size:12px;letter-spacing:.04em;font-weight:800}.release-state small{color:var(--muted);font-size:13px}.feature-grid,.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.feature-card{background:linear-gradient(155deg,#1a3026,#101d18);border:1px solid var(--line);border-radius:18px;padding:24px}.feature-card h3{font-size:20px;line-height:1.3;margin:7px 0}.feature-card p{color:var(--muted);font-size:15px;margin:8px 0 0}.feature-card a{color:var(--mint)}.feature-card .kicker{font-size:11px;letter-spacing:.16em;font-weight:850;text-transform:uppercase;color:var(--gold)}.notes-list{margin:0;padding:0;list-style:none;display:grid;gap:14px}.notes-list li{border:1px solid var(--line);background:#17251e;border-radius:14px;padding:20px 23px}.notes-list strong{display:block;color:var(--ink);margin-bottom:5px}.notes-list p{margin:0;color:var(--muted)}.source-note{font-size:13px;color:var(--muted);margin-top:22px}.source-note a{color:var(--mint)}.faq article{border-top:1px solid var(--line);padding:17px 0}.faq h3{font-size:17px;margin:0 0 7px}.faq p{color:var(--muted);margin:0}.testing-status{border:1px solid #476d54;background:#192a20;border-radius:15px;padding:18px 23px;margin-top:18px}.testing-status strong{color:var(--mint)}.testing-status p{color:var(--muted);margin:5px 0 0;font-size:14px}@media(max-width:760px){.feature-grid,.faq{grid-template-columns:1fr}.feature-card{padding:19px}.notes-list li{padding:17px}.release-state{align-items:flex-start}}
 </style>
 <style>.beta-signup-panel{min-width:260px;flex:1;padding:20px;border:1px solid #527c5d;border-radius:15px;background:#0a170f70}.beta-signup-panel .actions{margin:0 0 14px}.beta-fine{font-size:13px;color:#b6c6ba;margin:0}@media(max-width:850px){.cta{display:block}.beta-signup-panel{margin-top:20px}}</style></head>
 <body>
 <header class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
-<nav class="navlinks" aria-label="Main navigation"><a href="#experience">App</a><a href="#new-in-138">Current build</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
+<nav class="navlinks" aria-label="Main navigation"><a href="#experience">App</a><a href="#current-build">Current beta</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
 <main>
 <div class="wrap hero">
-<div class="eyebrow">Android · Four-player Commander · Build 141 testing</div>
-<div class="release-state"><span class="release-pill">Build 141 · Android test build</span><small>Debug APK not uploaded to Google Play or released publicly.</small></div>
+<div class="eyebrow">Android · Four-player Commander · Beta 0.35.0</div>
+<div class="release-state"><span class="release-pill">Beta 0.35.0-beta1 · Google Play testing</span><small>Uploaded to Google Play for testers. Not a public release.</small></div>
 <h1>A four-player Commander table.<br><em>In your pocket.</em></h1>
-<div class="intro"><p>Bring your pod together on Android. Play with up to four players over local Wi-Fi or across networks online, or go offline against AI. Choose from premade Commander decks.</p>
+<div class="intro"><p>Bring your pod together on Android. Play with up to four players over local Wi-Fi or online, or go offline against AI. Pick an official Commander precon or bring your own deck.</p>
 <div class="actions"><a class="btn primary" href="#testing">Request a test invitation ↓</a><a class="btn" href="#screenshots">See the app ↓</a></div></div>
-<figure class="hero-visual"><img src="./assets/arcana-hero-four-player.svg" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Four-player Commander · Local Wi-Fi and cross-network play</figcaption></figure>
-<div class="strip"><span>Four-player Commander</span><span>Offline AI</span><span>Premade Commander decks</span><span>Local Wi-Fi</span><span>Cross-network play</span></div>
+<figure class="hero-visual"><img src="./assets/arcana-hero-four-player.svg" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Four-player Commander · Local Wi-Fi and online play</figcaption></figure>
+<div class="strip"><span>Four-player Commander</span><span>Official precons</span><span>Your own decks</span><span>Offline AI</span><span>Local Wi-Fi</span><span>Online rooms</span><span>Arcana Studio</span></div>
 </div>
 <section class="wrap" id="experience">
-<div class="section-title"><div class="eyebrow">Inside Arcana</div><h2>A Commander game built for Android.</h2><p>These genuine app captures are from earlier builds and may not match Build 141 exactly.</p></div>
+<div class="section-title"><div class="eyebrow">Inside Arcana</div><h2>A Commander game built for Android.</h2><p>These genuine app captures are from earlier builds and do not match the Beta 0.35.0 interface exactly.</p></div>
 <div class="feature-row">
-<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Choose a deck. Start a game.</h3><p>Choose a premade Commander deck and bring up to three others to the table. Public deck import is turned off in the current test.</p><p class="upcoming"><strong>Available in testing:</strong> Play locally over Wi-Fi or connect across networks online.</p><span class="detail">Build 141 · Android testing</span></div>
-<figure class="screenshot"><img class="phone" src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table home screen showing Sliver Overlord selected and the green Play button"></figure>
+<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Choose a deck. Start a game.</h3><p>Browse official Commander preconstructed decks by set, newest first, with each deck’s colors shown. Or import a deck list and edit it in the app.</p><p class="upcoming"><strong>New in this beta:</strong> the latest precons, including the Star Trek decks.</p><span class="detail">Beta 0.35.0 · Google Play testing</span></div>
+<figure class="screenshot"><img class="phone" src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table home screen from an earlier build showing Sliver Overlord selected and the green Play button"></figure>
 </div>
 <div class="feature-row alt">
-<figure class="screenshot"><img class="phone" src="./assets/arcana-ai.webp" width="800" height="1424" loading="lazy" alt="Arcana offline AI game setup, showing player count and opponent deck options"></figure>
-<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game with AI players, select a deck for the first opponent, or leave the selection to chance. No internet connection is needed for offline AI play.</p><span class="detail">Offline AI · No network required</span></div>
+<figure class="screenshot"><img class="phone" src="./assets/arcana-ai.webp" width="800" height="1424" loading="lazy" alt="Arcana offline AI game setup from an earlier build, showing player count and opponent deck options"></figure>
+<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game against AI players and choose a deck for each AI seat, or leave it to chance. No internet connection is needed for offline play.</p><span class="detail">Offline AI · No network required</span></div>
 </div>
 </section>
-<section class="wrap" id="new-in-138">
-<div class="section-title"><div class="eyebrow">Build 141 testing</div><h2>What’s in the current test build</h2><p>A focused Android card-table experience. This page lists capabilities confirmed for the current test cycle.</p></div>
+<section class="wrap" id="current-build">
+<div class="section-title"><div class="eyebrow">Beta 0.35.0</div><h2>What’s in the current beta</h2><p>This beta moves Arcana Table onto the open-source Forge rules engine, which handles card rules and AI for a far larger card pool than earlier builds.</p></div>
 <div class="feature-grid">
-<article class="feature-card"><div class="kicker">01 · Four-player Commander</div><h3>Bring your pod to the table.</h3><p>Play with up to four players, either over local Wi-Fi or across networks online.</p></article>
-<article class="feature-card"><div class="kicker">02 · Offline AI</div><h3>Play without a connection.</h3><p>Start a local game against AI opponents without an internet connection.</p></article>
-<article class="feature-card"><div class="kicker">03 · Premade decks</div><h3>Choose a Commander deck.</h3><p>Premade Commander decks are available in the current test. Public deck import is turned off.</p></article>
-<article class="feature-card"><div class="kicker">04 · Local Wi-Fi</div><h3>Gather around the same network.</h3><p>Connect devices on a local Wi-Fi network for a shared game.</p></article>
-<article class="feature-card"><div class="kicker">05 · Cross-network play</div><h3>Play across networks.</h3><p>Bring your pod together online, even when players are not on the same local network.</p></article>
-<article class="feature-card"><div class="kicker">06 · Test status</div><h3>A development test build.</h3><p>The Build 141 debug APK has not been uploaded to Google Play or released publicly.</p></article>
-<article class="feature-card"><div class="kicker">07 · Multiplayer</div><h3>A table for your pod.</h3><p>Play with up to four players over local Wi-Fi or across networks online.</p></article>
-<article class="feature-card"><div class="kicker">08 · Deck access</div><h3>Premade decks are available.</h3><p>Choose from premade Commander decks in the current test. Public deck import is turned off.</p></article>
+<article class="feature-card"><div class="kicker">01 · Rules engine</div><h3>Now running on Forge.</h3><p>Forge handles the rules and the AI opponents. If a deck includes a card Forge doesn’t have, the app tells you when the game starts.</p></article>
+<article class="feature-card"><div class="kicker">02 · Official precons</div><h3>Commander precons, by set.</h3><p>Official Commander preconstructed decks, grouped by product with the newest first, including the Star Trek decks. Collector’s Editions are left out.</p></article>
+<article class="feature-card"><div class="kicker">03 · Your decks</div><h3>Import and edit your own.</h3><p>Import a deck list, search cards and edit decks using Forge’s card catalog, and change your commander’s art.</p></article>
+<article class="feature-card"><div class="kicker">04 · Online rooms</div><h3>Play across networks.</h3><p>Host a room for up to four players. A host who drops can rejoin the same game, and Play again brings everyone back to the same room.</p></article>
+<article class="feature-card"><div class="kicker">05 · Local Wi-Fi and offline AI</div><h3>Same room, or no network at all.</h3><p>Connect devices on one Wi-Fi network, or play offline against AI. Hosts can pick the deck for each AI seat.</p></article>
+<article class="feature-card"><div class="kicker">06 · Arcana Studio</div><h3>Make the table yours.</h3><p>Choose a layout preset, color palette and battlefield background, and adjust game options from one place.</p></article>
+<article class="feature-card"><div class="kicker">07 · Faster turns</div><h3>Less tapping through priority.</h3><p>Pass to my turn skips empty windows but stops for a spell that targets you or an attack that would kill you. Answer repeated triggers once with Accept all on stack or Yes · Always.</p></article>
+<article class="feature-card"><div class="kicker">08 · Open source</div><h3>Licenses and source in the app.</h3><p>Forge is licensed under GPL-3.0. The app has a Licenses &amp; Source screen, and the <a href="https://github.com/AARMOU/arcana-chimera/releases/tag/chimera-0.35.0-beta1">source for this build</a> is published.</p></article>
 </div>
-<div class="testing-status"><strong>Current status — Build 141 · Android test APK</strong><p>The latest development build, <code>Build 141</code>, is a debug test APK. It has not been uploaded to Google Play or released publicly. It supports four-player games over local Wi-Fi and across networks online.</p></div>
+<div class="testing-status"><strong>Current status — Beta 0.35.0-beta1 · Google Play testing</strong><p>The latest build, <code>0.35.0-beta1</code>, has been uploaded to Google Play for testers. It is not a public release, and joining the closed test requires an invitation.</p></div>
 </section>
 <section class="wrap" id="changelog">
-<div class="section-title"><div class="eyebrow">Current development</div><h2>Build 141 testing focus.</h2><p>A snapshot of what’s available now and what remains in development.</p></div>
+<div class="section-title"><div class="eyebrow">Current development</div><h2>Beta 0.35.0 at a glance.</h2><p>What changed since the last build shown here, and what is still being worked on.</p></div>
 <ul class="notes-list">
-<li><strong>Current play · Up to four players</strong><p>Build 141 supports games with up to four players on Android, using local Wi-Fi or cross-network online play.</p></li>
-<li><strong>Available in testing · Core play</strong><p>Play offline against AI, choose a premade Commander deck, or bring your pod together for a four-player match.</p></li>
-<li><strong>Still in development · More ways to play</strong><p>Additional card interactions are still being developed. Public deck import is turned off for the test.</p></li>
+<li><strong>New engine · Forge</strong><p>Card rules and AI now come from Forge instead of the earlier engine. Deck import and the deck editor are available again, using Forge’s card catalog.</p></li>
+<li><strong>New decks · Official Commander precons</strong><p>Deck selection lists official Commander precons by set, including the Star Trek decks, alongside your own saved decks.</p></li>
+<li><strong>Still in testing · Expect rough edges</strong><p>This is a beta. Online play, some card prompts and a small number of cards Forge cannot fully play are still being tested and fixed.</p></li>
 </ul>
-<p class="source-note">See <a href="https://github.com/AARMOU/arcana_table/issues/81">current development coordination</a>, <a href="https://github.com/AARMOU/arcana_table/actions/runs/40512660878">historical Build 138 CI results</a>, and <a href="https://github.com/AARMOU/arcana_table">source code</a>. Build 141 is a debug test APK, not a public release.</p>
+<p class="source-note">See the <a href="https://github.com/AARMOU/arcana-chimera/releases/tag/chimera-0.35.0-beta1">Beta 0.35.0-beta1 source release</a>, the <a href="https://github.com/AARMOU/arcana-chimera">Forge integration repository</a>, and the <a href="https://github.com/AARMOU/arcana_table">Arcana Table repository</a>.</p>
 </section>
 <section class="wrap" id="screenshots">
-<div class="section-title"><div class="eyebrow">Genuine app captures · Earlier builds</div><h2>Real app screens.</h2><p>These screenshots show earlier Android builds and may not match the Build 141 interface exactly.</p></div>
+<div class="section-title"><div class="eyebrow">Genuine app captures · Earlier builds</div><h2>Real app screens.</h2><p>These screenshots show earlier Android builds and do not match the Beta 0.35.0 interface exactly.</p></div>
 <div class="gallery">
-<article><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Seven-card opening hand showing Hedge Maze and Sliver cards in the Argentum game"></figure><div><h3>Real opening hands</h3><p>See your seven cards, inspect their artwork, and make your opening decisions.</p></div></article>
+<article><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Seven-card opening hand showing Hedge Maze and Sliver cards in an earlier build"></figure><div><h3>Real opening hands</h3><p>See your seven cards, inspect their artwork, and make your opening decisions.</p></div></article>
 <article><figure><img src="./assets/arcana-battlefield.webp" width="800" height="1424" loading="lazy" alt="Arcana Table battlefield interface with phase controls, life totals, and a Bello card played by an AI opponent"></figure><div><h3>A live battlefield</h3><p>Track phases, boards, the stack, and AI actions while the game unfolds.</p></div></article>
 <article><figure><img src="./assets/arcana-settings.webp" width="800" height="1424" loading="lazy" alt="Arcana gameplay settings screen with card size, player following, AI action, timer, and background alert controls"></figure><div><h3>Settings that matter</h3><p>Adjust card size, UI layout, turn behavior, and game notifications to suit your play style.</p></div></article>
 </div>
-<div class="notice"><strong>Build 141 status:</strong> This is a development debug APK; it has <strong>not been uploaded to Google Play or released publicly</strong>. The current test supports up to four players over local Wi-Fi or across networks online, alongside offline AI and premade Commander decks. Additional card interactions are still in development. Public deck import is turned off.</div>
+<div class="notice"><strong>Beta 0.35.0 status:</strong> This build has been uploaded to Google Play for testers and is <strong>not a public release</strong>. It supports up to four players over local Wi-Fi or online, offline AI, official Commander precons and your own imported decks. It is a beta, so some cards and prompts may not work as expected.</div>
 </section>
-<section class="wrap" id="faq"><div class="section-title"><div class="eyebrow">Before you join</div><h2>What’s available in the current test.</h2></div><div class="faq">
-<article><h3>Can I play without internet?</h3><p>Yes. Offline games against local AI run on your device.</p></article>
-<article><h3>Can I play with my pod?</h3><p>Yes. Build 141 supports games with up to four players, over local Wi-Fi or across networks online.</p></article>
-<article><h3>Can I import a deck?</h3><p>No. Public deck import is turned off for the current test. Premade Commander decks are available.</p></article>
-<article><h3>Where can I get Build 141?</h3><p>Build 141 is a debug test APK and has not been uploaded to Google Play or released publicly. The closed-test form requests a Google Play invitation; it does not distribute this APK.</p></article>
+<section class="wrap" id="faq"><div class="section-title"><div class="eyebrow">Before you join</div><h2>What’s available in the current beta.</h2></div><div class="faq">
+<article><h3>Can I play without internet?</h3><p>Yes. Offline games against AI run on your device.</p></article>
+<article><h3>Can I play with my pod?</h3><p>Yes. Beta 0.35.0 supports games with up to four players, over local Wi-Fi or in online rooms.</p></article>
+<article><h3>Can I import a deck?</h3><p>Yes. Import a deck list or build one in the editor. Official Commander precons are also included.</p></article>
+<article><h3>Where can I get the beta?</h3><p>Through the Google Play closed test, by invitation. Use the form below to request one. The beta is not publicly listed.</p></article>
 </div></section>
-<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Request an invitation to the Google Play closed test. The form does not guarantee admission or distribute the Build 141 debug APK.</p></div><div class="beta-signup-panel"><div class="actions"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request a Google Play test invitation ↗</a></div><p class="beta-fine">Your email is used for closed-test invitations and essential updates. Signing up does not guarantee admission or provide the Build 141 debug APK. <a href="./privacy.html">Privacy policy</a>.</p></div></div>
+<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Request an invitation to the Google Play closed test. Requesting one does not guarantee admission.</p></div><div class="beta-signup-panel"><div class="actions"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request a Google Play test invitation ↗</a></div><p class="beta-fine">Your email is used for closed-test invitations and essential updates. Signing up does not guarantee admission. <a href="./privacy.html">Privacy policy</a>.</p></div></div>
 <p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p></section>
 </main>
-<footer><div class="wrap footrow"><span>Arcana Table · Build 141 testing · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a> · <a href="./assets/about-the-developers.webp">about the developers</a></span></div><img class="boneknuckles-egg" src="./assets/boneknuckles-peek.svg" width="35" height="38" alt="" aria-hidden="true" loading="lazy"></footer>
+<footer><div class="wrap footrow"><span>Arcana Table · Beta 0.35.0 · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a> · <a href="./assets/about-the-developers.webp">about the developers</a></span></div><img class="boneknuckles-egg" src="./assets/boneknuckles-peek.svg" width="35" height="38" alt="" aria-hidden="true" loading="lazy"></footer>
 </body></html>
