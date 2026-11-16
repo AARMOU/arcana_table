@@ -1,0 +1,9 @@
+{
+  "key": "canoptek-tomb-sentinel",
+  "name": "Canoptek Tomb Sentinel",
+  "issue": 820,
+  "source": "certification/CanoptekTombSentinelIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CanoptekTombSentinelIndependentCertificationTest",
+  "tests": 10,
+  "target": "build"
+}
