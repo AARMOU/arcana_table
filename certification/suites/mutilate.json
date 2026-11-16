@@ -1,0 +1,9 @@
+{
+  "key": "mutilate",
+  "name": "Mutilate",
+  "issue": 1068,
+  "source": "certification/MutilateIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MutilateIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
