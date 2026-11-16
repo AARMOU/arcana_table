@@ -1,0 +1,9 @@
+{
+  "key": "inquisitor-greyfax",
+  "name": "Inquisitor Greyfax",
+  "issue": 1042,
+  "source": "certification/InquisitorGreyfaxIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.InquisitorGreyfaxIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
