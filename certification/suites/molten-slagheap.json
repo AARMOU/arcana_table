@@ -1,0 +1,9 @@
+{
+  "key": "molten-slagheap",
+  "name": "Molten Slagheap",
+  "issue": 1064,
+  "source": "certification/MoltenSlagheapIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MoltenSlagheapIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
