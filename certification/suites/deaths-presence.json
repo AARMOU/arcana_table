@@ -1,0 +1,9 @@
+{
+  "key": "deaths-presence",
+  "name": "Death's Presence",
+  "issue": 836,
+  "source": "certification/DeathsPresenceIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.DeathsPresenceIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
