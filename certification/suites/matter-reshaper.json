@@ -1,0 +1,9 @@
+{
+  "key": "matter-reshaper",
+  "name": "Matter Reshaper",
+  "issue": 1062,
+  "source": "certification/MatterReshaperIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MatterReshaperIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
