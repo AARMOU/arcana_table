@@ -1,0 +1,9 @@
+{
+  "key": "plasmancer",
+  "name": "Plasmancer",
+  "issue": 1084,
+  "source": "certification/PlasmancerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PlasmancerIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
