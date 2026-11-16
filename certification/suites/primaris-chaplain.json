@@ -1,0 +1,9 @@
+{
+  "key": "primaris-chaplain",
+  "name": "Primaris Chaplain",
+  "issue": 1086,
+  "source": "certification/PrimarisChaplainIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PrimarisChaplainIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
