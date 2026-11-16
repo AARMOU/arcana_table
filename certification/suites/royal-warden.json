@@ -1,0 +1,9 @@
+{
+  "key": "royal-warden",
+  "name": "Royal Warden",
+  "issue": 1098,
+  "source": "certification/RoyalWardenIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.RoyalWardenIndependentCertificationTest",
+  "tests": 11,
+  "target": "build"
+}
