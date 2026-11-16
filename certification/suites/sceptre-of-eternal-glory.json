@@ -1,0 +1,9 @@
+{
+  "key": "sceptre-of-eternal-glory",
+  "name": "Sceptre of Eternal Glory",
+  "issue": 1109,
+  "source": "certification/SceptreOfEternalGloryIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SceptreOfEternalGloryIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
