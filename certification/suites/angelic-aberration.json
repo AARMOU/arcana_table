@@ -1,0 +1,9 @@
+{
+  "key": "angelic-aberration",
+  "name": "Angelic Aberration",
+  "issue": 896,
+  "source": "certification/AngelicAberrationIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AngelicAberrationIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
