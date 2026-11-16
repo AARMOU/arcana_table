@@ -1,0 +1,9 @@
+{
+  "key": "rishkars-expertise",
+  "name": "Rishkar's Expertise",
+  "issue": 1096,
+  "source": "certification/RishkarsExpertiseIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.RishkarsExpertiseIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
