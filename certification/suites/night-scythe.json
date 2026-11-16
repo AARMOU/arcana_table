@@ -1,0 +1,9 @@
+{
+  "key": "night-scythe",
+  "name": "Night Scythe",
+  "issue": 1076,
+  "source": "certification/NightScytheIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.NightScytheIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
