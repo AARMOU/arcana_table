@@ -1,0 +1,9 @@
+{
+  "key": "imotekh-the-stormlord",
+  "name": "Imotekh the Stormlord",
+  "issue": 1040,
+  "source": "certification/ImotekhTheStormlordIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ImotekhTheStormlordIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
