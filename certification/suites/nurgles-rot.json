@@ -1,0 +1,9 @@
+{
+  "key": "nurgles-rot",
+  "name": "Nurgle's Rot",
+  "issue": 1080,
+  "source": "certification/NurglesRotIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.NurglesRotIndependentCertificationTest",
+  "tests": 7,
+  "target": "build"
+}
