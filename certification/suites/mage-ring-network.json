@@ -1,0 +1,9 @@
+{
+  "key": "mage-ring-network",
+  "name": "Mage-Ring Network",
+  "issue": 1058,
+  "source": "certification/MageRingNetworkIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MageRingNetworkIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
