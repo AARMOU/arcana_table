@@ -1,0 +1,9 @@
+{
+  "key": "corrupted-crossroads",
+  "name": "Corrupted Crossroads",
+  "issue": 831,
+  "source": "certification/CorruptedCrossroadsIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CorruptedCrossroadsIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
