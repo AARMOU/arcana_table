@@ -1,0 +1,9 @@
+{
+  "key": "lictor",
+  "name": "Lictor",
+  "issue": 1052,
+  "source": "certification/LictorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.LictorIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
