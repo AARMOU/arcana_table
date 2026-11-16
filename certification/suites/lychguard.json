@@ -1,0 +1,9 @@
+{
+  "key": "lychguard",
+  "name": "Lychguard",
+  "issue": 1056,
+  "source": "certification/LychguardIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.LychguardIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
