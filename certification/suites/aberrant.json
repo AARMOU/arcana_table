@@ -1,0 +1,9 @@
+{
+  "key": "aberrant",
+  "name": "Aberrant",
+  "issue": 778,
+  "source": "certification/AberrantIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AberrantIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
