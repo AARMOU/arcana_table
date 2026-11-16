@@ -1,0 +1,9 @@
+{
+  "key": "mandate-of-abaddon",
+  "name": "Mandate of Abaddon",
+  "issue": 1060,
+  "source": "certification/MandateOfAbaddonIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MandateOfAbaddonIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
