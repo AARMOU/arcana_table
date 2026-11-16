@@ -1,0 +1,9 @@
+{
+  "key": "atalan-jackal",
+  "name": "Atalan Jackal",
+  "issue": 789,
+  "source": "certification/AtalanJackalIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AtalanJackalIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
