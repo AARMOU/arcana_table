@@ -1,0 +1,9 @@
+{
+  "key": "opal-palace",
+  "name": "Opal Palace",
+  "issue": 909,
+  "source": "certification/OpalPalaceIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.OpalPalaceIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
