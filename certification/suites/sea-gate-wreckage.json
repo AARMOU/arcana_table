@@ -1,0 +1,9 @@
+{
+  "key": "sea-gate-wreckage",
+  "name": "Sea Gate Wreckage",
+  "issue": 1113,
+  "source": "certification/SeaGateWreckageIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SeaGateWreckageIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
