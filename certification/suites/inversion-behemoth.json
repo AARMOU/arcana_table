@@ -1,0 +1,9 @@
+{
+  "key": "inversion-behemoth",
+  "name": "Inversion Behemoth",
+  "issue": 1044,
+  "source": "certification/InversionBehemothIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.InversionBehemothIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
