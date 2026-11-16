@@ -8,30 +8,31 @@ const root = path.resolve(__dirname, '..');
 const landing = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const closed = fs.readFileSync(path.join(root, 'closed-testing.html'), 'utf8');
 
-test('Build 141 copy states the actual debug-test release status', () => {
-  assert.match(landing, /Build 141 · Android test build/);
-  assert.match(landing, /Debug APK not uploaded to Google Play or released publicly/);
-  assert.match(landing, /Build 141 is a debug test APK, not a public release/);
-  assert.doesNotMatch(landing, /Build 112 is still under development/);
-  assert.doesNotMatch(landing, /Coming soon:<\/strong> Deck importing/);
+test('Beta 0.35.0 copy states the actual Play testing status', () => {
+  assert.match(landing, /Beta 0\.35\.0-beta1 · Google Play testing/);
+  assert.match(landing, /Uploaded to Google Play for testers\. Not a public release\./);
+  assert.match(landing, /It is not a public release, and joining the closed test requires an invitation/);
+  assert.doesNotMatch(landing, /Build 1\d\d/);
+  assert.doesNotMatch(landing, /debug APK/i);
 });
-test('Current feature copy distinguishes supported testing from public deck import', () => {
+test('Current feature copy lists what the beta supports and that it is a beta', () => {
   for (const phrase of [
-    'four players', 'offline AI', 'premade Commander decks',
-    'local Wi-Fi', 'across networks online',
-    'Public deck import is turned off',
+    'four players', 'Offline AI', 'official Commander precons',
+    'local Wi-Fi', 'Online rooms', 'Import a deck list',
+    'Forge is licensed under GPL-3.0',
+    'https://github.com/AARMOU/arcana-chimera/releases/tag/chimera-0.35.0-beta1',
   ]) assert.ok(landing.includes(phrase), 'Missing current feature/status: ' + phrase);
-  assert.match(landing, /Additional card interactions are still in development/);
+  assert.match(landing, /It is a beta, so some cards and prompts may not work as expected/);
 });
-test('Test invitation never claims to distribute the debug APK', () => {
-  assert.match(landing, /The closed-test form requests a Google Play invitation; it does not distribute this APK/);
-  assert.match(landing, /form does not guarantee admission or distribute the Build 141 debug APK/);
-  assert.match(landing, /not been uploaded to Google Play or released publicly/);
+test('Test invitation never promises admission or a public listing', () => {
+  assert.match(landing, /Requesting one does not guarantee admission/);
+  assert.match(landing, /Signing up does not guarantee admission/);
+  assert.match(landing, /The beta is not publicly listed/);
 });
 test('Historical marketing screenshots are explicitly identified as earlier captures', () => {
   assert.match(landing, /Genuine app captures · Earlier builds/);
-  assert.match(landing, /These screenshots show earlier Android builds and may not match the Build 141 interface exactly/);
-  assert.match(landing, /These genuine app captures are from earlier builds and may not match Build 141 exactly/);
+  assert.match(landing, /These screenshots show earlier Android builds and do not match the Beta 0\.35\.0 interface exactly/);
+  assert.match(landing, /These genuine app captures are from earlier builds and do not match the Beta 0\.35\.0 interface exactly/);
 });
 test('All same-page anchor links point to unique IDs', () => {
   const ids = [...landing.matchAll(/\bid="([^"]+)"/g)].map(x => x[1]);
@@ -53,5 +54,6 @@ test('Referenced local links and assets exist in the site source tree', () => {
 test('Closed testing keeps the existing external waitlist form and invitation caveat', () => {
   assert.match(closed, /1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/);
   assert.match(closed, /does not guarantee an invitation/);
-  assert.match(closed, /Google Play distribution is not yet confirmed/);
+  assert.match(closed, /uploaded to Google Play for testers and is not a public release/);
+  assert.match(closed, /href="\.\/#current-build"/);
 });
