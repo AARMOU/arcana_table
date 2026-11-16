@@ -1,0 +1,9 @@
+{
+  "key": "mutated-cultist",
+  "name": "Mutated Cultist",
+  "issue": 1066,
+  "source": "certification/MutatedCultistIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MutatedCultistIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
