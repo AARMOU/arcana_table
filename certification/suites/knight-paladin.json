@@ -1,0 +1,9 @@
+{
+  "key": "knight-paladin",
+  "name": "Knight Paladin",
+  "issue": 1048,
+  "source": "certification/KnightPaladinIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.KnightPaladinIndependentCertificationTest",
+  "tests": 5,
+  "target": "build"
+}
