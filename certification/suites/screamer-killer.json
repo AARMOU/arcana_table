@@ -1,0 +1,9 @@
+{
+  "key": "screamer-killer",
+  "name": "Screamer-Killer",
+  "issue": 1111,
+  "source": "certification/ScreamerKillerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ScreamerKillerIndependentCertificationTest",
+  "tests": 8,
+  "target": "build"
+}
