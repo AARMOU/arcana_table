@@ -22,6 +22,16 @@ test('goose tracker follows certification and exact-head approval, not green CI 
   assert.equal(state({...progressCard,kind:'engine'}),null);
   assert.equal(state({...progressCard,headSha:'bad'}),null);
 });
+test('Surge Conductor implementation green does not claim independent suite success',()=>{
+  const {state}=progressHelpers();
+  // #524 has green implementation CI, while the unmerged #535 suite has failed premerge.
+  // That suite runs on a different SHA and is not a trusted-main certificate on #524.
+  const card={...progressCard,pr:524,headSha:'671a593299294de0ae6d29916d5ca6f51bc3ff8d'};
+  assert.equal(state(card).step,1);
+  assert.equal(state(card).label,'Implementation tests passed · independent certification pending');
+  assert.match(state({...card,certification:'failed'}).label,/Independent certification failed/);
+  assert.match(state({...card,certification:'running'}).label,/Independent certification running/);
+});
 test('only a matching Android receipt reaches app ready; merged PRs and old receipts do not',()=>{
   const {state}=progressHelpers();
   const card={...progressCard,state:'approved',certification:'certified'};
